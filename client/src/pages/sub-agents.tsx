@@ -40,7 +40,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu, CheckCircle2, XCircle, AlertTriangle, Zap } from "lucide-react";
+import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu, CheckCircle2, XCircle, AlertTriangle, Zap, Lock } from "lucide-react";
 import { ModelSelector, providers } from "@/components/model-selector";
 import type { SubAgent } from "@shared/schema";
 
@@ -558,7 +558,10 @@ export default function SubAgentsPage() {
                             onValueChange={(v) => {
                               field.onChange(v);
                               const prov = providers.find(p => p.value === v);
-                              if (prov) form.setValue("llmModel", prov.defaultModel);
+                              if (prov) {
+                                form.setValue("llmModel", prov.defaultModel);
+                                form.setValue("llmApiKeyEnvVar", prov.keyName);
+                              }
                             }}
                             value={field.value || ""}
                           >
@@ -601,32 +604,26 @@ export default function SubAgentsPage() {
                       />
                     )}
 
-                    <FormField
-                      control={form.control}
-                      name="llmApiKeyEnvVar"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>API Key Secret Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              value={field.value || ""}
-                              placeholder={
-                                watchLlmProvider === "groq" ? "GROQ_API_KEY" :
-                                watchLlmProvider === "openai" ? "OPENAI_API_KEY" :
-                                watchLlmProvider === "anthropic" ? "ANTHROPIC_API_KEY" :
-                                "OPENROUTER_API_KEY"
-                              }
-                              data-testid="input-llm-api-key-env"
-                            />
-                          </FormControl>
-                          <FormDescription className="text-xs">
-                            The environment variable name holding the API key. Leave blank for the default.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {(() => {
+                      const defaultKeyName = providers.find(p => p.value === watchLlmProvider)?.keyName || "";
+                      return (
+                        <div className="rounded-md bg-muted/50 p-3 space-y-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">API Key</p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 bg-background rounded-md border px-3 py-1.5 flex-1">
+                              <Lock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm font-mono" data-testid="text-api-key-name">
+                                {form.watch("llmApiKeyEnvVar") || defaultKeyName || "Not configured"}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Uses the <span className="font-mono font-medium">{defaultKeyName}</span> secret already stored in your environment. No need to enter the key here.
+                          </p>
+                          <input type="hidden" {...form.register("llmApiKeyEnvVar")} />
+                        </div>
+                      );
+                    })()}
 
                     <FormField
                       control={form.control}

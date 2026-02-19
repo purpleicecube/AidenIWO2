@@ -1,21 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Loader2, ChevronsUpDown, Check, RefreshCw } from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, RefreshCw } from "lucide-react";
 
 interface ProviderModel {
   id: string;
@@ -48,8 +42,8 @@ export function ModelSelector({
   onChange: (val: string) => void;
   testIdPrefix?: string;
 }) {
-  const [open, setOpen] = useState(false);
   const [manualInput, setManualInput] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
 
   const { data: modelsData, isLoading, refetch, isFetching } = useQuery<ModelsResponse>({
     queryKey: ["/api/llm-settings/models", provider],
@@ -60,8 +54,19 @@ export function ModelSelector({
   const models = modelsData?.models || [];
   const keyConfigured = modelsData?.keyConfigured ?? false;
 
+  const filteredModels = useMemo(() => {
+    if (!searchFilter) return models;
+    const lower = searchFilter.toLowerCase();
+    return models.filter(m =>
+      m.id.toLowerCase().includes(lower) ||
+      m.name.toLowerCase().includes(lower) ||
+      (m.owned_by && m.owned_by.toLowerCase().includes(lower))
+    );
+  }, [models, searchFilter]);
+
   useEffect(() => {
     setManualInput(false);
+    setSearchFilter("");
   }, [provider]);
 
   if (!keyConfigured && !isLoading) {
@@ -113,56 +118,44 @@ export function ModelSelector({
 
   return (
     <div className="space-y-2">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between font-normal"
-            data-testid={`${testIdPrefix}button-select-model`}
-          >
-            <span className="truncate">
-              {value ? (models.find(m => m.id === value)?.name || value) : "Select a model..."}
-            </span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search models..." data-testid={`${testIdPrefix}input-model-search`} />
-            <CommandList className="max-h-[300px]">
-              <CommandEmpty>No model found.</CommandEmpty>
-              <CommandGroup>
-                {models.map((model) => (
-                  <CommandItem
-                    key={model.id}
-                    value={model.id}
-                    onSelect={(val) => {
-                      onChange(val);
-                      setOpen(false);
-                    }}
-                    data-testid={`${testIdPrefix}model-option-${model.id}`}
-                  >
-                    <Check className={`mr-2 h-4 w-4 ${value === model.id ? "opacity-100" : "opacity-0"}`} />
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-sm truncate">{model.name !== model.id ? model.name : model.id}</span>
-                      {model.name !== model.id && (
-                        <span className="text-xs text-muted-foreground font-mono truncate">{model.id}</span>
-                      )}
-                    </div>
-                    {model.contextWindow && (
-                      <span className="text-xs text-muted-foreground ml-2 shrink-0">
-                        {Math.round(model.contextWindow / 1000)}k ctx
-                      </span>
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger data-testid={`${testIdPrefix}button-select-model`}>
+          <SelectValue placeholder="Select a model..." />
+        </SelectTrigger>
+        <SelectContent>
+          {models.length > 10 && (
+            <div className="px-2 pb-2">
+              <Input
+                placeholder="Filter models..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="h-8 text-xs"
+                data-testid={`${testIdPrefix}input-model-search`}
+              />
+            </div>
+          )}
+          {filteredModels.length === 0 ? (
+            <div className="py-4 text-center text-sm text-muted-foreground">No models found.</div>
+          ) : (
+            filteredModels.map((model) => (
+              <SelectItem
+                key={model.id}
+                value={model.id}
+                data-testid={`${testIdPrefix}model-option-${model.id}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="truncate">{model.name !== model.id ? model.name : model.id}</span>
+                  {model.contextWindow && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {Math.round(model.contextWindow / 1000)}k ctx
+                    </span>
+                  )}
+                </div>
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
       <div className="flex items-center gap-2 flex-wrap">
         <Button
           type="button"
