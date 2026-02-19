@@ -152,7 +152,22 @@ _Auto-filed by Aiden on ${new Date().toISOString()}_
 function buildWorkProduct(order: WorkOrder, logs: ExecutionLog[]): string {
   const tier2 = (order.tier2Result as any) || {};
   const gcc = (order.gccMemory as any) || {};
-  const completionLog = logs.find(l => l.action === "Aiden: Resolution" || l.action === "Aiden: Workflow Completed");
+  const deliverable = tier2.output?.deliverable || null;
+  const summary = tier2.output?.message || "Work order completed successfully.";
+
+  const stepOutputs = logs
+    .filter(l => l.metadata && (l.metadata as any).output)
+    .map(l => {
+      const meta = l.metadata as any;
+      return meta.output?.deliverable || meta.output?.message || null;
+    })
+    .filter(Boolean);
+
+  const deliverableSection = deliverable
+    ? deliverable
+    : stepOutputs.length > 0
+      ? stepOutputs.join("\n\n---\n\n")
+      : `${summary}\n\n> _Enable LLM integration in Settings to get AI-generated deliverables with detailed, context-aware content._`;
 
   return `# Work Product: ${order.title}
 
@@ -165,8 +180,11 @@ function buildWorkProduct(order: WorkOrder, logs: ExecutionLog[]): string {
 | **Final Status** | ${order.status} |
 | **Completed** | ${gcc.completedAt || new Date().toISOString()} |
 
-## Result
-${tier2.output?.message || completionLog?.message || "Work order completed successfully."}
+---
+
+${deliverableSection}
+
+---
 
 ## Execution Path
 ${(gcc.breadcrumbs as string[] || []).map((b: string) => `- ${b.replace(/_/g, " ")}`).join("\n") || "- Direct execution"}

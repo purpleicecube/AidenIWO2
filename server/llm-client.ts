@@ -17,6 +17,7 @@ const tier2ResponseSchema = z.object({
   handler: z.string().nullable(),
   output: z.object({
     message: z.string(),
+    deliverable: z.string().optional(),
   }).optional(),
 });
 
@@ -101,7 +102,7 @@ async function callAnthropic(
 
   const response = await client.messages.create({
     model: settings.model,
-    max_tokens: 1024,
+    max_tokens: 4096,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],
   });
@@ -229,13 +230,23 @@ export async function runTier2WithLLM(
 
 Validate the schema and execute the work order. Decide if execution can proceed or if a BDM marker should be emitted.
 
+IMPORTANT: If not blocked, you MUST produce the actual deliverable — the real work product the user requested. For example:
+- If the work order asks to "draft an email", write the full email in the deliverable field.
+- If it asks to "create a deployment plan", write the full plan.
+- If it asks to "update documentation", write the actual documentation content.
+- If it asks to "investigate an incident", write the investigation report.
+The deliverable should be the complete, ready-to-use output — not just a summary or status message.
+
 Respond with ONLY a JSON object in this exact format:
 {
   "blocked": true/false,
   "reason": "explanation" or null if not blocked,
   "executionId": "exec_<unique_id>" or null if blocked,
   "handler": "${tier1Result.handler}",
-  "output": { "message": "result description" }
+  "output": {
+    "message": "brief one-line summary of what was produced",
+    "deliverable": "THE FULL WORK PRODUCT CONTENT HERE — the actual email, plan, report, documentation, etc. Use markdown formatting."
+  }
 }
 
 Work Order:
