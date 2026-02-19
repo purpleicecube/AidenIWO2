@@ -7,7 +7,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
   - **Aiden-controlled**: Aiden directly controls and executes through the sub-agent
   - **Independent**: Authorized human or AI operator executes independently
 - **System Admin**: A human who configures sub-agents, workflows, tools, and their assignments
-- **GCC Memory**: Shared context between tiers (routing context, correlation IDs, execution breadcrumbs)
+- **GCC Memory**: Shared context between tiers following the WS014 P_PODE command contract (COMMIT, BRANCH, MERGE, CONTEXT commands with gcc.* prefixed keys)
 - **BDM Markers**: Blocked Decision Markers emitted when work orders cannot proceed
 
 ## Architecture
