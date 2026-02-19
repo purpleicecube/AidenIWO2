@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun } from "@shared/schema";
 import { runTier1WithLLM, runTier2WithLLM, type Tier1Result, type Tier2Result } from "./llm-client";
+import { fileWorkOrderOutput } from "./workspace-filing";
 
 export async function processWorkOrder(orderId: string): Promise<WorkOrder | undefined> {
   const order = await storage.getWorkOrder(orderId);
@@ -193,7 +194,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     metadata: { finalStatus: "completed" },
   });
 
-  return storage.updateWorkOrder(orderId, {
+  const completedOrder = await storage.updateWorkOrder(orderId, {
     status: "completed",
     tier2Result,
     gccMemory: {
@@ -204,6 +205,14 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       breadcrumbs: ["tier1_policy_pass", "tier2_schema_valid", "tier2_execution_complete", "aiden_resolution"],
     },
   });
+
+  if (completedOrder) {
+    fileWorkOrderOutput(completedOrder).catch(err =>
+      console.error("Auto-filing error:", err.message)
+    );
+  }
+
+  return completedOrder;
 }
 
 function findSubAgent(agents: SubAgent[], handler: string | null): SubAgent | undefined {
@@ -363,7 +372,7 @@ export async function advanceWorkflowExecution(executionId: string) {
         completedAt: new Date(),
       });
       if (execution.workOrderId) {
-        await storage.updateWorkOrder(execution.workOrderId, {
+        const completedOrder = await storage.updateWorkOrder(execution.workOrderId, {
           status: "completed",
           gccMemory: {
             ...((await storage.getWorkOrder(execution.workOrderId))?.gccMemory as object || {}),
@@ -379,6 +388,11 @@ export async function advanceWorkflowExecution(executionId: string) {
           message: `All ${steps.length} workflow steps completed successfully.`,
           metadata: { executionId },
         });
+        if (completedOrder) {
+          fileWorkOrderOutput(completedOrder).catch(err =>
+            console.error("Auto-filing error (workflow):", err.message)
+          );
+        }
       }
     }
 
