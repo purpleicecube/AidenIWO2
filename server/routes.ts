@@ -840,37 +840,68 @@ export async function registerRoutes(
         return res.status(503).json({ message: `API key (${keyName}) is not configured. Please add it in Aiden Settings.` });
       }
 
-      const [workOrders, subAgents, stats, workflows] = await Promise.all([
+      const [workOrders, subAgents, stats, workflows, workflowExecutions, tools, rootFolders, rootArtifacts, sandboxSessions] = await Promise.all([
         storage.getWorkOrders(),
         storage.getSubAgents(),
         storage.getWorkOrderStats(),
         storage.getWorkflowTemplates(),
+        storage.getWorkflowExecutions(),
+        storage.getTools(),
+        storage.getArtifactFolders(null),
+        storage.getArtifacts(null),
+        storage.getSandboxSessions(),
       ]);
 
-      const recentOrders = workOrders.slice(0, 20);
-      const systemContext = `== CURRENT SYSTEM STATE ==
+      const recentOrders = workOrders.slice(0, 25);
+      const activeExecutions = workflowExecutions.filter(e => e.status === "running" || e.status === "pending");
+      const recentExecutions = workflowExecutions.slice(0, 10);
 
-Work Order Statistics:
-- Total: ${stats.total}
-- Pending: ${stats.pending}
-- Processing: ${stats.processing}
-- Completed: ${stats.completed}
-- Blocked: ${stats.blocked}
-- Failed: ${stats.failed}
+      const subAgentToolDetails = await Promise.all(
+        subAgents.map(async (a) => {
+          const agentTools = await storage.getSubAgentTools(a.id);
+          return { agent: a, tools: agentTools };
+        })
+      );
 
-Recent Work Orders (last 20):
-${recentOrders.map(o => `- [${o.status}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, id: ${o.id})`).join("\n") || "None"}
+      const systemContext = `== AIDEN GLOBAL ENVIRONMENT BRIEFING ==
 
-Registered Sub-Agents:
-${subAgents.map(a => `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.description ? `, desc: ${a.description}` : ""})`).join("\n") || "None configured"}
+=== WORK ORDER OVERVIEW ===
+Statistics:
+- Total: ${stats.total} | Pending: ${stats.pending} | Processing: ${stats.processing}
+- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed}
 
-Workflow Templates:
-${workflows.map(w => `- "${w.name}" (status: ${w.status}${w.description ? `, desc: ${w.description}` : ""})`).join("\n") || "None configured"}
+All Work Orders (${workOrders.length} total):
+${recentOrders.map(o => `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""})`).join("\n") || "No work orders"}
+${workOrders.length > 25 ? `... and ${workOrders.length - 25} more work orders` : ""}
 
-LLM Configuration:
+=== SUB-AGENTS (TIER 2 WORKERS) ===
+${subAgentToolDetails.map(({ agent: a, tools: t }) => `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${a.description ? `, desc: ${a.description}` : ""})${t.length > 0 ? `\n  Tools: ${t.map(at => at.tool.name).join(", ")}` : ""}`).join("\n") || "No sub-agents configured"}
+
+=== WORKFLOW TEMPLATES ===
+${workflows.map(w => `- "${w.name}" (status: ${w.status}, category: ${w.category}${w.description ? `, desc: ${w.description}` : ""}${w.goal ? `, goal: ${w.goal}` : ""})`).join("\n") || "No workflow templates"}
+
+=== WORKFLOW EXECUTIONS ===
+Active: ${activeExecutions.length}
+${recentExecutions.map(e => `- [${e.status.toUpperCase()}] template: ${e.templateId}, work order: ${e.workOrderId || "none"}, started: ${e.startedAt || "not started"}${e.completedAt ? `, completed: ${e.completedAt}` : ""}`).join("\n") || "No executions"}
+${workflowExecutions.length > 10 ? `... and ${workflowExecutions.length - 10} more executions` : ""}
+
+=== TOOLS PLATFORM ===
+${tools.map(t => `- "${t.name}" (type: ${t.type}, status: ${t.status}, version: ${t.version}${t.description ? `, desc: ${t.description}` : ""})`).join("\n") || "No tools registered"}
+
+=== WORKSPACE (FILE SYSTEM) ===
+Root Folders:
+${rootFolders.map(f => `- /${f.name}${f.description ? ` — ${f.description}` : ""}`).join("\n") || "No folders"}
+Root Files:
+${rootArtifacts.map(a => `- ${a.name} (${a.mimeType}, ${a.size} bytes, status: ${a.status})`).join("\n") || "No root files"}
+
+=== SANDBOX SESSIONS ===
+${sandboxSessions.map(s => `- "${s.name}" (status: ${s.status}, created: ${s.createdAt}${s.description ? `, desc: ${s.description}` : ""})`).join("\n") || "No sandbox sessions"}
+
+=== LLM CONFIGURATION ===
 - Provider: ${settings.provider}
 - Model: ${settings.model}
-- Status: Enabled`;
+- Status: Enabled
+- Timestamp: ${new Date().toISOString()}`;
 
       const conversationHistory = history.slice(-10);
 
