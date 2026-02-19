@@ -1,6 +1,6 @@
 import { storage } from "./storage";
 import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun } from "@shared/schema";
-import { runTier1WithLLM, runTier2WithLLM, type Tier1Result, type Tier2Result } from "./llm-client";
+import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
 
 export async function processWorkOrder(orderId: string): Promise<WorkOrder | undefined> {
@@ -126,16 +126,20 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     });
   }
 
-  const tier2Result: Tier2Result = useLLM && settings
-    ? await runTier2WithLLM(settings, order, tier1Result)
+  const effectiveLlmConfig = resolveSubAgentLlmConfig(targetSubAgent, settings);
+  const hasLlm = !!effectiveLlmConfig;
+  const llmSource = effectiveLlmConfig?.source || "none";
+
+  const tier2Result: Tier2Result = hasLlm && settings
+    ? await runTier2WithLLM(settings, order, tier1Result, effectiveLlmConfig)
     : runTier2Execution(order, tier1Result);
 
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 2,
     action: "Sub-Agent: Schema Validation",
-    message: `Sub-agent${targetSubAgent ? ` "${targetSubAgent.name}"` : ""} validated work order schema${useLLM ? " via Aiden" : ""}.`,
-    metadata: { valid: true, subAgentName: targetSubAgent?.name },
+    message: `Sub-agent${targetSubAgent ? ` "${targetSubAgent.name}"` : ""} validated work order schema${hasLlm ? ` via LLM (${llmSource}: ${effectiveLlmConfig?.model})` : ""}.`,
+    metadata: { valid: true, subAgentName: targetSubAgent?.name, llmSource, llmModel: effectiveLlmConfig?.model },
   });
 
   if (tier2Result.blocked) {
@@ -182,7 +186,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     workOrderId: orderId,
     tier: 2,
     action: "Sub-Agent: Execution Complete",
-    message: `Sub-agent${targetSubAgent ? ` "${targetSubAgent.name}"` : ""} executed work order successfully${useLLM ? " (Aiden-controlled)" : ""}.`,
+    message: `Sub-agent${targetSubAgent ? ` "${targetSubAgent.name}"` : ""} executed work order successfully${hasLlm ? ` (${llmSource} LLM: ${effectiveLlmConfig?.model})` : ""}.`,
     metadata: tier2Result,
   });
 

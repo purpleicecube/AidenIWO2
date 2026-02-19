@@ -3,6 +3,78 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { LlmSettings, WorkOrder, SubAgent } from "@shared/schema";
 import { z } from "zod";
 
+export interface EffectiveLlmConfig {
+  provider: string;
+  model: string;
+  baseUrl: string | null;
+  systemPrompt: string;
+  apiKeyEnvVar: string;
+  source: "sub-agent" | "global";
+  subAgentName?: string;
+}
+
+export function resolveSubAgentLlmConfig(
+  subAgent: SubAgent | null | undefined,
+  globalSettings: LlmSettings | undefined
+): EffectiveLlmConfig | null {
+  if (subAgent?.llmEnabled && subAgent.llmProvider && subAgent.llmModel) {
+    const defaultKeyMap: Record<string, string> = {
+      openai: "OPENAI_API_KEY",
+      anthropic: "ANTHROPIC_API_KEY",
+      openrouter: "OPENROUTER_API_KEY",
+      groq: "GROQ_API_KEY",
+    };
+
+    const apiKeyEnvVar = subAgent.llmApiKeyEnvVar || defaultKeyMap[subAgent.llmProvider] || "OPENAI_API_KEY";
+    const apiKey = process.env[apiKeyEnvVar];
+    if (!apiKey) {
+      console.warn(`Sub-agent "${subAgent.name}" LLM key ${apiKeyEnvVar} not found, falling back to global.`);
+    } else {
+      const defaultPrompt = `You are a Tier 2 sub-agent named "${subAgent.name}" (type: ${subAgent.type}). You execute work orders and produce deliverables as directed by Aiden, the Tier 1 orchestration manager.${subAgent.description ? ` Your specialization: ${subAgent.description}` : ""}\n\nProduce high-quality, complete deliverables. Use markdown formatting.`;
+
+      return {
+        provider: subAgent.llmProvider,
+        model: subAgent.llmModel,
+        baseUrl: subAgent.llmBaseUrl || null,
+        systemPrompt: subAgent.llmSystemPrompt || defaultPrompt,
+        apiKeyEnvVar,
+        source: "sub-agent",
+        subAgentName: subAgent.name,
+      };
+    }
+  }
+
+  if (globalSettings?.enabled) {
+    const globalKeyMap: Record<string, string> = {
+      openai: "OPENAI_API_KEY",
+      anthropic: "ANTHROPIC_API_KEY",
+      openrouter: "OPENROUTER_API_KEY",
+      groq: "GROQ_API_KEY",
+    };
+    return {
+      provider: globalSettings.provider,
+      model: globalSettings.model,
+      baseUrl: globalSettings.baseUrl,
+      systemPrompt: globalSettings.systemPrompt,
+      apiKeyEnvVar: globalKeyMap[globalSettings.provider] || "OPENAI_API_KEY",
+      source: "global",
+    };
+  }
+
+  return null;
+}
+
+export function effectiveConfigToSettings(config: EffectiveLlmConfig): LlmSettings {
+  return {
+    id: "effective",
+    provider: config.provider,
+    model: config.model,
+    baseUrl: config.baseUrl,
+    systemPrompt: config.systemPrompt,
+    enabled: true,
+  };
+}
+
 const tier1ResponseSchema = z.object({
   approved: z.boolean(),
   reason: z.string(),
@@ -66,10 +138,11 @@ function getApiKey(envVar: string): string {
 
 async function callOpenAICompatible(
   settings: LlmSettings,
-  messages: Array<{ role: string; content: string }>
+  messages: Array<{ role: string; content: string }>,
+  apiKeyEnvVarOverride?: string
 ): Promise<string> {
   const config = getProviderConfig(settings);
-  const apiKey = getApiKey(config.apiKeyEnvVar);
+  const apiKey = getApiKey(apiKeyEnvVarOverride || config.apiKeyEnvVar);
 
   const client = new OpenAI({
     apiKey,
@@ -94,9 +167,10 @@ async function callOpenAICompatible(
 async function callAnthropic(
   settings: LlmSettings,
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  apiKeyOverride?: string
 ): Promise<string> {
-  const apiKey = getApiKey("ANTHROPIC_API_KEY");
+  const apiKey = getApiKey(apiKeyOverride || "ANTHROPIC_API_KEY");
 
   const client = new Anthropic({
     apiKey,
@@ -113,15 +187,15 @@ async function callAnthropic(
   return textBlock?.text || "{}";
 }
 
-async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage: string): Promise<string> {
+async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage: string, apiKeyEnvVarOverride?: string): Promise<string> {
   if (settings.provider === "anthropic") {
-    return callAnthropic(settings, systemPrompt, userMessage);
+    return callAnthropic(settings, systemPrompt, userMessage, apiKeyEnvVarOverride);
   }
 
   return callOpenAICompatible(settings, [
     { role: "system", content: systemPrompt },
     { role: "user", content: userMessage },
-  ]);
+  ], apiKeyEnvVarOverride);
 }
 
 export async function chatWithAiden(
@@ -226,9 +300,18 @@ Work Order:
 export async function runTier2WithLLM(
   settings: LlmSettings,
   order: WorkOrder,
-  tier1Result: Tier1Result
+  tier1Result: Tier1Result,
+  effectiveConfig?: EffectiveLlmConfig | null
 ): Promise<Tier2Result> {
-  const prompt = `You are Aiden, controlling a Tier 2 sub-agent. The work order has passed your Tier 1 policy gate and was routed to handler "${tier1Result.handler}".
+  const useConfig = effectiveConfig || null;
+  const effectiveSettings = useConfig ? effectiveConfigToSettings(useConfig) : settings;
+  const effectiveSystemPrompt = useConfig ? useConfig.systemPrompt : settings.systemPrompt;
+  const effectiveApiKey = useConfig ? useConfig.apiKeyEnvVar : undefined;
+  const agentLabel = useConfig?.source === "sub-agent"
+    ? `You are "${useConfig.subAgentName}", a specialized Tier 2 sub-agent.`
+    : `You are Aiden, controlling a Tier 2 sub-agent.`;
+
+  const prompt = `${agentLabel} The work order has passed the Tier 1 policy gate and was routed to handler "${tier1Result.handler}".
 
 Validate the schema and execute the work order. Decide if execution can proceed or if a BDM marker should be emitted.
 
@@ -268,7 +351,7 @@ Work Order:
 - Handler: ${tier1Result.handler}`;
 
   try {
-    const raw = await callLLM(settings, settings.systemPrompt, prompt);
+    const raw = await callLLM(effectiveSettings, effectiveSystemPrompt, prompt, effectiveApiKey);
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
     return tier2ResponseSchema.parse(parsed);

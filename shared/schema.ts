@@ -12,6 +12,12 @@ export const subAgents = pgTable("sub_agents", {
   status: text("status").notNull().default("active"),
   capabilities: jsonb("capabilities").default(sql`'[]'::jsonb`),
   description: text("description"),
+  llmEnabled: boolean("llm_enabled").default(false),
+  llmProvider: text("llm_provider"),
+  llmModel: text("llm_model"),
+  llmBaseUrl: text("llm_base_url"),
+  llmSystemPrompt: text("llm_system_prompt"),
+  llmApiKeyEnvVar: text("llm_api_key_env_var"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

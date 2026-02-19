@@ -91,6 +91,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - **System Prompt**: Configurable via Settings page, defines Aiden's behavior as Tier 1 manager
 - **Fallback**: When LLM is disabled or fails, hardcoded orchestration rules are used
 - **Structured Output**: LLM responses are parsed with Zod schemas for Tier1Result/Tier2Result
+- **Per-Sub-Agent LLM**: Each sub-agent can have its own LLM configuration (provider, model, API key, system prompt) for Tier 2 execution. When enabled, the sub-agent uses its own model instead of Aiden's global settings. Falls back to global if sub-agent key is missing or LLM is disabled. Configured via the Sub-Agents page with fields: llmEnabled, llmProvider, llmModel, llmBaseUrl, llmSystemPrompt, llmApiKeyEnvVar.
 
 ## Orchestration Flow
 1. Work order submitted via API

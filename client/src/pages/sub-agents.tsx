@@ -31,10 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck } from "lucide-react";
+import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu } from "lucide-react";
 import type { SubAgent } from "@shared/schema";
 
 const subAgentFormSchema = z.object({
@@ -44,7 +45,19 @@ const subAgentFormSchema = z.object({
   assignedTo: z.string().nullable().optional(),
   status: z.string().min(1, "Status is required"),
   description: z.string().nullable().optional(),
-});
+  llmEnabled: z.boolean().optional().default(false),
+  llmProvider: z.string().nullable().optional(),
+  llmModel: z.string().nullable().optional(),
+  llmBaseUrl: z.string().nullable().optional(),
+  llmSystemPrompt: z.string().nullable().optional(),
+  llmApiKeyEnvVar: z.string().nullable().optional(),
+}).refine(
+  (data) => !data.llmEnabled || (data.llmProvider && data.llmProvider.length > 0),
+  { message: "Provider is required when LLM is enabled", path: ["llmProvider"] }
+).refine(
+  (data) => !data.llmEnabled || (data.llmModel && data.llmModel.length > 0),
+  { message: "Model is required when LLM is enabled", path: ["llmModel"] }
+);
 
 type SubAgentForm = z.infer<typeof subAgentFormSchema>;
 
@@ -97,6 +110,14 @@ function AgentCard({ agent, onEdit, onDelete }: { agent: SubAgent; onEdit: (a: S
                     </>
                   )}
                 </div>
+                {agent.llmEnabled && agent.llmProvider && (
+                  <div className="flex items-center gap-1.5 text-xs" data-testid={`llm-indicator-${agent.id}`}>
+                    <Cpu className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
+                    <span className="text-cyan-600 dark:text-cyan-400 font-medium">
+                      {agent.llmProvider}/{agent.llmModel}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -133,10 +154,18 @@ export default function SubAgentsPage() {
       assignedTo: null,
       status: "active",
       description: null,
+      llmEnabled: false,
+      llmProvider: null,
+      llmModel: null,
+      llmBaseUrl: null,
+      llmSystemPrompt: null,
+      llmApiKeyEnvVar: null,
     },
   });
 
   const watchControlMode = form.watch("controlMode");
+  const watchLlmEnabled = form.watch("llmEnabled");
+  const watchLlmProvider = form.watch("llmProvider");
 
   const createMutation = useMutation({
     mutationFn: (values: SubAgentForm) =>
@@ -187,6 +216,12 @@ export default function SubAgentsPage() {
       assignedTo: null,
       status: "active",
       description: null,
+      llmEnabled: false,
+      llmProvider: null,
+      llmModel: null,
+      llmBaseUrl: null,
+      llmSystemPrompt: null,
+      llmApiKeyEnvVar: null,
     });
     setDialogOpen(true);
   }
@@ -200,6 +235,12 @@ export default function SubAgentsPage() {
       assignedTo: agent.assignedTo,
       status: agent.status,
       description: agent.description,
+      llmEnabled: agent.llmEnabled ?? false,
+      llmProvider: agent.llmProvider,
+      llmModel: agent.llmModel,
+      llmBaseUrl: agent.llmBaseUrl,
+      llmSystemPrompt: agent.llmSystemPrompt,
+      llmApiKeyEnvVar: agent.llmApiKeyEnvVar,
     });
     setDialogOpen(true);
   }
@@ -265,7 +306,7 @@ export default function SubAgentsPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingAgent ? "Edit Sub-Agent" : "Create Sub-Agent"}</DialogTitle>
           </DialogHeader>
@@ -406,6 +447,163 @@ export default function SubAgentsPage() {
                   </FormItem>
                 )}
               />
+
+              <div className="border rounded-md p-4 space-y-4">
+                <FormField
+                  control={form.control}
+                  name="llmEnabled"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-medium">Independent LLM</FormLabel>
+                        <FormDescription className="text-xs">
+                          Give this sub-agent its own LLM for Tier 2 execution instead of using Aiden's global model.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-llm-enabled"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {watchLlmEnabled && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="llmProvider"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Provider</FormLabel>
+                            <Select
+                              onValueChange={(v) => {
+                                field.onChange(v);
+                                const defaultModels: Record<string, string> = {
+                                  groq: "llama-3.3-70b-versatile",
+                                  openai: "gpt-4o",
+                                  anthropic: "claude-sonnet-4-20250514",
+                                  openrouter: "openai/gpt-4o",
+                                };
+                                form.setValue("llmModel", defaultModels[v] || "");
+                              }}
+                              value={field.value || ""}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-llm-provider">
+                                  <SelectValue placeholder="Select provider" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="groq">Groq</SelectItem>
+                                <SelectItem value="openai">OpenAI</SelectItem>
+                                <SelectItem value="anthropic">Anthropic</SelectItem>
+                                <SelectItem value="openrouter">OpenRouter</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="llmModel"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Model</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder={
+                                  watchLlmProvider === "groq" ? "llama-3.3-70b-versatile" :
+                                  watchLlmProvider === "openai" ? "gpt-4o" :
+                                  watchLlmProvider === "anthropic" ? "claude-sonnet-4-20250514" :
+                                  "model-name"
+                                }
+                                data-testid="input-llm-model"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="llmApiKeyEnvVar"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>API Key Secret Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ""}
+                              placeholder={
+                                watchLlmProvider === "groq" ? "GROQ_API_KEY" :
+                                watchLlmProvider === "openai" ? "OPENAI_API_KEY" :
+                                watchLlmProvider === "anthropic" ? "ANTHROPIC_API_KEY" :
+                                "OPENROUTER_API_KEY"
+                              }
+                              data-testid="input-llm-api-key-env"
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                            The environment variable name holding the API key. Leave blank for the default.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="llmBaseUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Base URL (optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Custom API endpoint (leave blank for default)"
+                              data-testid="input-llm-base-url"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="llmSystemPrompt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>System Prompt (optional)</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Custom instructions for this sub-agent's LLM. Leave blank for auto-generated prompt based on the agent's name and type."
+                              className="resize-none text-xs"
+                              rows={3}
+                              data-testid="input-llm-system-prompt"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+              </div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
