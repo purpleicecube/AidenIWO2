@@ -12,7 +12,7 @@ import {
   insertSubAgentToolSchema,
 } from "@shared/schema";
 import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
-import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection } from "./llm-client";
+import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels } from "./llm-client";
 
 const startTime = Date.now();
 
@@ -253,6 +253,17 @@ export async function registerRoutes(
       });
     } catch (err) {
       res.status(500).json({ message: "Failed to update LLM settings" });
+    }
+  });
+
+  app.get("/api/llm-settings/models/:provider", async (req, res) => {
+    try {
+      const { provider } = req.params;
+      const keyConfigured = isApiKeyConfigured(provider);
+      const models = await fetchAvailableModels(provider);
+      res.json({ provider, keyConfigured, models });
+    } catch (err: any) {
+      res.status(500).json({ provider: req.params.provider, keyConfigured: false, models: [], error: err.message });
     }
   });
 

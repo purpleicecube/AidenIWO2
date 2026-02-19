@@ -260,3 +260,70 @@ export function isApiKeyConfigured(provider: string): boolean {
   const envVar = getRequiredApiKeyName(provider);
   return !!process.env[envVar];
 }
+
+export interface ProviderModel {
+  id: string;
+  name: string;
+  contextWindow?: number;
+  owned_by?: string;
+}
+
+export async function fetchAvailableModels(provider: string): Promise<ProviderModel[]> {
+  const keyName = getRequiredApiKeyName(provider);
+  const apiKey = process.env[keyName];
+  if (!apiKey) {
+    return [];
+  }
+
+  try {
+    if (provider === "anthropic") {
+      return [
+        { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", contextWindow: 200000 },
+        { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", contextWindow: 200000 },
+        { id: "claude-opus-4-20250514", name: "Claude Opus 4", contextWindow: 200000 },
+        { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", contextWindow: 200000 },
+        { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", contextWindow: 200000 },
+        { id: "claude-3-opus-20240229", name: "Claude 3 Opus", contextWindow: 200000 },
+      ];
+    }
+
+    if (provider === "openrouter") {
+      const res = await fetch("https://openrouter.ai/api/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.data || [])
+        .filter((m: any) => m.id)
+        .map((m: any) => ({
+          id: m.id,
+          name: m.name || m.id,
+          contextWindow: m.context_length,
+          owned_by: m.id.split("/")[0],
+        }))
+        .slice(0, 200);
+    }
+
+    const baseURLMap: Record<string, string> = {
+      openai: "https://api.openai.com/v1",
+      groq: "https://api.groq.com/openai/v1",
+    };
+
+    const baseURL = baseURLMap[provider] || "https://api.openai.com/v1";
+    const client = new OpenAI({ apiKey, baseURL });
+    const list = await client.models.list();
+    const models: ProviderModel[] = [];
+    for await (const m of list) {
+      models.push({
+        id: m.id,
+        name: m.id,
+        owned_by: m.owned_by,
+      });
+    }
+    models.sort((a, b) => a.id.localeCompare(b.id));
+    return models;
+  } catch (err: any) {
+    console.error(`Failed to fetch models for ${provider}:`, err.message);
+    return [];
+  }
+}
