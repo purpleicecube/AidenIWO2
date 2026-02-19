@@ -7,7 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +40,9 @@ import {
   RefreshCw,
   XCircle,
   CircleAlert,
+  Pencil,
+  Save,
+  X,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
 import { useState } from "react";
@@ -208,6 +213,44 @@ export default function WorkOrderDetail() {
     },
   });
 
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editType, setEditType] = useState("");
+  const [editPriority, setEditPriority] = useState("");
+
+  const startEditing = () => {
+    if (!order) return;
+    setEditTitle(order.title);
+    setEditDescription(order.description);
+    setEditType(order.type);
+    setEditPriority(order.priority);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("PUT", `/api/work-orders/${params.id}`, {
+        title: editTitle,
+        description: editDescription,
+        type: editType,
+        priority: editPriority,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      setEditing(false);
+      toast({ title: "Saved", description: "Work order updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save changes.", variant: "destructive" });
+    },
+  });
+
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [closeReason, setCloseReason] = useState("");
 
@@ -293,16 +336,25 @@ export default function WorkOrderDetail() {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Link href="/work-orders">
             <Button variant="ghost" size="icon" data-testid="button-back">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight" data-testid="text-order-title">
-              {order.title}
-            </h1>
+          <div className="min-w-0 flex-1">
+            {editing ? (
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="text-xl font-semibold"
+                data-testid="input-edit-title"
+              />
+            ) : (
+              <h1 className="text-xl font-semibold tracking-tight" data-testid="text-order-title">
+                {order.title}
+              </h1>
+            )}
             <div className="flex items-center gap-2 mt-1">
               <button
                 onClick={copyCorrelationId}
@@ -316,60 +368,89 @@ export default function WorkOrderDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {(order.status === "pending") && (
-            <Button
-              onClick={() => processMutation.mutate()}
-              disabled={processMutation.isPending}
-              data-testid="button-process"
-            >
-              {processMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Play className="w-4 h-4 mr-2" />
-              )}
-              {processMutation.isPending ? "Processing..." : "Process"}
-            </Button>
-          )}
-          {order.status === "blocked" && order.bdmMarker && (
+          {editing ? (
             <>
               <Button
-                onClick={() => reissueMutation.mutate()}
-                disabled={reissueMutation.isPending}
-                data-testid="button-reissue"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending || editTitle.trim().length === 0}
+                data-testid="button-save-edit"
               >
-                {reissueMutation.isPending ? (
+                {saveMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                  <Save className="w-4 h-4 mr-2" />
                 )}
-                {reissueMutation.isPending ? "Re-issuing..." : "Re-issue to Aiden"}
+                {saveMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setCloseReason("");
-                  setCloseDialogOpen(true);
-                }}
-                data-testid="button-close-order"
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Close Without Output
+              <Button variant="outline" onClick={cancelEditing} data-testid="button-cancel-edit">
+                <X className="w-4 h-4 mr-2" />
+                Cancel
               </Button>
             </>
-          )}
-          {order.status === "failed" && (
-            <Button
-              onClick={() => retryMutation.mutate()}
-              disabled={retryMutation.isPending}
-              data-testid="button-retry"
-            >
-              {retryMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <RotateCcw className="w-4 h-4 mr-2" />
+          ) : (
+            <>
+              {order.status !== "completed" && order.status !== "processing" && (
+                <Button variant="outline" onClick={startEditing} data-testid="button-edit">
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
               )}
-              {retryMutation.isPending ? "Retrying..." : "Retry"}
-            </Button>
+              {(order.status === "pending") && (
+                <Button
+                  onClick={() => processMutation.mutate()}
+                  disabled={processMutation.isPending}
+                  data-testid="button-process"
+                >
+                  {processMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4 mr-2" />
+                  )}
+                  {processMutation.isPending ? "Processing..." : "Process"}
+                </Button>
+              )}
+              {order.status === "blocked" && order.bdmMarker && (
+                <>
+                  <Button
+                    onClick={() => reissueMutation.mutate()}
+                    disabled={reissueMutation.isPending}
+                    data-testid="button-reissue"
+                  >
+                    {reissueMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    {reissueMutation.isPending ? "Re-issuing..." : "Re-issue to Aiden"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCloseReason("");
+                      setCloseDialogOpen(true);
+                    }}
+                    data-testid="button-close-order"
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Close Without Output
+                  </Button>
+                </>
+              )}
+              {order.status === "failed" && (
+                <Button
+                  onClick={() => retryMutation.mutate()}
+                  disabled={retryMutation.isPending}
+                  data-testid="button-retry"
+                >
+                  {retryMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                  )}
+                  {retryMutation.isPending ? "Retrying..." : "Retry"}
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -428,7 +509,16 @@ export default function WorkOrderDetail() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Description</p>
-                <p className="text-sm" data-testid="text-order-description">{order.description}</p>
+                {editing ? (
+                  <Textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="min-h-[120px] text-sm"
+                    data-testid="input-edit-description"
+                  />
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap" data-testid="text-order-description">{order.description}</p>
+                )}
               </div>
 
               {order.status === "blocked" && order.bdmMarker && (
@@ -512,12 +602,40 @@ export default function WorkOrderDetail() {
               <Separator />
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Priority</p>
-                <PriorityBadge priority={order.priority} />
+                {editing ? (
+                  <Select value={editPriority} onValueChange={setEditPriority}>
+                    <SelectTrigger data-testid="select-edit-priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <PriorityBadge priority={order.priority} />
+                )}
               </div>
               <Separator />
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Type</p>
-                <p className="text-sm capitalize" data-testid="text-order-type">{order.type}</p>
+                {editing ? (
+                  <Select value={editType} onValueChange={setEditType}>
+                    <SelectTrigger data-testid="select-edit-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="investigation">Investigation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm capitalize" data-testid="text-order-type">{order.type}</p>
+                )}
               </div>
               <Separator />
               <div>

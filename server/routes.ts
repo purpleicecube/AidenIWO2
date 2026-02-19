@@ -98,6 +98,30 @@ export async function registerRoutes(
     }
   });
 
+  const updateWorkOrderSchema = z.object({
+    title: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    type: z.string().optional(),
+    priority: z.string().optional(),
+  });
+
+  app.put("/api/work-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      const parsed = updateWorkOrderSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
+      }
+      const updated = await storage.updateWorkOrder(req.params.id, parsed.data);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update work order" });
+    }
+  });
+
   app.get("/api/work-orders/:id/logs", async (req, res) => {
     try {
       const logs = await storage.getExecutionLogs(req.params.id);
