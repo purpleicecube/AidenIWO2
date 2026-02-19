@@ -468,7 +468,20 @@ export async function fetchAvailableModels(provider: string): Promise<ProviderMo
     const client = new OpenAI({ apiKey, baseURL });
     const list = await client.models.list();
     const models: ProviderModel[] = [];
+
+    const nonChatPatterns = [
+      "whisper",
+      "llama-guard",
+      "llama-prompt-guard",
+      "safeguard",
+      "orpheus",
+    ];
+
     for await (const m of list) {
+      if (provider === "groq") {
+        const lower = m.id.toLowerCase();
+        if (nonChatPatterns.some(p => lower.includes(p))) continue;
+      }
       models.push({
         id: m.id,
         name: m.id,

@@ -131,7 +131,7 @@ export function ModelSelector({
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
           <Command>
             <CommandInput placeholder="Search models..." data-testid={`${testIdPrefix}input-model-search`} />
-            <CommandList>
+            <CommandList className="max-h-[300px]">
               <CommandEmpty>No model found.</CommandEmpty>
               <CommandGroup>
                 {models.map((model) => (
