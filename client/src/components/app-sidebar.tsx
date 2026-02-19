@@ -1,4 +1,4 @@
-import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain, Bot, GitBranch, Wrench } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -61,6 +61,29 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Environments</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/workspace"} data-testid="link-nav-workspace">
+                  <Link href="/workspace">
+                    <FolderOpen className="w-4 h-4" />
+                    <span>Workspace</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/sandbox"} data-testid="link-nav-sandbox">
+                  <Link href="/sandbox">
+                    <FlaskConical className="w-4 h-4" />
+                    <span>Sandbox</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

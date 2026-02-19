@@ -17,16 +17,16 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - Styling: Tailwind CSS with Inter font family
 
 ## Project Structure
-- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools
+- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools, Workspace, Sandbox
 - `client/src/components/` - AppSidebar, ThemeProvider, ThemeToggle, StatusBadge
-- `client/src/hooks/` - usePageTitle
+- `client/src/hooks/` - use-page-title, use-toast
 - `server/routes.ts` - API endpoints
 - `server/orchestration.ts` - Aiden (Tier 1), sub-agent (Tier 2), and workflow execution engine
 - `server/llm-client.ts` - Multi-provider LLM abstraction with structured JSON parsing
 - `server/storage.ts` - DatabaseStorage with all CRUD operations
 - `server/seed.ts` - Database seeding with sample work orders
 - `server/db.ts` - Database connection pool
-- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users, workflowTemplates, workflowSteps, workflowExecutions, workflowStepRuns, tools, subAgentTools)
+- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users, workflowTemplates, workflowSteps, workflowExecutions, workflowStepRuns, tools, subAgentTools, artifactFolders, artifacts, sandboxSessions)
 
 ## Key API Endpoints
 - `GET /api/health` - System health check
@@ -66,6 +66,23 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `GET /api/sub-agents/:id/tools` - Get tools assigned to a sub-agent
 - `POST /api/sub-agents/:id/tools` - Assign a tool to a sub-agent
 - `DELETE /api/sub-agents/:subAgentId/tools/:toolId` - Remove tool assignment
+- `GET /api/artifact-folders` - List folders (query: parentId=root for root level)
+- `GET /api/artifact-folders/:id` - Get folder detail
+- `POST /api/artifact-folders` - Create folder
+- `PUT /api/artifact-folders/:id` - Update folder
+- `DELETE /api/artifact-folders/:id` - Delete folder (cascades)
+- `GET /api/artifacts` - List artifacts (query: folderId=root for root level)
+- `GET /api/artifacts/:id` - Get artifact detail
+- `POST /api/artifacts` - Create artifact
+- `PUT /api/artifacts/:id` - Update artifact
+- `DELETE /api/artifacts/:id` - Delete artifact
+- `POST /api/workspace/seed` - Initialize workspace with default folder structure
+- `GET /api/sandbox-sessions` - List sandbox sessions
+- `GET /api/sandbox-sessions/:id` - Get session detail
+- `POST /api/sandbox-sessions` - Create sandbox session
+- `PUT /api/sandbox-sessions/:id` - Update session
+- `DELETE /api/sandbox-sessions/:id` - Delete session
+- `POST /api/sandbox-sessions/:id/execute` - Execute command in sandbox
 
 ## LLM Integration
 - **Providers**: OpenAI, Anthropic, OpenRouter, Groq

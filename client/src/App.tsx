@@ -18,6 +18,8 @@ import Settings from "@/pages/settings";
 import SubAgentsPage from "@/pages/sub-agents";
 import WorkflowsPage from "@/pages/workflows";
 import ToolsPage from "@/pages/tools";
+import WorkspacePage from "@/pages/workspace";
+import SandboxPage from "@/pages/sandbox";
 
 function Router() {
   return (
@@ -32,6 +34,8 @@ function Router() {
       <Route path="/sub-agents" component={SubAgentsPage} />
       <Route path="/workflows" component={WorkflowsPage} />
       <Route path="/tools" component={ToolsPage} />
+      <Route path="/workspace" component={WorkspacePage} />
+      <Route path="/sandbox" component={SandboxPage} />
       <Route component={NotFound} />
     </Switch>
   );

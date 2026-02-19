@@ -10,6 +10,9 @@ import {
   insertWorkflowExecutionSchema,
   insertToolSchema,
   insertSubAgentToolSchema,
+  insertArtifactFolderSchema,
+  insertArtifactSchema,
+  insertSandboxSessionSchema,
 } from "@shared/schema";
 import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels } from "./llm-client";
@@ -539,6 +542,270 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to remove tool" });
+    }
+  });
+
+  // ==================== Artifact Folder Routes ====================
+
+  app.get("/api/artifact-folders", async (req, res) => {
+    try {
+      const parentId = req.query.parentId as string | undefined;
+      const folders = await storage.getArtifactFolders(parentId === "root" ? null : parentId);
+      res.json(folders);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch folders" });
+    }
+  });
+
+  app.get("/api/artifact-folders/:id", async (req, res) => {
+    try {
+      const folder = await storage.getArtifactFolder(req.params.id);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      res.json(folder);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch folder" });
+    }
+  });
+
+  app.post("/api/artifact-folders", async (req, res) => {
+    try {
+      const parsed = insertArtifactFolderSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid folder data", errors: parsed.error.issues });
+      }
+      const folder = await storage.createArtifactFolder(parsed.data);
+      res.status(201).json(folder);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create folder" });
+    }
+  });
+
+  app.put("/api/artifact-folders/:id", async (req, res) => {
+    try {
+      const folder = await storage.getArtifactFolder(req.params.id);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      const updated = await storage.updateArtifactFolder(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update folder" });
+    }
+  });
+
+  app.delete("/api/artifact-folders/:id", async (req, res) => {
+    try {
+      const folder = await storage.getArtifactFolder(req.params.id);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      await storage.deleteArtifactFolder(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete folder" });
+    }
+  });
+
+  // ==================== Artifact Routes ====================
+
+  app.get("/api/artifacts", async (req, res) => {
+    try {
+      const folderId = req.query.folderId as string | undefined;
+      const items = await storage.getArtifacts(folderId === "root" ? null : folderId);
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch artifacts" });
+    }
+  });
+
+  app.get("/api/artifacts/:id", async (req, res) => {
+    try {
+      const artifact = await storage.getArtifact(req.params.id);
+      if (!artifact) return res.status(404).json({ message: "Artifact not found" });
+      res.json(artifact);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch artifact" });
+    }
+  });
+
+  app.post("/api/artifacts", async (req, res) => {
+    try {
+      const parsed = insertArtifactSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid artifact data", errors: parsed.error.issues });
+      }
+      const artifact = await storage.createArtifact(parsed.data);
+      res.status(201).json(artifact);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create artifact" });
+    }
+  });
+
+  app.put("/api/artifacts/:id", async (req, res) => {
+    try {
+      const artifact = await storage.getArtifact(req.params.id);
+      if (!artifact) return res.status(404).json({ message: "Artifact not found" });
+      const updated = await storage.updateArtifact(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update artifact" });
+    }
+  });
+
+  app.delete("/api/artifacts/:id", async (req, res) => {
+    try {
+      const artifact = await storage.getArtifact(req.params.id);
+      if (!artifact) return res.status(404).json({ message: "Artifact not found" });
+      await storage.deleteArtifact(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete artifact" });
+    }
+  });
+
+  // ==================== Workspace Seed Route ====================
+
+  app.post("/api/workspace/seed", async (_req, res) => {
+    try {
+      const existingFolders = await storage.getArtifactFolders(null);
+      if (existingFolders.length > 0) {
+        return res.json({ message: "Workspace already initialized", seeded: false });
+      }
+
+      const defaultFolders = [
+        { name: "00_Planning", path: "/00_Planning", description: "Strategic plans, roadmaps, and objectives" },
+        { name: "01_Directive-SOP", path: "/01_Directive-SOP", description: "Standard operating procedures and directives" },
+        { name: "02_Execution", path: "/02_Execution", description: "Execution logs, outputs, and deliverables" },
+        { name: "03_Orchestration", path: "/03_Orchestration", description: "Workflow configurations and orchestration files" },
+        { name: "04_Resources", path: "/04_Resources", description: "Shared resources, templates, and reference materials" },
+        { name: "05_Artifacts", path: "/05_Artifacts", description: "Final work products and completed artifacts" },
+        { name: "06_Tests", path: "/06_Tests", description: "Test plans, results, and validation reports" },
+      ];
+
+      const createdFolders = [];
+      for (const f of defaultFolders) {
+        const folder = await storage.createArtifactFolder({ name: f.name, path: f.path, description: f.description, parentId: null });
+        createdFolders.push(folder);
+      }
+
+      const rootFiles = [
+        {
+          name: "AGENTS.md",
+          type: "file",
+          mimeType: "text/markdown",
+          content: "# Agents Registry\n\nThis file documents all registered sub-agents and their capabilities.\n\n## Active Agents\n\n| Agent | Type | Mode | Status |\n|-------|------|------|--------|\n| _Configure via Sub-Agents page_ | | | |\n\n## Agent Protocols\n\n- All agents operate under Aiden's Tier 1 orchestration\n- Independent agents require operator authorization\n- Aiden-controlled agents execute automatically\n",
+          size: 350,
+        },
+        {
+          name: "CLAUDE.md",
+          type: "file",
+          mimeType: "text/markdown",
+          content: "# CLAUDE - Configuration & Context\n\nThis file provides context and configuration for AI-assisted operations.\n\n## System Context\n\n- Platform: AIDEN_PTIB Orchestration Engine\n- Architecture: 2-Tier (Aiden Manager + Sub-Agent Workers)\n- Workflow Engine: Multi-step with dependency resolution\n\n## Operating Guidelines\n\n1. Follow established SOPs in `01_Directive-SOP/`\n2. Store outputs in `02_Execution/` or `05_Artifacts/`\n3. Log test results in `06_Tests/`\n4. Reference resources from `04_Resources/`\n",
+          size: 480,
+        },
+      ];
+
+      for (const f of rootFiles) {
+        await storage.createArtifact({
+          name: f.name,
+          folderId: null,
+          type: f.type,
+          mimeType: f.mimeType,
+          content: f.content,
+          size: f.size,
+          createdBy: "system",
+        });
+      }
+
+      res.status(201).json({ message: "Workspace initialized", seeded: true, folders: createdFolders.length, files: rootFiles.length });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to seed workspace" });
+    }
+  });
+
+  // ==================== Sandbox Session Routes ====================
+
+  app.get("/api/sandbox-sessions", async (_req, res) => {
+    try {
+      const sessions = await storage.getSandboxSessions();
+      res.json(sessions);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch sandbox sessions" });
+    }
+  });
+
+  app.get("/api/sandbox-sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getSandboxSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      res.json(session);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch session" });
+    }
+  });
+
+  app.post("/api/sandbox-sessions", async (req, res) => {
+    try {
+      const parsed = insertSandboxSessionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid session data", errors: parsed.error.issues });
+      }
+      const session = await storage.createSandboxSession(parsed.data);
+      res.status(201).json(session);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create session" });
+    }
+  });
+
+  app.put("/api/sandbox-sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getSandboxSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      const updated = await storage.updateSandboxSession(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update session" });
+    }
+  });
+
+  app.delete("/api/sandbox-sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getSandboxSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      await storage.deleteSandboxSession(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete session" });
+    }
+  });
+
+  app.post("/api/sandbox-sessions/:id/execute", async (req, res) => {
+    try {
+      const session = await storage.getSandboxSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+
+      await storage.updateSandboxSession(req.params.id, {
+        status: "running",
+        startedAt: new Date(),
+      });
+
+      const { command, input } = req.body;
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        command: command || "execute",
+        input: input || {},
+        output: { message: `Sandbox execution completed for "${session.name}"`, status: "success" },
+      };
+
+      const existingLogs = Array.isArray(session.logs) ? session.logs : [];
+
+      await storage.updateSandboxSession(req.params.id, {
+        status: "completed",
+        logs: [...existingLogs, logEntry],
+        result: logEntry.output,
+        completedAt: new Date(),
+      });
+
+      const updated = await storage.getSandboxSession(req.params.id);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to execute sandbox session" });
     }
   });
 

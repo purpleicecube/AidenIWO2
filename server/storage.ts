@@ -423,6 +423,107 @@ export class DatabaseStorage implements IStorage {
     );
     return true;
   }
+
+  async getArtifactFolders(parentId?: string | null): Promise<ArtifactFolder[]> {
+    if (parentId === undefined) {
+      return db.select().from(artifactFolders).orderBy(artifactFolders.name);
+    }
+    if (parentId === null) {
+      return db.select().from(artifactFolders).where(sql`${artifactFolders.parentId} IS NULL`).orderBy(artifactFolders.name);
+    }
+    return db.select().from(artifactFolders).where(eq(artifactFolders.parentId, parentId)).orderBy(artifactFolders.name);
+  }
+
+  async getArtifactFolder(id: string): Promise<ArtifactFolder | undefined> {
+    const [folder] = await db.select().from(artifactFolders).where(eq(artifactFolders.id, id));
+    return folder;
+  }
+
+  async createArtifactFolder(folder: InsertArtifactFolder): Promise<ArtifactFolder> {
+    const [created] = await db.insert(artifactFolders).values(folder).returning();
+    return created;
+  }
+
+  async updateArtifactFolder(id: string, updates: Partial<ArtifactFolder>): Promise<ArtifactFolder | undefined> {
+    const [updated] = await db
+      .update(artifactFolders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(artifactFolders.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteArtifactFolder(id: string): Promise<boolean> {
+    await db.delete(artifacts).where(eq(artifacts.folderId, id));
+    const children = await db.select().from(artifactFolders).where(eq(artifactFolders.parentId, id));
+    for (const child of children) {
+      await this.deleteArtifactFolder(child.id);
+    }
+    await db.delete(artifactFolders).where(eq(artifactFolders.id, id));
+    return true;
+  }
+
+  async getArtifacts(folderId?: string | null): Promise<Artifact[]> {
+    if (folderId === undefined) {
+      return db.select().from(artifacts).orderBy(desc(artifacts.createdAt));
+    }
+    if (folderId === null) {
+      return db.select().from(artifacts).where(sql`${artifacts.folderId} IS NULL`).orderBy(artifacts.name);
+    }
+    return db.select().from(artifacts).where(eq(artifacts.folderId, folderId)).orderBy(artifacts.name);
+  }
+
+  async getArtifact(id: string): Promise<Artifact | undefined> {
+    const [artifact] = await db.select().from(artifacts).where(eq(artifacts.id, id));
+    return artifact;
+  }
+
+  async createArtifact(artifact: InsertArtifact): Promise<Artifact> {
+    const [created] = await db.insert(artifacts).values(artifact).returning();
+    return created;
+  }
+
+  async updateArtifact(id: string, updates: Partial<Artifact>): Promise<Artifact | undefined> {
+    const [updated] = await db
+      .update(artifacts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(artifacts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteArtifact(id: string): Promise<boolean> {
+    await db.delete(artifacts).where(eq(artifacts.id, id));
+    return true;
+  }
+
+  async getSandboxSessions(): Promise<SandboxSession[]> {
+    return db.select().from(sandboxSessions).orderBy(desc(sandboxSessions.createdAt));
+  }
+
+  async getSandboxSession(id: string): Promise<SandboxSession | undefined> {
+    const [session] = await db.select().from(sandboxSessions).where(eq(sandboxSessions.id, id));
+    return session;
+  }
+
+  async createSandboxSession(session: InsertSandboxSession): Promise<SandboxSession> {
+    const [created] = await db.insert(sandboxSessions).values(session).returning();
+    return created;
+  }
+
+  async updateSandboxSession(id: string, updates: Partial<SandboxSession>): Promise<SandboxSession | undefined> {
+    const [updated] = await db
+      .update(sandboxSessions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(sandboxSessions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSandboxSession(id: string): Promise<boolean> {
+    await db.delete(sandboxSessions).where(eq(sandboxSessions.id, id));
+    return true;
+  }
 }
 
 export const storage = new DatabaseStorage();
