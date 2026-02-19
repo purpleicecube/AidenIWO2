@@ -20,6 +20,9 @@ import {
   Copy,
   CheckCircle,
   Loader2,
+  Brain,
+  Bot,
+  UserCheck,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog } from "@shared/schema";
 import { useState } from "react";
@@ -65,11 +68,11 @@ function TimelineItem({
   log: ExecutionLog;
   isLast: boolean;
 }) {
-  const tierIcon = log.tier === 1 ? Layers : Activity;
-  const TierIcon = tierIcon;
+  const TierIcon = log.tier === 1 ? Brain : Bot;
   const tierColor = log.tier === 1
     ? "bg-primary/10 text-primary dark:bg-primary/20"
     : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400";
+  const tierLabel = log.tier === 1 ? "Aiden" : "Sub-Agent";
 
   return (
     <div className="flex gap-3">
@@ -83,7 +86,7 @@ function TimelineItem({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{log.action}</span>
           <Badge variant="outline" className="text-xs no-default-hover-elevate no-default-active-elevate">
-            Tier {log.tier}
+            {tierLabel}
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-1">{log.message}</p>
@@ -347,6 +350,39 @@ export default function WorkOrderDetail() {
                 <p className="text-xs text-muted-foreground mb-1">Updated</p>
                 <p className="text-sm">{new Date(order.updatedAt).toLocaleString()}</p>
               </div>
+              {order.assignedSubAgentId && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Assigned Sub-Agent</p>
+                    <div className="flex items-center gap-1.5">
+                      <Bot className="w-3.5 h-3.5 text-muted-foreground" />
+                      <p className="text-sm" data-testid="text-assigned-agent">{order.assignedSubAgentId}</p>
+                    </div>
+                  </div>
+                </>
+              )}
+              {order.executionMode && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Execution Mode</p>
+                    <div className="flex items-center gap-1.5">
+                      {order.executionMode === "aiden" ? (
+                        <>
+                          <Brain className="w-3.5 h-3.5 text-primary" />
+                          <p className="text-sm text-primary font-medium">Aiden-controlled</p>
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                          <p className="text-sm text-violet-600 dark:text-violet-400 font-medium">Independent</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -358,7 +394,7 @@ export default function WorkOrderDetail() {
               <CardContent className="space-y-4">
                 {order.tier1Result && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Tier 1 Result</p>
+                    <p className="text-xs text-muted-foreground mb-1">Aiden (Tier 1) Decision</p>
                     <pre className="p-2 rounded-md bg-muted/50 text-xs font-mono overflow-x-auto">
                       {JSON.stringify(order.tier1Result, null, 2)}
                     </pre>
@@ -366,7 +402,7 @@ export default function WorkOrderDetail() {
                 )}
                 {order.tier2Result && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Tier 2 Result</p>
+                    <p className="text-xs text-muted-foreground mb-1">Sub-Agent (Tier 2) Result</p>
                     <pre className="p-2 rounded-md bg-muted/50 text-xs font-mono overflow-x-auto">
                       {JSON.stringify(order.tier2Result, null, 2)}
                     </pre>

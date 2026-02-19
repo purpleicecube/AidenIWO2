@@ -3,6 +3,28 @@ import { pgTable, text, varchar, timestamp, jsonb, integer, boolean } from "driz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const subAgents = pgTable("sub_agents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("general"),
+  controlMode: text("control_mode").notNull().default("aiden"),
+  assignedTo: text("assigned_to"),
+  status: text("status").notNull().default("active"),
+  capabilities: jsonb("capabilities").default(sql`'[]'::jsonb`),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSubAgentSchema = createInsertSchema(subAgents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSubAgent = z.infer<typeof insertSubAgentSchema>;
+export type SubAgent = typeof subAgents.$inferSelect;
+
 export const workOrders = pgTable("work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   correlationId: varchar("correlation_id").notNull().default(sql`gen_random_uuid()`),
@@ -11,6 +33,8 @@ export const workOrders = pgTable("work_orders", {
   type: text("type").notNull().default("standard"),
   priority: text("priority").notNull().default("medium"),
   status: text("status").notNull().default("pending"),
+  assignedSubAgentId: varchar("assigned_sub_agent_id"),
+  executionMode: text("execution_mode"),
   tier1Result: jsonb("tier1_result"),
   tier2Result: jsonb("tier2_result"),
   gccMemory: jsonb("gcc_memory").default(sql`'{}'::jsonb`),
@@ -34,6 +58,8 @@ export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
   id: true,
   correlationId: true,
   status: true,
+  assignedSubAgentId: true,
+  executionMode: true,
   tier1Result: true,
   tier2Result: true,
   gccMemory: true,
@@ -58,18 +84,24 @@ export const llmSettings = pgTable("llm_settings", {
   model: text("model").notNull().default("gpt-4o"),
   baseUrl: text("base_url"),
   systemPrompt: text("system_prompt").notNull().default(
-    `You are Aiden, an intelligent work order orchestration engine. You operate within a 2-tier architecture:
+    `You are Aiden, the Tier 1 intelligent orchestration manager. You are the central decision-making authority for all work orders.
 
-Tier 1 (Manager): You evaluate incoming work orders against policy rules. You decide whether to approve or block them, and which handler to route approved orders to.
+Your Role (Tier 1 - Manager):
+You evaluate incoming work orders against policy rules. You decide whether to approve or block them, and which sub-agent (Tier 2 worker) to route approved orders to.
 
-Tier 2 (Worker): You validate the work order schema and execute the work. You may emit a BDM (Blocked Decision Marker) if execution cannot proceed.
+Sub-Agents (Tier 2 - Workers):
+Sub-agents are specialized workers that execute work orders under your direction. Each sub-agent has a control mode:
+- "aiden" mode: You directly control and execute through this sub-agent
+- "independent" mode: The sub-agent is controlled by an authorized human or AI operator; you assign the work but they execute independently
 
 Rules:
 - Critical deployments should be blocked at Tier 1 for manual review
 - Critical incidents should be carefully evaluated - block if escalation is needed
+- Route work orders to the most appropriate sub-agent based on their type and capabilities
 - Always provide clear reasoning for your decisions
-- Never allow Tier 2 to Tier 2 direct chaining
-- Use GCC memory for routing context and correlation IDs only`
+- Never allow sub-agent to sub-agent direct chaining (no Tier 2 to Tier 2)
+- Use GCC memory for routing context and correlation IDs only
+- When routing to an independent sub-agent, clearly state who should handle it`
   ),
   enabled: boolean("enabled").notNull().default(false),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

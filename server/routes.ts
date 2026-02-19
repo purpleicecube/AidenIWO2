@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkOrderSchema, insertLlmSettingsSchema } from "@shared/schema";
+import { insertWorkOrderSchema, insertLlmSettingsSchema, insertSubAgentSchema } from "@shared/schema";
 import { processWorkOrder } from "./orchestration";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection } from "./llm-client";
 
@@ -149,6 +149,61 @@ export async function registerRoutes(
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: "Failed to retry work order" });
+    }
+  });
+
+  // Sub-agent routes
+  app.get("/api/sub-agents", async (_req, res) => {
+    try {
+      const agents = await storage.getSubAgents();
+      res.json(agents);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch sub-agents" });
+    }
+  });
+
+  app.get("/api/sub-agents/:id", async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+      res.json(agent);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch sub-agent" });
+    }
+  });
+
+  app.post("/api/sub-agents", async (req, res) => {
+    try {
+      const parsed = insertSubAgentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid sub-agent data", errors: parsed.error.issues });
+      }
+      const agent = await storage.createSubAgent(parsed.data);
+      res.status(201).json(agent);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create sub-agent" });
+    }
+  });
+
+  app.put("/api/sub-agents/:id", async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+      const updated = await storage.updateSubAgent(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update sub-agent" });
+    }
+  });
+
+  app.delete("/api/sub-agents/:id", async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+      await storage.deleteSubAgent(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete sub-agent" });
     }
   });
 

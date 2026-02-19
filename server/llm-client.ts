@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import type { LlmSettings, WorkOrder } from "@shared/schema";
+import type { LlmSettings, WorkOrder, SubAgent } from "@shared/schema";
 import { z } from "zod";
 
 const tier1ResponseSchema = z.object({
@@ -123,11 +123,16 @@ async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage:
 
 export async function runTier1WithLLM(
   settings: LlmSettings,
-  order: WorkOrder
+  order: WorkOrder,
+  subAgents: SubAgent[] = []
 ): Promise<Tier1Result> {
-  const prompt = `${settings.systemPrompt}
+  const subAgentInfo = subAgents.length > 0
+    ? `\n\nAvailable Sub-Agents (Tier 2 Workers):\n${subAgents.map((a) =>
+        `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${a.description ? `, description: ${a.description}` : ""})`
+      ).join("\n")}`
+    : "\n\nNo sub-agents configured. Use default handler names.";
 
-You are now acting as Tier 1 (Manager). Evaluate this work order and decide whether to approve or block it.
+  const prompt = `You are Aiden, the Tier 1 orchestration manager. Evaluate this work order and decide whether to approve or block it. If approved, choose which sub-agent or handler to route it to.
 
 Respond with ONLY a JSON object in this exact format:
 {
@@ -138,6 +143,7 @@ Respond with ONLY a JSON object in this exact format:
 }
 
 Available handlers: general_executor, deploy_executor, maintenance_executor, incident_executor, change_executor, security_executor
+${subAgentInfo}
 
 Work Order:
 - Title: ${order.title}
@@ -168,9 +174,7 @@ export async function runTier2WithLLM(
   order: WorkOrder,
   tier1Result: Tier1Result
 ): Promise<Tier2Result> {
-  const prompt = `${settings.systemPrompt}
-
-You are now acting as Tier 2 (Worker). The work order has passed Tier 1 policy gate and was routed to handler "${tier1Result.handler}".
+  const prompt = `You are Aiden, controlling a Tier 2 sub-agent. The work order has passed your Tier 1 policy gate and was routed to handler "${tier1Result.handler}".
 
 Validate the schema and execute the work order. Decide if execution can proceed or if a BDM marker should be emitted.
 

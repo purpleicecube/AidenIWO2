@@ -1,4 +1,4 @@
-import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain, Bot } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -83,6 +83,14 @@ export function AppSidebar() {
           <SidebarGroupLabel>Configuration</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/sub-agents"} data-testid="link-nav-sub-agents">
+                  <Link href="/sub-agents">
+                    <Bot className="w-4 h-4" />
+                    <span>Sub-Agents</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location === "/settings"} data-testid="link-nav-aiden-settings">
                   <Link href="/settings">

@@ -15,6 +15,7 @@ import SubmitOrder from "@/pages/submit-order";
 import SystemHealth from "@/pages/system-health";
 import Architecture from "@/pages/architecture";
 import Settings from "@/pages/settings";
+import SubAgentsPage from "@/pages/sub-agents";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/health" component={SystemHealth} />
       <Route path="/architecture" component={Architecture} />
       <Route path="/settings" component={Settings} />
+      <Route path="/sub-agents" component={SubAgentsPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -7,10 +7,13 @@ import {
   type InsertUser,
   type LlmSettings,
   type InsertLlmSettings,
+  type SubAgent,
+  type InsertSubAgent,
   workOrders,
   executionLogs,
   users,
   llmSettings,
+  subAgents,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -39,6 +42,13 @@ export interface IStorage {
 
   getLlmSettings(): Promise<LlmSettings | undefined>;
   upsertLlmSettings(settings: InsertLlmSettings): Promise<LlmSettings>;
+
+  getSubAgents(): Promise<SubAgent[]>;
+  getSubAgent(id: string): Promise<SubAgent | undefined>;
+  getActiveSubAgents(): Promise<SubAgent[]>;
+  createSubAgent(agent: InsertSubAgent): Promise<SubAgent>;
+  updateSubAgent(id: string, updates: Partial<SubAgent>): Promise<SubAgent | undefined>;
+  deleteSubAgent(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -79,6 +89,7 @@ export class DatabaseStorage implements IStorage {
       completed: 0,
       blocked: 0,
       failed: 0,
+      awaiting_operator: 0,
     };
     for (const order of allOrders) {
       if (order.status in stats) {
@@ -118,6 +129,38 @@ export class DatabaseStorage implements IStorage {
   async getLlmSettings(): Promise<LlmSettings | undefined> {
     const [settings] = await db.select().from(llmSettings).where(eq(llmSettings.id, "default"));
     return settings;
+  }
+
+  async getSubAgents(): Promise<SubAgent[]> {
+    return db.select().from(subAgents).orderBy(subAgents.name);
+  }
+
+  async getSubAgent(id: string): Promise<SubAgent | undefined> {
+    const [agent] = await db.select().from(subAgents).where(eq(subAgents.id, id));
+    return agent;
+  }
+
+  async getActiveSubAgents(): Promise<SubAgent[]> {
+    return db.select().from(subAgents).where(eq(subAgents.status, "active")).orderBy(subAgents.name);
+  }
+
+  async createSubAgent(agent: InsertSubAgent): Promise<SubAgent> {
+    const [created] = await db.insert(subAgents).values(agent).returning();
+    return created;
+  }
+
+  async updateSubAgent(id: string, updates: Partial<SubAgent>): Promise<SubAgent | undefined> {
+    const [updated] = await db
+      .update(subAgents)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(subAgents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSubAgent(id: string): Promise<boolean> {
+    const result = await db.delete(subAgents).where(eq(subAgents.id, id));
+    return true;
   }
 
   async upsertLlmSettings(settings: InsertLlmSettings): Promise<LlmSettings> {

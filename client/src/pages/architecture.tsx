@@ -2,16 +2,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
-  Layers,
-  Activity,
   ArrowDown,
-  ArrowUp,
   Shield,
   Database,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  FileJson,
+  Brain,
+  Bot,
+  UserCheck,
 } from "lucide-react";
 
 function FlowStep({
@@ -25,7 +24,7 @@ function FlowStep({
   step: number;
   title: string;
   description: string;
-  icon: typeof Layers;
+  icon: typeof Brain;
   iconClass: string;
   showArrow?: boolean;
 }) {
@@ -61,7 +60,7 @@ export default function Architecture() {
           Tier Overview
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          AIDEN_PTIB 2-tier orchestration architecture and request lifecycle
+          Aiden (Tier 1) orchestrates sub-agents (Tier 2) in a 2-tier architecture
         </p>
       </div>
 
@@ -70,11 +69,11 @@ export default function Architecture() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-9 h-9 rounded-md bg-primary/10 text-primary dark:bg-primary/20">
-                <Layers className="w-5 h-5" />
+                <Brain className="w-5 h-5" />
               </div>
               <div>
-                <CardTitle className="text-base font-medium">Tier 1 - Manager</CardTitle>
-                <p className="text-xs text-muted-foreground">Policy, Approvals, Routing</p>
+                <CardTitle className="text-base font-medium">Tier 1 — Aiden (Manager)</CardTitle>
+                <p className="text-xs text-muted-foreground">LLM-powered policy, approvals, routing</p>
               </div>
             </div>
           </CardHeader>
@@ -82,9 +81,9 @@ export default function Architecture() {
             <div className="space-y-2">
               {[
                 "Receives incoming work orders from API",
-                "Applies policy gate checks (mode, rules)",
-                "Routes to appropriate Tier 2 handler",
-                "Handles BDM markers returned from Tier 2",
+                "Evaluates against policy rules (LLM or hardcoded)",
+                "Routes to the appropriate sub-agent (Tier 2)",
+                "Handles BDM markers returned from sub-agents",
                 "Resolves or pauses for human decision",
               ].map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
@@ -100,28 +99,47 @@ export default function Architecture() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-9 h-9 rounded-md bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                <Activity className="w-5 h-5" />
+                <Bot className="w-5 h-5" />
               </div>
               <div>
-                <CardTitle className="text-base font-medium">Tier 2 - Worker</CardTitle>
-                <p className="text-xs text-muted-foreground">Validation, Execution</p>
+                <CardTitle className="text-base font-medium">Tier 2 — Sub-Agents (Workers)</CardTitle>
+                <p className="text-xs text-muted-foreground">Validation, execution, specialized tasks</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               {[
                 "Validates work order schema",
                 "Executes the actual work order tasks",
-                "Emits BDM marker if blocked",
-                "Returns results back to Tier 1",
-                "No direct Tier 2 to Tier 2 chaining",
+                "Emits BDM marker if execution is blocked",
+                "Returns results back to Aiden (Tier 1)",
+                "No direct sub-agent to sub-agent chaining",
               ].map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm text-muted-foreground">{item}</p>
                 </div>
               ))}
+            </div>
+            <div className="pt-2 border-t">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Control Modes</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/40">
+                  <Brain className="w-4 h-4 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Aiden-controlled</p>
+                    <p className="text-xs text-muted-foreground">Aiden executes through the sub-agent automatically</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/40">
+                  <UserCheck className="w-4 h-4 text-violet-600 dark:text-violet-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Independent</p>
+                    <p className="text-xs text-muted-foreground">Authorized human or AI operator executes independently</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -142,23 +160,23 @@ export default function Architecture() {
             />
             <FlowStep
               step={2}
-              title="Tier 1 Policy Gate"
-              description="Checks mode, applies rules"
-              icon={Layers}
+              title="Aiden: Policy Gate"
+              description="Aiden evaluates policy rules (LLM or hardcoded)"
+              icon={Brain}
               iconClass="bg-primary/10 text-primary dark:bg-primary/20"
             />
             <FlowStep
               step={3}
-              title="Tier 1 Dispatch"
-              description="Routes to appropriate Tier 2 handler"
+              title="Aiden: Dispatch to Sub-Agent"
+              description="Aiden selects and routes to the best sub-agent"
               icon={Shield}
               iconClass="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
             />
             <FlowStep
               step={4}
-              title="Tier 2 Validation & Execution"
-              description="Schema validation, then execute"
-              icon={Activity}
+              title="Sub-Agent: Execution"
+              description="Aiden-controlled or awaiting independent operator"
+              icon={Bot}
               iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
             />
             <FlowStep
@@ -170,8 +188,8 @@ export default function Architecture() {
             />
             <FlowStep
               step={6}
-              title="Resolution"
-              description="Tier 1 resolves or pauses for human decision"
+              title="Aiden: Resolution"
+              description="Aiden confirms completion or pauses for human decision"
               icon={CheckCircle}
               iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
               showArrow={false}
@@ -192,7 +210,7 @@ export default function Architecture() {
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Approved Uses</p>
               <div className="space-y-1.5">
-                {["Routing context", "Correlation IDs", "Execution breadcrumbs"].map((item) => (
+                {["Routing context", "Correlation IDs", "Execution breadcrumbs", "Sub-agent assignments"].map((item) => (
                   <div key={item} className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     <span className="text-sm text-muted-foreground">{item}</span>
@@ -224,9 +242,10 @@ export default function Architecture() {
           <CardContent className="space-y-3">
             <div className="space-y-2">
               {[
-                { rule: "Keep 2-tier boundary", desc: "Tier 1 orchestrates, Tier 2 executes" },
-                { rule: "No Tier 2 to Tier 2 chaining", desc: "All routing goes through Tier 1" },
-                { rule: "PocketFlow as orchestration engine", desc: "Core flow engine cannot be replaced" },
+                { rule: "Aiden IS Tier 1", desc: "All policy and routing decisions go through Aiden" },
+                { rule: "Sub-agents are Tier 2", desc: "Workers execute under Aiden's direction or independently" },
+                { rule: "No sub-agent to sub-agent chaining", desc: "All routing goes through Aiden (Tier 1)" },
+                { rule: "System Admin controls sub-agents", desc: "Humans determine control mode and operator assignments" },
                 { rule: "GCC memory contract", desc: "Shared context with strict usage rules" },
                 { rule: "Schema validation", desc: "Work order and BDM schemas must validate" },
               ].map((item, i) => (

@@ -13,6 +13,9 @@ import {
   Layers,
   Activity,
   Plus,
+  UserCheck,
+  Brain,
+  Bot,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import type { WorkOrder } from "@shared/schema";
@@ -24,6 +27,7 @@ interface DashboardStats {
   completed: number;
   blocked: number;
   failed: number;
+  awaiting_operator: number;
 }
 
 function StatCard({
@@ -112,7 +116,7 @@ export default function Dashboard() {
             Dashboard
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Monitor work order orchestration across Tier 1 and Tier 2
+            Monitor Aiden (Tier 1) and sub-agent (Tier 2) orchestration
           </p>
         </div>
         <Link href="/submit">
@@ -126,7 +130,7 @@ export default function Dashboard() {
       {statsLoading ? (
         <StatsSkeleton />
       ) : stats ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             title="Total"
             value={stats.total}
@@ -138,7 +142,7 @@ export default function Dashboard() {
             title="Pending"
             value={stats.pending + stats.processing}
             icon={Clock}
-            description="Awaiting processing"
+            description="Awaiting Aiden review"
             iconClass="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
           />
           <StatCard
@@ -147,6 +151,13 @@ export default function Dashboard() {
             icon={CheckCircle}
             description="Successfully processed"
             iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+          />
+          <StatCard
+            title="Awaiting Operator"
+            value={stats.awaiting_operator}
+            icon={UserCheck}
+            description="Independent sub-agents"
+            iconClass="bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
           />
           <StatCard
             title="Blocked"
@@ -214,11 +225,11 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 rounded-md bg-muted/40">
                 <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary dark:bg-primary/20">
-                  <Layers className="w-4 h-4" />
+                  <Brain className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Tier 1</p>
-                  <p className="text-xs text-muted-foreground">Policy &amp; Routing</p>
+                  <p className="text-sm font-medium">Tier 1 — Aiden</p>
+                  <p className="text-xs text-muted-foreground">Policy, Routing, Decisions</p>
                 </div>
               </div>
 
@@ -228,11 +239,11 @@ export default function Dashboard() {
 
               <div className="flex items-center gap-3 p-3 rounded-md bg-muted/40">
                 <div className="flex items-center justify-center w-8 h-8 rounded-md bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                  <Activity className="w-4 h-4" />
+                  <Bot className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Tier 2</p>
-                  <p className="text-xs text-muted-foreground">Validation &amp; Execution</p>
+                  <p className="text-sm font-medium">Tier 2 — Sub-Agents</p>
+                  <p className="text-xs text-muted-foreground">Aiden-controlled or Independent</p>
                 </div>
               </div>
             </div>
