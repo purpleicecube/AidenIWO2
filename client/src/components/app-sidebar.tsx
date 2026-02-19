@@ -1,0 +1,90 @@
+import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarHeader,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
+
+const navigationItems = [
+  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Work Orders", url: "/work-orders", icon: ClipboardList },
+  { title: "Submit Order", url: "/submit", icon: Plus },
+  { title: "System Health", url: "/health", icon: Activity },
+];
+
+export function AppSidebar() {
+  const [location] = useLocation();
+
+  return (
+    <Sidebar>
+      <SidebarHeader className="p-4">
+        <Link href="/">
+          <div className="flex items-center gap-3 cursor-pointer" data-testid="link-logo">
+            <div className="flex items-center justify-center w-9 h-9 rounded-md bg-primary">
+              <Layers className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold tracking-tight">AIDEN_PTIB</span>
+              <span className="text-xs text-muted-foreground">Orchestration Engine</span>
+            </div>
+          </div>
+        </Link>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navigationItems.map((item) => {
+                const isActive = location === item.url || 
+                  (item.url !== "/" && location.startsWith(item.url));
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Architecture</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/architecture"} data-testid="link-nav-tier-overview">
+                  <Link href="/architecture">
+                    <Settings className="w-4 h-4" />
+                    <span>Tier Overview</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="p-4">
+        <div className="text-xs text-muted-foreground">
+          v1.0.0 MVP
+        </div>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
