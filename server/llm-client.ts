@@ -18,6 +18,8 @@ const tier2ResponseSchema = z.object({
   output: z.object({
     message: z.string(),
     deliverable: z.string().optional(),
+    deliverableType: z.enum(["document", "code", "image", "mixed"]).optional(),
+    deliverableTitle: z.string().optional(),
   }).optional(),
 });
 
@@ -245,9 +247,17 @@ Respond with ONLY a JSON object in this exact format:
   "handler": "${tier1Result.handler}",
   "output": {
     "message": "brief one-line summary of what was produced",
-    "deliverable": "THE FULL WORK PRODUCT CONTENT HERE — the actual email, plan, report, documentation, etc. Use markdown formatting."
+    "deliverable": "THE FULL WORK PRODUCT CONTENT HERE — the actual email, plan, report, documentation, etc. Use markdown formatting.",
+    "deliverableType": "document" or "code" or "image" or "mixed",
+    "deliverableTitle": "short filename-friendly title for the deliverable, e.g. Q1-Security-Review-Email"
   }
 }
+
+deliverableType guide:
+- "document" — emails, reports, plans, memos, proposals, SOPs, reviews
+- "code" — scripts, configurations, code snippets, YAML/JSON, infrastructure-as-code
+- "image" — when the output describes an image (rare for text LLMs)
+- "mixed" — when the output contains both code and documents
 
 Work Order:
 - Title: ${order.title}

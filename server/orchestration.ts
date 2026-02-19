@@ -277,6 +277,16 @@ function runTier2Execution(order: WorkOrder, tier1Result: Tier1Result): Tier2Res
 
   const deliverable = generateFallbackDeliverable(order);
 
+  const typeToDeliverableType: Record<string, string> = {
+    deployment: "document",
+    maintenance: "document",
+    incident: "document",
+    change_request: "document",
+    security: "document",
+    configuration: "code",
+    standard: "document",
+  };
+
   return {
     blocked: false,
     reason: null,
@@ -285,6 +295,8 @@ function runTier2Execution(order: WorkOrder, tier1Result: Tier1Result): Tier2Res
     output: {
       message: `Work order "${order.title}" processed successfully.`,
       deliverable,
+      deliverableType: (typeToDeliverableType[order.type] || "document") as "document" | "code" | "image" | "mixed",
+      deliverableTitle: order.title,
     },
   };
 }

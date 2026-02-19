@@ -31,6 +31,24 @@ async function getRootFolder(name: string) {
   return rootFolders.find(f => f.name === name);
 }
 
+function getOutputFolderName(deliverableType: string): string {
+  switch (deliverableType) {
+    case "code": return "#Code_Blocks";
+    case "image": return "#Images";
+    case "document":
+    case "mixed":
+    default: return "#Documents";
+  }
+}
+
+function getFileExtension(deliverableType: string): string {
+  switch (deliverableType) {
+    case "code": return ".md";
+    case "image": return ".md";
+    default: return ".md";
+  }
+}
+
 export async function fileWorkOrderOutput(order: WorkOrder) {
   try {
     const executionFolder = await getRootFolder("02_Execution");
@@ -71,6 +89,59 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       sourceId: order.id,
     });
 
+    const tier2 = (order.tier2Result as any) || {};
+    const deliverable = tier2.output?.deliverable || null;
+    const deliverableType = tier2.output?.deliverableType || "document";
+    const deliverableTitle = tier2.output?.deliverableTitle || order.title;
+    let deliverableFilePath: string | null = null;
+
+    if (deliverable) {
+      const outputFolderName = getOutputFolderName(deliverableType);
+      let outputFolder = await getRootFolder(outputFolderName);
+
+      if (!outputFolder) {
+        outputFolder = await storage.createArtifactFolder({
+          name: outputFolderName,
+          path: `/${outputFolderName}`,
+          description: `Auto-created output folder for ${outputFolderName.replace("#", "")}`,
+          parentId: null,
+        });
+      }
+
+      if (outputFolder) {
+        const outDateFolder = await ensureSubFolder(
+          outputFolder.id, outputFolder.path, dateStr,
+          `${outputFolderName.replace("#", "")} from ${dateStr}`
+        );
+
+        const outOrderFolder = await ensureSubFolder(
+          outDateFolder.id, outDateFolder.path, folderName,
+          `Work order: ${order.title}`
+        );
+
+        const fileSlug = slugify(deliverableTitle);
+        const ext = getFileExtension(deliverableType);
+        const fileName = `${fileSlug}${ext}`;
+
+        await storage.createArtifact({
+          name: fileName,
+          folderId: outOrderFolder.id,
+          type: "file",
+          mimeType: "text/markdown",
+          content: deliverable,
+          size: deliverable.length,
+          status: "active",
+          createdBy: "aiden",
+          tags: ["auto-filed", "deliverable", deliverableType, order.type],
+          sourceType: "work_order",
+          sourceId: order.id,
+        });
+
+        deliverableFilePath = `${outputFolderName}/${dateStr}/${folderName}/${fileName}`;
+        console.log(`  Deliverable saved to ${deliverableFilePath}`);
+      }
+    }
+
     const artDateFolder = await ensureSubFolder(
       artifactsFolder.id, artifactsFolder.path, dateStr,
       `Artifacts from ${dateStr}`
@@ -81,7 +152,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       `Work order: ${order.title}`
     );
 
-    const workProductContent = buildWorkProduct(order, logs);
+    const workProductContent = buildWorkProduct(order, logs, deliverableFilePath);
     await storage.createArtifact({
       name: "work-product.md",
       folderId: artOrderFolder.id,
@@ -96,7 +167,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       sourceId: order.id,
     });
 
-    console.log(`Auto-filed work order "${order.title}" to Workspace (02_Execution + 05_Artifacts)`);
+    console.log(`Auto-filed work order "${order.title}" to Workspace (02_Execution + 05_Artifacts + ${deliverableFilePath ? "deliverable" : "no deliverable"})`);
   } catch (err: any) {
     console.error("Auto-filing failed:", err.message);
   }
@@ -149,25 +220,18 @@ _Auto-filed by Aiden on ${new Date().toISOString()}_
 `;
 }
 
-function buildWorkProduct(order: WorkOrder, logs: ExecutionLog[]): string {
+function buildWorkProduct(order: WorkOrder, logs: ExecutionLog[], deliverableFilePath: string | null): string {
   const tier2 = (order.tier2Result as any) || {};
   const gcc = (order.gccMemory as any) || {};
-  const deliverable = tier2.output?.deliverable || null;
   const summary = tier2.output?.message || "Work order completed successfully.";
+  const deliverableType = tier2.output?.deliverableType || "document";
+  const deliverableTitle = tier2.output?.deliverableTitle || order.title;
 
-  const stepOutputs = logs
-    .filter(l => l.metadata && (l.metadata as any).output)
-    .map(l => {
-      const meta = l.metadata as any;
-      return meta.output?.deliverable || meta.output?.message || null;
-    })
-    .filter(Boolean);
-
-  const deliverableSection = deliverable
-    ? deliverable
-    : stepOutputs.length > 0
-      ? stepOutputs.join("\n\n---\n\n")
-      : `${summary}\n\n> _Enable LLM integration in Settings to get AI-generated deliverables with detailed, context-aware content._`;
+  const deliverableReference = deliverableFilePath
+    ? `**Deliverable**: [\`${deliverableTitle}\`](${deliverableFilePath})
+**Location**: \`${deliverableFilePath}\`
+**Type**: ${deliverableType}`
+    : `_No standalone deliverable was generated. Enable LLM integration in Settings for AI-generated outputs._`;
 
   return `# Work Product: ${order.title}
 
@@ -180,11 +244,11 @@ function buildWorkProduct(order: WorkOrder, logs: ExecutionLog[]): string {
 | **Final Status** | ${order.status} |
 | **Completed** | ${gcc.completedAt || new Date().toISOString()} |
 
----
+## Result
+${summary}
 
-${deliverableSection}
-
----
+## Deliverable Output
+${deliverableReference}
 
 ## Execution Path
 ${(gcc.breadcrumbs as string[] || []).map((b: string) => `- ${b.replace(/_/g, " ")}`).join("\n") || "- Direct execution"}

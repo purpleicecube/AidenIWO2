@@ -681,6 +681,9 @@ export async function registerRoutes(
         { name: "04_Resources", path: "/04_Resources", description: "Shared resources, templates, and reference materials" },
         { name: "05_Artifacts", path: "/05_Artifacts", description: "Final work products and completed artifacts" },
         { name: "06_Tests", path: "/06_Tests", description: "Test plans, results, and validation reports" },
+        { name: "#Documents", path: "/#Documents", description: "Deliverable documents — emails, reports, plans, memos, and written outputs" },
+        { name: "#Images", path: "/#Images", description: "Generated images, diagrams, screenshots, and visual outputs" },
+        { name: "#Code_Blocks", path: "/#Code_Blocks", description: "Code snippets, scripts, configurations, and technical outputs" },
       ];
 
       const createdFolders = [];
