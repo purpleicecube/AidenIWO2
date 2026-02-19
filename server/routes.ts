@@ -821,6 +821,49 @@ export async function registerRoutes(
 
   // ==================== Chat Sessions (GCC Memory Protocol) ====================
 
+  function generateCommitId(): string {
+    const hex = Array.from({ length: 8 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join("");
+    return `gcc-${hex}`;
+  }
+
+  function initializeGccMemory(correlationId: string): object {
+    const now = new Date().toISOString();
+    const initCommitId = generateCommitId();
+    return {
+      "gcc.project_id": `aiden-chat-${correlationId.slice(0, 8)}`,
+      "gcc.branch": "main",
+      "gcc.tier": "tier1",
+      "gcc.commit_index": [
+        {
+          commit_id: initCommitId,
+          timestamp: now,
+          summary: "Session initialized",
+          tags: ["session_init"],
+        },
+      ],
+      "gcc.last_commit_id": initCommitId,
+      "gcc.last_commit_summary": "Session initialized",
+      "gcc.log": [
+        {
+          timestamp: now,
+          source_node: "ContextLoadNode",
+          entry: "Chat session created. GCC memory initialized on branch main.",
+        },
+      ],
+      "gcc.context_scope": "branch",
+      "gcc.context_commit_count": 1,
+      "gcc.breadcrumbs": ["session_created"],
+      "gcc.last_action": "session_created",
+      "gcc.metadata": {
+        parent_branch: null,
+        status: "active",
+        created_at: now,
+      },
+    };
+  }
+
   app.get("/api/chat/sessions", async (_req, res) => {
     try {
       const sessions = await storage.getChatSessions();
@@ -834,14 +877,8 @@ export async function registerRoutes(
     try {
       const parsed = insertChatSessionSchema.safeParse(req.body);
       const session = await storage.createChatSession(parsed.success ? parsed.data : { title: "New Conversation" });
-      await storage.updateChatSession(session.id, {
-        gccMemory: {
-          correlationId: session.correlationId,
-          breadcrumbs: ["session_created"],
-          lastAction: "session_created",
-          startedAt: new Date().toISOString(),
-        },
-      });
+      const gccMemory = initializeGccMemory(session.correlationId);
+      await storage.updateChatSession(session.id, { gccMemory });
       const updated = await storage.getChatSession(session.id);
       res.json(updated);
     } catch (err) {
@@ -987,8 +1024,8 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
 
       const systemContext = await buildSystemContext(settings);
 
-      const gccMemory = (session.gccMemory as any) || {};
-      const breadcrumbs = [...(gccMemory.breadcrumbs || []), "user_message", "llm_processing"];
+      const gcc = (session.gccMemory as any) || {};
+      const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || []), "user_message", "llm_processing"];
 
       const reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext);
 
@@ -999,18 +1036,56 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
         gccBreadcrumb: "assistant_reply",
       });
 
-      const updatedBreadcrumbs = [...breadcrumbs, "assistant_reply"];
+      const now = new Date().toISOString();
+      const commitId = generateCommitId();
+      const commitSummary = message.length > 100 ? message.slice(0, 97) + "..." : message;
+
+      const commitIndex = [...(gcc["gcc.commit_index"] || [])];
+      commitIndex.push({
+        commit_id: commitId,
+        timestamp: now,
+        summary: commitSummary,
+        tags: ["chat_exchange"],
+      });
+
+      const logEntries = [...(gcc["gcc.log"] || [])];
+      logEntries.push(
+        {
+          timestamp: now,
+          source_node: "ContextLogNode",
+          entry: `User message: "${commitSummary}"`,
+        },
+        {
+          timestamp: now,
+          source_node: "ContextCommitNode",
+          entry: `Committed exchange as ${commitId}. Aiden responded (${reply.length} chars).`,
+        }
+      );
+
+      const updatedBreadcrumbs = [...breadcrumbs, "assistant_reply", "committed"];
       await storage.updateChatSession(sessionId, {
         gccMemory: {
-          correlationId: session.correlationId,
-          breadcrumbs: updatedBreadcrumbs.slice(-50),
-          lastAction: "assistant_reply",
-          lastMessageAt: new Date().toISOString(),
+          "gcc.project_id": gcc["gcc.project_id"] || `aiden-chat-${session.correlationId.slice(0, 8)}`,
+          "gcc.branch": gcc["gcc.branch"] || "main",
+          "gcc.tier": "tier1",
+          "gcc.commit_index": commitIndex.slice(-100),
+          "gcc.last_commit_id": commitId,
+          "gcc.last_commit_summary": commitSummary,
+          "gcc.log": logEntries.slice(-200),
+          "gcc.context_scope": "branch",
+          "gcc.context_commit_count": commitIndex.length,
+          "gcc.breadcrumbs": updatedBreadcrumbs.slice(-50),
+          "gcc.last_action": "committed",
+          "gcc.metadata": {
+            ...(gcc["gcc.metadata"] || {}),
+            status: "active",
+            last_commit: now,
+          },
         },
         title: session.messageCount === 0 ? message.slice(0, 80) : session.title,
       });
 
-      res.json({ reply, messageId: assistantMsg.id, sessionId });
+      res.json({ reply, messageId: assistantMsg.id, sessionId, commitId });
     } catch (err: any) {
       console.error("Chat error:", err.message);
       res.status(500).json({ message: `Aiden encountered an error: ${err.message}` });

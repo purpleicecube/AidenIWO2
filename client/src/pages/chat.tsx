@@ -104,7 +104,18 @@ export default function ChatPage() {
 
   const sessions = sessionsQuery.data || [];
   const activeSession = activeSessionQuery.data;
-  const gccMemory = activeSession?.gccMemory as Record<string, unknown> | null;
+  const rawGcc = activeSession?.gccMemory as Record<string, unknown> | null;
+  const gccMemory = rawGcc ? (
+    rawGcc["gcc.project_id"] ? rawGcc : {
+      "gcc.project_id": rawGcc.correlationId ? `aiden-chat-${String(rawGcc.correlationId).slice(0, 8)}` : null,
+      "gcc.branch": "main",
+      "gcc.tier": "tier1",
+      "gcc.last_commit_id": null,
+      "gcc.context_commit_count": 0,
+      "gcc.last_action": rawGcc.lastAction || rawGcc["lastAction"] || "none",
+      ...rawGcc,
+    }
+  ) : null;
 
   return (
     <div className="flex h-full" data-testid="page-chat">
@@ -159,17 +170,30 @@ export default function ChatPage() {
           </div>
         </ScrollArea>
         {gccMemory && activeSessionId && (
-          <div className="border-t p-3 space-y-1" data-testid="container-gcc-memory">
+          <div className="border-t p-3 space-y-2" data-testid="container-gcc-memory">
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <GitBranch className="w-3 h-3" />
               GCC Memory
             </div>
-            <div className="text-xs text-muted-foreground space-y-0.5">
-              <div className="truncate" title={String(gccMemory.correlationId || "")}>
-                ID: {String(gccMemory.correlationId || "").slice(0, 8)}...
+            <div className="text-xs text-muted-foreground space-y-1">
+              <div className="truncate" title={String(gccMemory["gcc.project_id"] || "")} data-testid="text-gcc-project">
+                Project: {String(gccMemory["gcc.project_id"] || "—")}
               </div>
-              <div>Action: {String(gccMemory.lastAction || "none")}</div>
-              <div>Crumbs: {(gccMemory.breadcrumbs as string[] || []).length}</div>
+              <div data-testid="text-gcc-branch">
+                Branch: {String(gccMemory["gcc.branch"] || "main")}
+              </div>
+              <div data-testid="text-gcc-tier">
+                Tier: {String(gccMemory["gcc.tier"] || "tier1")}
+              </div>
+              <div data-testid="text-gcc-last-commit">
+                Last Commit: <span className="font-mono">{String(gccMemory["gcc.last_commit_id"] || "—")}</span>
+              </div>
+              <div data-testid="text-gcc-commit-count">
+                Commits: {Number(gccMemory["gcc.context_commit_count"] || 0)}
+              </div>
+              <div data-testid="text-gcc-action">
+                Action: {String(gccMemory["gcc.last_action"] || "none")}
+              </div>
             </div>
           </div>
         )}
