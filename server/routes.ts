@@ -569,7 +569,9 @@ export async function registerRoutes(
 
   app.post("/api/artifact-folders", async (req, res) => {
     try {
-      const parsed = insertArtifactFolderSchema.safeParse(req.body);
+      const body = { ...req.body };
+      if (body.parentId === "root") body.parentId = null;
+      const parsed = insertArtifactFolderSchema.safeParse(body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid folder data", errors: parsed.error.issues });
       }
@@ -626,7 +628,9 @@ export async function registerRoutes(
 
   app.post("/api/artifacts", async (req, res) => {
     try {
-      const parsed = insertArtifactSchema.safeParse(req.body);
+      const body = { ...req.body };
+      if (body.folderId === "root") body.folderId = null;
+      const parsed = insertArtifactSchema.safeParse(body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid artifact data", errors: parsed.error.issues });
       }
