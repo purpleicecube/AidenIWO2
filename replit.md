@@ -1,5 +1,39 @@
 # AIDEN_PTIB - Intelligent Work Order Orchestration
 
+## Version
+**Current: v0.2.4 MVP** — Core orchestration engine with LLM-powered routing, HITL intervention, and admin tooling.
+
+### v0.2.4 MVP — What's Included
+- 2-tier orchestration (Aiden as Tier 1 manager, sub-agents as Tier 2 workers)
+- Work order lifecycle: submit, process, complete, block, fail, retry, edit
+- LLM-powered policy evaluation and routing (multi-provider: OpenAI, Anthropic, OpenRouter, Groq)
+- Per-sub-agent LLM configuration (independent model/prompt per worker)
+- BDM (Blocked Decision Marker) system with structured failure info
+- HITL intervention: Re-issue to Aiden or Close Without Output with required explanation
+- Work order inline editing (title, description, type, priority) for blocked/pending/failed orders
+- Multi-step workflow templates with step dependencies, conditions, retries, timeouts
+- Agentic tools platform (slash_command, skill, cli, api, webhook) with sub-agent assignment
+- Workspace with artifact/folder management
+- Sandbox sessions for command execution
+- Persistent chat with GCC memory protocol (WS014 P_PODE contract)
+- Dashboard with stats, recent orders, system health monitoring
+- Dark/light theme, responsive sidebar navigation
+- Hardcoded fallback orchestration when LLM is unavailable
+
+### v1.0.0 MVP — Roadmap
+- **Authentication & RBAC**: User login, role-based access (admin, operator, viewer), per-user work order ownership
+- **Real-time updates**: WebSocket or SSE push for live work order status changes, log streaming
+- **Notification system**: Email/webhook alerts for blocked orders, completed workflows, operator assignments
+- **Audit trail**: Immutable log of all state transitions, user actions, and LLM decisions with timestamps
+- **Sub-agent health monitoring**: Heartbeat checks, uptime tracking, auto-disable on repeated failures
+- **Workflow visual builder**: Drag-and-drop workflow template editor with step dependency graph
+- **Bulk operations**: Multi-select work orders for batch processing, reassignment, or closure
+- **Search & filtering**: Full-text search across work orders, advanced filters (date range, status, assignee, type)
+- **Metrics & analytics**: Processing time trends, throughput charts, sub-agent performance scorecards
+- **LLM observability**: Token usage tracking, cost estimation, prompt versioning, response quality scoring
+- **API keys & external integrations**: Secure API key management for external consumers, webhook subscriptions
+- **Data export**: CSV/JSON export for work orders, execution logs, and analytics data
+
 ## Overview
 AIDEN_PTIB is a 2-tier work order orchestration platform:
 - **Tier 1 — Aiden (Manager)**: LLM-powered policy gate, approvals, routing decisions
