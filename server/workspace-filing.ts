@@ -41,6 +41,62 @@ function getOutputFolderName(deliverableType: string): string {
   }
 }
 
+function classifyWorkProductFolder(order: WorkOrder): string {
+  const tier2 = (order.tier2Result as any) || {};
+  const title = (order.title || "").toLowerCase();
+  const description = (order.description || "").toLowerCase();
+  const deliverableTitle = (tier2.output?.deliverableTitle || "").toLowerCase();
+  const deliverableType = (tier2.output?.deliverableType || "").toLowerCase();
+  const handler = (tier2.handler || "").toLowerCase();
+  const orderType = (order.type || "").toLowerCase();
+
+  const allText = `${title} ${description} ${deliverableTitle} ${deliverableType}`;
+
+  const planningKeywords = [
+    "plan", "planning", "roadmap", "strategy", "proposal", "design",
+    "blueprint", "architecture", "specification", "scope", "requirements",
+    "staging plan", "deployment plan", "migration plan", "rollout plan",
+    "assessment", "evaluation", "review plan", "audit plan",
+  ];
+  if (planningKeywords.some(kw => allText.includes(kw))) {
+    return "00_Planning";
+  }
+
+  const policyKeywords = [
+    "policy", "sop", "directive", "procedure", "guideline", "compliance",
+    "standard", "regulation", "protocol", "rule",
+  ];
+  if (policyKeywords.some(kw => allText.includes(kw))) {
+    return "01_Directive-SOP";
+  }
+
+  const orchestrationKeywords = [
+    "workflow", "orchestration", "pipeline", "automation", "integration",
+    "configuration", "template", "schedule",
+  ];
+  if (orchestrationKeywords.some(kw => allText.includes(kw))) {
+    return "03_Orchestration";
+  }
+
+  const resourceKeywords = [
+    "template", "reference", "resource", "guide", "documentation",
+    "tutorial", "manual", "handbook",
+  ];
+  if (resourceKeywords.some(kw => allText.includes(kw))) {
+    return "04_Resources";
+  }
+
+  const testKeywords = [
+    "test", "testing", "qa", "quality", "validation", "verification",
+    "benchmark", "performance test",
+  ];
+  if (testKeywords.some(kw => allText.includes(kw))) {
+    return "06_Tests";
+  }
+
+  return "05_Artifacts";
+}
+
 function getFileExtension(deliverableType: string): string {
   switch (deliverableType) {
     case "code": return ".md";
@@ -142,20 +198,27 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       }
     }
 
-    const artDateFolder = await ensureSubFolder(
-      artifactsFolder.id, artifactsFolder.path, dateStr,
-      `Artifacts from ${dateStr}`
+    const targetFolderName = classifyWorkProductFolder(order);
+    let targetFolder = await getRootFolder(targetFolderName);
+
+    if (!targetFolder) {
+      targetFolder = artifactsFolder;
+    }
+
+    const targetDateFolder = await ensureSubFolder(
+      targetFolder.id, targetFolder.path, dateStr,
+      `${targetFolder.name.replace(/^\d+_/, "")} from ${dateStr}`
     );
 
-    const artOrderFolder = await ensureSubFolder(
-      artDateFolder.id, artDateFolder.path, folderName,
+    const targetOrderFolder = await ensureSubFolder(
+      targetDateFolder.id, targetDateFolder.path, folderName,
       `Work order: ${order.title}`
     );
 
-    const workProductContent = buildWorkProduct(order, logs, deliverableFilePath);
+    const workProductContent = buildWorkProduct(order, logs, deliverableFilePath, targetFolderName);
     await storage.createArtifact({
       name: "work-product.md",
-      folderId: artOrderFolder.id,
+      folderId: targetOrderFolder.id,
       type: "file",
       mimeType: "text/markdown",
       content: workProductContent,
@@ -167,7 +230,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       sourceId: order.id,
     });
 
-    console.log(`Auto-filed work order "${order.title}" to Workspace (02_Execution + 05_Artifacts + ${deliverableFilePath ? "deliverable" : "no deliverable"})`);
+    console.log(`Auto-filed work order "${order.title}" to Workspace (02_Execution + ${targetFolderName} + ${deliverableFilePath ? "deliverable" : "no deliverable"})`);
   } catch (err: any) {
     console.error("Auto-filing failed:", err.message);
   }
@@ -220,7 +283,7 @@ _Auto-filed by Aiden on ${new Date().toISOString()}_
 `;
 }
 
-function buildWorkProduct(order: WorkOrder, logs: ExecutionLog[], deliverableFilePath: string | null): string {
+function buildWorkProduct(order: WorkOrder, logs: ExecutionLog[], deliverableFilePath: string | null, filedToFolder: string = "05_Artifacts"): string {
   const tier2 = (order.tier2Result as any) || {};
   const gcc = (order.gccMemory as any) || {};
   const summary = tier2.output?.message || "Work order completed successfully.";
@@ -257,6 +320,9 @@ ${(gcc.breadcrumbs as string[] || []).map((b: string) => `- ${b.replace(/_/g, " 
 - **Routing**: ${tier2.handler || "N/A"}
 - **Execution Mode**: ${order.executionMode || "auto"}
 ${order.assignedSubAgentId ? `- **Assigned Sub-Agent**: ${order.assignedSubAgentId}` : ""}
+
+## Filed To
+\`${filedToFolder}\`
 
 ## References
 - Execution Log: \`02_Execution/${new Date().toISOString().split("T")[0]}/${slugify(order.title)}_${order.id.slice(0, 8)}/execution-log.md\`
