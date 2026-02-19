@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +35,9 @@ import {
   UserCheck,
   GitBranch,
   ShieldCheck,
+  RefreshCw,
+  XCircle,
+  CircleAlert,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
 import { useState } from "react";
@@ -116,6 +118,51 @@ function TimelineItem({
   );
 }
 
+function BlockedSummary({ order }: { order: WorkOrder }) {
+  const bdm = order.bdmMarker as Record<string, any> | null;
+  const tier2 = order.tier2Result as Record<string, any> | null;
+
+  const reason = bdm?.reason || tier2?.reason || "Unknown reason";
+  const tier = bdm?.tier ?? (tier2 ? 2 : null);
+  const type = bdm?.type || "execution_block";
+
+  const hasOutput = tier2 && !tier2.blocked && tier2.output;
+
+  return (
+    <div className="rounded-md border border-red-200 dark:border-red-800/40 overflow-hidden" data-testid="blocked-summary">
+      <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/10">
+        <CircleAlert className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+        <div className="space-y-1 min-w-0">
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">
+            This work order is blocked
+          </p>
+          <p className="text-sm text-red-600 dark:text-red-300">
+            {reason}
+          </p>
+        </div>
+      </div>
+      <div className="px-4 py-3 bg-red-50/50 dark:bg-red-900/5 space-y-2">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+          {tier != null && (
+            <span>Blocked at: <span className="font-medium text-foreground">Tier {tier}</span></span>
+          )}
+          <span>Type: <span className="font-medium text-foreground capitalize">{String(type).replace(/_/g, " ")}</span></span>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+          <span>Output produced: <span className="font-medium text-foreground">{hasOutput ? "Yes" : "No"}</span></span>
+        </div>
+      </div>
+      <div className="px-4 py-3 border-t border-red-100 dark:border-red-800/20 bg-muted/30">
+        <p className="text-xs text-muted-foreground">
+          {hasOutput
+            ? "Some output was produced before the block. You can re-issue to Aiden to attempt completion, or close the order."
+            : "No output was produced. Use \"Re-issue to Aiden\" to try again, or \"Close Without Output\" if no longer needed."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkOrderDetail() {
   const params = useParams<{ id: string }>();
   const { toast } = useToast();
@@ -161,33 +208,52 @@ export default function WorkOrderDetail() {
     },
   });
 
-  const [unblockOpen, setUnblockOpen] = useState(false);
-  const [unblockResolution, setUnblockResolution] = useState("");
-  const [unblockReprocess, setUnblockReprocess] = useState(true);
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
 
-  const unblockMutation = useMutation({
+  const invalidateOrderQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id] });
+    queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id, "logs"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+  };
+
+  const reissueMutation = useMutation({
     mutationFn: () =>
       apiRequest("POST", `/api/work-orders/${params.id}/unblock`, {
-        resolution: unblockResolution,
-        reprocess: unblockReprocess,
+        resolution: "Re-issued to Aiden for re-processing.",
+        reprocess: true,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id, "logs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
-      setUnblockOpen(false);
-      setUnblockResolution("");
+      invalidateOrderQueries();
       toast({
-        title: "BDM Unblocked",
-        description: unblockReprocess
-          ? "BDM marker cleared and work order re-submitted for processing."
-          : "BDM marker cleared and work order marked complete.",
+        title: "Re-issued to Aiden",
+        description: "Work order has been cleared and re-submitted for processing.",
       });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to unblock work order.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to re-issue work order.", variant: "destructive" });
+    },
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${params.id}/unblock`, {
+        resolution: closeReason,
+        reprocess: false,
+      }),
+    onSuccess: () => {
+      invalidateOrderQueries();
+      setCloseDialogOpen(false);
+      setCloseReason("");
+      toast({
+        title: "Work order closed",
+        description: "Marked as complete without re-processing.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to close work order.", variant: "destructive" });
     },
   });
 
@@ -265,21 +331,34 @@ export default function WorkOrderDetail() {
             </Button>
           )}
           {order.status === "blocked" && order.bdmMarker && (
-            <Button
-              onClick={() => {
-                setUnblockResolution("");
-                setUnblockReprocess(true);
-                setUnblockOpen(true);
-              }}
-              data-testid="button-unblock"
-            >
-              <ShieldCheck className="w-4 h-4 mr-2" />
-              Resolve &amp; Unblock
-            </Button>
+            <>
+              <Button
+                onClick={() => reissueMutation.mutate()}
+                disabled={reissueMutation.isPending}
+                data-testid="button-reissue"
+              >
+                {reissueMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                {reissueMutation.isPending ? "Re-issuing..." : "Re-issue to Aiden"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCloseReason("");
+                  setCloseDialogOpen(true);
+                }}
+                data-testid="button-close-order"
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Close Without Output
+              </Button>
+            </>
           )}
-          {(order.status === "blocked" || order.status === "failed") && (
+          {order.status === "failed" && (
             <Button
-              variant="outline"
               onClick={() => retryMutation.mutate()}
               disabled={retryMutation.isPending}
               data-testid="button-retry"
@@ -295,76 +374,46 @@ export default function WorkOrderDetail() {
         </div>
       </div>
 
-      <Dialog open={unblockOpen} onOpenChange={setUnblockOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5" />
-              Resolve BDM &amp; Unblock
+              <XCircle className="w-5 h-5" />
+              Close Without Output
             </DialogTitle>
             <DialogDescription>
-              As a Human-In-The-Loop operator, provide a resolution for the blocked decision marker and choose how to proceed.
+              This will mark the work order as complete without producing any output. Please explain why you are closing it instead of re-issuing.
             </DialogDescription>
           </DialogHeader>
 
-          {order.bdmMarker && (
-            <div className="p-3 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/10 dark:border-amber-800/30">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Current BDM Marker</p>
-              </div>
-              <pre className="text-xs font-mono text-amber-800 dark:text-amber-300 mt-1 overflow-x-auto max-h-32 overflow-y-auto">
-                {JSON.stringify(order.bdmMarker, null, 2)}
-              </pre>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="resolution">Resolution Notes</Label>
-              <Textarea
-                id="resolution"
-                value={unblockResolution}
-                onChange={(e) => setUnblockResolution(e.target.value)}
-                placeholder="Describe why this block is being resolved and any corrective action taken..."
-                className="min-h-[100px]"
-                data-testid="input-unblock-resolution"
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/50">
-              <div className="space-y-0.5">
-                <Label htmlFor="reprocess" className="text-sm font-medium">Re-process through Aiden</Label>
-                <p className="text-xs text-muted-foreground">
-                  {unblockReprocess
-                    ? "Clear the BDM and re-submit for Tier 2 execution"
-                    : "Clear the BDM and mark as complete (no re-processing)"}
-                </p>
-              </div>
-              <Switch
-                id="reprocess"
-                checked={unblockReprocess}
-                onCheckedChange={setUnblockReprocess}
-                data-testid="switch-reprocess"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="close-reason">Why are you closing this?</Label>
+            <Textarea
+              id="close-reason"
+              value={closeReason}
+              onChange={(e) => setCloseReason(e.target.value)}
+              placeholder="e.g., No longer needed, handled externally, duplicate of another order..."
+              className="min-h-[100px]"
+              data-testid="input-close-reason"
+            />
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUnblockOpen(false)} data-testid="button-cancel-unblock">
+            <Button variant="outline" onClick={() => setCloseDialogOpen(false)} data-testid="button-cancel-close">
               Cancel
             </Button>
             <Button
-              onClick={() => unblockMutation.mutate()}
-              disabled={unblockMutation.isPending}
-              data-testid="button-confirm-unblock"
+              variant="destructive"
+              onClick={() => closeMutation.mutate()}
+              disabled={closeMutation.isPending || closeReason.trim().length === 0}
+              data-testid="button-confirm-close"
             >
-              {unblockMutation.isPending ? (
+              {closeMutation.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <ShieldCheck className="w-4 h-4 mr-2" />
+                <XCircle className="w-4 h-4 mr-2" />
               )}
-              {unblockMutation.isPending ? "Unblocking..." : "Confirm Unblock"}
+              {closeMutation.isPending ? "Closing..." : "Close Order"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -382,7 +431,11 @@ export default function WorkOrderDetail() {
                 <p className="text-sm" data-testid="text-order-description">{order.description}</p>
               </div>
 
-              {order.bdmMarker && (
+              {order.status === "blocked" && order.bdmMarker && (
+                <BlockedSummary order={order} />
+              )}
+
+              {order.status !== "blocked" && order.bdmMarker && (
                 <div className="p-3 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/10 dark:border-amber-800/30">
                   <div className="flex items-center gap-2 mb-1">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
