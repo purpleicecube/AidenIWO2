@@ -9,6 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -35,7 +40,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu } from "lucide-react";
+import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu, CheckCircle2, XCircle, AlertTriangle, Zap } from "lucide-react";
 import { ModelSelector, providers } from "@/components/model-selector";
 import type { SubAgent } from "@shared/schema";
 
@@ -62,6 +67,70 @@ const subAgentFormSchema = z.object({
 
 type SubAgentForm = z.infer<typeof subAgentFormSchema>;
 
+interface LlmStatus {
+  status: string;
+  llmReady: boolean;
+  aidenDirected: boolean;
+  source?: string;
+  provider?: string;
+  model?: string;
+  reason?: string;
+}
+
+function OperationalBadge({ agentId }: { agentId: string }) {
+  const { data: llmStatus, isLoading } = useQuery<LlmStatus>({
+    queryKey: ["/api/sub-agents", agentId, "llm-status"],
+    queryFn: async () => {
+      const res = await fetch(`/api/sub-agents/${agentId}/llm-status`);
+      return res.json();
+    },
+  });
+
+  if (isLoading || !llmStatus) return null;
+
+  const isOperational = llmStatus.llmReady && llmStatus.aidenDirected;
+  const isReady = llmStatus.llmReady && !llmStatus.aidenDirected;
+  const isMissing = llmStatus.status === "missing_key";
+  const isNoLlm = llmStatus.status === "no_llm";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={`flex items-center gap-1 text-xs font-medium ${
+            isOperational
+              ? "text-emerald-600 dark:text-emerald-400"
+              : isReady
+              ? "text-blue-600 dark:text-blue-400"
+              : isMissing
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-muted-foreground"
+          }`}
+          data-testid={`operational-status-${agentId}`}
+        >
+          {isOperational ? (
+            <><CheckCircle2 className="w-3.5 h-3.5" /> Operational</>
+          ) : isReady ? (
+            <><CheckCircle2 className="w-3.5 h-3.5" /> LLM Ready</>
+          ) : isMissing ? (
+            <><AlertTriangle className="w-3.5 h-3.5" /> Key Missing</>
+          ) : isNoLlm ? (
+            <><XCircle className="w-3.5 h-3.5" /> No LLM</>
+          ) : (
+            <><XCircle className="w-3.5 h-3.5" /> Offline</>
+          )}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs max-w-[250px]">{llmStatus.reason || "Unknown status"}</p>
+        {llmStatus.source && (
+          <p className="text-xs text-muted-foreground mt-0.5">Source: {llmStatus.source}</p>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function AgentCard({ agent, onEdit, onDelete }: { agent: SubAgent; onEdit: (a: SubAgent) => void; onDelete: (id: string) => void }) {
   return (
     <Card data-testid={`card-sub-agent-${agent.id}`}>
@@ -87,6 +156,7 @@ function AgentCard({ agent, onEdit, onDelete }: { agent: SubAgent; onEdit: (a: S
                 >
                   {agent.status}
                 </Badge>
+                <OperationalBadge agentId={agent.id} />
               </div>
               {agent.description && (
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{agent.description}</p>
@@ -141,6 +211,8 @@ export default function SubAgentsPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<SubAgent | null>(null);
+  const [testResult, setTestResult] = useState<{ operational: boolean; message?: string; reason?: string; source?: string; provider?: string; model?: string } | null>(null);
+  const [testingLlm, setTestingLlm] = useState(false);
 
   const { data: agents, isLoading } = useQuery<SubAgent[]>({
     queryKey: ["/api/sub-agents"],
@@ -210,6 +282,7 @@ export default function SubAgentsPage() {
 
   function openCreate() {
     setEditingAgent(null);
+    setTestResult(null);
     form.reset({
       name: "",
       type: "general",
@@ -229,6 +302,7 @@ export default function SubAgentsPage() {
 
   function openEdit(agent: SubAgent) {
     setEditingAgent(agent);
+    setTestResult(null);
     form.reset({
       name: agent.name,
       type: agent.type,
@@ -593,6 +667,67 @@ export default function SubAgentsPage() {
                         </FormItem>
                       )}
                     />
+
+                    {editingAgent && (
+                      <div className="pt-2 space-y-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={testingLlm}
+                          onClick={async () => {
+                            if (!editingAgent) return;
+                            setTestingLlm(true);
+                            setTestResult(null);
+                            try {
+                              const res = await apiRequest("POST", `/api/sub-agents/${editingAgent.id}/test-llm`);
+                              const result = await res.json();
+                              setTestResult(result);
+                              queryClient.invalidateQueries({ queryKey: ["/api/sub-agents", editingAgent.id, "llm-status"] });
+                            } catch (err: any) {
+                              setTestResult({ operational: false, reason: err.message });
+                            } finally {
+                              setTestingLlm(false);
+                            }
+                          }}
+                          data-testid="button-test-llm-connection"
+                        >
+                          {testingLlm ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                          ) : (
+                            <Zap className="w-3.5 h-3.5 mr-2" />
+                          )}
+                          Test Connection
+                        </Button>
+                        {testResult && (
+                          <div
+                            className={`flex items-start gap-2 p-2 rounded-md text-xs ${
+                              testResult.operational
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                            }`}
+                            data-testid="container-test-result"
+                          >
+                            {testResult.operational ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            )}
+                            <div>
+                              <p className="font-medium">
+                                {testResult.operational ? "Connection Successful" : "Connection Failed"}
+                              </p>
+                              <p className="mt-0.5">
+                                {testResult.message || testResult.reason}
+                              </p>
+                              {testResult.source && (
+                                <p className="text-muted-foreground mt-0.5">Source: {testResult.source}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

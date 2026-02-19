@@ -17,8 +17,9 @@ import {
   insertChatSessionSchema,
   insertChatMessageSchema,
 } from "@shared/schema";
+import type { LlmSettings } from "@shared/schema";
 import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
-import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden } from "./llm-client";
+import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig } from "./llm-client";
 
 const startTime = Date.now();
 
@@ -219,6 +220,90 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to delete sub-agent" });
+    }
+  });
+
+  app.post("/api/sub-agents/:id/test-llm", async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+
+      const globalSettings = await storage.getLlmSettings();
+      const config = resolveSubAgentLlmConfig(agent, globalSettings || undefined);
+
+      if (!config) {
+        return res.json({
+          operational: false,
+          source: "none",
+          reason: "No LLM configuration available. Neither sub-agent nor Aiden global LLM is configured.",
+        });
+      }
+
+      const apiKey = process.env[config.apiKeyEnvVar];
+      if (!apiKey) {
+        return res.json({
+          operational: false,
+          source: config.source,
+          reason: `API key secret "${config.apiKeyEnvVar}" is not set. Add it in the Secrets tab.`,
+        });
+      }
+
+      const testSettings: LlmSettings = {
+        id: "test",
+        provider: config.provider,
+        model: config.model,
+        baseUrl: config.baseUrl,
+        systemPrompt: config.systemPrompt,
+        enabled: true,
+      };
+
+      const result = await testLLMConnection(testSettings);
+      res.json({
+        operational: result.success,
+        source: config.source,
+        provider: config.provider,
+        model: config.model,
+        message: result.message,
+        aidenDirected: agent.controlMode === "aiden",
+      });
+    } catch (err: any) {
+      res.json({
+        operational: false,
+        source: "unknown",
+        reason: `Connection test failed: ${err.message}`,
+      });
+    }
+  });
+
+  app.get("/api/sub-agents/:id/llm-status", async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+
+      const globalSettings = await storage.getLlmSettings();
+      const config = resolveSubAgentLlmConfig(agent, globalSettings || undefined);
+
+      if (!config) {
+        return res.json({
+          status: "no_llm",
+          llmReady: false,
+          aidenDirected: agent.controlMode === "aiden",
+          reason: "No LLM configured",
+        });
+      }
+
+      const apiKey = process.env[config.apiKeyEnvVar];
+      res.json({
+        status: apiKey ? "ready" : "missing_key",
+        llmReady: !!apiKey,
+        aidenDirected: agent.controlMode === "aiden",
+        source: config.source,
+        provider: config.provider,
+        model: config.model,
+        reason: apiKey ? `Using ${config.source} LLM (${config.provider}/${config.model})` : `API key not found. Add it in the Secrets tab.`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to check LLM status" });
     }
   });
 
