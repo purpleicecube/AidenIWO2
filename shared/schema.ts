@@ -52,6 +52,37 @@ export type WorkOrder = typeof workOrders.$inferSelect;
 export type InsertExecutionLog = z.infer<typeof insertExecutionLogSchema>;
 export type ExecutionLog = typeof executionLogs.$inferSelect;
 
+export const llmSettings = pgTable("llm_settings", {
+  id: varchar("id").primaryKey().default(sql`'default'`),
+  provider: text("provider").notNull().default("openai"),
+  model: text("model").notNull().default("gpt-4o"),
+  baseUrl: text("base_url"),
+  systemPrompt: text("system_prompt").notNull().default(
+    `You are Aiden, an intelligent work order orchestration engine. You operate within a 2-tier architecture:
+
+Tier 1 (Manager): You evaluate incoming work orders against policy rules. You decide whether to approve or block them, and which handler to route approved orders to.
+
+Tier 2 (Worker): You validate the work order schema and execute the work. You may emit a BDM (Blocked Decision Marker) if execution cannot proceed.
+
+Rules:
+- Critical deployments should be blocked at Tier 1 for manual review
+- Critical incidents should be carefully evaluated - block if escalation is needed
+- Always provide clear reasoning for your decisions
+- Never allow Tier 2 to Tier 2 direct chaining
+- Use GCC memory for routing context and correlation IDs only`
+  ),
+  enabled: boolean("enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLlmSettingsSchema = createInsertSchema(llmSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertLlmSettings = z.infer<typeof insertLlmSettingsSchema>;
+export type LlmSettings = typeof llmSettings.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),

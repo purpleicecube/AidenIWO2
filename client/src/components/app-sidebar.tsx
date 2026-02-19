@@ -1,4 +1,4 @@
-import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -71,8 +71,23 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location === "/architecture"} data-testid="link-nav-tier-overview">
                   <Link href="/architecture">
-                    <Settings className="w-4 h-4" />
+                    <Layers className="w-4 h-4" />
                     <span>Tier Overview</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/settings"} data-testid="link-nav-aiden-settings">
+                  <Link href="/settings">
+                    <Brain className="w-4 h-4" />
+                    <span>Aiden Settings</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

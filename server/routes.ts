@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkOrderSchema } from "@shared/schema";
+import { insertWorkOrderSchema, insertLlmSettingsSchema } from "@shared/schema";
 import { processWorkOrder } from "./orchestration";
+import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection } from "./llm-client";
 
 const startTime = Date.now();
 
@@ -148,6 +149,66 @@ export async function registerRoutes(
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: "Failed to retry work order" });
+    }
+  });
+
+  app.get("/api/llm-settings", async (_req, res) => {
+    try {
+      const settings = await storage.getLlmSettings();
+      const provider = settings?.provider || "openai";
+      const keyName = getRequiredApiKeyName(provider);
+      res.json({
+        settings: settings || {
+          id: "default",
+          provider: "openai",
+          model: "gpt-4o",
+          baseUrl: null,
+          systemPrompt: "",
+          enabled: false,
+        },
+        apiKeyConfigured: isApiKeyConfigured(provider),
+        requiredKeyName: keyName,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch LLM settings" });
+    }
+  });
+
+  app.put("/api/llm-settings", async (req, res) => {
+    try {
+      const parsed = insertLlmSettingsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid settings", errors: parsed.error.issues });
+      }
+      const updated = await storage.upsertLlmSettings(parsed.data);
+      const keyName = getRequiredApiKeyName(updated.provider);
+      res.json({
+        settings: updated,
+        apiKeyConfigured: isApiKeyConfigured(updated.provider),
+        requiredKeyName: keyName,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update LLM settings" });
+    }
+  });
+
+  app.post("/api/llm-settings/test", async (_req, res) => {
+    try {
+      const settings = await storage.getLlmSettings();
+      if (!settings) {
+        return res.status(400).json({ success: false, message: "No LLM settings configured" });
+      }
+      if (!isApiKeyConfigured(settings.provider)) {
+        return res.status(400).json({
+          success: false,
+          message: `API key not configured. Please set ${getRequiredApiKeyName(settings.provider)} in your secrets.`,
+        });
+      }
+
+      const result = await testLLMConnection(settings);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message || "Connection test failed" });
     }
   });
 

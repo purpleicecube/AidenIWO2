@@ -14,6 +14,7 @@ import WorkOrderDetail from "@/pages/work-order-detail";
 import SubmitOrder from "@/pages/submit-order";
 import SystemHealth from "@/pages/system-health";
 import Architecture from "@/pages/architecture";
+import Settings from "@/pages/settings";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/submit" component={SubmitOrder} />
       <Route path="/health" component={SystemHealth} />
       <Route path="/architecture" component={Architecture} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

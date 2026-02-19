@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import type { WorkOrder } from "@shared/schema";
+import { runTier1WithLLM, runTier2WithLLM, type Tier1Result, type Tier2Result } from "./llm-client";
 
 export async function processWorkOrder(orderId: string): Promise<WorkOrder | undefined> {
   const order = await storage.getWorkOrder(orderId);
@@ -7,22 +8,27 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
 
   await storage.updateWorkOrder(orderId, { status: "processing" });
 
+  const settings = await storage.getLlmSettings();
+  const useLLM = settings?.enabled === true;
+
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 1,
     action: "Policy Gate",
-    message: `Tier 1 received work order "${order.title}" — checking policy rules and mode.`,
-    metadata: { type: order.type, priority: order.priority },
+    message: `Tier 1 received work order "${order.title}" — checking policy rules${useLLM ? " via Aiden LLM" : ""}.`,
+    metadata: { type: order.type, priority: order.priority, aiEnabled: useLLM },
   });
 
-  const tier1Result = await runTier1PolicyGate(order);
+  const tier1Result: Tier1Result = useLLM && settings
+    ? await runTier1WithLLM(settings, order)
+    : runTier1PolicyGate(order);
 
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 1,
     action: "Policy Decision",
     message: tier1Result.approved
-      ? "Policy gate passed — dispatching to Tier 2."
+      ? `Policy gate passed${useLLM ? " (Aiden)" : ""} — dispatching to Tier 2.`
       : `Policy gate blocked: ${tier1Result.reason}`,
     metadata: tier1Result,
   });
@@ -74,13 +80,15 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     metadata: { handler: tier1Result.handler },
   });
 
-  const tier2Result = await runTier2Execution(order, tier1Result);
+  const tier2Result: Tier2Result = useLLM && settings
+    ? await runTier2WithLLM(settings, order, tier1Result)
+    : runTier2Execution(order, tier1Result);
 
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 2,
     action: "Schema Validation",
-    message: "Work order schema validated successfully.",
+    message: `Work order schema validated successfully${useLLM ? " by Aiden" : ""}.`,
     metadata: { valid: true },
   });
 
@@ -126,7 +134,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     workOrderId: orderId,
     tier: 2,
     action: "Execution Complete",
-    message: `Work order executed successfully via ${tier1Result.handler} handler.`,
+    message: `Work order executed successfully via ${tier1Result.handler} handler${useLLM ? " (Aiden)" : ""}.`,
     metadata: tier2Result,
   });
 
@@ -151,7 +159,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   });
 }
 
-function runTier1PolicyGate(order: WorkOrder) {
+function runTier1PolicyGate(order: WorkOrder): Tier1Result {
   const isBlocked =
     order.priority === "critical" && order.type === "deployment";
 
@@ -174,13 +182,13 @@ function runTier1PolicyGate(order: WorkOrder) {
 
   return {
     approved: true,
-    reason: null,
+    reason: "Policy gate passed — all rules satisfied.",
     mode: "auto",
     handler: handlerMap[order.type] || "general_executor",
   };
 }
 
-function runTier2Execution(order: WorkOrder, tier1Result: any) {
+function runTier2Execution(order: WorkOrder, tier1Result: Tier1Result): Tier2Result {
   const shouldBlock =
     order.type === "incident" && order.priority === "critical";
 
@@ -189,6 +197,7 @@ function runTier2Execution(order: WorkOrder, tier1Result: any) {
       blocked: true,
       reason: "Critical incident requires escalation — BDM marker emitted for human review.",
       executionId: null,
+      handler: tier1Result.handler,
     };
   }
 
@@ -197,10 +206,8 @@ function runTier2Execution(order: WorkOrder, tier1Result: any) {
     reason: null,
     executionId: `exec_${Date.now()}`,
     handler: tier1Result.handler,
-    duration: Math.floor(Math.random() * 3000) + 500,
     output: {
       message: `Work order "${order.title}" processed successfully.`,
-      handler: tier1Result.handler,
     },
   };
 }

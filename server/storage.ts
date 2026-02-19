@@ -5,9 +5,12 @@ import {
   type InsertExecutionLog,
   type User,
   type InsertUser,
+  type LlmSettings,
+  type InsertLlmSettings,
   workOrders,
   executionLogs,
   users,
+  llmSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -33,6 +36,9 @@ export interface IStorage {
 
   getExecutionLogs(workOrderId: string): Promise<ExecutionLog[]>;
   createExecutionLog(log: InsertExecutionLog): Promise<ExecutionLog>;
+
+  getLlmSettings(): Promise<LlmSettings | undefined>;
+  upsertLlmSettings(settings: InsertLlmSettings): Promise<LlmSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -106,6 +112,28 @@ export class DatabaseStorage implements IStorage {
 
   async createExecutionLog(log: InsertExecutionLog): Promise<ExecutionLog> {
     const [created] = await db.insert(executionLogs).values(log).returning();
+    return created;
+  }
+
+  async getLlmSettings(): Promise<LlmSettings | undefined> {
+    const [settings] = await db.select().from(llmSettings).where(eq(llmSettings.id, "default"));
+    return settings;
+  }
+
+  async upsertLlmSettings(settings: InsertLlmSettings): Promise<LlmSettings> {
+    const existing = await this.getLlmSettings();
+    if (existing) {
+      const [updated] = await db
+        .update(llmSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(llmSettings.id, "default"))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(llmSettings)
+      .values({ ...settings, id: "default" })
+      .returning();
     return created;
   }
 }
