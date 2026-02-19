@@ -6,7 +6,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - **Tier 2 — Sub-Agents (Workers)**: Specialized workers that execute work orders
   - **Aiden-controlled**: Aiden directly controls and executes through the sub-agent
   - **Independent**: Authorized human or AI operator executes independently
-- **System Admin**: A human who configures sub-agents, their control modes, and operator assignments
+- **System Admin**: A human who configures sub-agents, workflows, tools, and their assignments
 - **GCC Memory**: Shared context between tiers (routing context, correlation IDs, execution breadcrumbs)
 - **BDM Markers**: Blocked Decision Markers emitted when work orders cannot proceed
 
@@ -17,16 +17,16 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - Styling: Tailwind CSS with Inter font family
 
 ## Project Structure
-- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents
+- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools
 - `client/src/components/` - AppSidebar, ThemeProvider, ThemeToggle, StatusBadge
 - `client/src/hooks/` - usePageTitle
 - `server/routes.ts` - API endpoints
-- `server/orchestration.ts` - Aiden (Tier 1) and sub-agent (Tier 2) processing logic
+- `server/orchestration.ts` - Aiden (Tier 1), sub-agent (Tier 2), and workflow execution engine
 - `server/llm-client.ts` - Multi-provider LLM abstraction with structured JSON parsing
 - `server/storage.ts` - DatabaseStorage with all CRUD operations
 - `server/seed.ts` - Database seeding with sample work orders
 - `server/db.ts` - Database connection pool
-- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users)
+- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users, workflowTemplates, workflowSteps, workflowExecutions, workflowStepRuns, tools, subAgentTools)
 
 ## Key API Endpoints
 - `GET /api/health` - System health check
@@ -46,6 +46,26 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `GET /api/llm-settings` - Get Aiden LLM configuration
 - `PUT /api/llm-settings` - Update Aiden LLM configuration
 - `POST /api/llm-settings/test` - Test LLM provider connection
+- `GET /api/workflow-templates` - List workflow templates
+- `GET /api/workflow-templates/:id` - Get template with steps
+- `POST /api/workflow-templates` - Create workflow template
+- `PUT /api/workflow-templates/:id` - Update workflow template
+- `DELETE /api/workflow-templates/:id` - Delete workflow template
+- `POST /api/workflow-templates/:templateId/steps` - Create workflow step
+- `PUT /api/workflow-steps/:id` - Update workflow step
+- `DELETE /api/workflow-steps/:id` - Delete workflow step
+- `GET /api/workflow-executions` - List workflow executions
+- `GET /api/workflow-executions/:id` - Get execution with step runs
+- `POST /api/workflow-executions` - Start workflow execution
+- `POST /api/workflow-executions/:id/advance` - Advance workflow execution
+- `GET /api/tools` - List all tools
+- `GET /api/tools/:id` - Get tool detail
+- `POST /api/tools` - Create/deploy a tool
+- `PUT /api/tools/:id` - Update a tool
+- `DELETE /api/tools/:id` - Delete a tool
+- `GET /api/sub-agents/:id/tools` - Get tools assigned to a sub-agent
+- `POST /api/sub-agents/:id/tools` - Assign a tool to a sub-agent
+- `DELETE /api/sub-agents/:subAgentId/tools/:toolId` - Remove tool assignment
 
 ## LLM Integration
 - **Providers**: OpenAI, Anthropic, OpenRouter, Groq
@@ -58,10 +78,25 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 1. Work order submitted via API
 2. Aiden (Tier 1) evaluates against policy rules
 3. If approved, Aiden routes to the best matching sub-agent
-4. If sub-agent is "aiden" mode → Aiden runs Tier 2 execution automatically
-5. If sub-agent is "independent" mode → work order set to "awaiting_operator" for human/AI action
+4. If sub-agent is "aiden" mode -> Aiden runs Tier 2 execution automatically
+5. If sub-agent is "independent" mode -> work order set to "awaiting_operator" for human/AI action
 6. Sub-agents can emit BDM markers if execution is blocked
 7. Aiden resolves or pauses for human decision
+
+## Multi-Step Workflow Orchestration
+1. Workflow templates define reusable multi-step pipelines with ordered steps
+2. Each step can be assigned a sub-agent type, specific sub-agent, and tools
+3. Steps support dependencies, conditions, retry policies, and timeouts
+4. Workflow executions track running instances step-by-step
+5. Aiden selects appropriate tools for each step during execution
+6. Steps pause for independent operators (awaiting_operator status)
+7. Workflow engine resolves dependencies and advances through steps automatically
+
+## Agentic Tools Platform
+- Tools are deployable capabilities (slash_command, skill, cli, api, webhook)
+- Tools are registered in the tools registry with versioning and status
+- Tools are assigned to sub-agents for use during workflow execution
+- Aiden selects tools per step based on sub-agent assignments and step requirements
 
 ## Work Order Statuses
 - `pending` - Awaiting processing
@@ -70,6 +105,14 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `blocked` - Blocked by policy or BDM marker
 - `failed` - Execution failed
 - `awaiting_operator` - Assigned to independent sub-agent, waiting for operator
+
+## Workflow Step Statuses
+- `pending` - Step not yet started
+- `running` - Step currently executing
+- `completed` - Step finished successfully
+- `skipped` - Step skipped (conditions not met)
+- `failed` - Step execution failed
+- `awaiting_operator` - Waiting for independent operator
 
 ## Running
 - `npm run dev` starts both frontend and backend on port 5000

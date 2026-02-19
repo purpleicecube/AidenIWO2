@@ -9,14 +9,32 @@ import {
   type InsertLlmSettings,
   type SubAgent,
   type InsertSubAgent,
+  type WorkflowTemplate,
+  type InsertWorkflowTemplate,
+  type WorkflowStep,
+  type InsertWorkflowStep,
+  type WorkflowExecution,
+  type InsertWorkflowExecution,
+  type WorkflowStepRun,
+  type InsertWorkflowStepRun,
+  type Tool,
+  type InsertTool,
+  type SubAgentTool,
+  type InsertSubAgentTool,
   workOrders,
   executionLogs,
   users,
   llmSettings,
   subAgents,
+  workflowTemplates,
+  workflowSteps,
+  workflowExecutions,
+  workflowStepRuns,
+  tools,
+  subAgentTools,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, asc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -49,6 +67,40 @@ export interface IStorage {
   createSubAgent(agent: InsertSubAgent): Promise<SubAgent>;
   updateSubAgent(id: string, updates: Partial<SubAgent>): Promise<SubAgent | undefined>;
   deleteSubAgent(id: string): Promise<boolean>;
+
+  getWorkflowTemplates(): Promise<WorkflowTemplate[]>;
+  getWorkflowTemplate(id: string): Promise<WorkflowTemplate | undefined>;
+  createWorkflowTemplate(template: InsertWorkflowTemplate): Promise<WorkflowTemplate>;
+  updateWorkflowTemplate(id: string, updates: Partial<WorkflowTemplate>): Promise<WorkflowTemplate | undefined>;
+  deleteWorkflowTemplate(id: string): Promise<boolean>;
+
+  getWorkflowSteps(templateId: string): Promise<WorkflowStep[]>;
+  getWorkflowStep(id: string): Promise<WorkflowStep | undefined>;
+  createWorkflowStep(step: InsertWorkflowStep): Promise<WorkflowStep>;
+  updateWorkflowStep(id: string, updates: Partial<WorkflowStep>): Promise<WorkflowStep | undefined>;
+  deleteWorkflowStep(id: string): Promise<boolean>;
+
+  getWorkflowExecutions(): Promise<WorkflowExecution[]>;
+  getWorkflowExecution(id: string): Promise<WorkflowExecution | undefined>;
+  getWorkflowExecutionsByWorkOrder(workOrderId: string): Promise<WorkflowExecution[]>;
+  createWorkflowExecution(execution: InsertWorkflowExecution): Promise<WorkflowExecution>;
+  updateWorkflowExecution(id: string, updates: Partial<WorkflowExecution>): Promise<WorkflowExecution | undefined>;
+
+  getWorkflowStepRuns(executionId: string): Promise<WorkflowStepRun[]>;
+  getWorkflowStepRun(id: string): Promise<WorkflowStepRun | undefined>;
+  createWorkflowStepRun(run: InsertWorkflowStepRun): Promise<WorkflowStepRun>;
+  updateWorkflowStepRun(id: string, updates: Partial<WorkflowStepRun>): Promise<WorkflowStepRun | undefined>;
+
+  getTools(): Promise<Tool[]>;
+  getTool(id: string): Promise<Tool | undefined>;
+  getToolBySlug(slug: string): Promise<Tool | undefined>;
+  createTool(tool: InsertTool): Promise<Tool>;
+  updateTool(id: string, updates: Partial<Tool>): Promise<Tool | undefined>;
+  deleteTool(id: string): Promise<boolean>;
+
+  getSubAgentTools(subAgentId: string): Promise<(SubAgentTool & { tool: Tool })[]>;
+  assignToolToSubAgent(assignment: InsertSubAgentTool): Promise<SubAgentTool>;
+  removeToolFromSubAgent(subAgentId: string, toolId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -178,6 +230,171 @@ export class DatabaseStorage implements IStorage {
       .values({ ...settings, id: "default" })
       .returning();
     return created;
+  }
+
+  async getWorkflowTemplates(): Promise<WorkflowTemplate[]> {
+    return db.select().from(workflowTemplates).orderBy(desc(workflowTemplates.createdAt));
+  }
+
+  async getWorkflowTemplate(id: string): Promise<WorkflowTemplate | undefined> {
+    const [template] = await db.select().from(workflowTemplates).where(eq(workflowTemplates.id, id));
+    return template;
+  }
+
+  async createWorkflowTemplate(template: InsertWorkflowTemplate): Promise<WorkflowTemplate> {
+    const [created] = await db.insert(workflowTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateWorkflowTemplate(id: string, updates: Partial<WorkflowTemplate>): Promise<WorkflowTemplate | undefined> {
+    const [updated] = await db
+      .update(workflowTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(workflowTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWorkflowTemplate(id: string): Promise<boolean> {
+    await db.delete(workflowSteps).where(eq(workflowSteps.templateId, id));
+    await db.delete(workflowTemplates).where(eq(workflowTemplates.id, id));
+    return true;
+  }
+
+  async getWorkflowSteps(templateId: string): Promise<WorkflowStep[]> {
+    return db.select().from(workflowSteps).where(eq(workflowSteps.templateId, templateId)).orderBy(asc(workflowSteps.order));
+  }
+
+  async getWorkflowStep(id: string): Promise<WorkflowStep | undefined> {
+    const [step] = await db.select().from(workflowSteps).where(eq(workflowSteps.id, id));
+    return step;
+  }
+
+  async createWorkflowStep(step: InsertWorkflowStep): Promise<WorkflowStep> {
+    const [created] = await db.insert(workflowSteps).values(step).returning();
+    return created;
+  }
+
+  async updateWorkflowStep(id: string, updates: Partial<WorkflowStep>): Promise<WorkflowStep | undefined> {
+    const [updated] = await db
+      .update(workflowSteps)
+      .set(updates)
+      .where(eq(workflowSteps.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWorkflowStep(id: string): Promise<boolean> {
+    await db.delete(workflowSteps).where(eq(workflowSteps.id, id));
+    return true;
+  }
+
+  async getWorkflowExecutions(): Promise<WorkflowExecution[]> {
+    return db.select().from(workflowExecutions).orderBy(desc(workflowExecutions.createdAt));
+  }
+
+  async getWorkflowExecution(id: string): Promise<WorkflowExecution | undefined> {
+    const [execution] = await db.select().from(workflowExecutions).where(eq(workflowExecutions.id, id));
+    return execution;
+  }
+
+  async getWorkflowExecutionsByWorkOrder(workOrderId: string): Promise<WorkflowExecution[]> {
+    return db.select().from(workflowExecutions).where(eq(workflowExecutions.workOrderId, workOrderId)).orderBy(desc(workflowExecutions.createdAt));
+  }
+
+  async createWorkflowExecution(execution: InsertWorkflowExecution): Promise<WorkflowExecution> {
+    const [created] = await db.insert(workflowExecutions).values(execution).returning();
+    return created;
+  }
+
+  async updateWorkflowExecution(id: string, updates: Partial<WorkflowExecution>): Promise<WorkflowExecution | undefined> {
+    const [updated] = await db
+      .update(workflowExecutions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(workflowExecutions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getWorkflowStepRuns(executionId: string): Promise<WorkflowStepRun[]> {
+    return db.select().from(workflowStepRuns).where(eq(workflowStepRuns.executionId, executionId)).orderBy(asc(workflowStepRuns.createdAt));
+  }
+
+  async getWorkflowStepRun(id: string): Promise<WorkflowStepRun | undefined> {
+    const [run] = await db.select().from(workflowStepRuns).where(eq(workflowStepRuns.id, id));
+    return run;
+  }
+
+  async createWorkflowStepRun(run: InsertWorkflowStepRun): Promise<WorkflowStepRun> {
+    const [created] = await db.insert(workflowStepRuns).values(run).returning();
+    return created;
+  }
+
+  async updateWorkflowStepRun(id: string, updates: Partial<WorkflowStepRun>): Promise<WorkflowStepRun | undefined> {
+    const [updated] = await db
+      .update(workflowStepRuns)
+      .set(updates)
+      .where(eq(workflowStepRuns.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getTools(): Promise<Tool[]> {
+    return db.select().from(tools).orderBy(tools.name);
+  }
+
+  async getTool(id: string): Promise<Tool | undefined> {
+    const [tool] = await db.select().from(tools).where(eq(tools.id, id));
+    return tool;
+  }
+
+  async getToolBySlug(slug: string): Promise<Tool | undefined> {
+    const [tool] = await db.select().from(tools).where(eq(tools.slug, slug));
+    return tool;
+  }
+
+  async createTool(tool: InsertTool): Promise<Tool> {
+    const [created] = await db.insert(tools).values(tool).returning();
+    return created;
+  }
+
+  async updateTool(id: string, updates: Partial<Tool>): Promise<Tool | undefined> {
+    const [updated] = await db
+      .update(tools)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tools.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTool(id: string): Promise<boolean> {
+    await db.delete(subAgentTools).where(eq(subAgentTools.toolId, id));
+    await db.delete(tools).where(eq(tools.id, id));
+    return true;
+  }
+
+  async getSubAgentTools(subAgentId: string): Promise<(SubAgentTool & { tool: Tool })[]> {
+    const assignments = await db.select().from(subAgentTools).where(eq(subAgentTools.subAgentId, subAgentId));
+    const results: (SubAgentTool & { tool: Tool })[] = [];
+    for (const assignment of assignments) {
+      const [tool] = await db.select().from(tools).where(eq(tools.id, assignment.toolId));
+      if (tool) {
+        results.push({ ...assignment, tool });
+      }
+    }
+    return results;
+  }
+
+  async assignToolToSubAgent(assignment: InsertSubAgentTool): Promise<SubAgentTool> {
+    const [created] = await db.insert(subAgentTools).values(assignment).returning();
+    return created;
+  }
+
+  async removeToolFromSubAgent(subAgentId: string, toolId: string): Promise<boolean> {
+    await db.delete(subAgentTools).where(
+      and(eq(subAgentTools.subAgentId, subAgentId), eq(subAgentTools.toolId, toolId))
+    );
+    return true;
   }
 }
 

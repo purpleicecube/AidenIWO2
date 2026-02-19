@@ -10,15 +10,15 @@ import {
   AlertTriangle,
   Clock,
   ArrowRight,
-  Layers,
-  Activity,
   Plus,
   UserCheck,
   Brain,
   Bot,
+  GitBranch,
+  Wrench,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import type { WorkOrder } from "@shared/schema";
+import type { WorkOrder, WorkflowExecution, Tool } from "@shared/schema";
 
 interface DashboardStats {
   total: number;
@@ -248,22 +248,28 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="pt-2 border-t">
-              <p className="text-xs text-muted-foreground mb-2">GCC Memory Contract</p>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-muted-foreground">Routing context</span>
+            <div className="pt-2 border-t space-y-2">
+              <Link href="/workflows">
+                <div className="flex items-center gap-2 p-2 rounded-md hover-elevate cursor-pointer" data-testid="link-dashboard-workflows">
+                  <GitBranch className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span className="text-sm">Workflows</span>
+                  <ArrowRight className="w-3 h-3 ml-auto text-muted-foreground" />
                 </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-muted-foreground">Correlation IDs</span>
+              </Link>
+              <Link href="/tools">
+                <div className="flex items-center gap-2 p-2 rounded-md hover-elevate cursor-pointer" data-testid="link-dashboard-tools">
+                  <Wrench className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                  <span className="text-sm">Tools</span>
+                  <ArrowRight className="w-3 h-3 ml-auto text-muted-foreground" />
                 </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-muted-foreground">Execution breadcrumbs</span>
+              </Link>
+              <Link href="/sub-agents">
+                <div className="flex items-center gap-2 p-2 rounded-md hover-elevate cursor-pointer" data-testid="link-dashboard-sub-agents">
+                  <Bot className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-sm">Sub-Agents</span>
+                  <ArrowRight className="w-3 h-3 ml-auto text-muted-foreground" />
                 </div>
-              </div>
+              </Link>
             </div>
           </CardContent>
         </Card>

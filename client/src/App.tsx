@@ -16,6 +16,8 @@ import SystemHealth from "@/pages/system-health";
 import Architecture from "@/pages/architecture";
 import Settings from "@/pages/settings";
 import SubAgentsPage from "@/pages/sub-agents";
+import WorkflowsPage from "@/pages/workflows";
+import ToolsPage from "@/pages/tools";
 
 function Router() {
   return (
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/architecture" component={Architecture} />
       <Route path="/settings" component={Settings} />
       <Route path="/sub-agents" component={SubAgentsPage} />
+      <Route path="/workflows" component={WorkflowsPage} />
+      <Route path="/tools" component={ToolsPage} />
       <Route component={NotFound} />
     </Switch>
   );

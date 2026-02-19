@@ -1,8 +1,17 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkOrderSchema, insertLlmSettingsSchema, insertSubAgentSchema } from "@shared/schema";
-import { processWorkOrder } from "./orchestration";
+import {
+  insertWorkOrderSchema,
+  insertLlmSettingsSchema,
+  insertSubAgentSchema,
+  insertWorkflowTemplateSchema,
+  insertWorkflowStepSchema,
+  insertWorkflowExecutionSchema,
+  insertToolSchema,
+  insertSubAgentToolSchema,
+} from "@shared/schema";
+import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection } from "./llm-client";
 
 const startTime = Date.now();
@@ -264,6 +273,261 @@ export async function registerRoutes(
       res.json(result);
     } catch (err: any) {
       res.status(400).json({ success: false, message: err.message || "Connection test failed" });
+    }
+  });
+
+  // ==================== Workflow Template Routes ====================
+
+  app.get("/api/workflow-templates", async (_req, res) => {
+    try {
+      const templates = await storage.getWorkflowTemplates();
+      res.json(templates);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch workflow templates" });
+    }
+  });
+
+  app.get("/api/workflow-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getWorkflowTemplate(req.params.id);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      const steps = await storage.getWorkflowSteps(req.params.id);
+      res.json({ ...template, steps });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch template" });
+    }
+  });
+
+  app.post("/api/workflow-templates", async (req, res) => {
+    try {
+      const parsed = insertWorkflowTemplateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid template data", errors: parsed.error.issues });
+      }
+      const template = await storage.createWorkflowTemplate(parsed.data);
+      res.status(201).json(template);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create template" });
+    }
+  });
+
+  app.put("/api/workflow-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getWorkflowTemplate(req.params.id);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      const updated = await storage.updateWorkflowTemplate(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/workflow-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getWorkflowTemplate(req.params.id);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      await storage.deleteWorkflowTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
+  // ==================== Workflow Step Routes ====================
+
+  app.get("/api/workflow-templates/:templateId/steps", async (req, res) => {
+    try {
+      const steps = await storage.getWorkflowSteps(req.params.templateId);
+      res.json(steps);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch steps" });
+    }
+  });
+
+  app.post("/api/workflow-templates/:templateId/steps", async (req, res) => {
+    try {
+      const data = { ...req.body, templateId: req.params.templateId };
+      const parsed = insertWorkflowStepSchema.safeParse(data);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid step data", errors: parsed.error.issues });
+      }
+      const step = await storage.createWorkflowStep(parsed.data);
+      res.status(201).json(step);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create step" });
+    }
+  });
+
+  app.put("/api/workflow-steps/:id", async (req, res) => {
+    try {
+      const step = await storage.getWorkflowStep(req.params.id);
+      if (!step) return res.status(404).json({ message: "Step not found" });
+      const updated = await storage.updateWorkflowStep(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update step" });
+    }
+  });
+
+  app.delete("/api/workflow-steps/:id", async (req, res) => {
+    try {
+      const step = await storage.getWorkflowStep(req.params.id);
+      if (!step) return res.status(404).json({ message: "Step not found" });
+      await storage.deleteWorkflowStep(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete step" });
+    }
+  });
+
+  // ==================== Workflow Execution Routes ====================
+
+  app.get("/api/workflow-executions", async (_req, res) => {
+    try {
+      const executions = await storage.getWorkflowExecutions();
+      res.json(executions);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch executions" });
+    }
+  });
+
+  app.get("/api/workflow-executions/:id", async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+      const stepRuns = await storage.getWorkflowStepRuns(req.params.id);
+      const template = await storage.getWorkflowTemplate(execution.templateId);
+      res.json({ ...execution, stepRuns, template });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch execution" });
+    }
+  });
+
+  app.post("/api/workflow-executions", async (req, res) => {
+    try {
+      const { templateId, workOrderId, goal, context } = req.body;
+      if (!templateId) {
+        return res.status(400).json({ message: "templateId is required" });
+      }
+      const template = await storage.getWorkflowTemplate(templateId);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+
+      const execution = await startWorkflowExecution(templateId, workOrderId || null, goal || template.goal, context || {});
+      res.status(201).json(execution);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to start workflow" });
+    }
+  });
+
+  app.post("/api/workflow-executions/:id/advance", async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+      if (execution.status === "completed" || execution.status === "failed") {
+        return res.status(400).json({ message: `Cannot advance execution in '${execution.status}' status` });
+      }
+      const result = await advanceWorkflowExecution(req.params.id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to advance workflow" });
+    }
+  });
+
+  // ==================== Tools Routes ====================
+
+  app.get("/api/tools", async (_req, res) => {
+    try {
+      const allTools = await storage.getTools();
+      res.json(allTools);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch tools" });
+    }
+  });
+
+  app.get("/api/tools/:id", async (req, res) => {
+    try {
+      const tool = await storage.getTool(req.params.id);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      res.json(tool);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch tool" });
+    }
+  });
+
+  app.post("/api/tools", async (req, res) => {
+    try {
+      const parsed = insertToolSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid tool data", errors: parsed.error.issues });
+      }
+      const tool = await storage.createTool(parsed.data);
+      res.status(201).json(tool);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to create tool" });
+    }
+  });
+
+  app.put("/api/tools/:id", async (req, res) => {
+    try {
+      const tool = await storage.getTool(req.params.id);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      const updated = await storage.updateTool(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update tool" });
+    }
+  });
+
+  app.delete("/api/tools/:id", async (req, res) => {
+    try {
+      const tool = await storage.getTool(req.params.id);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      await storage.deleteTool(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete tool" });
+    }
+  });
+
+  // ==================== Sub-Agent Tool Assignment Routes ====================
+
+  app.get("/api/sub-agents/:id/tools", async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+      const agentTools = await storage.getSubAgentTools(req.params.id);
+      res.json(agentTools);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch agent tools" });
+    }
+  });
+
+  app.post("/api/sub-agents/:id/tools", async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+      const { toolId } = req.body;
+      if (!toolId) return res.status(400).json({ message: "toolId is required" });
+      const tool = await storage.getTool(toolId);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      const assignment = await storage.assignToolToSubAgent({
+        subAgentId: req.params.id,
+        toolId,
+        enabled: true,
+        config: req.body.config || {},
+      });
+      res.status(201).json(assignment);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to assign tool" });
+    }
+  });
+
+  app.delete("/api/sub-agents/:id/tools/:toolId", async (req, res) => {
+    try {
+      await storage.removeToolFromSubAgent(req.params.id, req.params.toolId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to remove tool" });
     }
   });
 

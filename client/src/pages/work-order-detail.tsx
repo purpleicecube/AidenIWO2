@@ -23,8 +23,9 @@ import {
   Brain,
   Bot,
   UserCheck,
+  GitBranch,
 } from "lucide-react";
-import type { WorkOrder, ExecutionLog } from "@shared/schema";
+import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
 import { useState } from "react";
 
 function DetailSkeleton() {
@@ -386,6 +387,10 @@ export default function WorkOrderDetail() {
             </CardContent>
           </Card>
 
+          {order.workflowExecutionId && (
+            <WorkflowExecutionPanel executionId={order.workflowExecutionId} />
+          )}
+
           {(order.tier1Result || order.tier2Result) && (
             <Card>
               <CardHeader className="pb-3">
@@ -414,5 +419,66 @@ export default function WorkOrderDetail() {
         </div>
       </div>
     </div>
+  );
+}
+
+function WorkflowExecutionPanel({ executionId }: { executionId: string }) {
+  const { data: execution } = useQuery<WorkflowExecution & { stepRuns: WorkflowStepRun[] }>({
+    queryKey: ["/api/workflow-executions", executionId],
+  });
+
+  if (!execution) return null;
+
+  const stepStatusColor: Record<string, string> = {
+    completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    running: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    pending: "bg-muted text-muted-foreground",
+    failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    skipped: "bg-muted text-muted-foreground",
+    awaiting_operator: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+  };
+
+  const completedSteps = execution.stepRuns?.filter(s => s.status === "completed").length ?? 0;
+  const totalSteps = execution.stepRuns?.length ?? 0;
+
+  return (
+    <Card data-testid="card-workflow-execution">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+        <div className="flex items-center gap-2">
+          <GitBranch className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <CardTitle className="text-base font-medium">Workflow Execution</CardTitle>
+        </div>
+        <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">
+          {completedSteps}/{totalSteps} steps
+        </Badge>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-xs text-muted-foreground">Goal</p>
+            <p className="text-sm">{execution.goal || "N/A"}</p>
+          </div>
+          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">
+            {execution.status}
+          </Badge>
+        </div>
+        {execution.stepRuns && execution.stepRuns.length > 0 && (
+          <div className="space-y-1.5 pt-2 border-t">
+            <p className="text-xs text-muted-foreground mb-2">Steps</p>
+            {execution.stepRuns.map((step) => (
+              <div key={step.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/30" data-testid={`step-run-${step.stepKey}`}>
+                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{step.stepName}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{step.stepKey}</p>
+                </div>
+                <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${stepStatusColor[step.status] || ""}`}>
+                  {step.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
