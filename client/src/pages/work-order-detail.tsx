@@ -6,6 +6,17 @@ import { StatusBadge, PriorityBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -24,6 +35,7 @@ import {
   Bot,
   UserCheck,
   GitBranch,
+  ShieldCheck,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
 import { useState } from "react";
@@ -149,6 +161,36 @@ export default function WorkOrderDetail() {
     },
   });
 
+  const [unblockOpen, setUnblockOpen] = useState(false);
+  const [unblockResolution, setUnblockResolution] = useState("");
+  const [unblockReprocess, setUnblockReprocess] = useState(true);
+
+  const unblockMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${params.id}/unblock`, {
+        resolution: unblockResolution,
+        reprocess: unblockReprocess,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id, "logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      setUnblockOpen(false);
+      setUnblockResolution("");
+      toast({
+        title: "BDM Unblocked",
+        description: unblockReprocess
+          ? "BDM marker cleared and work order re-submitted for processing."
+          : "BDM marker cleared and work order marked complete.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to unblock work order.", variant: "destructive" });
+    },
+  });
+
   const copyCorrelationId = () => {
     if (order) {
       navigator.clipboard.writeText(order.correlationId);
@@ -222,6 +264,19 @@ export default function WorkOrderDetail() {
               {processMutation.isPending ? "Processing..." : "Process"}
             </Button>
           )}
+          {order.status === "blocked" && order.bdmMarker && (
+            <Button
+              onClick={() => {
+                setUnblockResolution("");
+                setUnblockReprocess(true);
+                setUnblockOpen(true);
+              }}
+              data-testid="button-unblock"
+            >
+              <ShieldCheck className="w-4 h-4 mr-2" />
+              Resolve &amp; Unblock
+            </Button>
+          )}
           {(order.status === "blocked" || order.status === "failed") && (
             <Button
               variant="outline"
@@ -239,6 +294,81 @@ export default function WorkOrderDetail() {
           )}
         </div>
       </div>
+
+      <Dialog open={unblockOpen} onOpenChange={setUnblockOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              Resolve BDM &amp; Unblock
+            </DialogTitle>
+            <DialogDescription>
+              As a Human-In-The-Loop operator, provide a resolution for the blocked decision marker and choose how to proceed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {order.bdmMarker && (
+            <div className="p-3 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/10 dark:border-amber-800/30">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Current BDM Marker</p>
+              </div>
+              <pre className="text-xs font-mono text-amber-800 dark:text-amber-300 mt-1 overflow-x-auto max-h-32 overflow-y-auto">
+                {JSON.stringify(order.bdmMarker, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="resolution">Resolution Notes</Label>
+              <Textarea
+                id="resolution"
+                value={unblockResolution}
+                onChange={(e) => setUnblockResolution(e.target.value)}
+                placeholder="Describe why this block is being resolved and any corrective action taken..."
+                className="min-h-[100px]"
+                data-testid="input-unblock-resolution"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/50">
+              <div className="space-y-0.5">
+                <Label htmlFor="reprocess" className="text-sm font-medium">Re-process through Aiden</Label>
+                <p className="text-xs text-muted-foreground">
+                  {unblockReprocess
+                    ? "Clear the BDM and re-submit for Tier 2 execution"
+                    : "Clear the BDM and mark as complete (no re-processing)"}
+                </p>
+              </div>
+              <Switch
+                id="reprocess"
+                checked={unblockReprocess}
+                onCheckedChange={setUnblockReprocess}
+                data-testid="switch-reprocess"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnblockOpen(false)} data-testid="button-cancel-unblock">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => unblockMutation.mutate()}
+              disabled={unblockMutation.isPending}
+              data-testid="button-confirm-unblock"
+            >
+              {unblockMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 mr-2" />
+              )}
+              {unblockMutation.isPending ? "Unblocking..." : "Confirm Unblock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

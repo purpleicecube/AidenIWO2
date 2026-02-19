@@ -168,6 +168,125 @@ export async function registerRoutes(
     }
   });
 
+  const unblockSchema = z.object({
+    resolution: z.string().min(1, "Resolution notes are required"),
+    reprocess: z.boolean().default(true),
+  });
+
+  app.post("/api/work-orders/:id/unblock", async (req, res) => {
+    try {
+      const parsed = unblockSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { resolution, reprocess } = parsed.data;
+
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      if (order.status !== "blocked") {
+        return res.status(400).json({ message: `Cannot unblock order in '${order.status}' status — only 'blocked' orders can be unblocked` });
+      }
+      if (!order.bdmMarker) {
+        return res.status(400).json({ message: "No BDM marker to resolve on this work order" });
+      }
+
+      const bdmSnapshot = order.bdmMarker;
+      const now = new Date().toISOString();
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+
+      const commitId = `gcc-${Math.random().toString(16).slice(2, 10)}`;
+      const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || []), "hitl_unblock"];
+      const commitIndex = [...(gcc["gcc.commit_index"] || [])];
+      commitIndex.push({
+        commit_id: commitId,
+        timestamp: now,
+        summary: `HITL unblock: ${resolution.slice(0, 80)}`,
+        command: "COMMIT",
+      });
+      const logEntries = [...(gcc["gcc.log"] || [])];
+      logEntries.push({
+        timestamp: now,
+        type: "COMMIT",
+        commit_id: commitId,
+        detail: `HITL operator unblocked BDM. Resolution: ${resolution}`,
+      });
+
+      const gccMemory: Record<string, any> = {
+        "gcc.project_id": gcc["gcc.project_id"] || `wo-${order.correlationId.slice(0, 8)}`,
+        "gcc.branch": gcc["gcc.branch"] || "main",
+        "gcc.tier": "tier1",
+        "gcc.commit_index": commitIndex.slice(-100),
+        "gcc.last_commit_id": commitId,
+        "gcc.last_commit_summary": `HITL unblock: ${resolution.slice(0, 80)}`,
+        "gcc.log": logEntries.slice(-200),
+        "gcc.context_scope": "branch",
+        "gcc.context_commit_count": commitIndex.length,
+        "gcc.breadcrumbs": breadcrumbs.slice(-50),
+        "gcc.last_action": "hitl_unblock",
+        "gcc.metadata": {
+          ...(gcc["gcc.metadata"] || {}),
+          unblockedAt: now,
+          unblockedBy: "hitl_operator",
+          resolution,
+          bdmCleared: true,
+          reprocessed: reprocess,
+        },
+      };
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "HITL Unblock",
+        message: resolution,
+        metadata: { bdmMarkerCleared: bdmSnapshot, reprocess, commitId },
+      });
+
+      if (reprocess) {
+        await storage.updateWorkOrder(req.params.id, {
+          status: "pending",
+          bdmMarker: null,
+          tier2Result: null,
+          gccMemory,
+        });
+
+        await storage.createExecutionLog({
+          workOrderId: req.params.id,
+          tier: 1,
+          action: "Re-process after HITL Unblock",
+          message: "Work order re-submitted for Tier 2 execution after human intervention.",
+          metadata: { commitId },
+        });
+
+        const result = await processWorkOrder(req.params.id);
+        res.json({ ...result, unblocked: true, reprocessed: true });
+      } else {
+        gccMemory["gcc.last_action"] = "hitl_resolved";
+        gccMemory["gcc.metadata"].completedAt = now;
+
+        await storage.updateWorkOrder(req.params.id, {
+          status: "completed",
+          bdmMarker: null,
+          gccMemory,
+        });
+
+        await storage.createExecutionLog({
+          workOrderId: req.params.id,
+          tier: 1,
+          action: "Resolved by Operator",
+          message: "Work order marked complete by human operator without re-processing.",
+          metadata: { commitId },
+        });
+
+        const updated = await storage.getWorkOrder(req.params.id);
+        res.json({ ...updated, unblocked: true, reprocessed: false });
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Failed to unblock work order" });
+    }
+  });
+
   // Sub-agent routes
   app.get("/api/sub-agents", async (_req, res) => {
     try {

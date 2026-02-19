@@ -38,6 +38,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `POST /api/work-orders` - Submit new work order
 - `POST /api/work-orders/:id/process` - Process a pending work order
 - `POST /api/work-orders/:id/retry` - Retry a blocked/failed work order
+- `POST /api/work-orders/:id/unblock` - HITL unblock: clear BDM marker with resolution notes, optionally re-process
 - `GET /api/sub-agents` - List all sub-agents
 - `GET /api/sub-agents/:id` - Get sub-agent detail
 - `POST /api/sub-agents` - Create a sub-agent
