@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu } from "lucide-react";
+import { ModelSelector, providers } from "@/components/model-selector";
 import type { SubAgent } from "@shared/schema";
 
 const subAgentFormSchema = z.object({
@@ -473,43 +474,39 @@ export default function SubAgentsPage() {
 
                 {watchLlmEnabled && (
                   <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField
-                        control={form.control}
-                        name="llmProvider"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Provider</FormLabel>
-                            <Select
-                              onValueChange={(v) => {
-                                field.onChange(v);
-                                const defaultModels: Record<string, string> = {
-                                  groq: "llama-3.3-70b-versatile",
-                                  openai: "gpt-4o",
-                                  anthropic: "claude-sonnet-4-20250514",
-                                  openrouter: "openai/gpt-4o",
-                                };
-                                form.setValue("llmModel", defaultModels[v] || "");
-                              }}
-                              value={field.value || ""}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-llm-provider">
-                                  <SelectValue placeholder="Select provider" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="groq">Groq</SelectItem>
-                                <SelectItem value="openai">OpenAI</SelectItem>
-                                <SelectItem value="anthropic">Anthropic</SelectItem>
-                                <SelectItem value="openrouter">OpenRouter</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <FormField
+                      control={form.control}
+                      name="llmProvider"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Provider</FormLabel>
+                          <Select
+                            onValueChange={(v) => {
+                              field.onChange(v);
+                              const prov = providers.find(p => p.value === v);
+                              if (prov) form.setValue("llmModel", prov.defaultModel);
+                            }}
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-llm-provider">
+                                <SelectValue placeholder="Select provider" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {providers.map((p) => (
+                                <SelectItem key={p.value} value={p.value}>
+                                  {p.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
+                    {watchLlmProvider && (
                       <FormField
                         control={form.control}
                         name="llmModel"
@@ -517,23 +514,18 @@ export default function SubAgentsPage() {
                           <FormItem>
                             <FormLabel>Model</FormLabel>
                             <FormControl>
-                              <Input
-                                {...field}
+                              <ModelSelector
+                                provider={watchLlmProvider || ""}
                                 value={field.value || ""}
-                                placeholder={
-                                  watchLlmProvider === "groq" ? "llama-3.3-70b-versatile" :
-                                  watchLlmProvider === "openai" ? "gpt-4o" :
-                                  watchLlmProvider === "anthropic" ? "claude-sonnet-4-20250514" :
-                                  "model-name"
-                                }
-                                data-testid="input-llm-model"
+                                onChange={field.onChange}
+                                testIdPrefix="llm-"
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    </div>
+                    )}
 
                     <FormField
                       control={form.control}
