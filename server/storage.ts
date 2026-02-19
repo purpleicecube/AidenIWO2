@@ -21,6 +21,12 @@ import {
   type InsertTool,
   type SubAgentTool,
   type InsertSubAgentTool,
+  type ArtifactFolder,
+  type InsertArtifactFolder,
+  type Artifact,
+  type InsertArtifact,
+  type SandboxSession,
+  type InsertSandboxSession,
   workOrders,
   executionLogs,
   users,
@@ -32,6 +38,9 @@ import {
   workflowStepRuns,
   tools,
   subAgentTools,
+  artifactFolders,
+  artifacts,
+  sandboxSessions,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, asc } from "drizzle-orm";
@@ -101,6 +110,24 @@ export interface IStorage {
   getSubAgentTools(subAgentId: string): Promise<(SubAgentTool & { tool: Tool })[]>;
   assignToolToSubAgent(assignment: InsertSubAgentTool): Promise<SubAgentTool>;
   removeToolFromSubAgent(subAgentId: string, toolId: string): Promise<boolean>;
+
+  getArtifactFolders(parentId?: string | null): Promise<ArtifactFolder[]>;
+  getArtifactFolder(id: string): Promise<ArtifactFolder | undefined>;
+  createArtifactFolder(folder: InsertArtifactFolder): Promise<ArtifactFolder>;
+  updateArtifactFolder(id: string, updates: Partial<ArtifactFolder>): Promise<ArtifactFolder | undefined>;
+  deleteArtifactFolder(id: string): Promise<boolean>;
+
+  getArtifacts(folderId?: string | null): Promise<Artifact[]>;
+  getArtifact(id: string): Promise<Artifact | undefined>;
+  createArtifact(artifact: InsertArtifact): Promise<Artifact>;
+  updateArtifact(id: string, updates: Partial<Artifact>): Promise<Artifact | undefined>;
+  deleteArtifact(id: string): Promise<boolean>;
+
+  getSandboxSessions(): Promise<SandboxSession[]>;
+  getSandboxSession(id: string): Promise<SandboxSession | undefined>;
+  createSandboxSession(session: InsertSandboxSession): Promise<SandboxSession>;
+  updateSandboxSession(id: string, updates: Partial<SandboxSession>): Promise<SandboxSession | undefined>;
+  deleteSandboxSession(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {

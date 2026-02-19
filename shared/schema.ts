@@ -289,3 +289,83 @@ export const insertSubAgentToolSchema = createInsertSchema(subAgentTools).omit({
 
 export type InsertSubAgentTool = z.infer<typeof insertSubAgentToolSchema>;
 export type SubAgentTool = typeof subAgentTools.$inferSelect;
+
+// ==================== Artifact Folders ====================
+
+export const artifactFolders = pgTable("artifact_folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  parentId: varchar("parent_id"),
+  path: text("path").notNull().default("/"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertArtifactFolderSchema = createInsertSchema(artifactFolders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertArtifactFolder = z.infer<typeof insertArtifactFolderSchema>;
+export type ArtifactFolder = typeof artifactFolders.$inferSelect;
+
+// ==================== Artifacts ====================
+
+export const artifacts = pgTable("artifacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  folderId: varchar("folder_id"),
+  type: text("type").notNull().default("file"),
+  mimeType: text("mime_type").default("text/plain"),
+  content: text("content"),
+  size: integer("size").default(0),
+  sourceType: text("source_type"),
+  sourceId: varchar("source_id"),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  status: text("status").notNull().default("active"),
+  createdBy: text("created_by").default("system"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertArtifactSchema = createInsertSchema(artifacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertArtifact = z.infer<typeof insertArtifactSchema>;
+export type Artifact = typeof artifacts.$inferSelect;
+
+// ==================== Sandbox Sessions ====================
+
+export const sandboxSessions = pgTable("sandbox_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("active"),
+  environment: jsonb("environment").default(sql`'{}'::jsonb`),
+  logs: jsonb("logs").default(sql`'[]'::jsonb`),
+  result: jsonb("result"),
+  createdBy: text("created_by").default("system"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSandboxSessionSchema = createInsertSchema(sandboxSessions).omit({
+  id: true,
+  status: true,
+  logs: true,
+  result: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSandboxSession = z.infer<typeof insertSandboxSessionSchema>;
+export type SandboxSession = typeof sandboxSessions.$inferSelect;
