@@ -121,6 +121,57 @@ async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage:
   ]);
 }
 
+export async function chatWithAiden(
+  settings: LlmSettings,
+  userMessage: string,
+  conversationHistory: Array<{ role: string; content: string }>,
+  systemContext: string
+): Promise<string> {
+  const chatSystemPrompt = `${settings.systemPrompt}
+
+${systemContext}
+
+You are Aiden, the intelligent Tier 1 orchestration manager for the AIDEN_PTIB platform. You are having a direct conversation with your operator. Answer questions about work orders, sub-agents, workflows, system status, and operations. Be helpful, concise, and informative. Use the system context provided to give accurate, data-driven answers. If you don't have enough information to answer, say so clearly.
+
+Respond in natural language (not JSON). Use markdown formatting when helpful for readability.`;
+
+  if (settings.provider === "anthropic") {
+    const apiKey = getApiKey("ANTHROPIC_API_KEY");
+    const client = new Anthropic({ apiKey });
+    const messages = [
+      ...conversationHistory.map(m => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+      { role: "user" as const, content: userMessage },
+    ];
+    const response = await client.messages.create({
+      model: settings.model,
+      max_tokens: 2048,
+      system: chatSystemPrompt,
+      messages,
+    });
+    const textBlock = response.content.find((b) => b.type === "text");
+    return textBlock?.text || "I could not generate a response.";
+  }
+
+  const config = getProviderConfig(settings);
+  const apiKey = getApiKey(config.apiKeyEnvVar);
+  const client = new OpenAI({ apiKey, baseURL: config.baseURL });
+  const messages = [
+    { role: "system", content: chatSystemPrompt },
+    ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
+    { role: "user", content: userMessage },
+  ];
+  const response = await client.chat.completions.create({
+    model: settings.model,
+    messages: messages as any,
+    temperature: 0.5,
+    max_tokens: 2048,
+  });
+  return response.choices[0]?.message?.content || "I could not generate a response.";
+}
+
 export async function runTier1WithLLM(
   settings: LlmSettings,
   order: WorkOrder,

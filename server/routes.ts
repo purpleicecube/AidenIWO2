@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { z } from "zod";
 import { storage } from "./storage";
 import {
   insertWorkOrderSchema,
@@ -15,7 +16,7 @@ import {
   insertSandboxSessionSchema,
 } from "@shared/schema";
 import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
-import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels } from "./llm-client";
+import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden } from "./llm-client";
 
 const startTime = Date.now();
 
@@ -810,6 +811,74 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err) {
       res.status(500).json({ message: "Failed to execute sandbox session" });
+    }
+  });
+
+  const chatRequestSchema = z.object({
+    message: z.string().min(1),
+    history: z.array(z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string(),
+    })).optional().default([]),
+  });
+
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const parsed = chatRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.issues });
+      }
+      const { message, history } = parsed.data;
+
+      const settings = await storage.getLlmSettings();
+      if (!settings || !settings.enabled) {
+        return res.status(503).json({ message: "Aiden's LLM is not enabled. Please configure it in Aiden Settings." });
+      }
+
+      const keyName = getRequiredApiKeyName(settings.provider);
+      if (!isApiKeyConfigured(settings.provider)) {
+        return res.status(503).json({ message: `API key (${keyName}) is not configured. Please add it in Aiden Settings.` });
+      }
+
+      const [workOrders, subAgents, stats, workflows] = await Promise.all([
+        storage.getWorkOrders(),
+        storage.getSubAgents(),
+        storage.getWorkOrderStats(),
+        storage.getWorkflowTemplates(),
+      ]);
+
+      const recentOrders = workOrders.slice(0, 20);
+      const systemContext = `== CURRENT SYSTEM STATE ==
+
+Work Order Statistics:
+- Total: ${stats.total}
+- Pending: ${stats.pending}
+- Processing: ${stats.processing}
+- Completed: ${stats.completed}
+- Blocked: ${stats.blocked}
+- Failed: ${stats.failed}
+
+Recent Work Orders (last 20):
+${recentOrders.map(o => `- [${o.status}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, id: ${o.id})`).join("\n") || "None"}
+
+Registered Sub-Agents:
+${subAgents.map(a => `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.description ? `, desc: ${a.description}` : ""})`).join("\n") || "None configured"}
+
+Workflow Templates:
+${workflows.map(w => `- "${w.name}" (status: ${w.status}${w.description ? `, desc: ${w.description}` : ""})`).join("\n") || "None configured"}
+
+LLM Configuration:
+- Provider: ${settings.provider}
+- Model: ${settings.model}
+- Status: Enabled`;
+
+      const conversationHistory = history.slice(-10);
+
+      const reply = await chatWithAiden(settings, message, conversationHistory, systemContext);
+      res.json({ reply });
+    } catch (err: any) {
+      console.error("Chat error:", err.message);
+      res.status(500).json({ message: `Aiden encountered an error: ${err.message}` });
     }
   });
 

@@ -1,4 +1,4 @@
-import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical, MessageSquare } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -15,6 +15,7 @@ import {
 
 const navigationItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Chat with Aiden", url: "/chat", icon: MessageSquare },
   { title: "Work Orders", url: "/work-orders", icon: ClipboardList },
   { title: "Submit Order", url: "/submit", icon: Plus },
   { title: "System Health", url: "/health", icon: Activity },

@@ -17,7 +17,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - Styling: Tailwind CSS with Inter font family
 
 ## Project Structure
-- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools, Workspace, Sandbox
+- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools, Workspace, Sandbox, Chat
 - `client/src/components/` - AppSidebar, ThemeProvider, ThemeToggle, StatusBadge
 - `client/src/hooks/` - use-page-title, use-toast
 - `server/routes.ts` - API endpoints
@@ -83,6 +83,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `PUT /api/sandbox-sessions/:id` - Update session
 - `DELETE /api/sandbox-sessions/:id` - Delete session
 - `POST /api/sandbox-sessions/:id/execute` - Execute command in sandbox
+- `POST /api/chat` - Chat with Aiden (sends message + history, returns LLM response with system context)
 
 ## LLM Integration
 - **Providers**: OpenAI, Anthropic, OpenRouter, Groq

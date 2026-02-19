@@ -20,6 +20,7 @@ import WorkflowsPage from "@/pages/workflows";
 import ToolsPage from "@/pages/tools";
 import WorkspacePage from "@/pages/workspace";
 import SandboxPage from "@/pages/sandbox";
+import ChatPage from "@/pages/chat";
 
 function Router() {
   return (
@@ -36,6 +37,7 @@ function Router() {
       <Route path="/tools" component={ToolsPage} />
       <Route path="/workspace" component={WorkspacePage} />
       <Route path="/sandbox" component={SandboxPage} />
+      <Route path="/chat" component={ChatPage} />
       <Route component={NotFound} />
     </Switch>
   );
