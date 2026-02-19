@@ -14,6 +14,8 @@ import {
   insertArtifactFolderSchema,
   insertArtifactSchema,
   insertSandboxSessionSchema,
+  insertChatSessionSchema,
+  insertChatMessageSchema,
 } from "@shared/schema";
 import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden } from "./llm-client";
@@ -817,6 +819,204 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Chat Sessions (GCC Memory Protocol) ====================
+
+  app.get("/api/chat/sessions", async (_req, res) => {
+    try {
+      const sessions = await storage.getChatSessions();
+      res.json(sessions);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch chat sessions" });
+    }
+  });
+
+  app.post("/api/chat/sessions", async (req, res) => {
+    try {
+      const parsed = insertChatSessionSchema.safeParse(req.body);
+      const session = await storage.createChatSession(parsed.success ? parsed.data : { title: "New Conversation" });
+      await storage.updateChatSession(session.id, {
+        gccMemory: {
+          correlationId: session.correlationId,
+          breadcrumbs: ["session_created"],
+          lastAction: "session_created",
+          startedAt: new Date().toISOString(),
+        },
+      });
+      const updated = await storage.getChatSession(session.id);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create chat session" });
+    }
+  });
+
+  app.get("/api/chat/sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getChatSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      const messages = await storage.getChatMessages(session.id);
+      res.json({ ...session, messages });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch chat session" });
+    }
+  });
+
+  app.put("/api/chat/sessions/:id", async (req, res) => {
+    try {
+      const updateSchema = z.object({
+        title: z.string().optional(),
+        status: z.enum(["active", "archived"]).optional(),
+      });
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+      const updated = await storage.updateChatSession(req.params.id, parsed.data);
+      if (!updated) return res.status(404).json({ message: "Session not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update chat session" });
+    }
+  });
+
+  app.delete("/api/chat/sessions/:id", async (req, res) => {
+    try {
+      await storage.deleteChatSession(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete chat session" });
+    }
+  });
+
+  async function buildSystemContext(settings: any) {
+    const [workOrders, subAgents, stats, workflows, workflowExecutions, toolsList, rootFolders, rootArtifacts, sandboxSessionsList] = await Promise.all([
+      storage.getWorkOrders(),
+      storage.getSubAgents(),
+      storage.getWorkOrderStats(),
+      storage.getWorkflowTemplates(),
+      storage.getWorkflowExecutions(),
+      storage.getTools(),
+      storage.getArtifactFolders(null),
+      storage.getArtifacts(null),
+      storage.getSandboxSessions(),
+    ]);
+
+    const recentOrders = workOrders.slice(0, 25);
+    const activeExecutions = workflowExecutions.filter(e => e.status === "running" || e.status === "pending");
+    const recentExecutions = workflowExecutions.slice(0, 10);
+
+    const subAgentToolDetails = await Promise.all(
+      subAgents.map(async (a) => {
+        const agentTools = await storage.getSubAgentTools(a.id);
+        return { agent: a, tools: agentTools };
+      })
+    );
+
+    return `== AIDEN GLOBAL ENVIRONMENT BRIEFING ==
+
+=== WORK ORDER OVERVIEW ===
+Statistics:
+- Total: ${stats.total} | Pending: ${stats.pending} | Processing: ${stats.processing}
+- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed}
+
+All Work Orders (${workOrders.length} total):
+${recentOrders.map(o => `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""})`).join("\n") || "No work orders"}
+${workOrders.length > 25 ? `... and ${workOrders.length - 25} more work orders` : ""}
+
+=== SUB-AGENTS (TIER 2 WORKERS) ===
+${subAgentToolDetails.map(({ agent: a, tools: t }) => `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${a.description ? `, desc: ${a.description}` : ""})${t.length > 0 ? `\n  Tools: ${t.map(at => at.tool.name).join(", ")}` : ""}`).join("\n") || "No sub-agents configured"}
+
+=== WORKFLOW TEMPLATES ===
+${workflows.map(w => `- "${w.name}" (status: ${w.status}, category: ${w.category}${w.description ? `, desc: ${w.description}` : ""}${w.goal ? `, goal: ${w.goal}` : ""})`).join("\n") || "No workflow templates"}
+
+=== WORKFLOW EXECUTIONS ===
+Active: ${activeExecutions.length}
+${recentExecutions.map(e => `- [${e.status.toUpperCase()}] template: ${e.templateId}, work order: ${e.workOrderId || "none"}, started: ${e.startedAt || "not started"}${e.completedAt ? `, completed: ${e.completedAt}` : ""}`).join("\n") || "No executions"}
+${workflowExecutions.length > 10 ? `... and ${workflowExecutions.length - 10} more executions` : ""}
+
+=== TOOLS PLATFORM ===
+${toolsList.map(t => `- "${t.name}" (type: ${t.type}, status: ${t.status}, version: ${t.version}${t.description ? `, desc: ${t.description}` : ""})`).join("\n") || "No tools registered"}
+
+=== WORKSPACE (FILE SYSTEM) ===
+Root Folders:
+${rootFolders.map(f => `- /${f.name}${f.description ? ` — ${f.description}` : ""}`).join("\n") || "No folders"}
+Root Files:
+${rootArtifacts.map(a => `- ${a.name} (${a.mimeType}, ${a.size} bytes, status: ${a.status})`).join("\n") || "No root files"}
+
+=== SANDBOX SESSIONS ===
+${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s.createdAt}${s.description ? `, desc: ${s.description}` : ""})`).join("\n") || "No sandbox sessions"}
+
+=== LLM CONFIGURATION ===
+- Provider: ${settings.provider}
+- Model: ${settings.model}
+- Status: Enabled
+- Timestamp: ${new Date().toISOString()}`;
+  }
+
+  app.post("/api/chat/sessions/:id/messages", async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const session = await storage.getChatSession(sessionId);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+
+      const messageSchema = z.object({ message: z.string().min(1) });
+      const parsed = messageSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+
+      const { message } = parsed.data;
+
+      await storage.addChatMessage({
+        sessionId,
+        role: "user",
+        content: message,
+        gccBreadcrumb: "user_message",
+      });
+
+      const settings = await storage.getLlmSettings();
+      if (!settings || !settings.enabled) {
+        return res.status(503).json({ message: "Aiden's LLM is not enabled. Please configure it in Aiden Settings." });
+      }
+
+      const keyName = getRequiredApiKeyName(settings.provider);
+      if (!isApiKeyConfigured(settings.provider)) {
+        return res.status(503).json({ message: `API key (${keyName}) is not configured. Please add it in Aiden Settings.` });
+      }
+
+      const allMessages = await storage.getChatMessages(sessionId);
+      const conversationHistory = allMessages.slice(-20).map(m => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      const systemContext = await buildSystemContext(settings);
+
+      const gccMemory = (session.gccMemory as any) || {};
+      const breadcrumbs = [...(gccMemory.breadcrumbs || []), "user_message", "llm_processing"];
+
+      const reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext);
+
+      const assistantMsg = await storage.addChatMessage({
+        sessionId,
+        role: "assistant",
+        content: reply,
+        gccBreadcrumb: "assistant_reply",
+      });
+
+      const updatedBreadcrumbs = [...breadcrumbs, "assistant_reply"];
+      await storage.updateChatSession(sessionId, {
+        gccMemory: {
+          correlationId: session.correlationId,
+          breadcrumbs: updatedBreadcrumbs.slice(-50),
+          lastAction: "assistant_reply",
+          lastMessageAt: new Date().toISOString(),
+        },
+        title: session.messageCount === 0 ? message.slice(0, 80) : session.title,
+      });
+
+      res.json({ reply, messageId: assistantMsg.id, sessionId });
+    } catch (err: any) {
+      console.error("Chat error:", err.message);
+      res.status(500).json({ message: `Aiden encountered an error: ${err.message}` });
+    }
+  });
+
   const chatRequestSchema = z.object({
     message: z.string().min(1),
     history: z.array(z.object({
@@ -843,69 +1043,7 @@ export async function registerRoutes(
         return res.status(503).json({ message: `API key (${keyName}) is not configured. Please add it in Aiden Settings.` });
       }
 
-      const [workOrders, subAgents, stats, workflows, workflowExecutions, tools, rootFolders, rootArtifacts, sandboxSessions] = await Promise.all([
-        storage.getWorkOrders(),
-        storage.getSubAgents(),
-        storage.getWorkOrderStats(),
-        storage.getWorkflowTemplates(),
-        storage.getWorkflowExecutions(),
-        storage.getTools(),
-        storage.getArtifactFolders(null),
-        storage.getArtifacts(null),
-        storage.getSandboxSessions(),
-      ]);
-
-      const recentOrders = workOrders.slice(0, 25);
-      const activeExecutions = workflowExecutions.filter(e => e.status === "running" || e.status === "pending");
-      const recentExecutions = workflowExecutions.slice(0, 10);
-
-      const subAgentToolDetails = await Promise.all(
-        subAgents.map(async (a) => {
-          const agentTools = await storage.getSubAgentTools(a.id);
-          return { agent: a, tools: agentTools };
-        })
-      );
-
-      const systemContext = `== AIDEN GLOBAL ENVIRONMENT BRIEFING ==
-
-=== WORK ORDER OVERVIEW ===
-Statistics:
-- Total: ${stats.total} | Pending: ${stats.pending} | Processing: ${stats.processing}
-- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed}
-
-All Work Orders (${workOrders.length} total):
-${recentOrders.map(o => `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""})`).join("\n") || "No work orders"}
-${workOrders.length > 25 ? `... and ${workOrders.length - 25} more work orders` : ""}
-
-=== SUB-AGENTS (TIER 2 WORKERS) ===
-${subAgentToolDetails.map(({ agent: a, tools: t }) => `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${a.description ? `, desc: ${a.description}` : ""})${t.length > 0 ? `\n  Tools: ${t.map(at => at.tool.name).join(", ")}` : ""}`).join("\n") || "No sub-agents configured"}
-
-=== WORKFLOW TEMPLATES ===
-${workflows.map(w => `- "${w.name}" (status: ${w.status}, category: ${w.category}${w.description ? `, desc: ${w.description}` : ""}${w.goal ? `, goal: ${w.goal}` : ""})`).join("\n") || "No workflow templates"}
-
-=== WORKFLOW EXECUTIONS ===
-Active: ${activeExecutions.length}
-${recentExecutions.map(e => `- [${e.status.toUpperCase()}] template: ${e.templateId}, work order: ${e.workOrderId || "none"}, started: ${e.startedAt || "not started"}${e.completedAt ? `, completed: ${e.completedAt}` : ""}`).join("\n") || "No executions"}
-${workflowExecutions.length > 10 ? `... and ${workflowExecutions.length - 10} more executions` : ""}
-
-=== TOOLS PLATFORM ===
-${tools.map(t => `- "${t.name}" (type: ${t.type}, status: ${t.status}, version: ${t.version}${t.description ? `, desc: ${t.description}` : ""})`).join("\n") || "No tools registered"}
-
-=== WORKSPACE (FILE SYSTEM) ===
-Root Folders:
-${rootFolders.map(f => `- /${f.name}${f.description ? ` — ${f.description}` : ""}`).join("\n") || "No folders"}
-Root Files:
-${rootArtifacts.map(a => `- ${a.name} (${a.mimeType}, ${a.size} bytes, status: ${a.status})`).join("\n") || "No root files"}
-
-=== SANDBOX SESSIONS ===
-${sandboxSessions.map(s => `- "${s.name}" (status: ${s.status}, created: ${s.createdAt}${s.description ? `, desc: ${s.description}` : ""})`).join("\n") || "No sandbox sessions"}
-
-=== LLM CONFIGURATION ===
-- Provider: ${settings.provider}
-- Model: ${settings.model}
-- Status: Enabled
-- Timestamp: ${new Date().toISOString()}`;
-
+      const systemContext = await buildSystemContext(settings);
       const conversationHistory = history.slice(-10);
 
       const reply = await chatWithAiden(settings, message, conversationHistory, systemContext);

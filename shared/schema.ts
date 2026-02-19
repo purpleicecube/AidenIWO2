@@ -346,6 +346,51 @@ export const insertArtifactSchema = createInsertSchema(artifacts).omit({
 export type InsertArtifact = z.infer<typeof insertArtifactSchema>;
 export type Artifact = typeof artifacts.$inferSelect;
 
+// ==================== Chat Sessions (GCC Memory Protocol) ====================
+
+export const chatSessions = pgTable("chat_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  correlationId: varchar("correlation_id").notNull().default(sql`gen_random_uuid()`),
+  title: text("title").notNull().default("New Conversation"),
+  status: text("status").notNull().default("active"),
+  gccMemory: jsonb("gcc_memory").default(sql`'{}'::jsonb`),
+  messageCount: integer("message_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
+  id: true,
+  correlationId: true,
+  status: true,
+  gccMemory: true,
+  messageCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
+export type ChatSession = typeof chatSessions.$inferSelect;
+
+// ==================== Chat Messages ====================
+
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  gccBreadcrumb: text("gcc_breadcrumb"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
 // ==================== Sandbox Sessions ====================
 
 export const sandboxSessions = pgTable("sandbox_sessions", {

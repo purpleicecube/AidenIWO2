@@ -26,7 +26,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `server/storage.ts` - DatabaseStorage with all CRUD operations
 - `server/seed.ts` - Database seeding with sample work orders
 - `server/db.ts` - Database connection pool
-- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users, workflowTemplates, workflowSteps, workflowExecutions, workflowStepRuns, tools, subAgentTools, artifactFolders, artifacts, sandboxSessions)
+- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users, workflowTemplates, workflowSteps, workflowExecutions, workflowStepRuns, tools, subAgentTools, artifactFolders, artifacts, sandboxSessions, chatSessions, chatMessages)
 
 ## Key API Endpoints
 - `GET /api/health` - System health check
@@ -83,7 +83,13 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `PUT /api/sandbox-sessions/:id` - Update session
 - `DELETE /api/sandbox-sessions/:id` - Delete session
 - `POST /api/sandbox-sessions/:id/execute` - Execute command in sandbox
-- `POST /api/chat` - Chat with Aiden (sends message + history, returns LLM response with system context)
+- `GET /api/chat/sessions` - List chat sessions (GCC memory protocol)
+- `POST /api/chat/sessions` - Create new chat session with correlationId
+- `GET /api/chat/sessions/:id` - Get session detail with messages
+- `PUT /api/chat/sessions/:id` - Update session (title, status)
+- `DELETE /api/chat/sessions/:id` - Delete session and messages
+- `POST /api/chat/sessions/:id/messages` - Send message to session (persists + calls LLM + updates GCC memory breadcrumbs)
+- `POST /api/chat` - Legacy chat endpoint (sends message + history, returns LLM response with system context)
 
 ## LLM Integration
 - **Providers**: OpenAI, Anthropic, OpenRouter, Groq

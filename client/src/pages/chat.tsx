@@ -1,22 +1,29 @@
 import { useState, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Send, Bot, User, AlertCircle, Loader2 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Plus,
+  MessageSquare,
+  Trash2,
+  GitBranch,
+} from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
+import type { ChatSession, ChatMessage } from "@shared/schema";
 
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-}
+type SessionWithMessages = ChatSession & { messages: ChatMessage[] };
 
 export default function ChatPage() {
   usePageTitle("Chat with Aiden");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -25,45 +32,61 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const sessionsQuery = useQuery<ChatSession[]>({
+    queryKey: ["/api/chat/sessions"],
+  });
+
+  const activeSessionQuery = useQuery<SessionWithMessages>({
+    queryKey: ["/api/chat/sessions", activeSessionId],
+    enabled: !!activeSessionId,
+  });
+
+  const messages = activeSessionQuery.data?.messages || [];
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/chat/sessions/${id}`);
+    },
+    onSuccess: (_data, id) => {
+      if (activeSessionId === id) {
+        setActiveSessionId(null);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions"] });
+    },
+  });
+
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
-      const history = messages.map(m => ({ role: m.role, content: m.content }));
-      const res = await apiRequest("POST", "/api/chat", { message, history });
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        const res = await apiRequest("POST", "/api/chat/sessions", {});
+        const newSession: ChatSession = await res.json();
+        sessionId = newSession.id;
+        setActiveSessionId(sessionId);
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions"] });
+      }
+      const res = await apiRequest("POST", `/api/chat/sessions/${sessionId}/messages`, { message });
       return res.json();
     },
     onSuccess: (data) => {
-      setMessages(prev => [
-        ...prev,
-        { role: "assistant", content: data.reply, timestamp: new Date() },
-      ]);
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions", activeSessionId || data.sessionId] });
+      if (!activeSessionId && data.sessionId) {
+        setActiveSessionId(data.sessionId);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions"] });
     },
-    onError: (error: any) => {
-      let errorMsg = "Failed to get a response from Aiden.";
-      try {
-        const raw = error?.message || "";
-        const jsonStart = raw.indexOf("{");
-        if (jsonStart >= 0) {
-          const parsed = JSON.parse(raw.slice(jsonStart));
-          errorMsg = parsed.message || errorMsg;
-        } else if (raw) {
-          errorMsg = raw.replace(/^\d+:\s*/, "");
-        }
-      } catch {}
-      setMessages(prev => [
-        ...prev,
-        { role: "assistant", content: `**Error:** ${errorMsg}`, timestamp: new Date() },
-      ]);
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions", activeSessionId] });
     },
   });
 
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || chatMutation.isPending) return;
-    setMessages(prev => [...prev, { role: "user", content: trimmed, timestamp: new Date() }]);
     setInput("");
     chatMutation.mutate(trimmed);
   };
@@ -75,145 +98,226 @@ export default function ChatPage() {
     }
   };
 
+  const handleNewChat = () => {
+    setActiveSessionId(null);
+  };
+
+  const sessions = sessionsQuery.data || [];
+  const activeSession = activeSessionQuery.data;
+  const gccMemory = activeSession?.gccMemory as Record<string, unknown> | null;
+
   return (
-    <div className="flex flex-col h-full" data-testid="page-chat">
-      <div className="flex items-center justify-between gap-4 p-6 pb-4 border-b flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary">
-            <Bot className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold" data-testid="heading-chat">Chat with Aiden</h1>
-            <p className="text-sm text-muted-foreground">Ask about work orders, system status, and operations</p>
-          </div>
+    <div className="flex h-full" data-testid="page-chat">
+      <div className="w-64 border-r flex flex-col bg-muted/30">
+        <div className="p-3 border-b flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-sm font-medium">History</span>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleNewChat}
+            data-testid="button-new-chat"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
         </div>
-        <Badge variant="outline" data-testid="badge-chat-status">
-          {chatMutation.isPending ? "Thinking..." : "Online"}
-        </Badge>
+        <ScrollArea className="flex-1">
+          <div className="p-2 space-y-1">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className={`group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm transition-colors ${
+                  activeSessionId === session.id
+                    ? "bg-accent text-accent-foreground"
+                    : "hover-elevate"
+                }`}
+                onClick={() => setActiveSessionId(session.id)}
+                data-testid={`session-item-${session.id}`}
+              >
+                <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                <span className="flex-1 truncate">
+                  {session.title || "New Conversation"}
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="invisible group-hover:visible h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteSessionMutation.mutate(session.id);
+                  }}
+                  data-testid={`button-delete-session-${session.id}`}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+            {sessions.length === 0 && !sessionsQuery.isLoading && (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                No conversations yet
+              </p>
+            )}
+          </div>
+        </ScrollArea>
+        {gccMemory && activeSessionId && (
+          <div className="border-t p-3 space-y-1" data-testid="container-gcc-memory">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <GitBranch className="w-3 h-3" />
+              GCC Memory
+            </div>
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              <div className="truncate" title={String(gccMemory.correlationId || "")}>
+                ID: {String(gccMemory.correlationId || "").slice(0, 8)}...
+              </div>
+              <div>Action: {String(gccMemory.lastAction || "none")}</div>
+              <div>Crumbs: {(gccMemory.breadcrumbs as string[] || []).length}</div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="flex-1 overflow-auto p-6" data-testid="container-messages">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-muted">
-              <Bot className="w-8 h-8 text-muted-foreground" />
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-md bg-primary">
+              <Bot className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="text-lg font-medium" data-testid="text-empty-state">Welcome! I'm Aiden.</h2>
-              <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                Your Tier 1 orchestration manager. Ask me about work order statuses, sub-agent assignments, workflow progress, or any operational question.
+              <h1 className="text-lg font-semibold" data-testid="heading-chat">Chat with Aiden</h1>
+              <p className="text-xs text-muted-foreground">
+                {activeSession
+                  ? activeSession.title
+                  : "Start a new conversation"}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 mt-4 justify-center">
-              {[
-                "What's the current system status?",
-                "Show me pending work orders",
-                "Which sub-agents are active?",
-                "Summarize recent activity",
-              ].map((suggestion) => (
-                <Button
-                  key={suggestion}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setInput(suggestion);
-                    textareaRef.current?.focus();
-                  }}
-                  data-testid={`button-suggestion-${suggestion.slice(0, 10).replace(/\s/g, "-").toLowerCase()}`}
-                >
-                  {suggestion}
-                </Button>
-              ))}
-            </div>
           </div>
-        ) : (
-          <div className="space-y-4 max-w-3xl mx-auto">
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                data-testid={`message-${msg.role}-${i}`}
-              >
-                {msg.role === "assistant" && (
+          <Badge variant="outline" data-testid="badge-chat-status">
+            {chatMutation.isPending ? "Thinking..." : "Online"}
+          </Badge>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6" data-testid="container-messages">
+          {!activeSessionId || messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-muted">
+                <Bot className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <div>
+                <h2 className="text-lg font-medium" data-testid="text-empty-state">Welcome! I'm Aiden.</h2>
+                <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                  Your Tier 1 orchestration manager. Ask me about work order statuses, sub-agent assignments, workflow progress, or any operational question.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                {[
+                  "What's the current system status?",
+                  "Show me pending work orders",
+                  "Which sub-agents are active?",
+                  "Summarize recent activity",
+                ].map((suggestion) => (
+                  <Button
+                    key={suggestion}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setInput(suggestion);
+                      textareaRef.current?.focus();
+                    }}
+                    data-testid={`button-suggestion-${suggestion.slice(0, 10).replace(/\s/g, "-").toLowerCase()}`}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 max-w-3xl mx-auto">
+              {messages.map((msg, i) => (
+                <div
+                  key={msg.id}
+                  className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  data-testid={`message-${msg.role}-${i}`}
+                >
+                  {msg.role === "assistant" && (
+                    <div className="flex-shrink-0 flex items-start pt-1">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
+                        <Bot className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                    </div>
+                  )}
+                  <Card
+                    className={`px-4 py-3 max-w-[80%] ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : ""
+                    }`}
+                  >
+                    <div
+                      className={`text-sm whitespace-pre-wrap break-words ${
+                        msg.role === "user" ? "" : "prose prose-sm dark:prose-invert max-w-none"
+                      }`}
+                      data-testid={`text-message-content-${i}`}
+                    >
+                      {msg.content}
+                    </div>
+                    <div
+                      className={`text-xs mt-2 ${
+                        msg.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                      }`}
+                    >
+                      {new Date(msg.createdAt).toLocaleTimeString()}
+                    </div>
+                  </Card>
+                  {msg.role === "user" && (
+                    <div className="flex-shrink-0 flex items-start pt-1">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {chatMutation.isPending && (
+                <div className="flex gap-3 justify-start" data-testid="message-loading">
                   <div className="flex-shrink-0 flex items-start pt-1">
                     <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
                       <Bot className="w-4 h-4 text-primary-foreground" />
                     </div>
                   </div>
-                )}
-                <Card
-                  className={`px-4 py-3 max-w-[80%] ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : ""
-                  }`}
-                >
-                  <div
-                    className={`text-sm whitespace-pre-wrap break-words ${
-                      msg.role === "user" ? "" : "prose prose-sm dark:prose-invert max-w-none"
-                    }`}
-                    data-testid={`text-message-content-${i}`}
-                  >
-                    {msg.content}
-                  </div>
-                  <div
-                    className={`text-xs mt-2 ${
-                      msg.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
-                    }`}
-                  >
-                    {msg.timestamp.toLocaleTimeString()}
-                  </div>
-                </Card>
-                {msg.role === "user" && (
-                  <div className="flex-shrink-0 flex items-start pt-1">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted">
-                      <User className="w-4 h-4 text-muted-foreground" />
+                  <Card className="px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Aiden is thinking...
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
-            {chatMutation.isPending && (
-              <div className="flex gap-3 justify-start" data-testid="message-loading">
-                <div className="flex-shrink-0 flex items-start pt-1">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
-                    <Bot className="w-4 h-4 text-primary-foreground" />
-                  </div>
+                  </Card>
                 </div>
-                <Card className="px-4 py-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Aiden is thinking...
-                  </div>
-                </Card>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
 
-      <div className="border-t p-4" data-testid="container-input">
-        <div className="flex gap-2 max-w-3xl mx-auto items-end">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask Aiden anything about your work orders and operations..."
-            className="resize-none min-h-[44px] max-h-[120px] text-sm"
-            rows={1}
-            disabled={chatMutation.isPending}
-            data-testid="input-chat-message"
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || chatMutation.isPending}
-            size="icon"
-            data-testid="button-send-message"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+        <div className="border-t p-4" data-testid="container-input">
+          <div className="flex gap-2 max-w-3xl mx-auto items-end">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Aiden anything about your work orders and operations..."
+              className="resize-none min-h-[44px] max-h-[120px] text-sm"
+              rows={1}
+              disabled={chatMutation.isPending}
+              data-testid="input-chat-message"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || chatMutation.isPending}
+              size="icon"
+              data-testid="button-send-message"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
