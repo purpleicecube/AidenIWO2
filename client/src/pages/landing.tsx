@@ -1,26 +1,34 @@
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Layers, Shield, Zap, GitBranch, Bot, ArrowRight } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 
-function handleLogin() {
-  const loginUrl = `${window.location.origin}/api/login`;
-  const newWindow = window.open(loginUrl, "_blank");
-  if (!newWindow) {
-    window.location.href = "/api/login";
-  }
-}
-
 export default function LandingPage() {
+  const [loginPending, setLoginPending] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const handleLogin = useCallback(() => {
+    setLoginPending(true);
+    const loginUrl = `${window.location.origin}/api/login`;
+    const newWindow = window.open(loginUrl, "_blank");
+    if (!newWindow) {
+      window.location.href = "/api/login";
+    }
+  }, []);
+
   useEffect(() => {
+    if (!loginPending) return;
+    const timeoutId = setTimeout(() => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      setLoginPending(false);
+    }, 5 * 60 * 1000);
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch("/api/auth/user", { credentials: "include" });
         if (res.ok) {
           if (pollingRef.current) clearInterval(pollingRef.current);
+          clearTimeout(timeoutId);
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
           window.location.reload();
         }
@@ -28,8 +36,9 @@ export default function LandingPage() {
     }, 2000);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
+      clearTimeout(timeoutId);
     };
-  }, []);
+  }, [loginPending]);
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950">
       <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-white/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
@@ -43,8 +52,8 @@ export default function LandingPage() {
               <span className="text-[10px] text-muted-foreground">Orchestration Engine</span>
             </div>
           </div>
-          <Button data-testid="button-login-nav" onClick={handleLogin}>
-            Sign In
+          <Button data-testid="button-login-nav" onClick={handleLogin} disabled={loginPending}>
+            {loginPending ? "Waiting for login…" : "Sign In"}
           </Button>
         </div>
       </nav>
@@ -60,9 +69,9 @@ export default function LandingPage() {
               Aiden is your AI-powered Tier 1 manager. It evaluates policy, routes work orders to specialized sub-agents, and orchestrates multi-step workflows — autonomously.
             </p>
             <div className="flex gap-4">
-              <Button size="lg" data-testid="button-login-hero" onClick={handleLogin}>
-                Get Started
-                <ArrowRight className="w-4 h-4 ml-2" />
+              <Button size="lg" data-testid="button-login-hero" onClick={handleLogin} disabled={loginPending}>
+                {loginPending ? "Waiting for login…" : "Get Started"}
+                {!loginPending && <ArrowRight className="w-4 h-4 ml-2" />}
               </Button>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
