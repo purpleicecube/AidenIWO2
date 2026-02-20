@@ -16,6 +16,7 @@ import {
   Bot,
   GitBranch,
   Wrench,
+  RotateCcw,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import type { WorkOrder, WorkflowExecution, Tool } from "@shared/schema";
@@ -28,6 +29,7 @@ interface DashboardStats {
   blocked: number;
   failed: number;
   awaiting_operator: number;
+  reopened: number;
 }
 
 function StatCard({
@@ -130,7 +132,7 @@ export default function Dashboard() {
       {statsLoading ? (
         <StatsSkeleton />
       ) : stats ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           <StatCard
             title="Total"
             value={stats.total}
@@ -151,6 +153,13 @@ export default function Dashboard() {
             icon={CheckCircle}
             description="Successfully processed"
             iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+          />
+          <StatCard
+            title="Reopened"
+            value={stats.reopened}
+            icon={RotateCcw}
+            description="Sent back for revision"
+            iconClass="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
           />
           <StatCard
             title="Awaiting Operator"

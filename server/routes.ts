@@ -150,7 +150,7 @@ export async function registerRoutes(
       if (!order) {
         return res.status(404).json({ message: "Work order not found" });
       }
-      if (order.status !== "pending") {
+      if (order.status !== "pending" && order.status !== "reopened") {
         return res.status(400).json({ message: `Cannot process order in '${order.status}' status` });
       }
       const result = await processWorkOrder(req.params.id);
@@ -189,6 +189,100 @@ export async function registerRoutes(
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: "Failed to retry work order" });
+    }
+  });
+
+  const reopenSchema = z.object({
+    reason: z.string().min(1, "Reason for reopening is required"),
+  });
+
+  app.post("/api/work-orders/:id/reopen", async (req, res) => {
+    try {
+      const parsed = reopenSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { reason } = parsed.data;
+
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      if (order.status !== "completed") {
+        return res.status(400).json({ message: `Cannot reopen order in '${order.status}' status — only completed orders can be reopened` });
+      }
+
+      const now = new Date().toISOString();
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+
+      const commitId = `gcc-${Math.random().toString(16).slice(2, 10)}`;
+      const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || []), "reopened"];
+      const commitIndex = [...(gcc["gcc.commit_index"] || [])];
+      commitIndex.push({
+        commit_id: commitId,
+        timestamp: now,
+        summary: `Reopened: ${reason.slice(0, 80)}`,
+        command: "COMMIT",
+      });
+      const logEntries = [...(gcc["gcc.log"] || [])];
+      logEntries.push({
+        timestamp: now,
+        type: "COMMIT",
+        commit_id: commitId,
+        detail: `Work order reopened for reprocessing. Reason: ${reason}`,
+      });
+
+      const previousResult = order.tier2Result;
+
+      const gccMemory: Record<string, any> = {
+        "gcc.project_id": gcc["gcc.project_id"] || `wo-${order.correlationId.slice(0, 8)}`,
+        "gcc.branch": gcc["gcc.branch"] || "main",
+        "gcc.tier": "tier1",
+        "gcc.commit_index": commitIndex.slice(-100),
+        "gcc.last_commit_id": commitId,
+        "gcc.last_commit_summary": `Reopened: ${reason.slice(0, 80)}`,
+        "gcc.log": logEntries.slice(-200),
+        "gcc.context_scope": "branch",
+        "gcc.context_commit_count": commitIndex.length,
+        "gcc.breadcrumbs": breadcrumbs.slice(-50),
+        "gcc.last_action": "reopened",
+        "gcc.metadata": {
+          ...(gcc["gcc.metadata"] || {}),
+          reopenedAt: now,
+          reopenReason: reason,
+          previousCompletedAt: gcc["gcc.metadata"]?.completedAt || gcc.completedAt,
+          previousDeliverable: previousResult ? "preserved_in_logs" : null,
+          reopenCount: ((gcc["gcc.metadata"]?.reopenCount || 0) + 1),
+        },
+      };
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Work Order Reopened",
+        message: `Work order reopened for reprocessing. Reason: ${reason}`,
+        metadata: {
+          reopenReason: reason,
+          previousStatus: "completed",
+          previousTier2Result: previousResult,
+          reopenedAt: now,
+        },
+      });
+
+      await storage.updateWorkOrder(req.params.id, {
+        status: "reopened",
+        bdmMarker: null,
+        tier1Result: null,
+        tier2Result: null,
+        assignedSubAgentId: null,
+        executionMode: null,
+        gccMemory,
+      });
+
+      const updated = await storage.getWorkOrder(req.params.id);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to reopen work order" });
     }
   });
 
@@ -1213,7 +1307,7 @@ export async function registerRoutes(
 === WORK ORDER OVERVIEW ===
 Statistics:
 - Total: ${stats.total} | Pending: ${stats.pending} | Processing: ${stats.processing}
-- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed}
+- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed} | Reopened: ${stats.reopened}
 
 All Work Orders (${workOrders.length} total):
 ${recentOrders.map(o => `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""})`).join("\n") || "No work orders"}

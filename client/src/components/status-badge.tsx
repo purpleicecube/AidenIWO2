@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, Loader2, AlertTriangle, XCircle, UserCheck } from "lucide-react";
+import { CheckCircle, Clock, Loader2, AlertTriangle, XCircle, UserCheck, RotateCcw } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof CheckCircle; className: string }> = {
   pending: {
@@ -37,6 +37,12 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
     variant: "outline",
     icon: UserCheck,
     className: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+  },
+  reopened: {
+    label: "Reopened",
+    variant: "default",
+    icon: RotateCcw,
+    className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   },
 };
 

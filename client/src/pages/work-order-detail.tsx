@@ -272,6 +272,26 @@ export default function WorkOrderDetail() {
 
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [closeReason, setCloseReason] = useState("");
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+
+  const reopenMutation = useMutation({
+    mutationFn: (reason: string) =>
+      apiRequest("POST", `/api/work-orders/${params.id}/reopen`, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id, "logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      setReopenDialogOpen(false);
+      setReopenReason("");
+      toast({ title: "Work order reopened", description: "The work order has been reopened and is ready for editing or reprocessing." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to reopen work order.", variant: "destructive" });
+    },
+  });
 
   const invalidateOrderQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/work-orders", params.id] });
@@ -414,7 +434,21 @@ export default function WorkOrderDetail() {
                   Edit
                 </Button>
               )}
-              {(order.status === "pending") && (
+              {order.status === "completed" && (
+                <Button
+                  variant="outline"
+                  className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                  onClick={() => {
+                    setReopenReason("");
+                    setReopenDialogOpen(true);
+                  }}
+                  data-testid="button-reopen"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reopen
+                </Button>
+              )}
+              {(order.status === "pending" || order.status === "reopened") && (
                 <Button
                   onClick={() => processMutation.mutate()}
                   disabled={processMutation.isPending}
@@ -514,6 +548,51 @@ export default function WorkOrderDetail() {
                 <XCircle className="w-4 h-4 mr-2" />
               )}
               {closeMutation.isPending ? "Closing..." : "Close Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reopenDialogOpen} onOpenChange={setReopenDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-purple-600" />
+              Reopen Work Order
+            </DialogTitle>
+            <DialogDescription>
+              This will reopen the completed work order for reprocessing. The previous deliverable will be preserved in the execution history. You can edit the work order before processing it again.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="reopen-reason">Why does this need to be reopened?</Label>
+            <Textarea
+              id="reopen-reason"
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              placeholder="e.g., New requirements received, needs revision based on feedback, additional information available..."
+              className="min-h-[100px]"
+              data-testid="input-reopen-reason"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReopenDialogOpen(false)} data-testid="button-cancel-reopen">
+              Cancel
+            </Button>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              onClick={() => reopenMutation.mutate(reopenReason)}
+              disabled={reopenMutation.isPending || reopenReason.trim().length === 0}
+              data-testid="button-confirm-reopen"
+            >
+              {reopenMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RotateCcw className="w-4 h-4 mr-2" />
+              )}
+              {reopenMutation.isPending ? "Reopening..." : "Reopen Work Order"}
             </Button>
           </DialogFooter>
         </DialogContent>

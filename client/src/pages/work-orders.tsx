@@ -102,6 +102,7 @@ export default function WorkOrders() {
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="blocked">Blocked</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="reopened">Reopened</SelectItem>
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
