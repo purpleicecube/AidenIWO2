@@ -18,6 +18,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import type { ChatSession, ChatMessage } from "@shared/schema";
+import SplitPane from "@/components/split-pane";
 
 type SessionWithMessages = ChatSession & { messages: ChatMessage[] };
 
@@ -119,7 +120,14 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full" data-testid="page-chat">
-      <div className="w-64 border-r flex flex-col bg-muted/30">
+      <SplitPane
+        panes={[
+          { defaultSize: 25, minSize: 15, maxSize: 40 },
+          { defaultSize: 75, minSize: 50, maxSize: 85 },
+        ]}
+        storageKey="chat"
+      >
+      <div className="flex flex-col bg-muted/30 h-full">
         <div className="p-3 border-b flex items-center justify-between gap-2 flex-wrap">
           <span className="text-sm font-medium">History</span>
           <Button
@@ -199,7 +207,7 @@ export default function ChatPage() {
         )}
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex flex-col min-w-0 h-full">
         <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b flex-wrap">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-9 h-9 rounded-md bg-primary">
@@ -344,6 +352,7 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+      </SplitPane>
     </div>
   );
 }

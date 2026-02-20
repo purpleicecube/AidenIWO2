@@ -50,6 +50,7 @@ import {
   File,
   Save,
 } from "lucide-react";
+import SplitPane from "@/components/split-pane";
 
 const FILE_ICONS: Record<string, typeof FileText> = {
   "text/markdown": FileText,
@@ -265,9 +266,8 @@ export default function WorkspacePage() {
   const isLoading = foldersLoading || filesLoading;
   const isEmpty = folders.length === 0 && files.length === 0 && !isLoading;
 
-  return (
-    <div className="flex h-full" data-testid="page-workspace">
-      <div className={`flex-1 flex flex-col min-w-0 ${selectedArtifact ? "border-r" : ""}`}>
+  const fileBrowserPanel = (
+      <div className="flex flex-col min-w-0 h-full">
         <div className="p-4 border-b sticky top-0 z-10 bg-background">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -484,9 +484,10 @@ export default function WorkspacePage() {
           )}
         </div>
       </div>
+  );
 
-      {selectedArtifact && (
-        <div className="w-[400px] lg:w-[480px] flex flex-col bg-background border-l" data-testid="panel-file-preview">
+  const previewPanel = selectedArtifact ? (
+        <div className="flex flex-col bg-background h-full" data-testid="panel-file-preview">
           <div className="p-3 border-b flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               {(() => {
@@ -555,6 +556,23 @@ export default function WorkspacePage() {
             )}
           </div>
         </div>
+  ) : null;
+
+  return (
+    <div className="flex h-full" data-testid="page-workspace">
+      {selectedArtifact ? (
+        <SplitPane
+          panes={[
+            { defaultSize: 60, minSize: 30, maxSize: 80 },
+            { defaultSize: 40, minSize: 20, maxSize: 60 },
+          ]}
+          storageKey="workspace"
+        >
+          {fileBrowserPanel}
+          {previewPanel}
+        </SplitPane>
+      ) : (
+        fileBrowserPanel
       )}
 
       <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>

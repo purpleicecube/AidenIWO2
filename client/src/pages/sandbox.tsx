@@ -30,6 +30,7 @@ import {
   Terminal,
   RotateCcw,
 } from "lucide-react";
+import SplitPane from "@/components/split-pane";
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -136,9 +137,8 @@ export default function SandboxPage() {
     },
   });
 
-  return (
-    <div className="flex h-full" data-testid="page-sandbox">
-      <div className={`flex-1 flex flex-col min-w-0 ${selectedSession ? "border-r" : ""}`}>
+  const sessionListPanel = (
+      <div className="flex flex-col min-w-0 h-full">
         <div className="p-4 border-b sticky top-0 z-10 bg-background">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
@@ -234,9 +234,10 @@ export default function SandboxPage() {
           )}
         </div>
       </div>
+  );
 
-      {selectedSession && (
-        <div className="w-[400px] lg:w-[480px] flex flex-col bg-background" data-testid="panel-session-detail">
+  const detailPanel = selectedSession ? (
+        <div className="flex flex-col bg-background h-full" data-testid="panel-session-detail">
           <div className="p-3 border-b flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <FlaskConical className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -365,6 +366,23 @@ export default function SandboxPage() {
             ) : null}
           </div>
         </div>
+  ) : null;
+
+  return (
+    <div className="flex h-full" data-testid="page-sandbox">
+      {selectedSession ? (
+        <SplitPane
+          panes={[
+            { defaultSize: 55, minSize: 30, maxSize: 75 },
+            { defaultSize: 45, minSize: 25, maxSize: 60 },
+          ]}
+          storageKey="sandbox"
+        >
+          {sessionListPanel}
+          {detailPanel}
+        </SplitPane>
+      ) : (
+        sessionListPanel
       )}
 
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
