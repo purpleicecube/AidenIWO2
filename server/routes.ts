@@ -232,7 +232,11 @@ export async function registerRoutes(
         detail: `Work order reopened for reprocessing. Reason: ${reason}`,
       });
 
-      const previousResult = order.tier2Result;
+      const previousResult = order.tier2Result as Record<string, any> | null;
+      const previousOutput = previousResult?.output;
+      const previousDeliverableSummary = previousOutput
+        ? `[Previous output message: "${previousOutput.message || "N/A"}"] [Previous deliverable title: "${previousOutput.deliverableTitle || "N/A"}"] [Previous deliverable type: "${previousOutput.deliverableType || "N/A"}"] [Previous deliverable (first 2000 chars): ${(previousOutput.deliverable || "").slice(0, 2000)}]`
+        : null;
 
       const gccMemory: Record<string, any> = {
         "gcc.project_id": gcc["gcc.project_id"] || `wo-${order.correlationId.slice(0, 8)}`,
@@ -251,7 +255,7 @@ export async function registerRoutes(
           reopenedAt: now,
           reopenReason: reason,
           previousCompletedAt: gcc["gcc.metadata"]?.completedAt || gcc.completedAt,
-          previousDeliverable: previousResult ? "preserved_in_logs" : null,
+          previousDeliverable: previousDeliverableSummary || "no_previous_output",
           reopenCount: ((gcc["gcc.metadata"]?.reopenCount || 0) + 1),
         },
       };

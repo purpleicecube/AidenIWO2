@@ -303,6 +303,30 @@ Respond in natural language (not JSON). Use markdown formatting when helpful for
   return response.choices[0]?.message?.content || "I could not generate a response.";
 }
 
+function buildReopenContext(gcc: Record<string, any>): string {
+  const metadata = gcc["gcc.metadata"] || {};
+  const reopenReason = metadata.reopenReason || gcc.reopenReason;
+  const reopenCount = metadata.reopenCount || 1;
+  const previousDeliverable = metadata.previousDeliverable;
+  const commitIndex = gcc["gcc.commit_index"] || [];
+  const lastCommit = commitIndex.length > 0 ? commitIndex[commitIndex.length - 1] : null;
+
+  if (!reopenReason) return "";
+
+  let context = `\n=== REOPEN CONTEXT (Revision #${reopenCount}) ===\n`;
+  context += `Reason for reopening: ${reopenReason}\n`;
+  if (previousDeliverable && previousDeliverable !== "no_previous_output") {
+    context += `\nPrevious deliverable reference:\n${previousDeliverable}\n`;
+  }
+  if (lastCommit?.detail) {
+    context += `\nAudit trail: ${lastCommit.detail}\n`;
+  }
+  context += `\nINSTRUCTION: This work order was previously completed and has been reopened for revision. The user expects a DIFFERENT and IMPROVED output that directly addresses the reopen reason stated above. Do NOT simply repeat the previous output.\n`;
+  context += `=== END REOPEN CONTEXT ===\n`;
+
+  return context;
+}
+
 export async function runTier1WithLLM(
   settings: LlmSettings,
   order: WorkOrder,
@@ -313,6 +337,10 @@ export async function runTier1WithLLM(
         `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${a.description ? `, description: ${a.description}` : ""})`
       ).join("\n")}`
     : "\n\nNo sub-agents configured. Use default handler names.";
+
+  const gcc = (order.gccMemory || {}) as Record<string, any>;
+  const isReopened = order.status === "reopened" || gcc["gcc.last_action"] === "reopened";
+  const reopenContext = isReopened ? buildReopenContext(gcc) : "";
 
   const prompt = `You are Aiden, the Tier 1 orchestration manager. Evaluate this work order and decide whether to approve or block it. If approved, choose which sub-agent or handler to route it to.
 
@@ -326,7 +354,7 @@ Respond with ONLY a JSON object in this exact format:
 
 Available handlers: general_executor, deploy_executor, maintenance_executor, incident_executor, change_executor, security_executor
 ${subAgentInfo}
-
+${reopenContext}
 Work Order:
 - Title: ${order.title}
 - Description: ${order.description}
@@ -366,6 +394,10 @@ export async function runTier2WithLLM(
     ? `You are "${useConfig.subAgentName}", a specialized Tier 2 sub-agent. You are independently executing this work order using your own capabilities and LLM configuration.`
     : `You are Aiden, controlling a Tier 2 sub-agent.`;
 
+  const gcc = (order.gccMemory || {}) as Record<string, any>;
+  const isReopened = gcc["gcc.last_action"] === "reopened" || gcc.lastAction === "reopened";
+  const reopenContext = isReopened ? buildReopenContext(gcc) : "";
+
   const prompt = `${agentLabel} The work order has passed the Tier 1 policy gate and was routed to handler "${tier1Result.handler}".
 
 Validate the schema and execute the work order. Decide if execution can proceed or if a BDM marker should be emitted.
@@ -376,7 +408,7 @@ IMPORTANT: If not blocked, you MUST produce the actual deliverable — the real 
 - If it asks to "update documentation", write the actual documentation content.
 - If it asks to "investigate an incident", write the investigation report.
 The deliverable should be the complete, ready-to-use output — not just a summary or status message.
-
+${reopenContext ? `\n${reopenContext}\nCRITICAL: This is a REOPENED work order. You MUST produce a REVISED deliverable that directly addresses the reopen reason above. Do NOT reproduce the previous output — incorporate the new requirements, feedback, or information that prompted the reopen.\n` : ""}
 Respond with ONLY a JSON object in this exact format:
 {
   "blocked": true/false,
