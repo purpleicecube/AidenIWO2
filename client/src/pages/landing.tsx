@@ -16,8 +16,8 @@ export default function LandingPage() {
               <span className="text-[10px] text-muted-foreground">Orchestration Engine</span>
             </div>
           </div>
-          <Button asChild data-testid="button-login-nav">
-            <a href="/api/login" target="_top">Sign In</a>
+          <Button data-testid="button-login-nav" onClick={() => { window.location.href = "/api/login"; }}>
+            Sign In
           </Button>
         </div>
       </nav>
@@ -33,11 +33,9 @@ export default function LandingPage() {
               Aiden is your AI-powered Tier 1 manager. It evaluates policy, routes work orders to specialized sub-agents, and orchestrates multi-step workflows — autonomously.
             </p>
             <div className="flex gap-4">
-              <Button size="lg" asChild data-testid="button-login-hero">
-                <a href="/api/login" target="_top">
-                  Get Started
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </a>
+              <Button size="lg" data-testid="button-login-hero" onClick={() => { window.location.href = "/api/login"; }}>
+                Get Started
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
