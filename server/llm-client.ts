@@ -18,6 +18,41 @@ function isEnvVarName(value: string): boolean {
   return /^[A-Z][A-Z0-9_]*$/.test(value);
 }
 
+function safeJsonParse(jsonStr: string): any {
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    let cleaned = jsonStr
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      const sanitized = cleaned.replace(
+        /"(?:[^"\\]|\\.)*"/g,
+        (match) => {
+          const inner = match.slice(1, -1);
+          const escaped = inner
+            .replace(/(?<!\\)\n/g, '\\n')
+            .replace(/(?<!\\)\r/g, '\\r')
+            .replace(/(?<!\\)\t/g, '\\t')
+            .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+          return `"${escaped}"`;
+        }
+      );
+      return JSON.parse(sanitized);
+    }
+  }
+}
+
 export function resolveSubAgentLlmConfig(
   subAgent: SubAgent | null | undefined,
   globalSettings: LlmSettings | undefined
@@ -306,7 +341,8 @@ Work Order:
   try {
     const raw = await callLLM(settings, settings.systemPrompt, prompt);
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+    const parsed = safeJsonParse(jsonStr);
     return tier1ResponseSchema.parse(parsed);
   } catch (err: any) {
     console.error("Tier 1 LLM error:", err.message);
@@ -375,7 +411,8 @@ Work Order:
   try {
     const raw = await callLLM(effectiveSettings, effectiveSystemPrompt, prompt, effectiveApiKey);
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+    const parsed = safeJsonParse(jsonStr);
     return tier2ResponseSchema.parse(parsed);
   } catch (err: any) {
     console.error("Tier 2 LLM error:", err.message);
