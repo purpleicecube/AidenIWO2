@@ -9,8 +9,13 @@ export interface EffectiveLlmConfig {
   baseUrl: string | null;
   systemPrompt: string;
   apiKeyEnvVar: string;
+  directApiKey?: string;
   source: "sub-agent" | "global";
   subAgentName?: string;
+}
+
+function isEnvVarName(value: string): boolean {
+  return /^[A-Z][A-Z0-9_]*$/.test(value);
 }
 
 export function resolveSubAgentLlmConfig(
@@ -25,10 +30,22 @@ export function resolveSubAgentLlmConfig(
       groq: "GROQ_API_KEY",
     };
 
-    const apiKeyEnvVar = subAgent.llmApiKeyEnvVar || defaultKeyMap[subAgent.llmProvider] || "OPENAI_API_KEY";
-    const apiKey = process.env[apiKeyEnvVar];
+    const rawKeyField = subAgent.llmApiKeyEnvVar?.trim() || "";
+    let apiKey: string | undefined;
+    let apiKeyEnvVar: string;
+    let directApiKey: string | undefined;
+
+    if (rawKeyField && !isEnvVarName(rawKeyField)) {
+      directApiKey = rawKeyField;
+      apiKey = rawKeyField;
+      apiKeyEnvVar = defaultKeyMap[subAgent.llmProvider] || "OPENAI_API_KEY";
+    } else {
+      apiKeyEnvVar = rawKeyField || defaultKeyMap[subAgent.llmProvider] || "OPENAI_API_KEY";
+      apiKey = process.env[apiKeyEnvVar];
+    }
+
     if (!apiKey) {
-      console.warn(`Sub-agent "${subAgent.name}" LLM key ${apiKeyEnvVar} not found, falling back to global.`);
+      console.warn(`Sub-agent "${subAgent.name}" LLM key not found (checked: ${apiKeyEnvVar}), falling back to global.`);
     } else {
       const defaultPrompt = `You are a Tier 2 sub-agent named "${subAgent.name}" (type: ${subAgent.type}). You execute work orders and produce deliverables as directed by Aiden, the Tier 1 orchestration manager.${subAgent.description ? ` Your specialization: ${subAgent.description}` : ""}\n\nProduce high-quality, complete deliverables. Use markdown formatting.`;
 
@@ -38,6 +55,7 @@ export function resolveSubAgentLlmConfig(
         baseUrl: subAgent.llmBaseUrl || null,
         systemPrompt: subAgent.llmSystemPrompt || defaultPrompt,
         apiKeyEnvVar,
+        directApiKey,
         source: "sub-agent",
         subAgentName: subAgent.name,
       };
@@ -72,6 +90,7 @@ export function effectiveConfigToSettings(config: EffectiveLlmConfig): LlmSettin
     baseUrl: config.baseUrl,
     systemPrompt: config.systemPrompt,
     enabled: true,
+    updatedAt: new Date(),
   };
 }
 
@@ -128,10 +147,13 @@ function getProviderConfig(settings: LlmSettings): { baseURL: string; apiKeyEnvV
   }
 }
 
-function getApiKey(envVar: string): string {
-  const key = process.env[envVar];
+function getApiKey(envVarOrDirectKey: string): string {
+  if (!isEnvVarName(envVarOrDirectKey)) {
+    return envVarOrDirectKey;
+  }
+  const key = process.env[envVarOrDirectKey];
   if (!key) {
-    throw new Error(`API key not configured. Please set the ${envVar} secret.`);
+    throw new Error(`API key not configured. Please set the ${envVarOrDirectKey} secret.`);
   }
   return key;
 }
@@ -306,9 +328,9 @@ export async function runTier2WithLLM(
   const useConfig = effectiveConfig || null;
   const effectiveSettings = useConfig ? effectiveConfigToSettings(useConfig) : settings;
   const effectiveSystemPrompt = useConfig ? useConfig.systemPrompt : settings.systemPrompt;
-  const effectiveApiKey = useConfig ? useConfig.apiKeyEnvVar : undefined;
+  const effectiveApiKey = useConfig?.directApiKey || (useConfig ? useConfig.apiKeyEnvVar : undefined);
   const agentLabel = useConfig?.source === "sub-agent"
-    ? `You are "${useConfig.subAgentName}", a specialized Tier 2 sub-agent.`
+    ? `You are "${useConfig.subAgentName}", a specialized Tier 2 sub-agent. You are independently executing this work order using your own capabilities and LLM configuration.`
     : `You are Aiden, controlling a Tier 2 sub-agent.`;
 
   const prompt = `${agentLabel} The work order has passed the Tier 1 policy gate and was routed to handler "${tier1Result.handler}".

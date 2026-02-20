@@ -88,11 +88,22 @@ function TimelineItem({
   log: ExecutionLog;
   isLast: boolean;
 }) {
+  const meta = log.metadata as Record<string, any> | null;
+  const llmSource = meta?.llmSource || meta?.executedBy;
+  const isSubAgentOwn = log.tier === 2 && llmSource === "sub-agent";
   const TierIcon = log.tier === 1 ? Brain : Bot;
   const tierColor = log.tier === 1
     ? "bg-primary/10 text-primary dark:bg-primary/20"
-    : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400";
-  const tierLabel = log.tier === 1 ? "Aiden" : "Sub-Agent";
+    : isSubAgentOwn
+      ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+      : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400";
+  const tierLabel = log.tier === 1
+    ? "Aiden (Tier 1)"
+    : isSubAgentOwn
+      ? `${meta?.subAgentName || "Sub-Agent"} (own LLM)`
+      : meta?.subAgentName
+        ? `${meta.subAgentName} (via Aiden)`
+        : "Sub-Agent (Tier 2)";
 
   return (
     <div className="flex gap-3">
@@ -105,9 +116,17 @@ function TimelineItem({
       <div className={`flex-1 pb-6 ${isLast ? "" : ""}`}>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{log.action}</span>
-          <Badge variant="outline" className="text-xs no-default-hover-elevate no-default-active-elevate">
+          <Badge
+            variant="outline"
+            className={`text-xs no-default-hover-elevate no-default-active-elevate ${isSubAgentOwn ? "border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400" : ""}`}
+          >
             {tierLabel}
           </Badge>
+          {isSubAgentOwn && meta?.llmModel && (
+            <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">
+              {meta.llmProvider}/{meta.llmModel}
+            </Badge>
+          )}
         </div>
         <p className="text-sm text-muted-foreground mt-1">{log.message}</p>
         <p className="text-xs text-muted-foreground mt-1.5">

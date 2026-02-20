@@ -129,6 +129,11 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   const effectiveLlmConfig = resolveSubAgentLlmConfig(targetSubAgent, settings);
   const hasLlm = !!effectiveLlmConfig;
   const llmSource = effectiveLlmConfig?.source || "none";
+  const executorLabel = llmSource === "sub-agent"
+    ? `"${targetSubAgent?.name}" (own LLM: ${effectiveLlmConfig?.provider}/${effectiveLlmConfig?.model})`
+    : targetSubAgent
+      ? `"${targetSubAgent.name}" (via Aiden's LLM: ${effectiveLlmConfig?.provider || "none"}/${effectiveLlmConfig?.model || "fallback"})`
+      : "fallback handler";
 
   const tier2Result: Tier2Result = hasLlm && settings
     ? await runTier2WithLLM(settings, order, tier1Result, effectiveLlmConfig)
@@ -137,9 +142,9 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 2,
-    action: "Sub-Agent: Schema Validation",
-    message: `Sub-agent${targetSubAgent ? ` "${targetSubAgent.name}"` : ""} validated work order schema${hasLlm ? ` via LLM (${llmSource}: ${effectiveLlmConfig?.model})` : ""}.`,
-    metadata: { valid: true, subAgentName: targetSubAgent?.name, llmSource, llmModel: effectiveLlmConfig?.model },
+    action: llmSource === "sub-agent" ? `${targetSubAgent?.name}: Schema Validation` : "Sub-Agent: Schema Validation",
+    message: `${executorLabel} validated work order schema.`,
+    metadata: { valid: true, subAgentName: targetSubAgent?.name, llmSource, llmModel: effectiveLlmConfig?.model, llmProvider: effectiveLlmConfig?.provider },
   });
 
   if (tier2Result.blocked) {
@@ -156,7 +161,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       workOrderId: orderId,
       tier: 2,
       action: "BDM Marker Emitted",
-      message: `Sub-agent${targetSubAgent ? ` "${targetSubAgent.name}"` : ""} blocked execution: ${tier2Result.reason}`,
+      message: `${executorLabel} blocked execution: ${tier2Result.reason}`,
       metadata: bdmMarker,
     });
 
@@ -164,7 +169,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       workOrderId: orderId,
       tier: 1,
       action: "Aiden: BDM Resolution",
-      message: "Aiden received BDM marker from sub-agent — pausing for human decision.",
+      message: `Aiden received BDM marker from ${executorLabel} — pausing for human decision.`,
       metadata: { bdmMarker },
     });
 
@@ -185,17 +190,17 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 2,
-    action: "Sub-Agent: Execution Complete",
-    message: `Sub-agent${targetSubAgent ? ` "${targetSubAgent.name}"` : ""} executed work order successfully${hasLlm ? ` (${llmSource} LLM: ${effectiveLlmConfig?.model})` : ""}.`,
-    metadata: tier2Result,
+    action: llmSource === "sub-agent" ? `${targetSubAgent?.name}: Execution Complete` : "Sub-Agent: Execution Complete",
+    message: `${executorLabel} executed work order successfully.`,
+    metadata: { ...tier2Result, llmSource, llmProvider: effectiveLlmConfig?.provider, llmModel: effectiveLlmConfig?.model },
   });
 
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 1,
     action: "Aiden: Resolution",
-    message: "Aiden confirmed successful execution — work order completed.",
-    metadata: { finalStatus: "completed" },
+    message: `Aiden confirmed successful execution by ${executorLabel} — work order completed.`,
+    metadata: { finalStatus: "completed", executedBy: llmSource, executorName: targetSubAgent?.name, executorModel: effectiveLlmConfig?.model },
   });
 
   const completedOrder = await storage.updateWorkOrder(orderId, {

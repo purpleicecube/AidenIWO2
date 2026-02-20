@@ -606,22 +606,56 @@ export default function SubAgentsPage() {
 
                     {(() => {
                       const defaultKeyName = providers.find(p => p.value === watchLlmProvider)?.keyName || "";
+                      const currentValue = form.watch("llmApiKeyEnvVar") || "";
+                      const isDirectKey = currentValue && !/^[A-Z][A-Z0-9_]*$/.test(currentValue);
+                      const maskedKey = isDirectKey ? currentValue.slice(0, 6) + "••••••" + currentValue.slice(-4) : "";
                       return (
-                        <div className="rounded-md bg-muted/50 p-3 space-y-1.5">
-                          <p className="text-xs font-medium text-muted-foreground">API Key</p>
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 bg-background rounded-md border px-3 py-1.5 flex-1">
-                              <Lock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                              <span className="text-sm font-mono" data-testid="text-api-key-name">
-                                {form.watch("llmApiKeyEnvVar") || defaultKeyName || "Not configured"}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Uses the <span className="font-mono font-medium">{defaultKeyName}</span> secret already stored in your environment. No need to enter the key here.
-                          </p>
-                          <input type="hidden" {...form.register("llmApiKeyEnvVar")} />
-                        </div>
+                        <FormField
+                          control={form.control}
+                          name="llmApiKeyEnvVar"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>API Key</FormLabel>
+                              <div className="rounded-md bg-muted/50 p-3 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5 bg-background rounded-md border px-3 py-1.5 flex-1">
+                                    <Lock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                                    <span className="text-sm font-mono" data-testid="text-api-key-name">
+                                      {isDirectKey ? maskedKey : (currentValue || defaultKeyName || "Not configured")}
+                                    </span>
+                                  </div>
+                                  {isDirectKey && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => form.setValue("llmApiKeyEnvVar", defaultKeyName)}
+                                      data-testid="button-use-env-key"
+                                    >
+                                      Use env secret
+                                    </Button>
+                                  )}
+                                </div>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    value={field.value || ""}
+                                    placeholder={`Env var name (e.g. ${defaultKeyName}) or paste API key directly`}
+                                    className="font-mono text-xs"
+                                    data-testid="input-llm-api-key"
+                                  />
+                                </FormControl>
+                                <p className="text-xs text-muted-foreground">
+                                  {isDirectKey
+                                    ? "Using a direct API key. This sub-agent will use its own key independently from Aiden."
+                                    : <>Defaults to the <span className="font-mono font-medium">{defaultKeyName}</span> environment secret. You can also paste an API key directly.</>
+                                  }
+                                </p>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       );
                     })()}
 
