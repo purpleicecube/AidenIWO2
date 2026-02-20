@@ -157,8 +157,10 @@ export function AppSidebar() {
                 {userRole}
               </Badge>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid="button-logout" onClick={() => window.open("/api/logout", "_top")}>
-              <LogOut className="w-4 h-4" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild data-testid="button-logout">
+              <a href="/api/logout" target="_top">
+                <LogOut className="w-4 h-4" />
+              </a>
             </Button>
           </div>
         )}
