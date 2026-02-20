@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
+import { sendInviteEmail } from "./sendgrid";
 import { isAuthenticated as _isAuthenticated } from "./replit_integrations/auth";
 const isAuth: any = _isAuthenticated;
 import {
@@ -135,6 +136,24 @@ export async function registerRoutes(
       res.json({ message: "User deleted successfully" });
     } catch (err) {
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  app.post("/api/admin/invite", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        return res.status(400).json({ message: "A valid email address is required" });
+      }
+      const actor = getActor(req);
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers["host"] || "localhost:5000";
+      const appUrl = `${protocol}://${host}`;
+      await sendInviteEmail(email.trim(), actor.actorName, appUrl);
+      res.json({ message: `Invitation sent to ${email}` });
+    } catch (err: any) {
+      console.error("Failed to send invite email:", err);
+      res.status(500).json({ message: err.message || "Failed to send invitation email" });
     }
   });
 
