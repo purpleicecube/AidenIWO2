@@ -30,6 +30,10 @@ import {
   type InsertChatSession,
   type ChatMessage,
   type InsertChatMessage,
+  type OperationalSettings,
+  type InsertOperationalSettings,
+  type Approval,
+  type InsertApproval,
   workOrders,
   executionLogs,
   users,
@@ -46,6 +50,8 @@ import {
   sandboxSessions,
   chatSessions,
   chatMessages,
+  operationalSettings,
+  approvals,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, asc } from "drizzle-orm";
@@ -143,6 +149,16 @@ export interface IStorage {
   deleteChatSession(id: string): Promise<boolean>;
   getChatMessages(sessionId: string): Promise<ChatMessage[]>;
   addChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+
+  getOperationalSettings(): Promise<OperationalSettings | undefined>;
+  upsertOperationalSettings(settings: InsertOperationalSettings): Promise<OperationalSettings>;
+
+  getApprovals(): Promise<Approval[]>;
+  getPendingApprovals(): Promise<Approval[]>;
+  getApproval(id: string): Promise<Approval | undefined>;
+  getApprovalsByWorkOrder(workOrderId: string): Promise<Approval[]>;
+  createApproval(approval: InsertApproval): Promise<Approval>;
+  updateApproval(id: string, updates: Partial<Approval>): Promise<Approval | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -592,6 +608,52 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(chatSessions.id, message.sessionId));
     return created;
+  }
+
+  async getOperationalSettings(): Promise<OperationalSettings | undefined> {
+    const [settings] = await db.select().from(operationalSettings).where(eq(operationalSettings.id, "default"));
+    return settings;
+  }
+
+  async upsertOperationalSettings(settings: InsertOperationalSettings): Promise<OperationalSettings> {
+    const existing = await this.getOperationalSettings();
+    if (existing) {
+      const [updated] = await db
+        .update(operationalSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(operationalSettings.id, "default"))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(operationalSettings).values({ ...settings, id: "default" } as any).returning();
+    return created;
+  }
+
+  async getApprovals(): Promise<Approval[]> {
+    return db.select().from(approvals).orderBy(desc(approvals.createdAt));
+  }
+
+  async getPendingApprovals(): Promise<Approval[]> {
+    return db.select().from(approvals).where(eq(approvals.status, "pending")).orderBy(desc(approvals.createdAt));
+  }
+
+  async getApproval(id: string): Promise<Approval | undefined> {
+    const [approval] = await db.select().from(approvals).where(eq(approvals.id, id));
+    return approval;
+  }
+
+  async getApprovalsByWorkOrder(workOrderId: string): Promise<Approval[]> {
+    return db.select().from(approvals).where(eq(approvals.workOrderId, workOrderId)).orderBy(desc(approvals.createdAt));
+  }
+
+  async createApproval(approval: InsertApproval): Promise<Approval> {
+    const [created] = await db.insert(approvals).values(approval).returning();
+    return created;
+  }
+
+  async updateApproval(id: string, updates: Partial<Approval>): Promise<Approval | undefined> {
+    const [updated] = await db.update(approvals).set(updates).where(eq(approvals.id, id)).returning();
+    return updated;
   }
 }
 

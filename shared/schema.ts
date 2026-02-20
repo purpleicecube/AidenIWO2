@@ -46,10 +46,69 @@ export const workOrders = pgTable("work_orders", {
   tier2Result: jsonb("tier2_result"),
   gccMemory: jsonb("gcc_memory").default(sql`'{}'::jsonb`),
   bdmMarker: jsonb("bdm_marker"),
+  effectiveMode: text("effective_mode"),
+  impactScore: integer("impact_score"),
+  approvalStatus: text("approval_status"),
   submittedBy: text("submitted_by").default("system"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ==================== Operational Settings ====================
+
+export const operationalSettings = pgTable("operational_settings", {
+  id: varchar("id").primaryKey().default(sql`'default'`),
+  currentMode: text("current_mode").notNull().default("autonomous"),
+  thresholds: jsonb("thresholds").default(sql`'{"financialAmount": 10000, "riskLevel": "high", "categories": ["legal", "security", "strategic"]}'::jsonb`),
+  scheduleRules: jsonb("schedule_rules").default(sql`'[]'::jsonb`),
+  emergencyOverrideEnabled: boolean("emergency_override_enabled").notNull().default(true),
+  emergencyTriggers: jsonb("emergency_triggers").default(sql`'["security_breach", "legal_deadline_24h", "revenue_loss", "system_outage"]'::jsonb`),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: text("updated_by").default("system"),
+});
+
+export const insertOperationalSettingsSchema = createInsertSchema(operationalSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertOperationalSettings = z.infer<typeof insertOperationalSettingsSchema>;
+export type OperationalSettings = typeof operationalSettings.$inferSelect;
+
+// ==================== Approvals ====================
+
+export const approvals = pgTable("approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workOrderId: varchar("work_order_id").notNull(),
+  bdmType: text("bdm_type"),
+  impactScore: integer("impact_score").default(0),
+  effectiveMode: text("effective_mode").notNull().default("hitl"),
+  triggerReason: text("trigger_reason"),
+  aidenRecommendation: jsonb("aiden_recommendation"),
+  status: text("status").notNull().default("pending"),
+  decidedBy: text("decided_by"),
+  decidedByName: text("decided_by_name"),
+  decision: text("decision"),
+  rationale: text("rationale"),
+  decidedAt: timestamp("decided_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertApprovalSchema = createInsertSchema(approvals).omit({
+  id: true,
+  status: true,
+  decidedBy: true,
+  decidedByName: true,
+  decision: true,
+  rationale: true,
+  decidedAt: true,
+  createdAt: true,
+});
+
+export type InsertApproval = z.infer<typeof insertApprovalSchema>;
+export type Approval = typeof approvals.$inferSelect;
+
+// ==================== Execution Logs ====================
 
 export const executionLogs = pgTable("execution_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -72,6 +131,9 @@ export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
   tier2Result: true,
   gccMemory: true,
   bdmMarker: true,
+  effectiveMode: true,
+  impactScore: true,
+  approvalStatus: true,
   createdAt: true,
   updatedAt: true,
 });

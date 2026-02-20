@@ -14,6 +14,7 @@ import {
   insertWorkflowExecutionSchema,
   insertToolSchema,
   insertSubAgentToolSchema,
+  insertOperationalSettingsSchema,
   insertArtifactFolderSchema,
   insertArtifactSchema,
   insertSandboxSessionSchema,
@@ -1626,6 +1627,161 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
     } catch (err: any) {
       console.error("Chat error:", err.message);
       res.status(500).json({ message: `Aiden encountered an error: ${err.message}` });
+    }
+  });
+
+  // ==================== Operational Settings ====================
+
+  app.get("/api/operational-settings", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const settings = await storage.getOperationalSettings();
+      if (!settings) {
+        return res.json({
+          id: "default",
+          currentMode: "autonomous",
+          thresholds: { financialAmount: 10000, riskLevel: "high", categories: ["legal", "security", "strategic"] },
+          scheduleRules: [],
+          emergencyOverrideEnabled: true,
+          emergencyTriggers: ["security_breach", "legal_deadline_24h", "revenue_loss", "system_outage"],
+          updatedAt: new Date().toISOString(),
+          updatedBy: "system",
+        });
+      }
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch operational settings" });
+    }
+  });
+
+  app.put("/api/operational-settings", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const actor = getActor(req);
+      const parsed = insertOperationalSettingsSchema.safeParse({ ...req.body, updatedBy: actor.actorName });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid settings", errors: parsed.error.errors });
+      }
+      const settings = await storage.upsertOperationalSettings(parsed.data);
+
+      await storage.createExecutionLog({
+        workOrderId: "system",
+        tier: 0,
+        action: "mode_change",
+        message: `Operational mode changed to "${parsed.data.currentMode}" by ${actor.actorName}`,
+        metadata: { previousMode: req.body._previousMode, newMode: parsed.data.currentMode, actor },
+      });
+
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update operational settings" });
+    }
+  });
+
+  // ==================== Approvals ====================
+
+  app.get("/api/approvals", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const approvalsList = status === "pending"
+        ? await storage.getPendingApprovals()
+        : await storage.getApprovals();
+      res.json(approvalsList);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch approvals" });
+    }
+  });
+
+  app.get("/api/approvals/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const approval = await storage.getApproval(req.params.id);
+      if (!approval) return res.status(404).json({ message: "Approval not found" });
+      res.json(approval);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch approval" });
+    }
+  });
+
+  app.get("/api/work-orders/:id/approvals", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const list = await storage.getApprovalsByWorkOrder(req.params.id);
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch approvals for work order" });
+    }
+  });
+
+  app.post("/api/approvals/:id/approve", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const actor = getActor(req);
+      const { rationale } = req.body;
+      if (!rationale || typeof rationale !== "string" || rationale.trim().length < 3 || rationale.length > 2000) {
+        return res.status(400).json({ message: "Rationale is required (3-2000 characters)" });
+      }
+      const approval = await storage.getApproval(req.params.id);
+      if (!approval) return res.status(404).json({ message: "Approval not found" });
+      if (approval.status !== "pending") return res.status(400).json({ message: "Approval is no longer pending" });
+      const workOrder = await storage.getWorkOrder(approval.workOrderId);
+      if (!workOrder) return res.status(404).json({ message: "Associated work order not found" });
+
+      const updated = await storage.updateApproval(req.params.id, {
+        status: "approved",
+        decidedBy: actor.actorId,
+        decidedByName: actor.actorName,
+        decision: "approved",
+        rationale,
+        decidedAt: new Date(),
+      });
+
+      await storage.updateWorkOrder(approval.workOrderId, { approvalStatus: "approved" });
+
+      await storage.createExecutionLog({
+        workOrderId: approval.workOrderId,
+        tier: 0,
+        action: "approval_granted",
+        message: `Approval granted by ${actor.actorName}: ${rationale}`,
+        metadata: { approvalId: approval.id, actor, decision: "approved" },
+      });
+
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to approve" });
+    }
+  });
+
+  app.post("/api/approvals/:id/reject", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const actor = getActor(req);
+      const { rationale } = req.body;
+      if (!rationale || typeof rationale !== "string" || rationale.trim().length < 3 || rationale.length > 2000) {
+        return res.status(400).json({ message: "Rationale is required (3-2000 characters)" });
+      }
+      const approval = await storage.getApproval(req.params.id);
+      if (!approval) return res.status(404).json({ message: "Approval not found" });
+      if (approval.status !== "pending") return res.status(400).json({ message: "Approval is no longer pending" });
+      const workOrder = await storage.getWorkOrder(approval.workOrderId);
+      if (!workOrder) return res.status(404).json({ message: "Associated work order not found" });
+
+      const updated = await storage.updateApproval(req.params.id, {
+        status: "rejected",
+        decidedBy: actor.actorId,
+        decidedByName: actor.actorName,
+        decision: "rejected",
+        rationale,
+        decidedAt: new Date(),
+      });
+
+      await storage.updateWorkOrder(approval.workOrderId, { approvalStatus: "rejected", status: "blocked" });
+
+      await storage.createExecutionLog({
+        workOrderId: approval.workOrderId,
+        tier: 0,
+        action: "approval_rejected",
+        message: `Approval rejected by ${actor.actorName}: ${rationale}`,
+        metadata: { approvalId: approval.id, actor, decision: "rejected" },
+      });
+
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to reject" });
     }
   });
 

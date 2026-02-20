@@ -66,7 +66,8 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `server/storage.ts` - DatabaseStorage with all CRUD operations
 - `server/seed.ts` - Database seeding with sample work orders
 - `server/db.ts` - Database connection pool
-- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users, workflowTemplates, workflowSteps, workflowExecutions, workflowStepRuns, tools, subAgentTools, artifactFolders, artifacts, sandboxSessions, chatSessions, chatMessages)
+- `server/sendgrid.ts` - SendGrid email integration via Replit Connectors
+- `shared/schema.ts` - Data models (subAgents, workOrders, executionLogs, llmSettings, users, workflowTemplates, workflowSteps, workflowExecutions, workflowStepRuns, tools, subAgentTools, artifactFolders, artifacts, sandboxSessions, chatSessions, chatMessages, operationalSettings, approvals)
 
 ## Key API Endpoints
 - `GET /api/health` - System health check
@@ -141,6 +142,13 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `DELETE /api/chat/sessions/:id` - Delete session and messages
 - `POST /api/chat/sessions/:id/messages` - Send message to session (persists + calls LLM + updates GCC memory breadcrumbs)
 - `POST /api/chat` - Legacy chat endpoint (sends message + history, returns LLM response with system context)
+- `GET /api/operational-settings` - Get current operational mode settings (autonomous/semi-autonomous/hitl)
+- `PUT /api/operational-settings` - Update operational mode, thresholds, schedule rules (admin only)
+- `GET /api/approvals` - List all approvals (query: status=pending for pending only)
+- `GET /api/approvals/:id` - Get approval detail
+- `GET /api/work-orders/:id/approvals` - Get approvals for a work order
+- `POST /api/approvals/:id/approve` - Approve a pending approval with rationale (operator+)
+- `POST /api/approvals/:id/reject` - Reject a pending approval with rationale (operator+)
 
 ## LLM Integration
 - **Providers**: OpenAI, Anthropic, OpenRouter, Groq
