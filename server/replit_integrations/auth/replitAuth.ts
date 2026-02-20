@@ -131,7 +131,7 @@ export async function setupAuth(app: Express) {
           return res.redirect("/");
         }
         console.log("[auth] Login successful for user:", user?.claims?.email);
-        return res.redirect("/api/auth/success");
+        return res.redirect("/");
       });
     })(req, res, next);
   });
