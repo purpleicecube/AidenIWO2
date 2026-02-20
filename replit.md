@@ -52,11 +52,12 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 
 ## Project Structure
 - `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools, Workspace, Sandbox, Chat
-- `client/src/components/` - AppSidebar, ThemeProvider, ThemeToggle, StatusBadge
+- `client/src/components/` - AppSidebar, ThemeProvider, ThemeToggle, StatusBadge, SplitPane
 - `client/src/hooks/` - use-page-title, use-toast
 - `server/routes.ts` - API endpoints
 - `server/orchestration.ts` - Aiden (Tier 1), sub-agent (Tier 2), and workflow execution engine
 - `server/llm-client.ts` - Multi-provider LLM abstraction with structured JSON parsing
+- `server/workspace-filing.ts` - Auto-filing engine: routes deliverables to #Code_Blocks, #Documents, #Images; auto-deploys HTML to Sandbox
 - `server/storage.ts` - DatabaseStorage with all CRUD operations
 - `server/seed.ts` - Database seeding with sample work orders
 - `server/db.ts` - Database connection pool
@@ -73,6 +74,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `POST /api/work-orders/:id/process` - Process a pending work order
 - `PUT /api/work-orders/:id` - Update work order (title, description, type, priority)
 - `POST /api/work-orders/:id/retry` - Retry a blocked/failed work order
+- `POST /api/work-orders/:id/refile` - Re-trigger workspace filing for a completed work order
 - `POST /api/work-orders/:id/unblock` - HITL unblock: clear BDM marker with resolution notes, optionally re-process
 - `GET /api/sub-agents` - List all sub-agents
 - `GET /api/sub-agents/:id` - Get sub-agent detail
@@ -119,6 +121,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `PUT /api/sandbox-sessions/:id` - Update session
 - `DELETE /api/sandbox-sessions/:id` - Delete session
 - `POST /api/sandbox-sessions/:id/execute` - Execute command in sandbox
+- `GET /api/sandbox-sessions/:id/preview` - Serve raw HTML preview for renderable sandbox sessions (iframe)
 - `GET /api/chat/sessions` - List chat sessions (GCC memory protocol)
 - `POST /api/chat/sessions` - Create new chat session with correlationId
 - `GET /api/chat/sessions/:id` - Get session detail with messages

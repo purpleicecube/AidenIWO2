@@ -192,6 +192,21 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/work-orders/:id/refile", async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      if (order.status !== "completed") {
+        return res.status(400).json({ message: "Only completed work orders can be re-filed" });
+      }
+      const { fileWorkOrderOutput } = await import("./workspace-filing");
+      await fileWorkOrderOutput(order);
+      res.json({ message: "Work order re-filed successfully", workOrderId: order.id });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to re-file work order", error: err.message });
+    }
+  });
+
   const unblockSchema = z.object({
     resolution: z.string().min(1, "Resolution notes are required"),
     reprocess: z.boolean().default(true),
@@ -1044,6 +1059,25 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err) {
       res.status(500).json({ message: "Failed to execute sandbox session" });
+    }
+  });
+
+  app.get("/api/sandbox-sessions/:id/preview", async (req, res) => {
+    try {
+      const session = await storage.getSandboxSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+
+      const result = session.result as any;
+      if (!result?.html || !result?.renderable) {
+        return res.status(404).json({ message: "No renderable preview available for this session" });
+      }
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src * data:; font-src * data:; style-src 'self' 'unsafe-inline' *;");
+      res.setHeader("X-Frame-Options", "SAMEORIGIN");
+      res.send(result.html);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to load preview" });
     }
   });
 

@@ -29,6 +29,10 @@ import {
   Loader2,
   Terminal,
   RotateCcw,
+  Globe,
+  Code,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
 
@@ -81,6 +85,8 @@ export default function SandboxPage() {
   const [newDesc, setNewDesc] = useState("");
   const [execCommand, setExecCommand] = useState("");
   const [execInput, setExecInput] = useState("");
+  const [viewMode, setViewMode] = useState<"terminal" | "preview">("terminal");
+  const [previewExpanded, setPreviewExpanded] = useState(false);
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
     queryKey: ["/api/sandbox-sessions"],
@@ -185,7 +191,15 @@ export default function SandboxPage() {
                   <Card
                     key={session.id}
                     className={`hover-elevate cursor-pointer ${isSelected ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => setSelectedSession(session)}
+                    onClick={() => {
+                      setSelectedSession(session);
+                      const result = session.result as any;
+                      if (result?.html && result?.renderable) {
+                        setViewMode("preview");
+                      } else {
+                        setViewMode("terminal");
+                      }
+                    }}
                     data-testid={`session-${session.id}`}
                   >
                     <CardContent className="p-4">
@@ -236,6 +250,11 @@ export default function SandboxPage() {
       </div>
   );
 
+  const sessionResult = selectedSession?.result as any;
+  const isRenderable = !!(sessionResult?.html && sessionResult?.renderable);
+
+  const activeViewMode = isRenderable ? viewMode : "terminal";
+
   const detailPanel = selectedSession ? (
         <div className="flex flex-col bg-background h-full" data-testid="panel-session-detail">
           <div className="p-3 border-b flex items-center justify-between gap-2">
@@ -245,126 +264,200 @@ export default function SandboxPage() {
               <Badge variant={getStatusColor(selectedSession.status)} className="text-[10px]">
                 {selectedSession.status}
               </Badge>
+              {isRenderable && (
+                <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-600 border-green-500/30">
+                  <Globe className="w-3 h-3 mr-0.5" />
+                  Preview
+                </Badge>
+              )}
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setSelectedSession(null)}
-              data-testid="button-close-session"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <div className="p-3 border-b">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-muted-foreground">Created</span>
-                <div>{formatDate(selectedSession.createdAt)}</div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Completed</span>
-                <div>{formatDate(selectedSession.completedAt)}</div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Created By</span>
-                <div>{selectedSession.createdBy || "system"}</div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Executions</span>
-                <div>{Array.isArray(selectedSession.logs) ? (selectedSession.logs as any[]).length : 0}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 border-b space-y-2">
-            <h4 className="text-xs font-medium flex items-center gap-1">
-              <Terminal className="w-3 h-3" />
-              Execute Command
-            </h4>
-            <Input
-              placeholder="Command (e.g., test-workflow, validate-config)"
-              value={execCommand}
-              onChange={(e) => setExecCommand(e.target.value)}
-              data-testid="input-exec-command"
-            />
-            <Textarea
-              placeholder="Input data (optional JSON or text)..."
-              value={execInput}
-              onChange={(e) => setExecInput(e.target.value)}
-              className="min-h-[60px] font-mono text-xs"
-              data-testid="textarea-exec-input"
-            />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {isRenderable && (
+                <>
+                  <Button
+                    size="icon"
+                    variant={activeViewMode === "preview" ? "default" : "ghost"}
+                    onClick={() => setViewMode("preview")}
+                    title="Live Preview"
+                    data-testid="button-view-preview"
+                  >
+                    <Globe className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={activeViewMode === "terminal" ? "default" : "ghost"}
+                    onClick={() => setViewMode("terminal")}
+                    title="Terminal / Logs"
+                    data-testid="button-view-terminal"
+                  >
+                    <Terminal className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
               <Button
-                size="sm"
-                onClick={() =>
-                  executeMutation.mutate({
-                    id: selectedSession.id,
-                    command: execCommand || "execute",
-                    input: execInput,
-                  })
-                }
-                disabled={executeMutation.isPending}
-                data-testid="button-execute"
+                size="icon"
+                variant="ghost"
+                onClick={() => setSelectedSession(null)}
+                data-testid="button-close-session"
               >
-                {executeMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                ) : (
-                  <Play className="w-4 h-4 mr-1" />
-                )}
-                Run
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => resetMutation.mutate(selectedSession.id)}
-                disabled={resetMutation.isPending}
-                data-testid="button-reset-session"
-              >
-                <RotateCcw className="w-4 h-4 mr-1" />
-                Reset
+                <X className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-3">
-            <h4 className="text-xs font-medium mb-2">Execution Log</h4>
-            {Array.isArray(selectedSession.logs) && (selectedSession.logs as any[]).length > 0 ? (
-              <div className="space-y-2">
-                {(selectedSession.logs as any[]).map((log: any, i: number) => (
-                  <Card key={i} className="p-2">
-                    <div className="text-[10px] text-muted-foreground mb-1">
-                      {log.timestamp ? formatDate(log.timestamp) : `Run #${i + 1}`}
-                    </div>
-                    <div className="text-xs font-medium mb-1">
-                      {log.command || "execute"}
-                    </div>
-                    {log.output && (
-                      <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap bg-muted/50 rounded p-1.5">
-                        {typeof log.output === "string" ? log.output : JSON.stringify(log.output, null, 2)}
-                      </pre>
+          {activeViewMode === "preview" && isRenderable ? (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Globe className="w-3 h-3" />
+                  <span className="font-medium">{sessionResult.title || "HTML Preview"}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setPreviewExpanded(!previewExpanded)}
+                    title={previewExpanded ? "Collapse" : "Expand"}
+                    data-testid="button-toggle-preview-expand"
+                  >
+                    {previewExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      window.open(`/api/sandbox-sessions/${selectedSession.id}/preview`, '_blank');
+                    }}
+                    title="Open in new tab"
+                    data-testid="button-open-preview-tab"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 bg-white">
+                <iframe
+                  src={`/api/sandbox-sessions/${selectedSession.id}/preview`}
+                  className="w-full h-full border-0"
+                  title={`Preview: ${selectedSession.name}`}
+                  sandbox="allow-scripts"
+                  data-testid="iframe-preview"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="p-3 border-b">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Created</span>
+                    <div>{formatDate(selectedSession.createdAt)}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Completed</span>
+                    <div>{formatDate(selectedSession.completedAt)}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Created By</span>
+                    <div>{selectedSession.createdBy || "system"}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Executions</span>
+                    <div>{Array.isArray(selectedSession.logs) ? (selectedSession.logs as any[]).length : 0}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 border-b space-y-2">
+                <h4 className="text-xs font-medium flex items-center gap-1">
+                  <Terminal className="w-3 h-3" />
+                  Execute Command
+                </h4>
+                <Input
+                  placeholder="Command (e.g., test-workflow, validate-config)"
+                  value={execCommand}
+                  onChange={(e) => setExecCommand(e.target.value)}
+                  data-testid="input-exec-command"
+                />
+                <Textarea
+                  placeholder="Input data (optional JSON or text)..."
+                  value={execInput}
+                  onChange={(e) => setExecInput(e.target.value)}
+                  className="min-h-[60px] font-mono text-xs"
+                  data-testid="textarea-exec-input"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      executeMutation.mutate({
+                        id: selectedSession.id,
+                        command: execCommand || "execute",
+                        input: execInput,
+                      })
+                    }
+                    disabled={executeMutation.isPending}
+                    data-testid="button-execute"
+                  >
+                    {executeMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 mr-1" />
                     )}
-                  </Card>
-                ))}
+                    Run
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => resetMutation.mutate(selectedSession.id)}
+                    disabled={resetMutation.isPending}
+                    data-testid="button-reset-session"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-1" />
+                    Reset
+                  </Button>
+                </div>
               </div>
-            ) : (
-              <div className="text-xs text-muted-foreground text-center py-6">
-                No executions yet. Run a command above to test.
-              </div>
-            )}
 
-            {selectedSession.result ? (
-              <div className="mt-3">
-                <h4 className="text-xs font-medium mb-2">Latest Result</h4>
-                <Card className="p-2">
-                  <pre className="text-[10px] font-mono whitespace-pre-wrap" data-testid="text-session-result">
-                    {JSON.stringify(selectedSession.result, null, 2)}
-                  </pre>
-                </Card>
+              <div className="flex-1 overflow-auto p-3">
+                <h4 className="text-xs font-medium mb-2">Execution Log</h4>
+                {Array.isArray(selectedSession.logs) && (selectedSession.logs as any[]).length > 0 ? (
+                  <div className="space-y-2">
+                    {(selectedSession.logs as any[]).map((log: any, i: number) => (
+                      <Card key={i} className="p-2">
+                        <div className="text-[10px] text-muted-foreground mb-1">
+                          {log.timestamp ? formatDate(log.timestamp) : `Run #${i + 1}`}
+                        </div>
+                        <div className="text-xs font-medium mb-1">
+                          {log.command || "execute"}
+                        </div>
+                        {log.output && (
+                          <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap bg-muted/50 rounded p-1.5">
+                            {typeof log.output === "string" ? log.output : JSON.stringify(log.output, null, 2)}
+                          </pre>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground text-center py-6">
+                    No executions yet. Run a command above to test.
+                  </div>
+                )}
+
+                {selectedSession.result ? (
+                  <div className="mt-3">
+                    <h4 className="text-xs font-medium mb-2">Latest Result</h4>
+                    <Card className="p-2">
+                      <pre className="text-[10px] font-mono whitespace-pre-wrap" data-testid="text-session-result">
+                        {JSON.stringify(selectedSession.result, null, 2)}
+                      </pre>
+                    </Card>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
+            </>
+          )}
         </div>
   ) : null;
 

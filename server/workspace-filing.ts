@@ -31,14 +31,54 @@ async function getRootFolder(name: string) {
   return rootFolders.find(f => f.name === name);
 }
 
-function getOutputFolderName(deliverableType: string): string {
-  switch (deliverableType) {
-    case "code": return "#Code_Blocks";
-    case "image": return "#Images";
-    case "document":
-    case "mixed":
-    default: return "#Documents";
+function containsCodeBlock(content: string): boolean {
+  if (/```(html|css|js|javascript|typescript|tsx|jsx|python|ruby|go|rust|java|c|cpp|csharp|sql|bash|sh|yaml|json|xml|php|swift|kotlin)\b/i.test(content)) {
+    return true;
   }
+  const codeBlocks = content.match(/```[\s\S]*?```/g);
+  if (codeBlocks && codeBlocks.some(block => {
+    const inner = block.slice(3, -3).trim();
+    return inner.includes('<') && inner.includes('>') || 
+           inner.includes('function ') || inner.includes('const ') ||
+           inner.includes('import ') || inner.includes('class ') ||
+           inner.includes('def ') || inner.includes('fn ');
+  })) {
+    return true;
+  }
+  return false;
+}
+
+function containsHtmlDocument(content: string): boolean {
+  return /<!DOCTYPE\s+html|<html[\s>]/i.test(content);
+}
+
+function extractHtmlFromDeliverable(content: string): string | null {
+  const htmlBlockMatch = content.match(/```html?\s*\n([\s\S]*?)```/i);
+  if (htmlBlockMatch) return htmlBlockMatch[1].trim();
+
+  if (containsHtmlDocument(content)) {
+    const startIdx = content.search(/<!DOCTYPE\s+html|<html[\s>]/i);
+    if (startIdx >= 0) {
+      const htmlContent = content.slice(startIdx);
+      const endIdx = htmlContent.lastIndexOf("</html>");
+      if (endIdx >= 0) return htmlContent.slice(0, endIdx + 7);
+      return htmlContent;
+    }
+  }
+  return null;
+}
+
+function resolveOutputFolder(deliverableType: string, deliverableContent: string | null): string {
+  if (deliverableType === "code") return "#Code_Blocks";
+  if (deliverableType === "image") return "#Images";
+
+  if (deliverableContent && (deliverableType === "mixed" || deliverableType === "document")) {
+    if (containsCodeBlock(deliverableContent) || containsHtmlDocument(deliverableContent)) {
+      return "#Code_Blocks";
+    }
+  }
+
+  return "#Documents";
 }
 
 function classifyWorkProductFolder(order: WorkOrder): string {
@@ -152,7 +192,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
     let deliverableFilePath: string | null = null;
 
     if (deliverable) {
-      const outputFolderName = getOutputFolderName(deliverableType);
+      const outputFolderName = resolveOutputFolder(deliverableType, deliverable);
       let outputFolder = await getRootFolder(outputFolderName);
 
       if (!outputFolder) {
@@ -195,6 +235,41 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
 
         deliverableFilePath = `${outputFolderName}/${dateStr}/${folderName}/${fileName}`;
         console.log(`  Deliverable saved to ${deliverableFilePath}`);
+      }
+
+      const htmlContent = extractHtmlFromDeliverable(deliverable);
+      if (htmlContent) {
+        try {
+          const sandboxSession = await storage.createSandboxSession({
+            name: `Preview: ${order.title}`,
+            description: `Auto-deployed from work order "${order.title}" — renderable HTML preview.`,
+            environment: {
+              sourceType: "work_order",
+              sourceId: order.id,
+              deliverableTitle,
+              autoDeployed: true,
+            },
+            createdBy: "aiden",
+          });
+
+          const previewLog = {
+            timestamp: new Date().toISOString(),
+            command: "deploy-preview",
+            input: { workOrderId: order.id, title: order.title },
+            output: { message: `HTML preview deployed for "${order.title}"`, status: "success" },
+          };
+
+          await storage.updateSandboxSession(sandboxSession.id, {
+            status: "completed",
+            result: { html: htmlContent, renderable: true, title: deliverableTitle },
+            logs: [previewLog],
+            completedAt: new Date(),
+          });
+
+          console.log(`  Sandbox preview deployed: session ${sandboxSession.id}`);
+        } catch (sandboxErr: any) {
+          console.error("Sandbox auto-deploy failed:", sandboxErr.message);
+        }
       }
     }
 
