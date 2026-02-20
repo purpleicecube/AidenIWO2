@@ -141,16 +141,19 @@ export async function registerRoutes(
 
   app.post("/api/admin/invite", isAuth, requireRole("admin"), async (req, res) => {
     try {
-      const { email } = req.body;
-      if (!email || typeof email !== "string" || !email.includes("@")) {
-        return res.status(400).json({ message: "A valid email address is required" });
+      const emailSchema = z.object({ email: z.string().email("A valid email address is required") });
+      const parsed = emailSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
       }
       const actor = getActor(req);
-      const protocol = req.headers["x-forwarded-proto"] || "https";
-      const host = req.headers["host"] || "localhost:5000";
-      const appUrl = `${protocol}://${host}`;
-      await sendInviteEmail(email.trim(), actor.actorName, appUrl);
-      res.json({ message: `Invitation sent to ${email}` });
+      const replSlug = process.env.REPL_SLUG;
+      const replOwner = process.env.REPL_OWNER;
+      const appUrl = replSlug && replOwner
+        ? `https://${replSlug}.${replOwner}.repl.co`
+        : process.env.APP_URL || `https://${req.hostname}`;
+      await sendInviteEmail(parsed.data.email, actor.actorName, appUrl);
+      res.json({ message: `Invitation sent to ${parsed.data.email}` });
     } catch (err: any) {
       console.error("Failed to send invite email:", err);
       res.status(500).json({ message: err.message || "Failed to send invitation email" });
