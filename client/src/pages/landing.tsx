@@ -56,7 +56,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <div className="space-y-8">
             <h1 className="text-4xl lg:text-5xl font-serif font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
-              Intelligent Work Order<br />
+              Intelligent Work<br />
               <span className="text-primary">Orchestration</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-lg">
@@ -153,8 +153,9 @@ export default function LandingPage() {
       </section>
 
       <footer className="py-8 px-6 border-t border-slate-200 dark:border-slate-800">
-        <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground">
-          AIDEN_PTIB v0.3.0 — Intelligent Work Order Orchestration
+        <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground space-y-1">
+          <p>AIDEN_PTIB v0.3.0 — Intelligent Work Orchestration</p>
+          <p className="text-xs">designed by LuaAzullaB | darrel vaughn</p>
         </div>
       </footer>
     </div>
