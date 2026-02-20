@@ -210,11 +210,8 @@ async function callOpenAICompatible(
     model: settings.model,
     messages: messages as any,
     temperature: 0.3,
+    response_format: { type: "json_object" },
   };
-
-  if (settings.provider === "openai") {
-    params.response_format = { type: "json_object" };
-  }
 
   const response = await client.chat.completions.create(params);
 
