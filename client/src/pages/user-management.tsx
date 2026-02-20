@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Shield, Users, Loader2, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Shield, Users, Loader2, Trash2, Send, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { User } from "@shared/models/auth";
@@ -38,6 +40,22 @@ export default function UserManagementPage() {
     },
     onError: (err: any) => {
       toast({ title: "Failed to update role", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  const inviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest("POST", "/api/admin/invite", { email });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Invitation sent", description: data.message });
+      setInviteEmail("");
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send invitation", description: err.message, variant: "destructive" });
     },
   });
 
@@ -73,6 +91,50 @@ export default function UserManagementPage() {
           Manage user accounts and role assignments. First user to sign in is automatically assigned Admin.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Invite User
+          </CardTitle>
+          <CardDescription>Send an email invitation to join the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="flex gap-3"
+            data-testid="form-invite-user"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (inviteEmail.trim()) {
+                inviteMutation.mutate(inviteEmail.trim());
+              }
+            }}
+          >
+            <Input
+              type="email"
+              placeholder="colleague@example.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              className="flex-1"
+              data-testid="input-invite-email"
+              required
+            />
+            <Button
+              type="submit"
+              disabled={inviteMutation.isPending || !inviteEmail.trim()}
+              data-testid="button-send-invite"
+            >
+              {inviteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              Send Invite
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -76,6 +76,7 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - `GET /api/admin/users` - List all users (admin only)
 - `PUT /api/admin/users/:id/role` - Update user role (admin only)
 - `DELETE /api/admin/users/:id` - Remove a user (admin only, cannot delete self)
+- `POST /api/admin/invite` - Send email invitation to a new user (admin only, via SendGrid)
 - `GET /api/work-orders` - List all work orders
 - `GET /api/work-orders/stats` - Dashboard statistics
 - `GET /api/work-orders/recent` - Recent work orders
