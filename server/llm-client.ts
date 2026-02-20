@@ -147,10 +147,58 @@ const tier2ResponseSchema = z.object({
     deliverableType: z.enum(["document", "code", "image", "mixed"]).optional(),
     deliverableTitle: z.string().optional(),
   }).optional(),
+  pocketflow: z.object({
+    iterations: z.number().optional(),
+    convergenceScore: z.number().optional(),
+    stepResults: z.array(z.object({
+      stepId: z.string(),
+      stepName: z.string(),
+      output: z.string(),
+      iteration: z.number(),
+    })).optional(),
+    refinementHistory: z.array(z.object({
+      iteration: z.number(),
+      gaps: z.array(z.string()),
+      deltaSteps: z.array(z.string()),
+    })).optional(),
+    bdmMarker: z.any().optional(),
+  }).optional(),
 });
 
 export type Tier1Result = z.infer<typeof tier1ResponseSchema>;
 export type Tier2Result = z.infer<typeof tier2ResponseSchema>;
+
+const planStepsSchema = z.array(z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  dependencies: z.array(z.string()).default([]),
+}));
+
+const execStepResultSchema = z.object({
+  blocked: z.boolean(),
+  reason: z.string().nullable().optional(),
+  output: z.string().optional(),
+});
+
+const evaluateResultSchema = z.object({
+  score: z.number().min(0).max(1),
+  meetsCriteria: z.boolean(),
+  gaps: z.array(z.string()).default([]),
+  strengths: z.array(z.string()).default([]),
+  reasoning: z.string(),
+});
+
+const refineResultSchema = z.object({
+  gaps: z.array(z.string()),
+  deltaSteps: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    dependencies: z.array(z.string()).default([]),
+  })),
+  reasoning: z.string(),
+});
 
 function getProviderConfig(settings: LlmSettings): { baseURL: string; apiKeyEnvVar: string } {
   switch (settings.provider) {
@@ -509,6 +557,184 @@ export interface ProviderModel {
   name: string;
   contextWindow?: number;
   owned_by?: string;
+}
+
+export async function llmPlanSteps(
+  settings: LlmSettings,
+  systemPrompt: string,
+  order: WorkOrder,
+  tier1Result: Tier1Result,
+  existingGaps: string[],
+  existingOutputs: Record<string, string>,
+  apiKeyOverride?: string
+): Promise<Array<{ id: string; name: string; description: string; dependencies: string[] }>> {
+  const isRefinement = existingGaps.length > 0;
+  const existingContext = Object.entries(existingOutputs).length > 0
+    ? `\nAlready completed outputs:\n${Object.entries(existingOutputs).map(([id, out]) => `- ${id}: ${out.substring(0, 200)}...`).join("\n")}`
+    : "";
+  const gapsContext = isRefinement
+    ? `\nThis is a REFINEMENT pass. Only plan steps to address these gaps:\n${existingGaps.map(g => `- ${g}`).join("\n")}${existingContext}`
+    : "";
+
+  const prompt = `You are executing a work order as a Tier 2 sub-agent. Break the work order into concrete execution steps.
+${gapsContext}
+Each step should be a discrete unit of work. Steps can declare dependencies on other steps by ID.
+Independent steps (no dependencies) will be executed in PARALLEL for efficiency.
+
+Respond with ONLY a JSON array:
+[
+  { "id": "step_1", "name": "Step Name", "description": "What to do", "dependencies": [] },
+  { "id": "step_2", "name": "Step Name", "description": "What to do", "dependencies": ["step_1"] }
+]
+
+${isRefinement ? "IMPORTANT: Only add NEW steps needed to fill gaps. Use new unique IDs (e.g. step_r1, step_r2). Reference existing step IDs in dependencies if needed." : ""}
+For simple work orders, a single step is perfectly fine.
+
+Work Order:
+- Title: ${order.title}
+- Description: ${order.description}
+- Type: ${order.type}
+- Priority: ${order.priority}
+- Handler: ${tier1Result.handler}`;
+
+  const raw = await callLLM(settings, systemPrompt, prompt, apiKeyOverride);
+  const jsonMatch = raw.match(/\[[\s\S]*\]/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+  const parsed = safeJsonParse(jsonStr);
+  return planStepsSchema.parse(parsed);
+}
+
+export async function llmExecStep(
+  settings: LlmSettings,
+  systemPrompt: string,
+  order: WorkOrder,
+  step: { id: string; name: string; description: string },
+  previousOutputs: Record<string, string>,
+  apiKeyOverride?: string
+): Promise<{ blocked: boolean; reason?: string | null; output?: string }> {
+  const contextEntries = Object.entries(previousOutputs);
+  const prevContext = contextEntries.length > 0
+    ? `\nPrevious step outputs available:\n${contextEntries.map(([id, out]) => `--- ${id} ---\n${out}`).join("\n\n")}`
+    : "";
+
+  const gcc = (order.gccMemory || {}) as Record<string, any>;
+  const isReopened = gcc["gcc.last_action"] === "reopened" || gcc.lastAction === "reopened";
+  const reopenContext = isReopened ? buildReopenContext(gcc) : "";
+
+  const prompt = `You are executing step "${step.name}" of a work order.
+
+Step description: ${step.description}
+${prevContext}
+${reopenContext}
+Work Order Context:
+- Title: ${order.title}
+- Description: ${order.description}
+- Type: ${order.type}
+- Priority: ${order.priority}
+
+IMPORTANT: Produce the ACTUAL deliverable content for this step. Write the real work product — not a summary or status.
+If this step cannot be executed (missing info, external dependency, etc.), set blocked=true.
+
+Respond with ONLY a JSON object:
+{
+  "blocked": false,
+  "reason": null,
+  "output": "THE ACTUAL CONTENT/DELIVERABLE FOR THIS STEP in markdown"
+}`;
+
+  const raw = await callLLM(settings, systemPrompt, prompt, apiKeyOverride);
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+  const parsed = safeJsonParse(jsonStr);
+  return execStepResultSchema.parse(parsed);
+}
+
+export async function llmEvaluate(
+  settings: LlmSettings,
+  systemPrompt: string,
+  order: WorkOrder,
+  combinedOutput: string,
+  planSteps: Array<{ id: string; name: string; status: string }>,
+  apiKeyOverride?: string
+): Promise<{ score: number; meetsCriteria: boolean; gaps: string[]; strengths: string[]; reasoning: string }> {
+  const prompt = `You are evaluating the quality and completeness of a work order's deliverable.
+
+Work Order:
+- Title: ${order.title}
+- Description: ${order.description}
+- Type: ${order.type}
+- Priority: ${order.priority}
+
+Steps executed: ${planSteps.filter(s => s.status === "completed").map(s => s.name).join(", ")}
+Steps failed: ${planSteps.filter(s => s.status === "failed").map(s => s.name).join(", ") || "none"}
+
+Combined output to evaluate:
+${combinedOutput.substring(0, 4000)}
+
+Score the output from 0.0 to 1.0:
+- 0.0-0.3: Missing most requirements, incomplete
+- 0.4-0.6: Partially complete, major gaps
+- 0.7-0.8: Mostly complete, minor improvements possible
+- 0.8-1.0: Comprehensive, meets all criteria
+
+Respond with ONLY a JSON object:
+{
+  "score": 0.85,
+  "meetsCriteria": true,
+  "gaps": ["gap description if any"],
+  "strengths": ["what was done well"],
+  "reasoning": "brief explanation of score"
+}`;
+
+  const raw = await callLLM(settings, systemPrompt, prompt, apiKeyOverride);
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+  const parsed = safeJsonParse(jsonStr);
+  return evaluateResultSchema.parse(parsed);
+}
+
+export async function llmRefine(
+  settings: LlmSettings,
+  systemPrompt: string,
+  order: WorkOrder,
+  gaps: string[],
+  existingOutputs: Record<string, string>,
+  planSteps: Array<{ id: string; name: string; status: string }>,
+  apiKeyOverride?: string
+): Promise<{ gaps: string[]; deltaSteps: Array<{ id: string; name: string; description: string; dependencies: string[] }>; reasoning: string }> {
+  const prompt = `You are refining a work order execution. The previous iteration identified gaps that need to be addressed.
+
+Work Order:
+- Title: ${order.title}
+- Description: ${order.description}
+- Type: ${order.type}
+
+Identified gaps:
+${gaps.map(g => `- ${g}`).join("\n")}
+
+Existing completed steps: ${planSteps.filter(s => s.status === "completed").map(s => `${s.id}: ${s.name}`).join(", ")}
+Failed steps: ${planSteps.filter(s => s.status === "failed").map(s => `${s.id}: ${s.name}`).join(", ") || "none"}
+
+Existing outputs available:
+${Object.entries(existingOutputs).map(([id, out]) => `--- ${id} ---\n${out.substring(0, 300)}...`).join("\n\n")}
+
+Produce ONLY new delta steps needed to fill the gaps. Do NOT re-do completed work.
+Use unique IDs like step_r1, step_r2, etc.
+
+Respond with ONLY a JSON object:
+{
+  "gaps": ["restated gaps being addressed"],
+  "deltaSteps": [
+    { "id": "step_r1", "name": "Fill Gap Name", "description": "What to produce", "dependencies": [] }
+  ],
+  "reasoning": "why these steps will address the gaps"
+}`;
+
+  const raw = await callLLM(settings, systemPrompt, prompt, apiKeyOverride);
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+  const parsed = safeJsonParse(jsonStr);
+  return refineResultSchema.parse(parsed);
 }
 
 export async function fetchAvailableModels(provider: string): Promise<ProviderModel[]> {

@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun } from "@shared/schema";
 import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
+import { pocketflowExecute } from "./pocketflow";
 
 export async function processWorkOrder(orderId: string): Promise<WorkOrder | undefined> {
   const order = await storage.getWorkOrder(orderId);
@@ -135,20 +136,24 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       ? `"${targetSubAgent.name}" (via Aiden's LLM: ${effectiveLlmConfig?.provider || "none"}/${effectiveLlmConfig?.model || "fallback"})`
       : "fallback handler";
 
-  const tier2Result: Tier2Result = hasLlm && settings
-    ? await runTier2WithLLM(settings, order, tier1Result, effectiveLlmConfig)
-    : runTier2Execution(order, tier1Result);
-
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 2,
-    action: llmSource === "sub-agent" ? `${targetSubAgent?.name}: Schema Validation` : "Sub-Agent: Schema Validation",
-    message: `${executorLabel} validated work order schema.`,
-    metadata: { valid: true, subAgentName: targetSubAgent?.name, llmSource, llmModel: effectiveLlmConfig?.model, llmProvider: effectiveLlmConfig?.provider },
+    action: "PocketFlow: Engine Start",
+    message: `${executorLabel} starting PocketFlow iterative execution engine.`,
+    metadata: { llmSource, llmModel: effectiveLlmConfig?.model, llmProvider: effectiveLlmConfig?.provider, subAgentName: targetSubAgent?.name },
   });
 
+  const tier2Result: Tier2Result = await pocketflowExecute(
+    order,
+    tier1Result,
+    effectiveLlmConfig,
+    settings || null,
+    { maxIterations: 3, convergenceThreshold: 0.8 }
+  );
+
   if (tier2Result.blocked) {
-    const bdmMarker = {
+    const bdmMarker = tier2Result.pocketflow?.bdmMarker || {
       type: "execution_block",
       reason: tier2Result.reason,
       tier: 2,
@@ -159,18 +164,10 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
 
     await storage.createExecutionLog({
       workOrderId: orderId,
-      tier: 2,
-      action: "BDM Marker Emitted",
-      message: `${executorLabel} blocked execution: ${tier2Result.reason}`,
-      metadata: bdmMarker,
-    });
-
-    await storage.createExecutionLog({
-      workOrderId: orderId,
       tier: 1,
       action: "Aiden: BDM Resolution",
       message: `Aiden received BDM marker from ${executorLabel} — pausing for human decision.`,
-      metadata: { bdmMarker },
+      metadata: { bdmMarker, pocketflow: tier2Result.pocketflow },
     });
 
     return storage.updateWorkOrder(orderId, {
@@ -182,16 +179,18 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
         lastAction: "tier2_execution_block",
         correlationId: order.correlationId,
         blockedAt: new Date().toISOString(),
-        breadcrumbs: ["tier1_policy_pass", "tier2_schema_valid", "tier2_execution_block"],
+        breadcrumbs: ["tier1_policy_pass", "pocketflow_execution_block"],
+        pocketflow: tier2Result.pocketflow,
       },
     });
   }
 
+  const pfMeta = tier2Result.pocketflow;
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 2,
-    action: llmSource === "sub-agent" ? `${targetSubAgent?.name}: Execution Complete` : "Sub-Agent: Execution Complete",
-    message: `${executorLabel} executed work order successfully.`,
+    action: llmSource === "sub-agent" ? `${targetSubAgent?.name}: PocketFlow Complete` : "Sub-Agent: PocketFlow Complete",
+    message: `${executorLabel} completed PocketFlow execution — score: ${pfMeta?.convergenceScore?.toFixed(2) || "N/A"}, iterations: ${pfMeta?.iterations || 1}, steps: ${pfMeta?.stepResults?.length || 0}.`,
     metadata: { ...tier2Result, llmSource, llmProvider: effectiveLlmConfig?.provider, llmModel: effectiveLlmConfig?.model },
   });
 
@@ -199,8 +198,15 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     workOrderId: orderId,
     tier: 1,
     action: "Aiden: Resolution",
-    message: `Aiden confirmed successful execution by ${executorLabel} — work order completed.`,
-    metadata: { finalStatus: "completed", executedBy: llmSource, executorName: targetSubAgent?.name, executorModel: effectiveLlmConfig?.model },
+    message: `Aiden confirmed successful PocketFlow execution by ${executorLabel} — work order completed.`,
+    metadata: {
+      finalStatus: "completed",
+      executedBy: llmSource,
+      executorName: targetSubAgent?.name,
+      executorModel: effectiveLlmConfig?.model,
+      convergenceScore: pfMeta?.convergenceScore,
+      iterations: pfMeta?.iterations,
+    },
   });
 
   const completedOrder = await storage.updateWorkOrder(orderId, {
@@ -211,7 +217,8 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       lastAction: "completed",
       correlationId: order.correlationId,
       completedAt: new Date().toISOString(),
-      breadcrumbs: ["tier1_policy_pass", "tier2_schema_valid", "tier2_execution_complete", "aiden_resolution"],
+      breadcrumbs: ["tier1_policy_pass", "pocketflow_validated", "pocketflow_execution_complete", "aiden_resolution"],
+      pocketflow: tier2Result.pocketflow,
     },
   });
 
