@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Users, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Shield, Users, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { User } from "@shared/models/auth";
@@ -37,6 +38,19 @@ export default function UserManagementPage() {
     },
     onError: (err: any) => {
       toast({ title: "Failed to update role", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("DELETE", `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "User removed successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to remove user", description: err.message, variant: "destructive" });
     },
   });
 
@@ -92,20 +106,36 @@ export default function UserManagementPage() {
                           {u.role}
                         </Badge>
                       ) : (
-                        <Select
-                          value={u.role}
-                          onValueChange={(role) => updateRoleMutation.mutate({ userId: u.id, role })}
-                          data-testid={`select-role-${u.id}`}
-                        >
-                          <SelectTrigger className="w-28 h-8 text-xs" data-testid={`select-role-trigger-${u.id}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="operator">Operator</SelectItem>
-                            <SelectItem value="viewer">Viewer</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <>
+                          <Select
+                            value={u.role}
+                            onValueChange={(role) => updateRoleMutation.mutate({ userId: u.id, role })}
+                            data-testid={`select-role-${u.id}`}
+                          >
+                            <SelectTrigger className="w-28 h-8 text-xs" data-testid={`select-role-trigger-${u.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="operator">Operator</SelectItem>
+                              <SelectItem value="viewer">Viewer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            data-testid={`button-delete-user-${u.id}`}
+                            disabled={deleteUserMutation.isPending}
+                            onClick={() => {
+                              if (confirm(`Remove ${[u.firstName, u.lastName].filter(Boolean).join(" ") || "this user"}? They will need to sign in again to regain access.`)) {
+                                deleteUserMutation.mutate(u.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

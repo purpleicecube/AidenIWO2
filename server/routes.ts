@@ -122,6 +122,22 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/admin/users/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const actor = getActor(req);
+      if (actor.actorId === req.params.id) {
+        return res.status(403).json({ message: "You cannot delete your own account" });
+      }
+      const deleted = await storage.deleteUser(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ message: "User deleted successfully" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   app.get("/api/work-orders", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const orders = await storage.getWorkOrders();
