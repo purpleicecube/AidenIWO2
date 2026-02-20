@@ -51,7 +51,7 @@ const subAgentFormSchema = z.object({
   assignedTo: z.string().nullable().optional(),
   status: z.string().min(1, "Status is required"),
   description: z.string().nullable().optional(),
-  llmEnabled: z.boolean().optional().default(false),
+  llmEnabled: z.boolean().optional().default(true),
   llmProvider: z.string().nullable().optional(),
   llmModel: z.string().nullable().optional(),
   llmBaseUrl: z.string().nullable().optional(),
@@ -227,12 +227,12 @@ export default function SubAgentsPage() {
       assignedTo: null,
       status: "active",
       description: null,
-      llmEnabled: false,
-      llmProvider: null,
-      llmModel: null,
+      llmEnabled: true,
+      llmProvider: "groq",
+      llmModel: "llama-3.3-70b-versatile",
       llmBaseUrl: null,
       llmSystemPrompt: null,
-      llmApiKeyEnvVar: null,
+      llmApiKeyEnvVar: "GROQ_API_KEY",
     },
   });
 
@@ -290,12 +290,12 @@ export default function SubAgentsPage() {
       assignedTo: null,
       status: "active",
       description: null,
-      llmEnabled: false,
-      llmProvider: null,
-      llmModel: null,
+      llmEnabled: true,
+      llmProvider: "groq",
+      llmModel: "llama-3.3-70b-versatile",
       llmBaseUrl: null,
       llmSystemPrompt: null,
-      llmApiKeyEnvVar: null,
+      llmApiKeyEnvVar: "GROQ_API_KEY",
     });
     setDialogOpen(true);
   }
