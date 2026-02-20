@@ -19,9 +19,13 @@
 - Dashboard with stats, recent orders, system health monitoring
 - Dark/light theme, responsive sidebar navigation
 - Hardcoded fallback orchestration when LLM is unavailable
+- User authentication via Replit Auth (Google, GitHub login)
+- Role-based access control (admin, operator, viewer) with first-user-is-admin logic
+- Admin user management page with role assignment
+- Landing page for unauthenticated users
+- User identity tracking in GCC memory and execution logs for all work order actions
 
-### v1.0.0 MVP — Roadmap
-- **Authentication & RBAC**: User login, role-based access (admin, operator, viewer), per-user work order ownership
+### v1.0.0 MVP — Roadmap (remaining items)
 - **Real-time updates**: WebSocket or SSE push for live work order status changes, log streaming
 - **Notification system**: Email/webhook alerts for blocked orders, completed workflows, operator assignments
 - **Audit trail**: Immutable log of all state transitions, user actions, and LLM decisions with timestamps
@@ -51,9 +55,10 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 - Styling: Tailwind CSS with Inter font family
 
 ## Project Structure
-- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools, Workspace, Sandbox, Chat
+- `client/src/pages/` - Dashboard, WorkOrders, WorkOrderDetail, SubmitOrder, SystemHealth, Architecture, Settings, SubAgents, Workflows, Tools, Workspace, Sandbox, Chat, Landing, UserManagement
 - `client/src/components/` - AppSidebar, ThemeProvider, ThemeToggle, StatusBadge, SplitPane
-- `client/src/hooks/` - use-page-title, use-toast
+- `client/src/hooks/` - use-page-title, use-toast, use-auth
+- `server/replit_integrations/auth/` - Replit Auth integration (OIDC, session, user upsert)
 - `server/routes.ts` - API endpoints
 - `server/orchestration.ts` - Aiden (Tier 1), sub-agent (Tier 2), and workflow execution engine
 - `server/llm-client.ts` - Multi-provider LLM abstraction with structured JSON parsing
@@ -65,6 +70,11 @@ AIDEN_PTIB is a 2-tier work order orchestration platform:
 
 ## Key API Endpoints
 - `GET /api/health` - System health check
+- `GET /api/login` - Initiates Replit Auth login (redirects to OIDC provider)
+- `GET /api/logout` - Logs user out and destroys session
+- `GET /api/auth/user` - Get current authenticated user (returns 401 if not logged in)
+- `GET /api/admin/users` - List all users (admin only)
+- `PUT /api/admin/users/:id/role` - Update user role (admin only)
 - `GET /api/work-orders` - List all work orders
 - `GET /api/work-orders/stats` - Dashboard statistics
 - `GET /api/work-orders/recent` - Recent work orders

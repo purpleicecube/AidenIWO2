@@ -1,5 +1,9 @@
-import { LayoutDashboard, ClipboardList, Plus, Activity, Settings, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical, MessageSquare } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plus, Activity, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical, MessageSquare, Users, LogOut, Shield } from "lucide-react";
 import { useLocation, Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -14,15 +18,65 @@ import {
 } from "@/components/ui/sidebar";
 
 const navigationItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Chat with Aiden", url: "/chat", icon: MessageSquare },
-  { title: "Work Orders", url: "/work-orders", icon: ClipboardList },
-  { title: "Submit Order", url: "/submit", icon: Plus },
-  { title: "System Health", url: "/health", icon: Activity },
+  { title: "Dashboard", url: "/", icon: LayoutDashboard, minRole: "viewer" },
+  { title: "Chat with Aiden", url: "/chat", icon: MessageSquare, minRole: "viewer" },
+  { title: "Work Orders", url: "/work-orders", icon: ClipboardList, minRole: "viewer" },
+  { title: "Submit Order", url: "/submit", icon: Plus, minRole: "operator" },
+  { title: "System Health", url: "/health", icon: Activity, minRole: "viewer" },
 ];
+
+const environmentItems = [
+  { title: "Workspace", url: "/workspace", icon: FolderOpen, minRole: "operator" },
+  { title: "Sandbox", url: "/sandbox", icon: FlaskConical, minRole: "operator" },
+];
+
+const configItems = [
+  { title: "Sub-Agents", url: "/sub-agents", icon: Bot, minRole: "admin" },
+  { title: "Workflows", url: "/workflows", icon: GitBranch, minRole: "admin" },
+  { title: "Tools", url: "/tools", icon: Wrench, minRole: "admin" },
+  { title: "Aiden Settings", url: "/settings", icon: Brain, minRole: "admin" },
+  { title: "User Management", url: "/users", icon: Users, minRole: "admin" },
+];
+
+const ROLE_LEVEL: Record<string, number> = { admin: 3, operator: 2, viewer: 1 };
+
+function roleBadgeVariant(role: string) {
+  if (role === "admin") return "default";
+  if (role === "operator") return "secondary";
+  return "outline";
+}
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user } = useAuth();
+  const userRole = (user as any)?.role || "viewer";
+  const userLevel = ROLE_LEVEL[userRole] || 1;
+
+  const canSee = (minRole: string) => userLevel >= (ROLE_LEVEL[minRole] || 1);
+
+  const renderItems = (items: typeof navigationItems) =>
+    items.filter(item => canSee(item.minRole)).map((item) => {
+      const isActive = location === item.url ||
+        (item.url !== "/" && location.startsWith(item.url));
+      return (
+        <SidebarMenuItem key={item.title}>
+          <SidebarMenuButton
+            asChild
+            isActive={isActive}
+            data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}
+          >
+            <Link href={item.url}>
+              <item.icon className="w-4 h-4" />
+              <span>{item.title}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      );
+    });
+
+  const initials = user
+    ? `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U"
+    : "U";
 
   return (
     <Sidebar>
@@ -44,50 +98,22 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => {
-                const isActive = location === item.url || 
-                  (item.url !== "/" && location.startsWith(item.url));
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}
-                    >
-                      <Link href={item.url}>
-                        <item.icon className="w-4 h-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {renderItems(navigationItems)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Environments</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/workspace"} data-testid="link-nav-workspace">
-                  <Link href="/workspace">
-                    <FolderOpen className="w-4 h-4" />
-                    <span>Workspace</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/sandbox"} data-testid="link-nav-sandbox">
-                  <Link href="/sandbox">
-                    <FlaskConical className="w-4 h-4" />
-                    <span>Sandbox</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+
+        {environmentItems.some(i => canSee(i.minRole)) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Environments</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderItems(environmentItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarGroup>
           <SidebarGroupLabel>Architecture</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -103,49 +129,43 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/sub-agents"} data-testid="link-nav-sub-agents">
-                  <Link href="/sub-agents">
-                    <Bot className="w-4 h-4" />
-                    <span>Sub-Agents</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/workflows"} data-testid="link-nav-workflows">
-                  <Link href="/workflows">
-                    <GitBranch className="w-4 h-4" />
-                    <span>Workflows</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/tools"} data-testid="link-nav-tools">
-                  <Link href="/tools">
-                    <Wrench className="w-4 h-4" />
-                    <span>Tools</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/settings"} data-testid="link-nav-aiden-settings">
-                  <Link href="/settings">
-                    <Brain className="w-4 h-4" />
-                    <span>Aiden Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+
+        {configItems.some(i => canSee(i.minRole)) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderItems(configItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-3">
+        {user && (
+          <div className="flex items-center gap-3">
+            <Avatar className="w-8 h-8">
+              <AvatarImage src={user.profileImageUrl || undefined} />
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" data-testid="text-user-name">
+                {user.firstName || user.email || "User"}
+              </p>
+              <Badge variant={roleBadgeVariant(userRole)} className="text-[10px] h-4 px-1.5" data-testid="text-user-role">
+                <Shield className="w-2.5 h-2.5 mr-0.5" />
+                {userRole}
+              </Badge>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild data-testid="button-logout">
+              <a href="/api/logout">
+                <LogOut className="w-4 h-4" />
+              </a>
+            </Button>
+          </div>
+        )}
         <div className="text-xs text-muted-foreground">
-          v1.0.0 MVP
+          v0.2.4 MVP
         </div>
       </SidebarFooter>
     </Sidebar>

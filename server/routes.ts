@@ -1,7 +1,9 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
+import { isAuthenticated as _isAuthenticated } from "./replit_integrations/auth";
+const isAuth: any = _isAuthenticated;
 import {
   insertWorkOrderSchema,
   insertLlmSettingsSchema,
@@ -22,6 +24,38 @@ import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } fr
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig } from "./llm-client";
 
 const startTime = Date.now();
+
+function getActor(req: Request): { actorId: string; actorEmail: string | null; actorName: string } {
+  const u = (req as any).appUser;
+  return {
+    actorId: u?.id || "system",
+    actorEmail: u?.email || null,
+    actorName: [u?.firstName, u?.lastName].filter(Boolean).join(" ") || u?.email || "system",
+  };
+}
+
+type Role = "admin" | "operator" | "viewer";
+const ROLE_HIERARCHY: Record<Role, number> = { admin: 3, operator: 2, viewer: 1 };
+
+function requireRole(minRole: Role): any {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userClaims = (req as any).user?.claims;
+    if (!userClaims?.sub) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = await storage.getUser(userClaims.sub);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+    const userLevel = ROLE_HIERARCHY[(user.role as Role)] || 0;
+    const requiredLevel = ROLE_HIERARCHY[minRole];
+    if (userLevel < requiredLevel) {
+      return res.status(403).json({ message: `Forbidden: requires ${minRole} role` });
+    }
+    (req as any).appUser = user;
+    next();
+  };
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -59,7 +93,36 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/work-orders", async (_req, res) => {
+  app.get("/api/admin/users", isAuth, requireRole("admin"), async (_req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.put("/api/admin/users/:id/role", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const actor = getActor(req);
+      if (actor.actorId === req.params.id) {
+        return res.status(403).json({ message: "You cannot change your own role" });
+      }
+      const { role } = req.body;
+      if (!["admin", "operator", "viewer"].includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be admin, operator, or viewer." });
+      }
+      const updated = await storage.updateUserRole(req.params.id, role);
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  app.get("/api/work-orders", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const orders = await storage.getWorkOrders();
       res.json(orders);
@@ -68,7 +131,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/work-orders/stats", async (_req, res) => {
+  app.get("/api/work-orders/stats", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const stats = await storage.getWorkOrderStats();
       res.json(stats);
@@ -77,7 +140,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/work-orders/recent", async (_req, res) => {
+  app.get("/api/work-orders/recent", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const orders = await storage.getRecentWorkOrders(8);
       res.json(orders);
@@ -86,7 +149,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/work-orders/:id", async (req, res) => {
+  app.get("/api/work-orders/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const order = await storage.getWorkOrder(req.params.id);
       if (!order) {
@@ -105,7 +168,7 @@ export async function registerRoutes(
     priority: z.string().optional(),
   });
 
-  app.put("/api/work-orders/:id", async (req, res) => {
+  app.put("/api/work-orders/:id", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const order = await storage.getWorkOrder(req.params.id);
       if (!order) {
@@ -115,14 +178,22 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
+      const actor = getActor(req);
       const updated = await storage.updateWorkOrder(req.params.id, parsed.data);
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Work Order Edited",
+        message: `Work order edited by ${actor.actorName}`,
+        metadata: { actor, changes: parsed.data },
+      });
       res.json(updated);
     } catch (err) {
       res.status(500).json({ message: "Failed to update work order" });
     }
   });
 
-  app.get("/api/work-orders/:id/logs", async (req, res) => {
+  app.get("/api/work-orders/:id/logs", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const logs = await storage.getExecutionLogs(req.params.id);
       res.json(logs);
@@ -131,20 +202,38 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/work-orders", async (req, res) => {
+  app.post("/api/work-orders", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const parsed = insertWorkOrderSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid work order data", errors: parsed.error.issues });
       }
-      const order = await storage.createWorkOrder(parsed.data);
+      const actor = getActor(req);
+      const orderData = {
+        ...parsed.data,
+        gccMemory: {
+          ...(parsed.data.gccMemory as Record<string, any> || {}),
+          "gcc.metadata": {
+            ...((parsed.data.gccMemory as Record<string, any>)?.["gcc.metadata"] || {}),
+            submittedBy: actor,
+          },
+        },
+      };
+      const order = await storage.createWorkOrder(orderData);
+      await storage.createExecutionLog({
+        workOrderId: order.id,
+        tier: 1,
+        action: "Submitted",
+        message: `Work order submitted by ${actor.actorName}`,
+        metadata: { actor },
+      });
       res.status(201).json(order);
     } catch (err) {
       res.status(500).json({ message: "Failed to create work order" });
     }
   });
 
-  app.post("/api/work-orders/:id/process", async (req, res) => {
+  app.post("/api/work-orders/:id/process", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const order = await storage.getWorkOrder(req.params.id);
       if (!order) {
@@ -153,6 +242,14 @@ export async function registerRoutes(
       if (order.status !== "pending" && order.status !== "reopened") {
         return res.status(400).json({ message: `Cannot process order in '${order.status}' status` });
       }
+      const actor = getActor(req);
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Processing Initiated",
+        message: `Processing started by ${actor.actorName}`,
+        metadata: { actor },
+      });
       const result = await processWorkOrder(req.params.id);
       res.json(result);
     } catch (err) {
@@ -160,7 +257,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/work-orders/:id/retry", async (req, res) => {
+  app.post("/api/work-orders/:id/retry", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const order = await storage.getWorkOrder(req.params.id);
       if (!order) {
@@ -177,12 +274,13 @@ export async function registerRoutes(
         gccMemory: {},
       });
 
+      const actor = getActor(req);
       await storage.createExecutionLog({
         workOrderId: req.params.id,
         tier: 1,
         action: "Retry Initiated",
-        message: "Work order reset and resubmitted for processing.",
-        metadata: { previousStatus: order.status },
+        message: `Work order reset and resubmitted by ${actor.actorName}`,
+        metadata: { previousStatus: order.status, actor },
       });
 
       const result = await processWorkOrder(req.params.id);
@@ -196,7 +294,7 @@ export async function registerRoutes(
     reason: z.string().min(1, "Reason for reopening is required"),
   });
 
-  app.post("/api/work-orders/:id/reopen", async (req, res) => {
+  app.post("/api/work-orders/:id/reopen", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const parsed = reopenSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -257,19 +355,22 @@ export async function registerRoutes(
           previousCompletedAt: gcc["gcc.metadata"]?.completedAt || gcc.completedAt,
           previousDeliverable: previousDeliverableSummary || "no_previous_output",
           reopenCount: ((gcc["gcc.metadata"]?.reopenCount || 0) + 1),
+          reopenedBy: getActor(req),
         },
       };
 
+      const actor = getActor(req);
       await storage.createExecutionLog({
         workOrderId: req.params.id,
         tier: 1,
         action: "Work Order Reopened",
-        message: `Work order reopened for reprocessing. Reason: ${reason}`,
+        message: `Work order reopened by ${actor.actorName}. Reason: ${reason}`,
         metadata: {
           reopenReason: reason,
           previousStatus: "completed",
           previousTier2Result: previousResult,
           reopenedAt: now,
+          actor,
         },
       });
 
@@ -290,7 +391,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/work-orders/:id/refile", async (req, res) => {
+  app.post("/api/work-orders/:id/refile", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const order = await storage.getWorkOrder(req.params.id);
       if (!order) return res.status(404).json({ message: "Work order not found" });
@@ -310,7 +411,7 @@ export async function registerRoutes(
     reprocess: z.boolean().default(true),
   });
 
-  app.post("/api/work-orders/:id/unblock", async (req, res) => {
+  app.post("/api/work-orders/:id/unblock", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const parsed = unblockSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -365,19 +466,20 @@ export async function registerRoutes(
         "gcc.metadata": {
           ...(gcc["gcc.metadata"] || {}),
           unblockedAt: now,
-          unblockedBy: "hitl_operator",
+          unblockedBy: getActor(req),
           resolution,
           bdmCleared: true,
           reprocessed: reprocess,
         },
       };
 
+      const actor = getActor(req);
       await storage.createExecutionLog({
         workOrderId: req.params.id,
         tier: 1,
         action: "HITL Unblock",
-        message: resolution,
-        metadata: { bdmMarkerCleared: bdmSnapshot, reprocess, commitId },
+        message: `Unblocked by ${actor.actorName}. Resolution: ${resolution}`,
+        metadata: { bdmMarkerCleared: bdmSnapshot, reprocess, commitId, actor },
       });
 
       if (reprocess) {
@@ -425,7 +527,7 @@ export async function registerRoutes(
   });
 
   // Sub-agent routes
-  app.get("/api/sub-agents", async (_req, res) => {
+  app.get("/api/sub-agents", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const agents = await storage.getSubAgents();
       res.json(agents);
@@ -434,7 +536,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sub-agents/:id", async (req, res) => {
+  app.get("/api/sub-agents/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
       if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
@@ -444,7 +546,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sub-agents", async (req, res) => {
+  app.post("/api/sub-agents", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const parsed = insertSubAgentSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -457,7 +559,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/sub-agents/:id", async (req, res) => {
+  app.put("/api/sub-agents/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
       if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
@@ -468,7 +570,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/sub-agents/:id", async (req, res) => {
+  app.delete("/api/sub-agents/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
       if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
@@ -479,7 +581,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sub-agents/:id/test-llm", async (req, res) => {
+  app.post("/api/sub-agents/:id/test-llm", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
       if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
@@ -531,7 +633,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sub-agents/:id/llm-status", async (req, res) => {
+  app.get("/api/sub-agents/:id/llm-status", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
       if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
@@ -563,7 +665,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/llm-settings", async (_req, res) => {
+  app.get("/api/llm-settings", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const settings = await storage.getLlmSettings();
       const provider = settings?.provider || "openai";
@@ -585,7 +687,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/llm-settings", async (req, res) => {
+  app.put("/api/llm-settings", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const parsed = insertLlmSettingsSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -603,7 +705,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/llm-settings/models/:provider", async (req, res) => {
+  app.get("/api/llm-settings/models/:provider", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const { provider } = req.params;
       const keyConfigured = isApiKeyConfigured(provider);
@@ -614,7 +716,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/llm-settings/test", async (_req, res) => {
+  app.post("/api/llm-settings/test", isAuth, requireRole("admin"), async (_req, res) => {
     try {
       const settings = await storage.getLlmSettings();
       if (!settings) {
@@ -636,7 +738,7 @@ export async function registerRoutes(
 
   // ==================== Workflow Template Routes ====================
 
-  app.get("/api/workflow-templates", async (_req, res) => {
+  app.get("/api/workflow-templates", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const templates = await storage.getWorkflowTemplates();
       res.json(templates);
@@ -645,7 +747,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/workflow-templates/:id", async (req, res) => {
+  app.get("/api/workflow-templates/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const template = await storage.getWorkflowTemplate(req.params.id);
       if (!template) return res.status(404).json({ message: "Template not found" });
@@ -656,7 +758,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/workflow-templates", async (req, res) => {
+  app.post("/api/workflow-templates", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const parsed = insertWorkflowTemplateSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -669,7 +771,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/workflow-templates/:id", async (req, res) => {
+  app.put("/api/workflow-templates/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const template = await storage.getWorkflowTemplate(req.params.id);
       if (!template) return res.status(404).json({ message: "Template not found" });
@@ -680,7 +782,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/workflow-templates/:id", async (req, res) => {
+  app.delete("/api/workflow-templates/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const template = await storage.getWorkflowTemplate(req.params.id);
       if (!template) return res.status(404).json({ message: "Template not found" });
@@ -693,7 +795,7 @@ export async function registerRoutes(
 
   // ==================== Workflow Step Routes ====================
 
-  app.get("/api/workflow-templates/:templateId/steps", async (req, res) => {
+  app.get("/api/workflow-templates/:templateId/steps", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const steps = await storage.getWorkflowSteps(req.params.templateId);
       res.json(steps);
@@ -702,7 +804,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/workflow-templates/:templateId/steps", async (req, res) => {
+  app.post("/api/workflow-templates/:templateId/steps", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const data = { ...req.body, templateId: req.params.templateId };
       const parsed = insertWorkflowStepSchema.safeParse(data);
@@ -716,7 +818,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/workflow-steps/:id", async (req, res) => {
+  app.put("/api/workflow-steps/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const step = await storage.getWorkflowStep(req.params.id);
       if (!step) return res.status(404).json({ message: "Step not found" });
@@ -727,7 +829,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/workflow-steps/:id", async (req, res) => {
+  app.delete("/api/workflow-steps/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const step = await storage.getWorkflowStep(req.params.id);
       if (!step) return res.status(404).json({ message: "Step not found" });
@@ -740,7 +842,7 @@ export async function registerRoutes(
 
   // ==================== Workflow Execution Routes ====================
 
-  app.get("/api/workflow-executions", async (_req, res) => {
+  app.get("/api/workflow-executions", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const executions = await storage.getWorkflowExecutions();
       res.json(executions);
@@ -749,7 +851,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/workflow-executions/:id", async (req, res) => {
+  app.get("/api/workflow-executions/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const execution = await storage.getWorkflowExecution(req.params.id);
       if (!execution) return res.status(404).json({ message: "Execution not found" });
@@ -761,7 +863,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/workflow-executions", async (req, res) => {
+  app.post("/api/workflow-executions", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const { templateId, workOrderId, goal, context } = req.body;
       if (!templateId) {
@@ -777,7 +879,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/workflow-executions/:id/advance", async (req, res) => {
+  app.post("/api/workflow-executions/:id/advance", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const execution = await storage.getWorkflowExecution(req.params.id);
       if (!execution) return res.status(404).json({ message: "Execution not found" });
@@ -793,7 +895,7 @@ export async function registerRoutes(
 
   // ==================== Tools Routes ====================
 
-  app.get("/api/tools", async (_req, res) => {
+  app.get("/api/tools", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const allTools = await storage.getTools();
       res.json(allTools);
@@ -802,7 +904,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/tools/:id", async (req, res) => {
+  app.get("/api/tools/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const tool = await storage.getTool(req.params.id);
       if (!tool) return res.status(404).json({ message: "Tool not found" });
@@ -812,7 +914,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/tools", async (req, res) => {
+  app.post("/api/tools", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const parsed = insertToolSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -825,7 +927,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/tools/:id", async (req, res) => {
+  app.put("/api/tools/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const tool = await storage.getTool(req.params.id);
       if (!tool) return res.status(404).json({ message: "Tool not found" });
@@ -836,7 +938,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/tools/:id", async (req, res) => {
+  app.delete("/api/tools/:id", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const tool = await storage.getTool(req.params.id);
       if (!tool) return res.status(404).json({ message: "Tool not found" });
@@ -849,7 +951,7 @@ export async function registerRoutes(
 
   // ==================== Sub-Agent Tool Assignment Routes ====================
 
-  app.get("/api/sub-agents/:id/tools", async (req, res) => {
+  app.get("/api/sub-agents/:id/tools", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
       if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
@@ -860,7 +962,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sub-agents/:id/tools", async (req, res) => {
+  app.post("/api/sub-agents/:id/tools", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
       if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
@@ -880,7 +982,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/sub-agents/:id/tools/:toolId", async (req, res) => {
+  app.delete("/api/sub-agents/:id/tools/:toolId", isAuth, requireRole("admin"), async (req, res) => {
     try {
       await storage.removeToolFromSubAgent(req.params.id, req.params.toolId);
       res.json({ success: true });
@@ -891,7 +993,7 @@ export async function registerRoutes(
 
   // ==================== Artifact Folder Routes ====================
 
-  app.get("/api/artifact-folders", async (req, res) => {
+  app.get("/api/artifact-folders", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const parentId = req.query.parentId as string | undefined;
       const folders = await storage.getArtifactFolders(parentId === "root" ? null : parentId);
@@ -901,7 +1003,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/artifact-folders/:id", async (req, res) => {
+  app.get("/api/artifact-folders/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const folder = await storage.getArtifactFolder(req.params.id);
       if (!folder) return res.status(404).json({ message: "Folder not found" });
@@ -911,7 +1013,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/artifact-folders", async (req, res) => {
+  app.post("/api/artifact-folders", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const body = { ...req.body };
       if (body.parentId === "root") body.parentId = null;
@@ -926,7 +1028,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/artifact-folders/:id", async (req, res) => {
+  app.put("/api/artifact-folders/:id", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const folder = await storage.getArtifactFolder(req.params.id);
       if (!folder) return res.status(404).json({ message: "Folder not found" });
@@ -937,7 +1039,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/artifact-folders/:id", async (req, res) => {
+  app.delete("/api/artifact-folders/:id", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const folder = await storage.getArtifactFolder(req.params.id);
       if (!folder) return res.status(404).json({ message: "Folder not found" });
@@ -950,7 +1052,7 @@ export async function registerRoutes(
 
   // ==================== Artifact Routes ====================
 
-  app.get("/api/artifacts", async (req, res) => {
+  app.get("/api/artifacts", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const folderId = req.query.folderId as string | undefined;
       const items = await storage.getArtifacts(folderId === "root" ? null : folderId);
@@ -960,7 +1062,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/artifacts/:id", async (req, res) => {
+  app.get("/api/artifacts/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const artifact = await storage.getArtifact(req.params.id);
       if (!artifact) return res.status(404).json({ message: "Artifact not found" });
@@ -970,7 +1072,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/artifacts", async (req, res) => {
+  app.post("/api/artifacts", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const body = { ...req.body };
       if (body.folderId === "root") body.folderId = null;
@@ -985,7 +1087,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/artifacts/:id", async (req, res) => {
+  app.put("/api/artifacts/:id", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const artifact = await storage.getArtifact(req.params.id);
       if (!artifact) return res.status(404).json({ message: "Artifact not found" });
@@ -996,7 +1098,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/artifacts/:id", async (req, res) => {
+  app.delete("/api/artifacts/:id", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const artifact = await storage.getArtifact(req.params.id);
       if (!artifact) return res.status(404).json({ message: "Artifact not found" });
@@ -1009,7 +1111,7 @@ export async function registerRoutes(
 
   // ==================== Workspace Seed Route ====================
 
-  app.post("/api/workspace/seed", async (_req, res) => {
+  app.post("/api/workspace/seed", isAuth, requireRole("operator"), async (_req, res) => {
     try {
       const existingFolders = await storage.getArtifactFolders(null);
       if (existingFolders.length > 0) {
@@ -1072,7 +1174,7 @@ export async function registerRoutes(
 
   // ==================== Sandbox Session Routes ====================
 
-  app.get("/api/sandbox-sessions", async (_req, res) => {
+  app.get("/api/sandbox-sessions", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const sessions = await storage.getSandboxSessions();
       res.json(sessions);
@@ -1081,7 +1183,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sandbox-sessions/:id", async (req, res) => {
+  app.get("/api/sandbox-sessions/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
@@ -1091,7 +1193,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sandbox-sessions", async (req, res) => {
+  app.post("/api/sandbox-sessions", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const parsed = insertSandboxSessionSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1104,7 +1206,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/sandbox-sessions/:id", async (req, res) => {
+  app.put("/api/sandbox-sessions/:id", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
@@ -1115,7 +1217,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/sandbox-sessions/:id", async (req, res) => {
+  app.delete("/api/sandbox-sessions/:id", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
@@ -1126,7 +1228,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sandbox-sessions/:id/execute", async (req, res) => {
+  app.post("/api/sandbox-sessions/:id/execute", isAuth, requireRole("operator"), async (req, res) => {
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
@@ -1160,7 +1262,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sandbox-sessions/:id/preview", async (req, res) => {
+  app.get("/api/sandbox-sessions/:id/preview", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
@@ -1224,7 +1326,7 @@ export async function registerRoutes(
     };
   }
 
-  app.get("/api/chat/sessions", async (_req, res) => {
+  app.get("/api/chat/sessions", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
       const sessions = await storage.getChatSessions();
       res.json(sessions);
@@ -1233,7 +1335,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/chat/sessions", async (req, res) => {
+  app.post("/api/chat/sessions", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const parsed = insertChatSessionSchema.safeParse(req.body);
       const session = await storage.createChatSession(parsed.success ? parsed.data : { title: "New Conversation" });
@@ -1246,7 +1348,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/chat/sessions/:id", async (req, res) => {
+  app.get("/api/chat/sessions/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const session = await storage.getChatSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
@@ -1257,7 +1359,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/chat/sessions/:id", async (req, res) => {
+  app.put("/api/chat/sessions/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const updateSchema = z.object({
         title: z.string().optional(),
@@ -1273,7 +1375,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/chat/sessions/:id", async (req, res) => {
+  app.delete("/api/chat/sessions/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       await storage.deleteChatSession(req.params.id);
       res.json({ success: true });
@@ -1347,7 +1449,7 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
 - Timestamp: ${new Date().toISOString()}`;
   }
 
-  app.post("/api/chat/sessions/:id/messages", async (req, res) => {
+  app.post("/api/chat/sessions/:id/messages", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const sessionId = req.params.id;
       const session = await storage.getChatSession(sessionId);
@@ -1460,7 +1562,7 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
     })).optional().default([]),
   });
 
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const parsed = chatRequestSchema.safeParse(req.body);
       if (!parsed.success) {
