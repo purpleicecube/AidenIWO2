@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 import { StatusBadge, PriorityBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -38,6 +39,8 @@ function OrdersTableSkeleton() {
 
 export default function WorkOrders() {
   usePageTitle("Work Orders");
+  const { user } = useAuth();
+  const canSubmit = user?.role === "admin" || user?.role === "operator";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -70,12 +73,14 @@ export default function WorkOrders() {
             Manage and track all work orders in the pipeline
           </p>
         </div>
-        <Link href="/submit">
-          <Button data-testid="button-submit-new-order">
-            <Plus className="w-4 h-4 mr-2" />
-            New Work Order
-          </Button>
-        </Link>
+        {canSubmit && (
+          <Link href="/submit">
+            <Button data-testid="button-submit-new-order">
+              <Plus className="w-4 h-4 mr-2" />
+              New Work Order
+            </Button>
+          </Link>
+        )}
       </div>
 
       <Card>

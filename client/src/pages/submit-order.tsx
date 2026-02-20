@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertWorkOrderSchema } from "@shared/schema";
 import { Send, ArrowLeft, Layers, Loader2 } from "lucide-react";
@@ -44,6 +45,12 @@ export default function SubmitOrder() {
   usePageTitle("Submit Work Order");
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  if (user && user.role === "viewer") {
+    navigate("/");
+    return null;
+  }
 
   const form = useForm<SubmitOrderForm>({
     resolver: zodResolver(submitOrderSchema),

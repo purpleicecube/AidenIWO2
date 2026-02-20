@@ -4,6 +4,7 @@ import { StatusBadge, PriorityBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 import {
   ClipboardList,
   CheckCircle,
@@ -102,6 +103,8 @@ function RecentOrdersSkeleton() {
 
 export default function Dashboard() {
   usePageTitle("Dashboard");
+  const { user } = useAuth();
+  const canSubmit = user?.role === "admin" || user?.role === "operator";
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/work-orders/stats"],
   });
@@ -121,12 +124,14 @@ export default function Dashboard() {
             Monitor Aiden (Tier 1) and sub-agent (Tier 2) orchestration
           </p>
         </div>
-        <Link href="/submit">
-          <Button data-testid="button-submit-new">
-            <Plus className="w-4 h-4 mr-2" />
-            New Work Order
-          </Button>
-        </Link>
+        {canSubmit && (
+          <Link href="/submit">
+            <Button data-testid="button-submit-new">
+              <Plus className="w-4 h-4 mr-2" />
+              New Work Order
+            </Button>
+          </Link>
+        )}
       </div>
 
       {statsLoading ? (
