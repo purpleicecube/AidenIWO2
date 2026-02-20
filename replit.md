@@ -1,9 +1,9 @@
 # AIDEN_PTIB - Intelligent Work Order Orchestration
 
 ## Version
-**Current: v0.2.4 MVP** — Core orchestration engine with LLM-powered routing, HITL intervention, and admin tooling.
+**Current: v0.3.0 MVP** — Core orchestration engine with LLM-powered routing, HITL intervention, admin tooling, and Replit Auth with RBAC.
 
-### v0.2.4 MVP — What's Included
+### v0.3.0 MVP — What's Included
 - 2-tier orchestration (Aiden as Tier 1 manager, sub-agents as Tier 2 workers)
 - Work order lifecycle: submit, process, complete, block, fail, retry, edit
 - LLM-powered policy evaluation and routing (multi-provider: OpenAI, Anthropic, OpenRouter, Groq)
