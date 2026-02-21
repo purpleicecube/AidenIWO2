@@ -20,6 +20,11 @@ import {
   insertSandboxSessionSchema,
   insertChatSessionSchema,
   insertChatMessageSchema,
+  insertToolTagSchema,
+  insertToolLeaseSchema,
+  insertLockerKeySchema,
+  insertToolAuditLogSchema,
+  insertSkillTemplateSchema,
 } from "@shared/schema";
 import type { LlmSettings } from "@shared/schema";
 import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
@@ -1027,6 +1032,434 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to remove tool" });
+    }
+  });
+
+  // ==================== Tools Locker: Tags Routes ====================
+
+  app.get("/api/locker/tags", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const tags = await storage.getToolTags();
+      res.json(tags);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch tags" });
+    }
+  });
+
+  app.post("/api/locker/tags", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = insertToolTagSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid tag data", errors: parsed.error.issues });
+      const tag = await storage.createToolTag(parsed.data);
+      res.status(201).json(tag);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to create tag" });
+    }
+  });
+
+  app.delete("/api/locker/tags/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      await storage.deleteToolTag(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete tag" });
+    }
+  });
+
+  app.get("/api/locker/tools/:toolId/tags", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const assignments = await storage.getToolTagAssignments(req.params.toolId);
+      res.json(assignments);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch tool tags" });
+    }
+  });
+
+  app.post("/api/locker/tools/:toolId/tags", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { tagId } = req.body;
+      if (!tagId) return res.status(400).json({ message: "tagId is required" });
+      const tool = await storage.getTool(req.params.toolId);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      const tag = await storage.getToolTag(tagId);
+      if (!tag) return res.status(404).json({ message: "Tag not found" });
+      const existing = await storage.getToolTagAssignments(req.params.toolId);
+      if (existing.some(a => a.tagId === tagId)) {
+        return res.status(409).json({ message: "Tag already assigned to this tool" });
+      }
+      const assignment = await storage.assignTagToTool({ toolId: req.params.toolId, tagId });
+      res.status(201).json(assignment);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to assign tag" });
+    }
+  });
+
+  app.delete("/api/locker/tools/:toolId/tags/:tagId", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      await storage.removeTagFromTool(req.params.toolId, req.params.tagId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to remove tag" });
+    }
+  });
+
+  // ==================== Tools Locker: Leases Routes ====================
+
+  app.get("/api/locker/leases", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.toolId) filters.toolId = req.query.toolId;
+      if (req.query.agentId) filters.agentId = req.query.agentId;
+      if (req.query.status) filters.status = req.query.status;
+      const leases = await storage.getToolLeases(Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(leases);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch leases" });
+    }
+  });
+
+  app.get("/api/locker/leases/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const lease = await storage.getToolLease(req.params.id);
+      if (!lease) return res.status(404).json({ message: "Lease not found" });
+      res.json(lease);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch lease" });
+    }
+  });
+
+  app.post("/api/locker/checkout", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const { toolId, agentId, agentType, tier, leaseType, context, workOrderId } = req.body;
+      if (!toolId || !agentId) return res.status(400).json({ message: "toolId and agentId are required" });
+
+      const tool = await storage.getTool(toolId);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      if (tool.status !== "active") return res.status(400).json({ message: "Tool is not active" });
+      if (tool.restricted) return res.status(403).json({ message: `Tool restricted: ${tool.restrictedReason || "No reason given"}` });
+      if (tool.requiresApproval) return res.status(403).json({ message: "Tool requires approval before checkout" });
+
+      if (tool.accessTier !== "any") {
+        const requestedTier = tier || "tier2";
+        if (tool.accessTier === "tier1" && requestedTier !== "tier1") {
+          return res.status(403).json({ message: "Tool is restricted to Tier 1 agents only" });
+        }
+        if (tool.accessTier === "tier2" && requestedTier !== "tier2") {
+          return res.status(403).json({ message: "Tool is restricted to Tier 2 agents only" });
+        }
+      }
+
+      if (tool.maxConcurrent > 0) {
+        const activeLeases = await storage.getActiveLeases(toolId);
+        if (activeLeases.length >= tool.maxConcurrent) {
+          return res.status(409).json({ message: "Tool at max concurrent usage", activeLeases: activeLeases.length, maxConcurrent: tool.maxConcurrent });
+        }
+      }
+
+      if (tool.dailyUsageLimit) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayLeases = await storage.getToolLeases({ toolId });
+        const todayCount = todayLeases.filter(l => new Date(l.issuedAt) >= todayStart).length;
+        if (todayCount >= tool.dailyUsageLimit) {
+          return res.status(429).json({ message: "Daily usage limit reached", dailyUsageLimit: tool.dailyUsageLimit, usedToday: todayCount });
+        }
+      }
+
+      const requestedSeconds = req.body.leaseSeconds;
+      const maxAllowed = tool.maxLeaseSeconds || 3600;
+      const defaultSeconds = tool.defaultLeaseSeconds || 300;
+      const leaseSeconds = requestedSeconds ? Math.min(requestedSeconds, maxAllowed) : defaultSeconds;
+      const expiresAt = new Date(Date.now() + leaseSeconds * 1000);
+
+      const lease = await storage.createToolLease({
+        toolId,
+        agentId,
+        agentType: agentType || "sub_agent",
+        tier: tier || "tier2",
+        leaseType: leaseType || "checkout",
+        status: "active",
+        toolVersion: tool.version,
+        context: context || {},
+        workOrderId: workOrderId || null,
+        expiresAt,
+      });
+
+      await storage.createToolAuditLog({
+        toolId,
+        leaseId: lease.id,
+        action: "checkout",
+        actorId: agentId,
+        actorType: agentType || "sub_agent",
+        reason: `Checked out tool "${tool.name}" v${tool.version}`,
+        metadata: { leaseType, tier, workOrderId },
+      });
+
+      res.status(201).json(lease);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to checkout tool" });
+    }
+  });
+
+  app.post("/api/locker/return/:leaseId", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const lease = await storage.getToolLease(req.params.leaseId);
+      if (!lease) return res.status(404).json({ message: "Lease not found" });
+      if (lease.status !== "active") return res.status(400).json({ message: "Lease is not active" });
+
+      const updated = await storage.updateToolLease(req.params.leaseId, {
+        status: "returned",
+        returnedAt: new Date(),
+        result: req.body.result || {},
+        error: req.body.error || null,
+      });
+
+      await storage.createToolAuditLog({
+        toolId: lease.toolId,
+        leaseId: lease.id,
+        action: "return",
+        actorId: lease.agentId,
+        actorType: lease.agentType,
+        reason: req.body.error ? `Returned with error: ${req.body.error}` : "Returned successfully",
+        metadata: { result: req.body.result },
+      });
+
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to return tool" });
+    }
+  });
+
+  app.post("/api/locker/expire", isAuth, requireRole("admin"), async (_req, res) => {
+    try {
+      const count = await storage.expireOverdueLeases();
+      res.json({ expired: count });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to expire leases" });
+    }
+  });
+
+  // ==================== Tools Locker: Keys Routes ====================
+
+  app.get("/api/locker/keys", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const ownerId = req.query.ownerId as string | undefined;
+      const keys = await storage.getLockerKeys(ownerId);
+      res.json(keys);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch locker keys" });
+    }
+  });
+
+  app.get("/api/locker/keys/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const key = await storage.getLockerKey(req.params.id);
+      if (!key) return res.status(404).json({ message: "Locker key not found" });
+      res.json(key);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch locker key" });
+    }
+  });
+
+  app.post("/api/locker/keys", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = insertLockerKeySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid key data", errors: parsed.error.issues });
+      const key = await storage.createLockerKey(parsed.data);
+      res.status(201).json(key);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to create locker key" });
+    }
+  });
+
+  app.put("/api/locker/keys/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const key = await storage.getLockerKey(req.params.id);
+      if (!key) return res.status(404).json({ message: "Locker key not found" });
+      const updated = await storage.updateLockerKey(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update locker key" });
+    }
+  });
+
+  app.post("/api/locker/keys/:id/revoke", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { revokedBy, reason } = req.body;
+      if (!revokedBy || !reason) return res.status(400).json({ message: "revokedBy and reason are required" });
+      const revoked = await storage.revokeLockerKey(req.params.id, revokedBy, reason);
+      if (!revoked) return res.status(404).json({ message: "Locker key not found" });
+      res.json(revoked);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to revoke locker key" });
+    }
+  });
+
+  // ==================== Tools Locker: Audit Logs Routes ====================
+
+  app.get("/api/locker/audit", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.toolId) filters.toolId = req.query.toolId;
+      if (req.query.actorId) filters.actorId = req.query.actorId;
+      if (req.query.action) filters.action = req.query.action;
+      const logs = await storage.getToolAuditLogs(Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
+  // ==================== Tools Locker: Restrict/Unrestrict ====================
+
+  app.post("/api/locker/tools/:id/restrict", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const tool = await storage.getTool(req.params.id);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      const { reason, restrictedBy } = req.body;
+      const updated = await storage.updateTool(req.params.id, {
+        restricted: true,
+        restrictedReason: reason || "Restricted by admin",
+        restrictedBy: restrictedBy || "admin",
+      });
+
+      await storage.createToolAuditLog({
+        toolId: req.params.id,
+        action: "restrict",
+        actorId: restrictedBy || "admin",
+        actorType: "human",
+        reason: reason || "Restricted by admin",
+        metadata: {},
+      });
+
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to restrict tool" });
+    }
+  });
+
+  app.post("/api/locker/tools/:id/unrestrict", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const tool = await storage.getTool(req.params.id);
+      if (!tool) return res.status(404).json({ message: "Tool not found" });
+      const updated = await storage.updateTool(req.params.id, {
+        restricted: false,
+        restrictedReason: null,
+        restrictedBy: null,
+      });
+
+      await storage.createToolAuditLog({
+        toolId: req.params.id,
+        action: "unrestrict",
+        actorId: req.body.unrestrictedBy || "admin",
+        actorType: "human",
+        reason: req.body.reason || "Restriction removed",
+        metadata: {},
+      });
+
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to unrestrict tool" });
+    }
+  });
+
+  // ==================== Skill Templates Routes ====================
+
+  app.get("/api/locker/skills", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.format) filters.format = req.query.format;
+      if (req.query.category) filters.category = req.query.category;
+      if (req.query.status) filters.status = req.query.status;
+      const templates = await storage.getSkillTemplates(Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(templates);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch skill templates" });
+    }
+  });
+
+  app.get("/api/locker/skills/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const template = await storage.getSkillTemplate(req.params.id);
+      if (!template) return res.status(404).json({ message: "Skill template not found" });
+      res.json(template);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch skill template" });
+    }
+  });
+
+  app.post("/api/locker/skills", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = insertSkillTemplateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid skill template data", errors: parsed.error.issues });
+      const template = await storage.createSkillTemplate(parsed.data);
+      res.status(201).json(template);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to create skill template" });
+    }
+  });
+
+  app.put("/api/locker/skills/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const template = await storage.getSkillTemplate(req.params.id);
+      if (!template) return res.status(404).json({ message: "Skill template not found" });
+      const updated = await storage.updateSkillTemplate(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update skill template" });
+    }
+  });
+
+  app.delete("/api/locker/skills/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const template = await storage.getSkillTemplate(req.params.id);
+      if (!template) return res.status(404).json({ message: "Skill template not found" });
+      await storage.deleteSkillTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete skill template" });
+    }
+  });
+
+  // ==================== Tools Locker: Inventory Overview ====================
+
+  app.get("/api/locker/inventory", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const [allTools, allTags, activeLeases, allKeys, allSkills] = await Promise.all([
+        storage.getTools(),
+        storage.getToolTags(),
+        storage.getToolLeases({ status: "active" }),
+        storage.getLockerKeys(),
+        storage.getSkillTemplates(),
+      ]);
+
+      const toolsWithLeases = allTools.map(tool => ({
+        ...tool,
+        activeLeaseCount: activeLeases.filter(l => l.toolId === tool.id).length,
+        available: tool.maxConcurrent === 0 || activeLeases.filter(l => l.toolId === tool.id).length < tool.maxConcurrent,
+      }));
+
+      res.json({
+        tools: toolsWithLeases,
+        tags: allTags,
+        activeLeases,
+        keys: allKeys.filter(k => k.active),
+        skills: allSkills,
+        summary: {
+          totalTools: allTools.length,
+          activeTools: allTools.filter(t => t.status === "active").length,
+          restrictedTools: allTools.filter(t => t.restricted).length,
+          totalActiveLeases: activeLeases.length,
+          totalSkills: allSkills.length,
+          skillsByFormat: {
+            claude_md: allSkills.filter(s => s.format === "claude_md").length,
+            agents_md: allSkills.filter(s => s.format === "agents_md").length,
+            aiden_md: allSkills.filter(s => s.format === "aiden_md").length,
+          },
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch locker inventory" });
     }
   });
 

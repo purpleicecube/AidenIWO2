@@ -36,6 +36,18 @@ import {
   type InsertApproval,
   type UploadedImage,
   type InsertUploadedImage,
+  type ToolTag,
+  type InsertToolTag,
+  type ToolTagAssignment,
+  type InsertToolTagAssignment,
+  type ToolLease,
+  type InsertToolLease,
+  type LockerKey,
+  type InsertLockerKey,
+  type ToolAuditLog,
+  type InsertToolAuditLog,
+  type SkillTemplate,
+  type InsertSkillTemplate,
   workOrders,
   executionLogs,
   users,
@@ -55,6 +67,12 @@ import {
   operationalSettings,
   approvals,
   uploadedImages,
+  toolTags,
+  toolTagAssignments,
+  toolLeases,
+  lockerKeys,
+  toolAuditLogs,
+  skillTemplates,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, asc } from "drizzle-orm";
@@ -167,6 +185,42 @@ export interface IStorage {
   getUploadedImageById(id: string): Promise<UploadedImage | undefined>;
   upsertUploadedImage(image: InsertUploadedImage): Promise<UploadedImage>;
   deleteUploadedImage(placeholderId: string): Promise<boolean>;
+
+  // Tools Locker: Tags
+  getToolTags(): Promise<ToolTag[]>;
+  getToolTag(id: string): Promise<ToolTag | undefined>;
+  createToolTag(tag: InsertToolTag): Promise<ToolTag>;
+  deleteToolTag(id: string): Promise<boolean>;
+  getToolTagAssignments(toolId: string): Promise<(ToolTagAssignment & { tag: ToolTag })[]>;
+  assignTagToTool(assignment: InsertToolTagAssignment): Promise<ToolTagAssignment>;
+  removeTagFromTool(toolId: string, tagId: string): Promise<boolean>;
+
+  // Tools Locker: Leases
+  getToolLeases(filters?: { toolId?: string; agentId?: string; status?: string }): Promise<ToolLease[]>;
+  getToolLease(id: string): Promise<ToolLease | undefined>;
+  getActiveLeases(toolId: string): Promise<ToolLease[]>;
+  createToolLease(lease: InsertToolLease): Promise<ToolLease>;
+  updateToolLease(id: string, updates: Partial<ToolLease>): Promise<ToolLease | undefined>;
+  expireOverdueLeases(): Promise<number>;
+
+  // Tools Locker: Keys
+  getLockerKeys(ownerId?: string): Promise<LockerKey[]>;
+  getLockerKey(id: string): Promise<LockerKey | undefined>;
+  createLockerKey(key: InsertLockerKey): Promise<LockerKey>;
+  updateLockerKey(id: string, updates: Partial<LockerKey>): Promise<LockerKey | undefined>;
+  revokeLockerKey(id: string, revokedBy: string, reason: string): Promise<LockerKey | undefined>;
+
+  // Tools Locker: Audit Logs
+  getToolAuditLogs(filters?: { toolId?: string; actorId?: string; action?: string }): Promise<ToolAuditLog[]>;
+  createToolAuditLog(log: InsertToolAuditLog): Promise<ToolAuditLog>;
+
+  // Skill Templates
+  getSkillTemplates(filters?: { format?: string; category?: string; status?: string }): Promise<SkillTemplate[]>;
+  getSkillTemplate(id: string): Promise<SkillTemplate | undefined>;
+  getSkillTemplateBySlug(slug: string): Promise<SkillTemplate | undefined>;
+  createSkillTemplate(template: InsertSkillTemplate): Promise<SkillTemplate>;
+  updateSkillTemplate(id: string, updates: Partial<SkillTemplate>): Promise<SkillTemplate | undefined>;
+  deleteSkillTemplate(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -690,6 +744,177 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUploadedImage(placeholderId: string): Promise<boolean> {
     const result = await db.delete(uploadedImages).where(eq(uploadedImages.placeholderId, placeholderId)).returning();
+    return result.length > 0;
+  }
+
+  // ==================== Tools Locker: Tags ====================
+
+  async getToolTags(): Promise<ToolTag[]> {
+    return db.select().from(toolTags).orderBy(asc(toolTags.name));
+  }
+
+  async getToolTag(id: string): Promise<ToolTag | undefined> {
+    const [tag] = await db.select().from(toolTags).where(eq(toolTags.id, id));
+    return tag;
+  }
+
+  async createToolTag(tag: InsertToolTag): Promise<ToolTag> {
+    const [created] = await db.insert(toolTags).values(tag).returning();
+    return created;
+  }
+
+  async deleteToolTag(id: string): Promise<boolean> {
+    await db.delete(toolTagAssignments).where(eq(toolTagAssignments.tagId, id));
+    const result = await db.delete(toolTags).where(eq(toolTags.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getToolTagAssignments(toolId: string): Promise<(ToolTagAssignment & { tag: ToolTag })[]> {
+    const assignments = await db.select().from(toolTagAssignments).where(eq(toolTagAssignments.toolId, toolId));
+    const result: (ToolTagAssignment & { tag: ToolTag })[] = [];
+    for (const assignment of assignments) {
+      const tag = await this.getToolTag(assignment.tagId);
+      if (tag) result.push({ ...assignment, tag });
+    }
+    return result;
+  }
+
+  async assignTagToTool(assignment: InsertToolTagAssignment): Promise<ToolTagAssignment> {
+    const [created] = await db.insert(toolTagAssignments).values(assignment).returning();
+    return created;
+  }
+
+  async removeTagFromTool(toolId: string, tagId: string): Promise<boolean> {
+    const result = await db.delete(toolTagAssignments)
+      .where(and(eq(toolTagAssignments.toolId, toolId), eq(toolTagAssignments.tagId, tagId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ==================== Tools Locker: Leases ====================
+
+  async getToolLeases(filters?: { toolId?: string; agentId?: string; status?: string }): Promise<ToolLease[]> {
+    if (!filters) return db.select().from(toolLeases).orderBy(desc(toolLeases.issuedAt));
+    const conditions = [];
+    if (filters.toolId) conditions.push(eq(toolLeases.toolId, filters.toolId));
+    if (filters.agentId) conditions.push(eq(toolLeases.agentId, filters.agentId));
+    if (filters.status) conditions.push(eq(toolLeases.status, filters.status));
+    if (conditions.length === 0) return db.select().from(toolLeases).orderBy(desc(toolLeases.issuedAt));
+    return db.select().from(toolLeases).where(and(...conditions)).orderBy(desc(toolLeases.issuedAt));
+  }
+
+  async getToolLease(id: string): Promise<ToolLease | undefined> {
+    const [lease] = await db.select().from(toolLeases).where(eq(toolLeases.id, id));
+    return lease;
+  }
+
+  async getActiveLeases(toolId: string): Promise<ToolLease[]> {
+    return db.select().from(toolLeases)
+      .where(and(eq(toolLeases.toolId, toolId), eq(toolLeases.status, "active")));
+  }
+
+  async createToolLease(lease: InsertToolLease): Promise<ToolLease> {
+    const [created] = await db.insert(toolLeases).values(lease).returning();
+    return created;
+  }
+
+  async updateToolLease(id: string, updates: Partial<ToolLease>): Promise<ToolLease | undefined> {
+    const [updated] = await db.update(toolLeases).set(updates).where(eq(toolLeases.id, id)).returning();
+    return updated;
+  }
+
+  async expireOverdueLeases(): Promise<number> {
+    const now = new Date();
+    const expired = await db.update(toolLeases)
+      .set({ status: "expired" })
+      .where(and(eq(toolLeases.status, "active"), sql`${toolLeases.expiresAt} < ${now}`))
+      .returning();
+    return expired.length;
+  }
+
+  // ==================== Tools Locker: Keys ====================
+
+  async getLockerKeys(ownerId?: string): Promise<LockerKey[]> {
+    if (ownerId) {
+      return db.select().from(lockerKeys).where(eq(lockerKeys.ownerId, ownerId)).orderBy(desc(lockerKeys.createdAt));
+    }
+    return db.select().from(lockerKeys).orderBy(desc(lockerKeys.createdAt));
+  }
+
+  async getLockerKey(id: string): Promise<LockerKey | undefined> {
+    const [key] = await db.select().from(lockerKeys).where(eq(lockerKeys.id, id));
+    return key;
+  }
+
+  async createLockerKey(key: InsertLockerKey): Promise<LockerKey> {
+    const [created] = await db.insert(lockerKeys).values(key).returning();
+    return created;
+  }
+
+  async updateLockerKey(id: string, updates: Partial<LockerKey>): Promise<LockerKey | undefined> {
+    const [updated] = await db.update(lockerKeys).set(updates).where(eq(lockerKeys.id, id)).returning();
+    return updated;
+  }
+
+  async revokeLockerKey(id: string, revokedBy: string, reason: string): Promise<LockerKey | undefined> {
+    const [revoked] = await db.update(lockerKeys)
+      .set({ active: false, revokedAt: new Date(), revokedBy, revokedReason: reason })
+      .where(eq(lockerKeys.id, id))
+      .returning();
+    return revoked;
+  }
+
+  // ==================== Tools Locker: Audit Logs ====================
+
+  async getToolAuditLogs(filters?: { toolId?: string; actorId?: string; action?: string }): Promise<ToolAuditLog[]> {
+    if (!filters) return db.select().from(toolAuditLogs).orderBy(desc(toolAuditLogs.createdAt)).limit(200);
+    const conditions = [];
+    if (filters.toolId) conditions.push(eq(toolAuditLogs.toolId, filters.toolId));
+    if (filters.actorId) conditions.push(eq(toolAuditLogs.actorId, filters.actorId));
+    if (filters.action) conditions.push(eq(toolAuditLogs.action, filters.action));
+    if (conditions.length === 0) return db.select().from(toolAuditLogs).orderBy(desc(toolAuditLogs.createdAt)).limit(200);
+    return db.select().from(toolAuditLogs).where(and(...conditions)).orderBy(desc(toolAuditLogs.createdAt)).limit(200);
+  }
+
+  async createToolAuditLog(log: InsertToolAuditLog): Promise<ToolAuditLog> {
+    const [created] = await db.insert(toolAuditLogs).values(log).returning();
+    return created;
+  }
+
+  // ==================== Skill Templates ====================
+
+  async getSkillTemplates(filters?: { format?: string; category?: string; status?: string }): Promise<SkillTemplate[]> {
+    if (!filters) return db.select().from(skillTemplates).orderBy(desc(skillTemplates.updatedAt));
+    const conditions = [];
+    if (filters.format) conditions.push(eq(skillTemplates.format, filters.format));
+    if (filters.category) conditions.push(eq(skillTemplates.category, filters.category));
+    if (filters.status) conditions.push(eq(skillTemplates.status, filters.status));
+    if (conditions.length === 0) return db.select().from(skillTemplates).orderBy(desc(skillTemplates.updatedAt));
+    return db.select().from(skillTemplates).where(and(...conditions)).orderBy(desc(skillTemplates.updatedAt));
+  }
+
+  async getSkillTemplate(id: string): Promise<SkillTemplate | undefined> {
+    const [template] = await db.select().from(skillTemplates).where(eq(skillTemplates.id, id));
+    return template;
+  }
+
+  async getSkillTemplateBySlug(slug: string): Promise<SkillTemplate | undefined> {
+    const [template] = await db.select().from(skillTemplates).where(eq(skillTemplates.slug, slug));
+    return template;
+  }
+
+  async createSkillTemplate(template: InsertSkillTemplate): Promise<SkillTemplate> {
+    const [created] = await db.insert(skillTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateSkillTemplate(id: string, updates: Partial<SkillTemplate>): Promise<SkillTemplate | undefined> {
+    const [updated] = await db.update(skillTemplates).set({ ...updates, updatedAt: new Date() }).where(eq(skillTemplates.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSkillTemplate(id: string): Promise<boolean> {
+    const result = await db.delete(skillTemplates).where(eq(skillTemplates.id, id)).returning();
     return result.length > 0;
   }
 }

@@ -312,6 +312,16 @@ export const tools = pgTable("tools", {
   outputSchema: jsonb("output_schema").default(sql`'{}'::jsonb`),
   executionConfig: jsonb("execution_config").default(sql`'{}'::jsonb`),
   version: text("version").notNull().default("1.0.0"),
+  accessTier: text("access_tier").notNull().default("any"),
+  maxConcurrent: integer("max_concurrent").notNull().default(0),
+  defaultLeaseSeconds: integer("default_lease_seconds").notNull().default(300),
+  maxLeaseSeconds: integer("max_lease_seconds").notNull().default(3600),
+  dailyUsageLimit: integer("daily_usage_limit"),
+  costCeilingPerDay: text("cost_ceiling_per_day"),
+  requiresApproval: boolean("requires_approval").notNull().default(false),
+  restricted: boolean("restricted").notNull().default(false),
+  restrictedReason: text("restricted_reason"),
+  restrictedBy: text("restricted_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -325,7 +335,7 @@ export const insertToolSchema = createInsertSchema(tools).omit({
 export type InsertTool = z.infer<typeof insertToolSchema>;
 export type Tool = typeof tools.$inferSelect;
 
-// ==================== Sub-Agent Tool Assignments ====================
+// ==================== Sub-Agent Tool Assignments (Default Entitlements) ====================
 
 export const subAgentTools = pgTable("sub_agent_tools", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -343,6 +353,162 @@ export const insertSubAgentToolSchema = createInsertSchema(subAgentTools).omit({
 
 export type InsertSubAgentTool = z.infer<typeof insertSubAgentToolSchema>;
 export type SubAgentTool = typeof subAgentTools.$inferSelect;
+
+// ==================== Tool Tags (Discovery Metadata) ====================
+
+export const toolTags = pgTable("tool_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  category: text("category").notNull().default("general"),
+  description: text("description"),
+  color: text("color").default("#6366f1"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertToolTagSchema = createInsertSchema(toolTags).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertToolTag = z.infer<typeof insertToolTagSchema>;
+export type ToolTag = typeof toolTags.$inferSelect;
+
+export const toolTagAssignments = pgTable("tool_tag_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  toolId: varchar("tool_id").notNull(),
+  tagId: varchar("tag_id").notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+});
+
+export const insertToolTagAssignmentSchema = createInsertSchema(toolTagAssignments).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertToolTagAssignment = z.infer<typeof insertToolTagAssignmentSchema>;
+export type ToolTagAssignment = typeof toolTagAssignments.$inferSelect;
+
+// ==================== Tool Leases (Checkout/Return Tracking) ====================
+
+export const toolLeases = pgTable("tool_leases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  toolId: varchar("tool_id").notNull(),
+  agentId: varchar("agent_id").notNull(),
+  agentType: text("agent_type").notNull().default("sub_agent"),
+  tier: text("tier").notNull().default("tier2"),
+  leaseType: text("lease_type").notNull().default("checkout"),
+  status: text("status").notNull().default("active"),
+  toolVersion: text("tool_version"),
+  context: jsonb("context").default(sql`'{}'::jsonb`),
+  workOrderId: varchar("work_order_id"),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  returnedAt: timestamp("returned_at"),
+  heartbeatAt: timestamp("heartbeat_at"),
+  result: jsonb("result").default(sql`'{}'::jsonb`),
+  error: text("error"),
+});
+
+export const insertToolLeaseSchema = createInsertSchema(toolLeases).omit({
+  id: true,
+  issuedAt: true,
+  returnedAt: true,
+  heartbeatAt: true,
+});
+
+export type InsertToolLease = z.infer<typeof insertToolLeaseSchema>;
+export type ToolLease = typeof toolLeases.$inferSelect;
+
+// ==================== Locker Keys (Agent Permissions & Scopes) ====================
+
+export const lockerKeys = pgTable("locker_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  ownerId: varchar("owner_id").notNull(),
+  ownerType: text("owner_type").notNull().default("sub_agent"),
+  scopes: jsonb("scopes").default(sql`'[]'::jsonb`),
+  toolIds: jsonb("tool_ids").default(sql`'[]'::jsonb`),
+  tagIds: jsonb("tag_ids").default(sql`'[]'::jsonb`),
+  permissions: jsonb("permissions").default(sql`'[]'::jsonb`),
+  maxConcurrentLeases: integer("max_concurrent_leases").notNull().default(5),
+  issuedBy: text("issued_by").notNull().default("admin"),
+  active: boolean("active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  revokedAt: timestamp("revoked_at"),
+  revokedBy: text("revoked_by"),
+  revokedReason: text("revoked_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLockerKeySchema = createInsertSchema(lockerKeys).omit({
+  id: true,
+  createdAt: true,
+  revokedAt: true,
+  revokedBy: true,
+  revokedReason: true,
+});
+
+export type InsertLockerKey = z.infer<typeof insertLockerKeySchema>;
+export type LockerKey = typeof lockerKeys.$inferSelect;
+
+// ==================== Tool Audit Logs ====================
+
+export const toolAuditLogs = pgTable("tool_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  toolId: varchar("tool_id").notNull(),
+  leaseId: varchar("lease_id"),
+  action: text("action").notNull(),
+  actorId: varchar("actor_id").notNull(),
+  actorType: text("actor_type").notNull().default("sub_agent"),
+  reason: text("reason"),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertToolAuditLogSchema = createInsertSchema(toolAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertToolAuditLog = z.infer<typeof insertToolAuditLogSchema>;
+export type ToolAuditLog = typeof toolAuditLogs.$inferSelect;
+
+// ==================== Skill Templates (CLAUDE.md / AGENTS.md / AIDEN.md) ====================
+
+export const skillTemplates = pgTable("skill_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  toolId: varchar("tool_id"),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  format: text("format").notNull().default("aiden_md"),
+  category: text("category").notNull().default("general"),
+  status: text("status").notNull().default("active"),
+  version: text("version").notNull().default("1.0.0"),
+  content: text("content").notNull(),
+  instructions: text("instructions"),
+  triggerConditions: jsonb("trigger_conditions").default(sql`'[]'::jsonb`),
+  inputContract: jsonb("input_contract").default(sql`'{}'::jsonb`),
+  outputContract: jsonb("output_contract").default(sql`'{}'::jsonb`),
+  referencedResources: jsonb("referenced_resources").default(sql`'[]'::jsonb`),
+  executionMode: text("execution_mode").notNull().default("prompt_injection"),
+  runtimeEnvironment: text("runtime_environment"),
+  sourceCode: text("source_code"),
+  entryPoint: text("entry_point"),
+  sandboxConfig: jsonb("sandbox_config").default(sql`'{}'::jsonb`),
+  createdBy: text("created_by").default("admin"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSkillTemplateSchema = createInsertSchema(skillTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSkillTemplate = z.infer<typeof insertSkillTemplateSchema>;
+export type SkillTemplate = typeof skillTemplates.$inferSelect;
 
 // ==================== Artifact Folders ====================
 

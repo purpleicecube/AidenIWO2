@@ -47,6 +47,16 @@ I want to be kept informed about the status of work orders, particularly when hu
 - **ImagePlaceholder** (`client/src/components/image-placeholder.tsx`): Reusable image placeholder with drag-and-drop upload. Uses `placeholderId` for persistence. Images stored as base64 in `uploaded_images` table. Supports click/drag upload, replace, remove. API: POST `/api/images/upload`, GET `/api/images/:placeholderId`, GET `/api/images/:placeholderId/meta`, DELETE `/api/images/:placeholderId`.
 - **ExpandablePanel** (`client/src/components/expandable-panel.tsx`): Universal fullscreen expand/contract button. Uses React portals for overlay. ESC key to close. Wired into Sandbox preview, Workspace file preview, and Work Order execution timeline.
 
+**Tools Locker System (Phase 1 — Data Foundation):**
+A governed, shared repository of callable tools and reusable skills that agents can check out, execute, and return with results and metadata.
+- **Locker Governance Fields** on `tools` table: `accessTier` (any/tier1/tier2), `maxConcurrent` (0=unlimited), `defaultLeaseSeconds`, `maxLeaseSeconds`, `dailyUsageLimit`, `costCeilingPerDay`, `requiresApproval`, `restricted`, `restrictedReason`, `restrictedBy`.
+- **Tool Tags** (`tool_tags`, `tool_tag_assignments`): Discovery metadata (capability, cost, risk, latency) for categorizing tools.
+- **Tool Leases** (`tool_leases`): Checkout/return/lease tracking with agent info, tier, expiry, heartbeat, result/error.
+- **Locker Keys** (`locker_keys`): Agent permissions with scopes, tool/tag access, concurrency limits, revocation support.
+- **Tool Audit Logs** (`tool_audit_logs`): Full audit trail of checkout, return, restrict, unrestrict actions.
+- **Skill Templates** (`skill_templates`): Supports three formats — `claude_md`, `agents_md`, `aiden_md`. Two execution modes: `prompt_injection` (skills loaded into agent context) and `sandbox_execution` (code tools run in sandbox). Fields include `content`, `instructions`, `triggerConditions`, `inputContract`, `outputContract`, `sourceCode`, `entryPoint`, `runtimeEnvironment`, `sandboxConfig`.
+- **API Namespace**: All locker routes under `/api/locker/*` — inventory, tags, leases, checkout/return, keys, audit, skills, restrict/unrestrict.
+
 ## External Dependencies
 - **PostgreSQL:** Primary database for persistent storage.
 - **OpenAI:** LLM provider.
