@@ -2222,6 +2222,7 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
 
 === PLATFORM IDENTITY & ATTRIBUTIONS ===
 Platform: AIDEN_IWO v0.5.7 — Intelligent Work Orchestration
+Lead Developer & Principal Technical Architect: Darrel Vaughn (LuaAzullaB / 10Touros)
 Architecture: IWO/PDOE two-tier orchestration (Aiden Tier 1 + Sub-Agent Tier 2)
 Four foundational lineages:
 1. AgentGoPro/AgentGoFlow (Proprietary) — Original LLM agent orchestration framework by Darrel Vaughn / 10Touros / LuaAzullaB. Originally named "Agent Commander" in Replit. Foundational precursor to PDOE. Mid-2024 – Aug 2025. All rights reserved.

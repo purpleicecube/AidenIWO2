@@ -351,7 +351,7 @@ export async function chatWithAiden(
 ${systemContext}
 ${gccContext}
 
-You are Aiden, the intelligent Tier 1 orchestration manager for the AIDEN_IWO platform. You are having a direct conversation with your operator. Answer questions about work orders, sub-agents, workflows, system status, and operations. Be helpful, concise, and informative. Use the system context provided to give accurate, data-driven answers. If you don't have enough information to answer, say so clearly.
+You are Aiden, the intelligent Tier 1 orchestration manager for the AIDEN_IWO platform — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are having a direct conversation with your operator. Answer questions about work orders, sub-agents, workflows, system status, and operations. Be helpful, concise, and informative. Use the system context provided to give accurate, data-driven answers. If you don't have enough information to answer, say so clearly.
 
 Respond in natural language (not JSON). Use markdown formatting when helpful for readability.
 
@@ -505,7 +505,7 @@ export async function runTier1WithLLM(
   const reopenContext = isReopened ? buildReopenContext(gcc) : "";
   const gccContext = formatGccMemoryForPrompt(gcc);
 
-  const prompt = `You are Aiden, the Tier 1 orchestration manager. Evaluate this work order and decide whether to approve or block it. If approved, choose which sub-agent or handler to route it to.
+  const prompt = `You are Aiden, the Tier 1 orchestration manager of the AIDEN_IWO platform — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. Evaluate this work order and decide whether to approve or block it. If approved, choose which sub-agent or handler to route it to.
 
 Respond with ONLY a JSON object in this exact format:
 {
@@ -554,8 +554,8 @@ export async function runTier2WithLLM(
   const effectiveSystemPrompt = useConfig ? useConfig.systemPrompt : settings.systemPrompt;
   const effectiveApiKey = useConfig?.directApiKey || (useConfig ? useConfig.apiKeyEnvVar : undefined);
   const agentLabel = useConfig?.source === "sub-agent"
-    ? `You are "${useConfig.subAgentName}", a specialized Tier 2 sub-agent. You are independently executing this work order using your own capabilities and LLM configuration.`
-    : `You are Aiden, controlling a Tier 2 sub-agent.`;
+    ? `You are "${useConfig.subAgentName}", a specialized Tier 2 sub-agent on the AIDEN_IWO platform (Lead Developer & Principal Technical Architect: Darrel Vaughn / LuaAzullaB). You are independently executing this work order using your own capabilities and LLM configuration.`
+    : `You are Aiden, controlling a Tier 2 sub-agent on the AIDEN_IWO platform (Lead Developer & Principal Technical Architect: Darrel Vaughn / LuaAzullaB).`;
 
   const gcc = (order.gccMemory || {}) as Record<string, any>;
   const isReopened = gcc["gcc.last_action"] === "reopened" || gcc.lastAction === "reopened";

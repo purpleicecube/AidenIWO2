@@ -1,5 +1,7 @@
 # AIDEN_IWO - Intelligent Work Order Orchestration
 
+**Lead Developer & Principal Technical Architect:** Darrel Vaughn (LuaAzullaB / 10Touros)
+
 ## Overview
 AIDEN_IWO is a 2-tier work order orchestration platform designed to streamline and automate complex operational workflows. Its primary purpose is to intelligently route and manage work orders using AI-powered policy evaluation and routing, human-in-the-loop (HITL) intervention, and specialized sub-agents. The platform aims to reduce manual effort, improve efficiency, and provide comprehensive visibility into work order lifecycles.
 
