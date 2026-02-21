@@ -914,6 +914,7 @@ export async function registerRoutes(
         baseUrl: config.baseUrl,
         systemPrompt: config.systemPrompt,
         enabled: true,
+        updatedAt: new Date(),
       };
 
       const result = await testLLMConnection(testSettings);
