@@ -40,7 +40,7 @@ export default function LandingPage() {
               <Layers className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-tight">AIDEN_PTIB</span>
+              <span className="text-sm font-semibold tracking-tight">AIDEN_IWO | FF.AI</span>
               <span className="text-[10px] text-muted-foreground">Orchestration Engine</span>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function LandingPage() {
 
       <footer className="py-8 px-6 border-t border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground space-y-1">
-          <p>AIDEN_PTIB v0.3.0 — Intelligent Work Orchestration</p>
+          <p>AIDEN_IWO | FF.AI v0.3.0 — Intelligent Work Orchestration</p>
           <p className="text-xs">designed by LuaAzullaB | darrel vaughn</p>
         </div>
       </footer>
