@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
 import { useState } from "react";
+import { ExpandablePanel } from "@/components/expandable-panel";
 
 function DetailSkeleton() {
   return (
@@ -648,7 +649,22 @@ export default function WorkOrderDetail() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">Execution Timeline</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-medium">Execution Timeline</CardTitle>
+                {logs && logs.length > 0 && (
+                  <ExpandablePanel title={`Execution Timeline — ${order.title}`}>
+                    <div className="p-6 space-y-0">
+                      {logs.map((log, index) => (
+                        <TimelineItem
+                          key={log.id}
+                          log={log}
+                          isLast={index === logs.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </ExpandablePanel>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {logsLoading ? (

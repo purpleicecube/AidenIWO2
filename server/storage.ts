@@ -34,6 +34,8 @@ import {
   type InsertOperationalSettings,
   type Approval,
   type InsertApproval,
+  type UploadedImage,
+  type InsertUploadedImage,
   workOrders,
   executionLogs,
   users,
@@ -52,6 +54,7 @@ import {
   chatMessages,
   operationalSettings,
   approvals,
+  uploadedImages,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, asc } from "drizzle-orm";
@@ -159,6 +162,11 @@ export interface IStorage {
   getApprovalsByWorkOrder(workOrderId: string): Promise<Approval[]>;
   createApproval(approval: InsertApproval): Promise<Approval>;
   updateApproval(id: string, updates: Partial<Approval>): Promise<Approval | undefined>;
+
+  getUploadedImage(placeholderId: string): Promise<UploadedImage | undefined>;
+  getUploadedImageById(id: string): Promise<UploadedImage | undefined>;
+  upsertUploadedImage(image: InsertUploadedImage): Promise<UploadedImage>;
+  deleteUploadedImage(placeholderId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -654,6 +662,35 @@ export class DatabaseStorage implements IStorage {
   async updateApproval(id: string, updates: Partial<Approval>): Promise<Approval | undefined> {
     const [updated] = await db.update(approvals).set(updates).where(eq(approvals.id, id)).returning();
     return updated;
+  }
+
+  async getUploadedImage(placeholderId: string): Promise<UploadedImage | undefined> {
+    const [image] = await db.select().from(uploadedImages).where(eq(uploadedImages.placeholderId, placeholderId));
+    return image;
+  }
+
+  async getUploadedImageById(id: string): Promise<UploadedImage | undefined> {
+    const [image] = await db.select().from(uploadedImages).where(eq(uploadedImages.id, id));
+    return image;
+  }
+
+  async upsertUploadedImage(image: InsertUploadedImage): Promise<UploadedImage> {
+    const existing = await this.getUploadedImage(image.placeholderId);
+    if (existing) {
+      const { createdAt, ...updateFields } = image as any;
+      const [updated] = await db.update(uploadedImages)
+        .set(updateFields)
+        .where(eq(uploadedImages.placeholderId, image.placeholderId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(uploadedImages).values(image).returning();
+    return created;
+  }
+
+  async deleteUploadedImage(placeholderId: string): Promise<boolean> {
+    const result = await db.delete(uploadedImages).where(eq(uploadedImages.placeholderId, placeholderId)).returning();
+    return result.length > 0;
   }
 }
 

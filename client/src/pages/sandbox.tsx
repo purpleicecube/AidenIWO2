@@ -31,10 +31,9 @@ import {
   RotateCcw,
   Globe,
   Code,
-  Maximize2,
-  Minimize2,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
+import { ExpandablePanel } from "@/components/expandable-panel";
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -86,7 +85,6 @@ export default function SandboxPage() {
   const [execCommand, setExecCommand] = useState("");
   const [execInput, setExecInput] = useState("");
   const [viewMode, setViewMode] = useState<"terminal" | "preview">("terminal");
-  const [previewExpanded, setPreviewExpanded] = useState(false);
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
     queryKey: ["/api/sandbox-sessions"],
@@ -313,15 +311,17 @@ export default function SandboxPage() {
                   <span className="font-medium">{sessionResult.title || "HTML Preview"}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setPreviewExpanded(!previewExpanded)}
-                    title={previewExpanded ? "Collapse" : "Expand"}
-                    data-testid="button-toggle-preview-expand"
+                  <ExpandablePanel
+                    title={`Preview: ${sessionResult.title || selectedSession.name}`}
                   >
-                    {previewExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                  </Button>
+                    <iframe
+                      src={`/api/sandbox-sessions/${selectedSession.id}/preview`}
+                      className="w-full h-full border-0"
+                      title={`Preview: ${selectedSession.name}`}
+                      sandbox="allow-scripts"
+                      data-testid="iframe-preview-expanded"
+                    />
+                  </ExpandablePanel>
                   <Button
                     size="sm"
                     variant="ghost"

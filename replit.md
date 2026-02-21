@@ -43,6 +43,10 @@ I want to be kept informed about the status of work orders, particularly when hu
 - **HITL Capabilities:** Features for re-issuing work orders to Aiden, closing without output, and inline editing of order details during intervention.
 - **Admin Tooling:** Includes user management with role assignment and system health monitoring.
 
+**Universal Components:**
+- **ImagePlaceholder** (`client/src/components/image-placeholder.tsx`): Reusable image placeholder with drag-and-drop upload. Uses `placeholderId` for persistence. Images stored as base64 in `uploaded_images` table. Supports click/drag upload, replace, remove. API: POST `/api/images/upload`, GET `/api/images/:placeholderId`, GET `/api/images/:placeholderId/meta`, DELETE `/api/images/:placeholderId`.
+- **ExpandablePanel** (`client/src/components/expandable-panel.tsx`): Universal fullscreen expand/contract button. Uses React portals for overlay. ESC key to close. Wired into Sandbox preview, Workspace file preview, and Work Order execution timeline.
+
 ## External Dependencies
 - **PostgreSQL:** Primary database for persistent storage.
 - **OpenAI:** LLM provider.

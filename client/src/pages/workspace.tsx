@@ -51,6 +51,7 @@ import {
   Save,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
+import { ExpandablePanel } from "@/components/expandable-panel";
 
 const FILE_ICONS: Record<string, typeof FileText> = {
   "text/markdown": FileText,
@@ -497,6 +498,15 @@ export default function WorkspacePage() {
               <span className="text-sm font-medium truncate">{selectedArtifact.name}</span>
             </div>
             <div className="flex items-center gap-1">
+              <ExpandablePanel
+                title={selectedArtifact.name}
+              >
+                <div className="p-6">
+                  <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-file-content-expanded">
+                    {selectedArtifact.content || "No content"}
+                  </pre>
+                </div>
+              </ExpandablePanel>
               <Button
                 size="icon"
                 variant="ghost"

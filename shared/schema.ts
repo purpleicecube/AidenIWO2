@@ -469,4 +469,26 @@ export const insertSandboxSessionSchema = createInsertSchema(sandboxSessions).om
 export type InsertSandboxSession = z.infer<typeof insertSandboxSessionSchema>;
 export type SandboxSession = typeof sandboxSessions.$inferSelect;
 
+// ==================== Uploaded Images ====================
+
+export const uploadedImages = pgTable("uploaded_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  placeholderId: varchar("placeholder_id").notNull(),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  data: text("data").notNull(),
+  alt: text("alt"),
+  uploadedBy: text("uploaded_by").default("system"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertUploadedImageSchema = createInsertSchema(uploadedImages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUploadedImage = z.infer<typeof insertUploadedImageSchema>;
+export type UploadedImage = typeof uploadedImages.$inferSelect;
+
 export * from "./models/auth";

@@ -1785,5 +1785,85 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
     }
   });
 
+  // ==================== Image Upload / Placeholder ====================
+
+  app.post("/api/images/upload", isAuth, async (req: Request, res: Response) => {
+    try {
+      const { placeholderId, filename, mimeType, data, alt } = req.body;
+      if (!placeholderId || !filename || !mimeType || !data) {
+        return res.status(400).json({ message: "Missing required fields: placeholderId, filename, mimeType, data" });
+      }
+      const allowedTypes = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"];
+      if (!allowedTypes.includes(mimeType)) {
+        return res.status(400).json({ message: "Unsupported image type" });
+      }
+      const base64Data = data.replace(/^data:[^;]+;base64,/, "");
+      const size = Math.ceil(base64Data.length * 0.75);
+      const maxSize = 5 * 1024 * 1024;
+      if (size > maxSize) {
+        return res.status(400).json({ message: "Image too large (max 5MB)" });
+      }
+      const actor = getActor(req);
+      const image = await storage.upsertUploadedImage({
+        placeholderId,
+        filename,
+        mimeType,
+        size,
+        data: base64Data,
+        alt: alt || null,
+        uploadedBy: actor.actorId,
+      });
+      res.json({ id: image.id, placeholderId: image.placeholderId, filename: image.filename, mimeType: image.mimeType, size: image.size });
+    } catch (err) {
+      res.status(500).json({ message: "Upload failed" });
+    }
+  });
+
+  app.get("/api/images/:placeholderId", async (req: Request, res: Response) => {
+    try {
+      const image = await storage.getUploadedImage(req.params.placeholderId as string);
+      if (!image) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      const buf = Buffer.from(image.data, "base64");
+      res.set("Content-Type", image.mimeType);
+      res.set("Content-Length", String(buf.length));
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(buf);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to retrieve image" });
+    }
+  });
+
+  app.get("/api/images/:placeholderId/meta", async (req: Request, res: Response) => {
+    try {
+      const image = await storage.getUploadedImage(req.params.placeholderId as string);
+      if (!image) {
+        return res.status(404).json({ exists: false });
+      }
+      res.json({
+        exists: true,
+        id: image.id,
+        placeholderId: image.placeholderId,
+        filename: image.filename,
+        mimeType: image.mimeType,
+        size: image.size,
+        alt: image.alt,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to check image" });
+    }
+  });
+
+  app.delete("/api/images/:placeholderId", isAuth, async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteUploadedImage(req.params.placeholderId as string);
+      if (!deleted) return res.status(404).json({ message: "Image not found" });
+      res.json({ message: "Image deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete image" });
+    }
+  });
+
   return httpServer;
 }
