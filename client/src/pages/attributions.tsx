@@ -78,7 +78,7 @@ export default function AttributionsPage() {
             Attribution Register
           </h1>
           <p className="text-muted-foreground mt-2">
-            AgentGoPro, Aiden Zephyr/TIB, GCC Memory &amp; PocketFlow — foundational lineages of IWO/PDOE (WS014).
+            AgentGoPro/AgentGoFlow, Aiden Zephyr/TIB, GCC Memory &amp; PocketFlow — foundational lineages of IWO/PDOE (WS014).
           </p>
           <p className="text-xs text-muted-foreground mt-1">Collected 2026-02-21</p>
         </div>
@@ -88,7 +88,7 @@ export default function AttributionsPage() {
           <AttributionSection
             icon={Layers}
             iconClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400"
-            title="AgentGoPro"
+            title="AgentGoPro/AgentGoFlow"
             subtitle="LuaAzullaB Orchestration Framework"
             license="Proprietary"
             licenseVariant="destructive"
@@ -105,7 +105,7 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">Creator &amp; Origin</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                AgentGoPro — originally named &ldquo;Agent Commander&rdquo; in Replit — was a basic orchestration framework for LLM-based agent coordination, developed independently by Darrel Vaughn under 10Touros (consulting) and LuaAzullaB (R&amp;D lab), beginning mid-2024 and continuing into 2025. The project was renamed from Agent Commander to AgentGoPro during active development. It predates the adoption of PocketFlow and GCC Memory and is the foundational precursor to the PDOE agent orchestration architecture.
+                AgentGoPro/AgentGoFlow — originally named &ldquo;Agent Commander&rdquo; in Replit — was a basic orchestration framework for LLM-based agent coordination, developed independently by Darrel Vaughn under 10Touros (consulting) and LuaAzullaB (R&amp;D lab), beginning mid-2024 and continuing into 2025. The project was renamed from Agent Commander to AgentGoPro/AgentGoFlow during active development. It predates the adoption of PocketFlow and GCC Memory and is the foundational precursor to the PDOE agent orchestration architecture.
               </p>
             </div>
 
@@ -114,7 +114,7 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">Core Concept</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                AgentGoPro established the foundational orchestration patterns later refined in PDOE: agent-to-agent task delegation, tiered authority (executive vs. execution layers), structured handoff protocols, and flow-based coordination of LLM agents. This original framework informed the architectural decisions that led to adopting PocketFlow as the production execution substrate and GCC Memory as the persistence layer.
+                AgentGoPro/AgentGoFlow established the foundational orchestration patterns later refined in PDOE: agent-to-agent task delegation, tiered authority (executive vs. execution layers), structured handoff protocols, and flow-based coordination of LLM agents. This original framework informed the architectural decisions that led to adopting PocketFlow as the production execution substrate and GCC Memory as the persistence layer.
               </p>
             </div>
 
@@ -127,7 +127,7 @@ export default function AttributionsPage() {
                 <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Jul 2024</span><span>Agent prompt language &amp; infrastructure (complete)</span></div>
                 <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Aug 2024</span><span>Multi-agent team structure (complete)</span></div>
                 <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Nov 2024</span><span>Replit deployment infrastructure (complete)</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Dec 2024</span><span>&ldquo;Agent Commander&rdquo; (original Replit project name) / RFP Bridge Assistant LAUNCH — LIVE. Project renamed to AgentGoPro during this period.</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Dec 2024</span><span>&ldquo;Agent Commander&rdquo; (original Replit project name) / RFP Bridge Assistant LAUNCH — LIVE. Project renamed to AgentGoPro/AgentGoFlow during this period.</span></div>
                 <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Jan 2025</span><span>API enhancements &amp; expansion (complete)</span></div>
                 <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Feb–Mar 2025</span><span>Advanced agent research &amp; new tools (ongoing)</span></div>
                 <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Through Aug 2025</span><span>PDOE architecture formalized; PocketFlow adopted as execution substrate</span></div>
@@ -139,14 +139,14 @@ export default function AttributionsPage() {
             <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 p-4">
               <h4 className="text-sm font-semibold mb-1.5">License Notice</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                AgentGoPro is proprietary software owned by Darrel Vaughn, operating under 10Touros (consulting company) and LuaAzullaB (formerly LuaLab, R&amp;D lab). This is NOT open-source. No MIT, Apache, or Creative Commons license applies. All rights to the AgentGoPro codebase, design patterns, and derived orchestration concepts are retained by Darrel Vaughn / 10Touros / LuaAzullaB. Any reproduction, distribution, or derivative use requires explicit written permission from the rights holder.
+                AgentGoPro/AgentGoFlow is proprietary software owned by Darrel Vaughn, operating under 10Touros (consulting company) and LuaAzullaB (formerly LuaLab, R&amp;D lab). This is NOT open-source. No MIT, Apache, or Creative Commons license applies. All rights to the AgentGoPro/AgentGoFlow codebase, design patterns, and derived orchestration concepts are retained by Darrel Vaughn / 10Touros / LuaAzullaB. Any reproduction, distribution, or derivative use requires explicit written permission from the rights holder.
               </p>
             </div>
 
             <div className="rounded-lg bg-muted/40 p-4">
               <h4 className="text-sm font-semibold mb-1.5">Attribution Statement</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                AgentGoPro is the original LLM agent orchestration framework created by Darrel Vaughn under 10Touros (consulting) and LuaAzullaB (formerly LuaLab, R&amp;D lab), developed from mid-2024 into 2025. It established the foundational patterns for tiered agent governance, structured task delegation, and flow-based orchestration that underpin the PDOE architecture. AgentGoPro is proprietary software — all rights reserved by Darrel Vaughn / 10Touros / LuaAzullaB. The subsequent adoption of PocketFlow and GCC Memory within PDOE builds upon and extends these original concepts under their respective open-source licenses.
+                AgentGoPro/AgentGoFlow is the original LLM agent orchestration framework created by Darrel Vaughn under 10Touros (consulting) and LuaAzullaB (formerly LuaLab, R&amp;D lab), developed from mid-2024 into 2025. It established the foundational patterns for tiered agent governance, structured task delegation, and flow-based orchestration that underpin the PDOE architecture. AgentGoPro/AgentGoFlow is proprietary software — all rights reserved by Darrel Vaughn / 10Touros / LuaAzullaB. The subsequent adoption of PocketFlow and GCC Memory within PDOE builds upon and extends these original concepts under their respective open-source licenses.
               </p>
             </div>
           </AttributionSection>
@@ -170,7 +170,7 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">Contributor &amp; Source</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Thomas C. Appling III introduced the &ldquo;Aiden Zephyr&rdquo; agent concept and later contributed The Internal Brain (TIB) framework through his work with FF.AI. These ideas shaped the identity, persona, and cognitive architecture of the Aiden agent within PDOE. Note: Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander, later AgentGoPro) was already in active planning and development prior to the introduction of the Aiden Zephyr concept.
+                Thomas C. Appling III introduced the &ldquo;Aiden Zephyr&rdquo; agent concept and later contributed The Internal Brain (TIB) framework through his work with FF.AI. These ideas shaped the identity, persona, and cognitive architecture of the Aiden agent within PDOE. Note: Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander, later AgentGoPro/AgentGoFlow) was already in active planning and development prior to the introduction of the Aiden Zephyr concept.
               </p>
             </div>
 
@@ -214,7 +214,7 @@ export default function AttributionsPage() {
             <div className="rounded-lg bg-muted/40 p-4">
               <h4 className="text-sm font-semibold mb-1.5">Attribution Statement</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                PDOE gratefully acknowledges Thomas C. Appling III and the Freedom Forge AI (FF.AI) for the creative inspiration behind the Aiden agent identity — originally conceived as &ldquo;Aiden Zephyr&rdquo; — and for the conceptual contributions of The Internal Brain (TIB) cognitive architecture framework. These contributions shaped the persona, identity, and reasoning character of Aiden as PDOE&rsquo;s Tier 1 executive orchestrator. It is expressly noted that Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander / AgentGoPro) was already in active planning and development prior to the introduction of the Aiden Zephyr concept — the creative identity was layered onto an existing architectural foundation.
+                PDOE gratefully acknowledges Thomas C. Appling III and the Freedom Forge AI (FF.AI) for the creative inspiration behind the Aiden agent identity — originally conceived as &ldquo;Aiden Zephyr&rdquo; — and for the conceptual contributions of The Internal Brain (TIB) cognitive architecture framework. These contributions shaped the persona, identity, and reasoning character of Aiden as PDOE&rsquo;s Tier 1 executive orchestrator. It is expressly noted that Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander / AgentGoPro/AgentGoFlow) was already in active planning and development prior to the introduction of the Aiden Zephyr concept — the creative identity was layered onto an existing architectural foundation.
               </p>
             </div>
           </AttributionSection>
