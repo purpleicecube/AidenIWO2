@@ -161,7 +161,7 @@ export default function AttributionsPage() {
           >
             <div className="space-y-3">
               <InfoRow label="Contributor">Thomas C. Appling III</InfoRow>
-              <InfoRow label="Organization">Foundation for AI (FF.AI)</InfoRow>
+              <InfoRow label="Organization">Freedom Forge AI (FF.AI)</InfoRow>
               <InfoRow label="Type">Creative inspiration &amp; conceptual framing</InfoRow>
             </div>
 
@@ -207,14 +207,14 @@ export default function AttributionsPage() {
             <div className="rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 p-4">
               <h4 className="text-sm font-semibold mb-1.5">License Notice</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                The Aiden Zephyr concept and TIB (The Internal Brain) framework are attributed to Thomas C. Appling III and the Foundation for AI (FF.AI) as creative and collaborative contributions. These are acknowledged as inspirational and collaborative inputs, not code-level dependencies. No open-source license applies. Attribution is granted in recognition of creative influence and collaborative development of agent identity, persona design, and cognitive architecture framing within the PDOE ecosystem.
+                The Aiden Zephyr concept and TIB (The Internal Brain) framework are attributed to Thomas C. Appling III and the Freedom Forge AI (FF.AI) as creative and collaborative contributions. These are acknowledged as inspirational and collaborative inputs, not code-level dependencies. No open-source license applies. Attribution is granted in recognition of creative influence and collaborative development of agent identity, persona design, and cognitive architecture framing within the PDOE ecosystem.
               </p>
             </div>
 
             <div className="rounded-lg bg-muted/40 p-4">
               <h4 className="text-sm font-semibold mb-1.5">Attribution Statement</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                PDOE gratefully acknowledges Thomas C. Appling III and the Foundation for AI (FF.AI) for the creative inspiration behind the Aiden agent identity — originally conceived as &ldquo;Aiden Zephyr&rdquo; — and for the conceptual contributions of The Internal Brain (TIB) cognitive architecture framework. These contributions shaped the persona, identity, and reasoning character of Aiden as PDOE&rsquo;s Tier 1 executive orchestrator. It is expressly noted that Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander / AgentGoPro) was already in active planning and development prior to the introduction of the Aiden Zephyr concept — the creative identity was layered onto an existing architectural foundation.
+                PDOE gratefully acknowledges Thomas C. Appling III and the Freedom Forge AI (FF.AI) for the creative inspiration behind the Aiden agent identity — originally conceived as &ldquo;Aiden Zephyr&rdquo; — and for the conceptual contributions of The Internal Brain (TIB) cognitive architecture framework. These contributions shaped the persona, identity, and reasoning character of Aiden as PDOE&rsquo;s Tier 1 executive orchestrator. It is expressly noted that Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander / AgentGoPro) was already in active planning and development prior to the introduction of the Aiden Zephyr concept — the creative identity was layered onto an existing architectural foundation.
               </p>
             </div>
           </AttributionSection>
