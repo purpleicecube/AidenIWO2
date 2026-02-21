@@ -341,7 +341,7 @@ export default function AttributionsPage() {
         </div>
 
         <footer className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-muted-foreground space-y-1">
-          <p>AIDEN_PTIB v0.5.2 — Intelligent Work Orchestration</p>
+          <p>AIDEN_IWO v0.5.7 — Intelligent Work Orchestration</p>
           <p className="text-xs">designed by LuaAzullaB | darrel vaughn</p>
         </footer>
       </div>
