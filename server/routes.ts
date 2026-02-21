@@ -32,6 +32,44 @@ import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvai
 
 const startTime = Date.now();
 
+function buildGccCommit(
+  existingGcc: Record<string, any>,
+  correlationId: string,
+  action: string,
+  summary: string,
+  detail: string,
+  metadataOverrides: Record<string, any> = {},
+): { gccMemory: Record<string, any>; commitId: string } {
+  const now = new Date().toISOString();
+  const commitId = `gcc-${Math.random().toString(16).slice(2, 10)}`;
+  const breadcrumbs = [...(existingGcc["gcc.breadcrumbs"] || existingGcc.breadcrumbs || []), action];
+  const commitIndex = [...(existingGcc["gcc.commit_index"] || [])];
+  commitIndex.push({ commit_id: commitId, timestamp: now, summary: summary.slice(0, 120), command: "COMMIT" });
+  const logEntries = [...(existingGcc["gcc.log"] || [])];
+  logEntries.push({ timestamp: now, type: "COMMIT", commit_id: commitId, detail });
+
+  return {
+    commitId,
+    gccMemory: {
+      "gcc.project_id": existingGcc["gcc.project_id"] || `wo-${correlationId.slice(0, 8)}`,
+      "gcc.branch": existingGcc["gcc.branch"] || "main",
+      "gcc.tier": "tier1",
+      "gcc.commit_index": commitIndex.slice(-100),
+      "gcc.last_commit_id": commitId,
+      "gcc.last_commit_summary": summary.slice(0, 120),
+      "gcc.log": logEntries.slice(-200),
+      "gcc.context_scope": "branch",
+      "gcc.context_commit_count": commitIndex.length,
+      "gcc.breadcrumbs": breadcrumbs.slice(-50),
+      "gcc.last_action": action,
+      "gcc.metadata": {
+        ...(existingGcc["gcc.metadata"] || {}),
+        ...metadataOverrides,
+      },
+    },
+  };
+}
+
 function getActor(req: Request): { actorId: string; actorEmail: string | null; actorName: string } {
   const u = (req as any).appUser;
   return {
@@ -223,13 +261,22 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
       const actor = getActor(req);
-      const updated = await storage.updateWorkOrder(req.params.id, parsed.data);
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      const changedFields = Object.keys(parsed.data).filter(k => k !== "gccMemory");
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, order.correlationId, "inline_edit",
+        `Edited: ${changedFields.join(", ")} by ${actor.actorName}`,
+        `Work order fields updated by ${actor.actorName}: ${changedFields.join(", ")}`,
+        { editedAt: new Date().toISOString(), editedBy: actor, changedFields },
+      );
+
+      const updated = await storage.updateWorkOrder(req.params.id, { ...parsed.data, gccMemory });
       await storage.createExecutionLog({
         workOrderId: req.params.id,
         tier: 1,
         action: "Work Order Edited",
         message: `Work order edited by ${actor.actorName}`,
-        metadata: { actor, changes: parsed.data },
+        metadata: { actor, changes: parsed.data, commitId },
       });
       res.json(updated);
     } catch (err) {
@@ -310,21 +357,29 @@ export async function registerRoutes(
       if (order.status !== "blocked" && order.status !== "failed") {
         return res.status(400).json({ message: `Cannot retry order in '${order.status}' status` });
       }
+      const actor = getActor(req);
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, order.correlationId, "retry",
+        `Retry: reset from ${order.status} by ${actor.actorName}`,
+        `Work order reset from '${order.status}' and resubmitted for processing by ${actor.actorName}`,
+        { retriedAt: new Date().toISOString(), retriedBy: actor, previousStatus: order.status },
+      );
+
       await storage.updateWorkOrder(req.params.id, {
         status: "pending",
         bdmMarker: null,
         tier1Result: null,
         tier2Result: null,
-        gccMemory: {},
+        gccMemory,
       });
 
-      const actor = getActor(req);
       await storage.createExecutionLog({
         workOrderId: req.params.id,
         tier: 1,
         action: "Retry Initiated",
         message: `Work order reset and resubmitted by ${actor.actorName}`,
-        metadata: { previousStatus: order.status, actor },
+        metadata: { previousStatus: order.status, actor, commitId },
       });
 
       const result = await processWorkOrder(req.params.id);
@@ -442,8 +497,26 @@ export async function registerRoutes(
       if (order.status !== "completed") {
         return res.status(400).json({ message: "Only completed work orders can be re-filed" });
       }
+
+      const actor = getActor(req);
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, order.correlationId, "refile",
+        `Re-filed by ${actor.actorName}`,
+        `Work order output re-filed to workspace by ${actor.actorName}`,
+        { refiledAt: new Date().toISOString(), refiledBy: actor },
+      );
+
       const { fileWorkOrderOutput } = await import("./workspace-filing");
       await fileWorkOrderOutput(order);
+      await storage.updateWorkOrder(req.params.id, { gccMemory });
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Re-filed",
+        message: `Work order output re-filed to workspace by ${actor.actorName}`,
+        metadata: { actor, commitId },
+      });
       res.json({ message: "Work order re-filed successfully", workOrderId: order.id });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to re-file work order", error: err.message });
@@ -1292,6 +1365,20 @@ export async function registerRoutes(
         metadata: { leaseType, tier, workOrderId },
       });
 
+      if (workOrderId) {
+        const wo = await storage.getWorkOrder(workOrderId);
+        if (wo) {
+          const gcc = (wo.gccMemory || {}) as Record<string, any>;
+          const { gccMemory } = buildGccCommit(
+            gcc, wo.correlationId, "tool_checkout",
+            `Tool checkout: ${tool.name} v${tool.version} by ${agentId}`,
+            `Agent ${agentId} checked out tool "${tool.name}" v${tool.version} (lease ${lease.id})`,
+            { toolId, toolName: tool.name, leaseId: lease.id, agentId, checkoutAt: new Date().toISOString() },
+          );
+          await storage.updateWorkOrder(workOrderId, { gccMemory });
+        }
+      }
+
       res.status(201).json(lease);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to checkout tool" });
@@ -1320,6 +1407,22 @@ export async function registerRoutes(
         reason: req.body.error ? `Returned with error: ${req.body.error}` : "Returned successfully",
         metadata: { result: req.body.result },
       });
+
+      if (lease.workOrderId) {
+        const wo = await storage.getWorkOrder(lease.workOrderId);
+        if (wo) {
+          const tool = await storage.getTool(lease.toolId);
+          const toolName = tool?.name || lease.toolId;
+          const gcc = (wo.gccMemory || {}) as Record<string, any>;
+          const { gccMemory } = buildGccCommit(
+            gcc, wo.correlationId, "tool_return",
+            `Tool returned: ${toolName} by ${lease.agentId}${req.body.error ? " (with error)" : ""}`,
+            `Agent ${lease.agentId} returned tool "${toolName}" (lease ${lease.id})${req.body.error ? ` — error: ${req.body.error}` : " — success"}`,
+            { toolId: lease.toolId, toolName, leaseId: lease.id, agentId: lease.agentId, returnedAt: new Date().toISOString(), hasError: !!req.body.error },
+          );
+          await storage.updateWorkOrder(lease.workOrderId, { gccMemory });
+        }
+      }
 
       res.json(updated);
     } catch (err) {
@@ -2261,14 +2364,22 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
         decidedAt: new Date(),
       });
 
-      await storage.updateWorkOrder(approval.workOrderId, { approvalStatus: "approved" });
+      const gcc = (workOrder.gccMemory || {}) as Record<string, any>;
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, workOrder.correlationId, "approval_granted",
+        `Approval granted by ${actor.actorName}`,
+        `Approval granted by ${actor.actorName}: ${rationale}`,
+        { approvalId: approval.id, approvedAt: new Date().toISOString(), approvedBy: actor },
+      );
+
+      await storage.updateWorkOrder(approval.workOrderId, { approvalStatus: "approved", gccMemory });
 
       await storage.createExecutionLog({
         workOrderId: approval.workOrderId,
         tier: 0,
         action: "approval_granted",
         message: `Approval granted by ${actor.actorName}: ${rationale}`,
-        metadata: { approvalId: approval.id, actor, decision: "approved" },
+        metadata: { approvalId: approval.id, actor, decision: "approved", commitId },
       });
 
       res.json(updated);
@@ -2299,14 +2410,22 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
         decidedAt: new Date(),
       });
 
-      await storage.updateWorkOrder(approval.workOrderId, { approvalStatus: "rejected", status: "blocked" });
+      const gcc = (workOrder.gccMemory || {}) as Record<string, any>;
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, workOrder.correlationId, "approval_rejected",
+        `Approval rejected by ${actor.actorName}`,
+        `Approval rejected by ${actor.actorName}: ${rationale}`,
+        { approvalId: approval.id, rejectedAt: new Date().toISOString(), rejectedBy: actor },
+      );
+
+      await storage.updateWorkOrder(approval.workOrderId, { approvalStatus: "rejected", status: "blocked", gccMemory });
 
       await storage.createExecutionLog({
         workOrderId: approval.workOrderId,
         tier: 0,
         action: "approval_rejected",
         message: `Approval rejected by ${actor.actorName}: ${rationale}`,
-        metadata: { approvalId: approval.id, actor, decision: "rejected" },
+        metadata: { approvalId: approval.id, actor, decision: "rejected", commitId },
       });
 
       res.json(updated);
