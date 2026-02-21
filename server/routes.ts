@@ -2252,7 +2252,7 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
 
       const actionResults: Array<{ type: string; workOrderId?: string; correlationId?: string; autoProcessed?: boolean }> = [];
       const actor = getActor(req);
-      const userRole = (req as any).user?.role || "viewer";
+      const userRole = (req as any).appUser?.role || "viewer";
       const canCreateOrders = userRole === "admin" || userRole === "operator";
 
       const lines = reply.split("\n");
@@ -2268,11 +2268,43 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
         }
       }
 
+      if (actionLines.length === 0 && canCreateOrders) {
+        const userMsgLower = message.toLowerCase();
+        const replyLower = reply.toLowerCase();
+        const userWantsWorkOrder = /\b(create|open|submit|make|start|raise|file)\b.*\b(work\s*order|wo|ticket|order)\b/i.test(message) ||
+          /\b(work\s*order|wo|ticket)\b.*\b(for|to|about)\b/i.test(message);
+        const aidenDescribesCreation = /\*\*title\*\*/i.test(reply) && /\*\*type\*\*/i.test(reply) && /\*\*priority\*\*/i.test(reply);
+
+        if (userWantsWorkOrder || aidenDescribesCreation) {
+          const titleMatch = reply.match(/\*\*Title\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
+            reply.match(/Title[:\s]+(.+?)(?:\n|$)/im);
+          const descMatch = reply.match(/\*\*Description\s*(?:\/\s*Prompt)?\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
+            reply.match(/Description[:\s]+(.+?)(?:\n|$)/im);
+          const typeMatch = reply.match(/\*\*Type\*\*\s*\|\s*\*?\*?(.+?)\*?\*?\s*(?:\(.*?\))?\s*(?:\||\s*$)/im) ||
+            reply.match(/Type[:\s]+(.+?)(?:\n|$)/im);
+          const priorityMatch = reply.match(/\*\*Priority\*\*\s*\|\s*\*?\*?(.+?)\*?\*?\s*(?:[\u2013\u2014–—-].*?)?\s*(?:\||\s*$)/im) ||
+            reply.match(/Priority[:\s]+(.+?)(?:\n|$)/im);
+
+          if (titleMatch) {
+            const extracted: Record<string, any> = {
+              title: titleMatch[1].replace(/\*+/g, "").trim(),
+              description: descMatch ? descMatch[1].replace(/\*+/g, "").trim() : "",
+              type: typeMatch ? typeMatch[1].replace(/\*+/g, "").replace(/\(.*?\)/g, "").trim().toLowerCase() : "general",
+              priority: priorityMatch ? priorityMatch[1].replace(/\*+/g, "").replace(/[\u2013\u2014–—-].*/g, "").trim().toLowerCase() : "medium",
+              submittedBy: "aiden",
+              autoProcess: true,
+            };
+            actionLines.push(JSON.stringify(extracted));
+            console.log("[Chat Action Fallback] Extracted work order from LLM visible text:", extracted.title);
+          }
+        }
+      }
+
       if (actionLines.length > 0 && canCreateOrders) {
         for (const actionJson of actionLines.slice(0, 3)) {
           try {
             const actionData = JSON.parse(actionJson);
-            const validTypes = ["general", "technical", "creative", "research", "compliance", "financial", "hr", "operations", "strategic", "process documentation", "training", "security", "infrastructure"];
+            const validTypes = ["general", "technical", "creative", "research", "compliance", "financial", "hr", "operations", "strategic", "process documentation", "process_documentation", "training", "security", "infrastructure"];
             const validPriorities = ["low", "medium", "high", "critical"];
             const safeTitle = String(actionData.title || "Untitled Work Order").slice(0, 200);
             const safeDescription = String(actionData.description || "").slice(0, 5000);
@@ -2335,8 +2367,8 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
             });
 
             reply = contentLines.join("\n");
-            reply = reply.replace("{{WORK_ORDER_ID}}", newOrder.id);
-            reply = reply.replace("{{CORRELATION_ID}}", newOrder.correlationId);
+            reply = reply.replaceAll("{{WORK_ORDER_ID}}", newOrder.id);
+            reply = reply.replaceAll("{{CORRELATION_ID}}", newOrder.correlationId);
           } catch (parseErr) {
             console.error("Failed to parse chat action:", parseErr);
           }
