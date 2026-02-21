@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ExternalLink, Scale, GitBranch, Cpu, Layers } from "lucide-react";
+import { ArrowLeft, ExternalLink, Scale, GitBranch, Cpu, Layers, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/use-page-title";
 
@@ -20,7 +20,7 @@ function AttributionSection({
   title: string;
   subtitle: string;
   license: string;
-  licenseVariant: "destructive" | "secondary" | "outline";
+  licenseVariant: "destructive" | "secondary" | "outline" | "default";
   children: React.ReactNode;
 }) {
   return (
@@ -78,12 +78,13 @@ export default function AttributionsPage() {
             Attribution Register
           </h1>
           <p className="text-muted-foreground mt-2">
-            AgentGoPro, GCC Memory &amp; PocketFlow — foundational components of PDOE (WS014).
+            AgentGoPro, Aiden Zephyr/TIB, GCC Memory &amp; PocketFlow — foundational lineages of IWO/PDOE (WS014).
           </p>
           <p className="text-xs text-muted-foreground mt-1">Collected 2026-02-21</p>
         </div>
 
         <div className="space-y-8">
+
           <AttributionSection
             icon={Layers}
             iconClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400"
@@ -96,7 +97,16 @@ export default function AttributionsPage() {
               <InfoRow label="Author">Darrel Vaughn</InfoRow>
               <InfoRow label="Consulting">10Touros</InfoRow>
               <InfoRow label="Lab">LuaAzullaB (formerly LuaLab)</InfoRow>
-              <InfoRow label="Period">Mid-2024 – 2025</InfoRow>
+              <InfoRow label="Period">Mid-2024 – Aug 2025</InfoRow>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Creator &amp; Origin</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                AgentGoPro — originally named &ldquo;Agent Commander&rdquo; in Replit — was a basic orchestration framework for LLM-based agent coordination, developed independently by Darrel Vaughn under 10Touros (consulting) and LuaAzullaB (R&amp;D lab), beginning mid-2024 and continuing into 2025. The project was renamed from Agent Commander to AgentGoPro during active development. It predates the adoption of PocketFlow and GCC Memory and is the foundational precursor to the PDOE agent orchestration architecture.
+              </p>
             </div>
 
             <Separator />
@@ -113,14 +123,14 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">Timeline &amp; Lineage</h4>
               <div className="space-y-1.5 text-sm text-muted-foreground">
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Jun 2024</span><span>Agent architecture planning (complete)</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Jul 2024</span><span>Agent prompt language &amp; infrastructure (complete)</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Aug 2024</span><span>Multi-agent team structure (complete)</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Nov 2024</span><span>Replit deployment infrastructure (complete)</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Dec 2024</span><span>Agent Go Pro / RFP Bridge Assistant — LIVE</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Jan 2025</span><span>API enhancements &amp; expansion (complete)</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Feb–Mar 2025</span><span>Advanced agent research &amp; new tools (ongoing)</span></div>
-                <div className="flex gap-3"><span className="text-xs font-mono w-20 shrink-0 text-right">Mid 2025</span><span>PDOE architecture formalized; PocketFlow adopted</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Jun 2024</span><span>Agent architecture planning (complete)</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Jul 2024</span><span>Agent prompt language &amp; infrastructure (complete)</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Aug 2024</span><span>Multi-agent team structure (complete)</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Nov 2024</span><span>Replit deployment infrastructure (complete)</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Dec 2024</span><span>&ldquo;Agent Commander&rdquo; (original Replit project name) / RFP Bridge Assistant LAUNCH — LIVE. Project renamed to AgentGoPro during this period.</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Jan 2025</span><span>API enhancements &amp; expansion (complete)</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Feb–Mar 2025</span><span>Advanced agent research &amp; new tools (ongoing)</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Through Aug 2025</span><span>PDOE architecture formalized; PocketFlow adopted as execution substrate</span></div>
               </div>
             </div>
 
@@ -137,6 +147,74 @@ export default function AttributionsPage() {
               <h4 className="text-sm font-semibold mb-1.5">Attribution Statement</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 AgentGoPro is the original LLM agent orchestration framework created by Darrel Vaughn under 10Touros (consulting) and LuaAzullaB (formerly LuaLab, R&amp;D lab), developed from mid-2024 into 2025. It established the foundational patterns for tiered agent governance, structured task delegation, and flow-based orchestration that underpin the PDOE architecture. AgentGoPro is proprietary software — all rights reserved by Darrel Vaughn / 10Touros / LuaAzullaB. The subsequent adoption of PocketFlow and GCC Memory within PDOE builds upon and extends these original concepts under their respective open-source licenses.
+              </p>
+            </div>
+          </AttributionSection>
+
+          <AttributionSection
+            icon={Sparkles}
+            iconClass="bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400"
+            title="Aiden Zephyr & TIB"
+            subtitle="Thomas C. Appling III / FF.AI"
+            license="Creative Attribution"
+            licenseVariant="default"
+          >
+            <div className="space-y-3">
+              <InfoRow label="Contributor">Thomas C. Appling III</InfoRow>
+              <InfoRow label="Organization">Foundation for AI (FF.AI)</InfoRow>
+              <InfoRow label="Type">Creative inspiration &amp; conceptual framing</InfoRow>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Contributor &amp; Source</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Thomas C. Appling III introduced the &ldquo;Aiden Zephyr&rdquo; agent concept and later contributed The Internal Brain (TIB) framework through his work with FF.AI. These ideas shaped the identity, persona, and cognitive architecture of the Aiden agent within PDOE. Note: Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander, later AgentGoPro) was already in active planning and development prior to the introduction of the Aiden Zephyr concept.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Core Contribution</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Two distinct contributions: (1) <strong>Aiden Zephyr</strong> — the original agent identity concept that became &ldquo;Aiden&rdquo; in PDOE&rsquo;s Tier 1 executive orchestrator. Appling&rsquo;s vision gave the agent its name, persona, and early character as an autonomous reasoning entity. (2) <strong>The Internal Brain (TIB)</strong> — a cognitive architecture concept contributed through FF.AI that informed how Aiden processes, reasons, and maintains internal state. TIB influenced the design of Aiden&rsquo;s executive decision-making layer within the two-tier PDOE architecture.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Timeline &amp; Precedence</h4>
+              <div className="space-y-1.5 text-sm text-muted-foreground">
+                <div className="rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 p-3 mb-3">
+                  <p className="text-xs font-semibold text-rose-800 dark:text-rose-300 mb-1">PRECEDENCE NOTE</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Darrel Vaughn began Agent Commander (multi-agent orchestration framework) architecture planning in Jun 2024, with prompt language, infrastructure, and multi-agent team structure built through Aug 2024 — all prior to the introduction of the Aiden Zephyr concept.
+                  </p>
+                </div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Late 2024</span><span>Aiden Zephyr agentic concepts evolved (Appling)</span></div>
+                <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Mar 17, 2025</span><span>&ldquo;Aiden Zephyr&rdquo; reference email from Thomas C. Appling III</span></div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+                The Aiden Zephyr identity and FF.AI / TIB concepts were introduced subsequent to Vaughn&rsquo;s foundational orchestration work and were integrated into the already-established multi-agent architecture as creative and conceptual enhancements.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 p-4">
+              <h4 className="text-sm font-semibold mb-1.5">License Notice</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                The Aiden Zephyr concept and TIB (The Internal Brain) framework are attributed to Thomas C. Appling III and the Foundation for AI (FF.AI) as creative and collaborative contributions. These are acknowledged as inspirational and collaborative inputs, not code-level dependencies. No open-source license applies. Attribution is granted in recognition of creative influence and collaborative development of agent identity, persona design, and cognitive architecture framing within the PDOE ecosystem.
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-muted/40 p-4">
+              <h4 className="text-sm font-semibold mb-1.5">Attribution Statement</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                PDOE gratefully acknowledges Thomas C. Appling III and the Foundation for AI (FF.AI) for the creative inspiration behind the Aiden agent identity — originally conceived as &ldquo;Aiden Zephyr&rdquo; — and for the conceptual contributions of The Internal Brain (TIB) cognitive architecture framework. These contributions shaped the persona, identity, and reasoning character of Aiden as PDOE&rsquo;s Tier 1 executive orchestrator. It is expressly noted that Darrel Vaughn&rsquo;s multi-agent orchestration framework (Agent Commander / AgentGoPro) was already in active planning and development prior to the introduction of the Aiden Zephyr concept — the creative identity was layered onto an existing architectural foundation.
               </p>
             </div>
           </AttributionSection>
@@ -168,7 +246,7 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">Core Concept</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                GCC applies Git&rsquo;s version-control metaphor to LLM agent memory. Four canonical commands: <strong>COMMIT</strong> (durable milestone snapshot), <strong>BRANCH</strong> (isolated memory line for alternate strategy exploration), <strong>MERGE</strong> (consolidate branch outcomes under Tier 1 governance), <strong>CONTEXT</strong> (scoped history retrieval). Memory artifacts are stored as markdown files in a project/branch/commit filesystem hierarchy.
+                GCC applies Git&rsquo;s version-control metaphor to LLM agent memory. Four canonical commands: <strong>COMMIT</strong> (durable milestone snapshot of branch progress), <strong>BRANCH</strong> (isolated memory line for alternate strategy exploration), <strong>MERGE</strong> (consolidate branch outcomes under Tier 1 governance), <strong>CONTEXT</strong> (scoped history retrieval at multiple granularities). Memory artifacts are stored as markdown files in a project/branch/commit filesystem hierarchy.
               </p>
             </div>
 
@@ -177,7 +255,7 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">PDOE Integration (WS014)</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                GCC Memory is a Tier 1 platform service in PDOE, peer to Channel Gateway and Tools Locker. Tier 2 agents may COMMIT and CONTEXT; only Tier 1 may MERGE. Branch creation requires Tier 1 approval (mode-dependent). GCC metadata lives in shared dict (<code className="text-xs bg-muted px-1 py-0.5 rounded">gcc.*</code> keys) and filesystem artifacts only — never injected into Work Order or BDM payloads.
+                GCC Memory is a Tier 1 platform service in PDOE, peer to Channel Gateway and Tools Locker. Tier 2 agents may COMMIT and CONTEXT; only Tier 1 may MERGE. Branch creation requires Tier 1 approval (mode-dependent). GCC metadata lives in shared dict (<code className="text-xs bg-muted px-1 py-0.5 rounded">gcc.*</code> keys) and filesystem artifacts only — never injected into Work Order or BDM payloads. Contracts: <code className="text-xs bg-muted px-1 py-0.5 rounded">gcc_command_contract.md</code> (GCC-A-001), <code className="text-xs bg-muted px-1 py-0.5 rounded">gcc_shared_dict_contract.md</code> (GCC-A-002).
               </p>
             </div>
 
@@ -209,7 +287,7 @@ export default function AttributionsPage() {
             licenseVariant="outline"
           >
             <div className="space-y-3">
-              <InfoRow label="Author">Zachary Huang</InfoRow>
+              <InfoRow label="Author">Zachary Huang (GitHub: zachary62)</InfoRow>
               <InfoRow label="Affiliation">Microsoft Research AI Frontiers; PhD Columbia University; 2023 Google PhD Fellow</InfoRow>
               <InfoRow label="Organization">The-Pocket (GitHub org)</InfoRow>
               <InfoRow label="Repository">
@@ -222,6 +300,7 @@ export default function AttributionsPage() {
                   the-pocket.github.io/PocketFlow <ExternalLink className="w-3 h-3" />
                 </a>
               </InfoRow>
+              <InfoRow label="PyPI">pocketflow (v0.0.3)</InfoRow>
               <InfoRow label="License">MIT (Copyright 2024 Zachary Huang)</InfoRow>
             </div>
 
@@ -230,7 +309,7 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">Core Concept</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                PocketFlow distills LLM framework abstractions into 100 lines of dependency-free Python. The core is a directed graph of Nodes and Flows: <strong>BaseNode</strong> (prep/exec/post lifecycle), <strong>Node</strong> (sync with retry), <strong>BatchNode</strong> (list processing), <strong>Flow</strong> (graph orchestrator with start_node and _orch() loop), plus async variants. From this 100-line core, users implement Agents, Multi-Agents, Workflows, RAG, Map-Reduce, Structured Output, and other LLM design patterns.
+                PocketFlow distills LLM framework abstractions into 100 lines of dependency-free Python. The core is a directed graph of Nodes and Flows: <strong>BaseNode</strong> (prep/exec/post lifecycle, <code className="text-xs bg-muted px-1 py-0.5 rounded">&gt;&gt;</code> and <code className="text-xs bg-muted px-1 py-0.5 rounded">-</code> DSL operators), <strong>Node</strong> (sync with retry), <strong>BatchNode</strong> (list processing), <strong>Flow</strong> (graph orchestrator with start_node and _orch() loop), plus async variants. From this 100-line core, users implement Agents, Multi-Agents, Workflows, RAG, Map-Reduce, Structured Output, and other LLM design patterns.
               </p>
             </div>
 
