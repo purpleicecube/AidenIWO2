@@ -316,6 +316,28 @@ function getReadySteps(dict: SharedDict): PlanStep[] {
   });
 }
 
+function cascadeFailBlockedDeps(dict: SharedDict): PlanStep[] {
+  const cascaded: PlanStep[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const step of dict.planSteps) {
+      if (step.status !== "pending") continue;
+      const hasFailedDep = step.dependencies.some(depId => {
+        const dep = dict.planSteps.find(s => s.id === depId);
+        return dep && (dep.status === "failed" || dep.status === "blocked");
+      });
+      if (hasFailedDep) {
+        step.status = "failed";
+        step.error = "Dependency failed — cascaded failure";
+        cascaded.push(step);
+        changed = true;
+      }
+    }
+  }
+  return cascaded;
+}
+
 async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
   const readySteps = getReadySteps(dict);
 
@@ -325,6 +347,17 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
 
     const allDone = dict.planSteps.every(s => s.status === "completed" || s.status === "failed");
     if (allDone) return { action: "done" };
+
+    const cascaded = cascadeFailBlockedDeps(dict);
+    if (cascaded.length > 0) {
+      await emitNodeLog(dict, "ExecStep",
+        `Cascade-failed ${cascaded.length} step(s) due to failed dependencies: ${cascaded.map(s => s.name).join(", ")}`,
+        { cascadedSteps: cascaded.map(s => ({ id: s.id, name: s.name })) }
+      );
+      const allDoneNow = dict.planSteps.every(s => s.status === "completed" || s.status === "failed");
+      if (allDoneNow) return { action: "done" };
+      return { action: "more_steps" };
+    }
 
     dict.blocked = true;
     dict.bdmMarker = {
