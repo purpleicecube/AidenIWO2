@@ -149,6 +149,47 @@ export default function AttributionsPage() {
                 AgentGoPro/AgentGoFlow is the original LLM agent orchestration framework created by Darrel Vaughn under 10Touros (consulting) and LuaAzullaB (formerly LuaLab, R&amp;D lab), developed from mid-2024 into 2025. It established the foundational patterns for tiered agent governance, structured task delegation, and flow-based orchestration that underpin the PDOE architecture. AgentGoPro/AgentGoFlow is proprietary software — all rights reserved by Darrel Vaughn / 10Touros / LuaAzullaB. The subsequent adoption of PocketFlow and GCC Memory within PDOE builds upon and extends these original concepts under their respective open-source licenses.
               </p>
             </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="text-sm font-semibold mb-2">LuaAzullaB Orchestration Framework — BeginnersMind Workshops</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                The LuaAzullaB Orchestration Framework, developed by Darrel Vaughn (Oct 2025) and outlined in the BeginnersMind workshops, provides the conceptual and cognitive foundation for the PDOE orchestration model. The framework defines:
+              </p>
+              <div className="rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 p-4 mb-4 font-mono text-xs leading-relaxed">
+                <p className="mb-1">Orchestration = [Workflow] &times; [Execution] &rarr; Results (factual) &ne; Goals (aspirational)</p>
+                <p className="mb-3">Workflow = [Plan] + [Context(i)]</p>
+                <p className="mb-1">where Context(i) is <span className="font-semibold">Informed Context</span> — &ldquo;Know-How&rdquo; — comprising four interdependent dimensions:</p>
+                <p className="font-semibold">Attention &middot; Meaning &middot; Relevance &middot; Memory</p>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                These four dimensions form a cross-linked quadrant that governs how agents maintain, retrieve, and apply contextual awareness during orchestrated execution. This cognitive + orchestration model is the theoretical basis for the AgentGoPro/AgentGoFlow orchestration architecture and directly informed the design of PDOE&rsquo;s two-tier governance, GCC Memory&rsquo;s persistence layer (the Memory dimension), and Aiden&rsquo;s executive reasoning (the Attention and Meaning dimensions).
+              </p>
+              <div className="rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 p-4 mb-4 overflow-x-auto">
+                <pre className="text-xs font-mono text-muted-foreground whitespace-pre leading-relaxed">{`                    ORCHESTRATION
+                   /             \\
+                  /               \\
+            WORKFLOW    ×    EXECUTION
+           /        \\               \\
+          /          \\               \\
+      PLAN    +    CONTEXT(i)     RESULTS (factual)
+                   "Know-How"         |
+                 /    |    \\           ≠
+               /      |      \\        |
+        Attention  Relevance  Memory  GOALS (aspirational)
+             \\        |       /
+              \\       |      /
+                \\     |     /
+                 Meaning`}</pre>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Reference diagram: <code className="text-xs bg-muted px-1 py-0.5 rounded">+6PLOCKER/Locker_BM.AI/Lua_Orchestration_Framework.png</code>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Developed by Darrel Vaughn | LuaAzullaB | Oct 20, 2025
+              </p>
+            </div>
           </AttributionSection>
 
           <AttributionSection
