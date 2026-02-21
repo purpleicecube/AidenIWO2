@@ -46,13 +46,13 @@ export async function sendInviteEmail(toEmail: string, inviterName: string, appU
   const msg = {
     to: toEmail,
     from: fromEmail,
-    subject: `You've been invited to AIDEN_PTIB`,
-    text: `${inviterName} has invited you to join AIDEN_PTIB — an intelligent work order orchestration platform.\n\nClick the link below to get started:\n${appUrl}\n\nOnce you sign in, an administrator will assign your role.`,
+    subject: `You've been invited to AIDEN_IWO`,
+    text: `${inviterName} has invited you to join AIDEN_IWO — an intelligent work order orchestration platform.\n\nClick the link below to get started:\n${appUrl}\n\nOnce you sign in, an administrator will assign your role.`,
     html: `
       <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
-        <h2 style="color: #111827; margin-bottom: 8px;">You're invited to AIDEN_PTIB</h2>
+        <h2 style="color: #111827; margin-bottom: 8px;">You're invited to AIDEN_IWO</h2>
         <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
-          <strong>${inviterName}</strong> has invited you to join <strong>AIDEN_PTIB</strong> — an intelligent work order orchestration platform.
+          <strong>${inviterName}</strong> has invited you to join <strong>AIDEN_IWO</strong> — an intelligent work order orchestration platform.
         </p>
         <a href="${appUrl}" style="display: inline-block; margin: 24px 0; padding: 12px 28px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 15px;">
           Get Started

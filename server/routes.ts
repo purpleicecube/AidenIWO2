@@ -1909,7 +1909,7 @@ export async function registerRoutes(
           name: "CLAUDE.md",
           type: "file",
           mimeType: "text/markdown",
-          content: "# CLAUDE - Configuration & Context\n\nThis file provides context and configuration for AI-assisted operations.\n\n## System Context\n\n- Platform: AIDEN_PTIB Orchestration Engine\n- Architecture: 2-Tier (Aiden Manager + Sub-Agent Workers)\n- Workflow Engine: Multi-step with dependency resolution\n\n## Operating Guidelines\n\n1. Follow established SOPs in `01_Directive-SOP/`\n2. Store outputs in `02_Execution/` or `05_Artifacts/`\n3. Log test results in `06_Tests/`\n4. Reference resources from `04_Resources/`\n",
+          content: "# CLAUDE - Configuration & Context\n\nThis file provides context and configuration for AI-assisted operations.\n\n## System Context\n\n- Platform: AIDEN_IWO Orchestration Engine\n- Architecture: 2-Tier (Aiden Manager + Sub-Agent Workers)\n- Workflow Engine: Multi-step with dependency resolution\n\n## Operating Guidelines\n\n1. Follow established SOPs in `01_Directive-SOP/`\n2. Store outputs in `02_Execution/` or `05_Artifacts/`\n3. Log test results in `06_Tests/`\n4. Reference resources from `04_Resources/`\n",
           size: 480,
         },
       ];
@@ -2211,7 +2211,17 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
 - Provider: ${settings.provider}
 - Model: ${settings.model}
 - Status: Enabled
-- Timestamp: ${new Date().toISOString()}`;
+- Timestamp: ${new Date().toISOString()}
+
+=== PLATFORM IDENTITY & ATTRIBUTIONS ===
+Platform: AIDEN_IWO v0.5.7 — Intelligent Work Orchestration
+Architecture: IWO/PDOE two-tier orchestration (Aiden Tier 1 + Sub-Agent Tier 2)
+Four foundational lineages:
+1. AgentGoPro/AgentGoFlow (Proprietary) — Original LLM agent orchestration framework by Darrel Vaughn / 10Touros / LuaAzullaB. Originally named "Agent Commander" in Replit. Foundational precursor to PDOE. Mid-2024 – Aug 2025. All rights reserved.
+2. Aiden Zephyr & TIB (Creative Attribution) — Thomas C. Appling III / Freedom Forge AI (FF.AI). Creative inspiration for the Aiden agent identity and The Internal Brain (TIB) cognitive architecture. AIDEN_IWO supports the TIB framework but is by design — not limited to it.
+3. GCC Memory (CC BY 4.0 / MIT) — Git Context Controller by Junde Wu (arXiv:2508.00031). Git-style COMMIT/BRANCH/MERGE/CONTEXT commands for persistent agent memory.
+4. PocketFlow (MIT) — 100-line LLM framework by Zachary Huang / The-Pocket. Graph-based execution substrate for PDOE two-tier orchestration.
+Attributions page: /attributions (accessible authenticated and unauthenticated)`;
   }
 
   app.post("/api/chat/sessions/:id/messages", isAuth, requireRole("viewer"), async (req, res) => {

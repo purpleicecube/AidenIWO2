@@ -124,7 +124,7 @@ export default function SystemHealth() {
             System Health
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Monitor the status of all AIDEN_PTIB services and components
+            Monitor the status of all AIDEN_IWO services and components
           </p>
         </div>
         <Button
@@ -162,7 +162,7 @@ export default function SystemHealth() {
               <XCircle className="w-12 h-12 text-red-500/60 mb-4" />
               <p className="text-lg font-medium">System Unreachable</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                Unable to connect to the AIDEN_PTIB health endpoint. The system may be down or experiencing issues.
+                Unable to connect to the AIDEN_IWO health endpoint. The system may be down or experiencing issues.
               </p>
               <Button
                 variant="outline"
