@@ -179,7 +179,7 @@ export default function AttributionsPage() {
             <div>
               <h4 className="text-sm font-semibold mb-2">Core Contribution</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Two distinct contributions: (1) <strong>Aiden Zephyr</strong> — the original agent identity concept that became &ldquo;Aiden&rdquo; in PDOE&rsquo;s Tier 1 executive orchestrator. Appling&rsquo;s vision gave the agent its name, persona, and early character as an autonomous reasoning entity. (2) <strong>The Internal Brain (TIB)</strong> — a cognitive architecture concept contributed through FF.AI that informed how Aiden processes, reasons, and maintains internal state. TIB influenced the design of Aiden&rsquo;s executive decision-making layer within the two-tier PDOE architecture. The current implementation of the AIDEN_IWO supports the TIB framework but is by design — not limited by it.
+                Two distinct contributions: (1) <strong>Aiden Zephyr</strong> — the original agent identity concept that became &ldquo;Aiden&rdquo; in PDOE&rsquo;s Tier 1 executive orchestrator. Appling&rsquo;s vision gave the agent its name, persona, and early character as an autonomous reasoning entity. (2) <strong>The Internal Brain (TIB)</strong> — a cognitive architecture concept contributed through FF.AI that informed how Aiden processes, reasons, and maintains internal state. TIB influenced the design of Aiden&rsquo;s executive decision-making layer within the two-tier PDOE architecture. The current implementation of the AIDEN_IWO supports the TIB framework but is by design — not limited to it.
               </p>
             </div>
 
