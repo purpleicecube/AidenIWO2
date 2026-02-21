@@ -2179,7 +2179,12 @@ ${recentOrders.map(o => `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.t
 ${workOrders.length > 25 ? `... and ${workOrders.length - 25} more work orders` : ""}
 
 === SUB-AGENTS (TIER 2 WORKERS) ===
-${subAgentToolDetails.map(({ agent: a, tools: t }) => `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${a.description ? `, desc: ${a.description}` : ""})${t.length > 0 ? `\n  Tools: ${t.map(at => at.tool.name).join(", ")}` : ""}`).join("\n") || "No sub-agents configured"}
+${subAgentToolDetails.map(({ agent: a, tools: t }) => {
+      const llmInfo = a.llmEnabled
+        ? `, LLM: INDEPENDENT — provider: ${a.llmProvider || "not set"}, model: ${a.llmModel || "not set"}`
+        : `, LLM: inherits Aiden global (${settings.provider}/${settings.model})`;
+      return `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${llmInfo}${a.description ? `, desc: ${a.description}` : ""})${t.length > 0 ? `\n  Tools: ${t.map(at => at.tool.name).join(", ")}` : ""}`;
+    }).join("\n") || "No sub-agents configured"}
 
 === WORKFLOW TEMPLATES ===
 ${workflows.map(w => `- "${w.name}" (status: ${w.status}, category: ${w.category}${w.description ? `, desc: ${w.description}` : ""}${w.goal ? `, goal: ${w.goal}` : ""})`).join("\n") || "No workflow templates"}
