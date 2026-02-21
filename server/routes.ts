@@ -2272,7 +2272,12 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
       }
       let extractionMethod = actionLines.length > 0 ? "action_block" : "none";
 
-      if (actionLines.length === 0 && canCreateOrders) {
+      const userWantsWO = /\b(create|open|submit|make|start|raise|file|assign)\b.*\b(work\s*order|wo|ticket|order|task)\b/i.test(message) ||
+        /\b(work\s*order|wo|ticket)\b.*\b(for|to|about)\b/i.test(message);
+      const aidenConfirmsWO = /\b(creat|submit|open|rais|draft)\w*\b.*\b(work\s*order|order|ticket)\b/i.test(reply);
+      const workOrderIntentDetected = userWantsWO || aidenConfirmsWO;
+
+      if (actionLines.length === 0 && canCreateOrders && workOrderIntentDetected) {
         const titleMatch = reply.match(/\*\*Title\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
           reply.match(/\bTitle\b[:\s]+([^\n|]+)/im);
         const descMatch = reply.match(/\*\*Description\s*(?:\/\s*Prompt)?\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
@@ -2300,29 +2305,23 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
         }
       }
 
-      if (actionLines.length === 0 && canCreateOrders) {
-        const userWantsWorkOrder = /\b(create|open|submit|make|start|raise|file|assign)\b.*\b(work\s*order|wo|ticket|order|task)\b/i.test(message) ||
-          /\b(work\s*order|wo|ticket)\b.*\b(for|to|about)\b/i.test(message);
-        const aidenConfirmsCreation = /\b(creat|submit|open|rais|draft)\w*\b.*\b(work\s*order|order|ticket)\b/i.test(reply);
-
-        if (userWantsWorkOrder || aidenConfirmsCreation) {
-          console.log("[Chat Action T3 LLM] User intent or Aiden confirmation detected, running extraction call...");
-          try {
-            const extracted = await extractWorkOrderFromChat(settings, message, reply);
-            if (extracted && extracted.shouldCreate) {
-              actionLines.push(JSON.stringify({
-                ...extracted,
-                submittedBy: "aiden",
-                autoProcess: true,
-              }));
-              extractionMethod = "llm_extraction";
-              console.log("[Chat Action T3 LLM] Extracted work order:", extracted.title);
-            } else {
-              console.log("[Chat Action T3 LLM] Extraction returned shouldCreate=false, skipping.");
-            }
-          } catch (extractErr) {
-            console.error("[Chat Action T3 LLM] Extraction call failed:", extractErr);
+      if (actionLines.length === 0 && canCreateOrders && workOrderIntentDetected) {
+        console.log("[Chat Action T3 LLM] Intent detected but T1/T2 missed, running extraction call...");
+        try {
+          const extracted = await extractWorkOrderFromChat(settings, message, reply);
+          if (extracted && extracted.shouldCreate) {
+            actionLines.push(JSON.stringify({
+              ...extracted,
+              submittedBy: "aiden",
+              autoProcess: true,
+            }));
+            extractionMethod = "llm_extraction";
+            console.log("[Chat Action T3 LLM] Extracted work order:", extracted.title);
+          } else {
+            console.log("[Chat Action T3 LLM] Extraction returned shouldCreate=false, skipping.");
           }
+        } catch (extractErr) {
+          console.error("[Chat Action T3 LLM] Extraction call failed:", extractErr);
         }
       }
 
