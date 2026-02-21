@@ -55,6 +55,7 @@ A governed, shared repository of callable tools and reusable skills that agents 
 - **Locker Keys** (`locker_keys`): Agent permissions with scopes, tool/tag access, concurrency limits, revocation support.
 - **Tool Audit Logs** (`tool_audit_logs`): Full audit trail of checkout, return, restrict, unrestrict actions.
 - **Skill Templates** (`skill_templates`): Supports three formats — `claude_md`, `agents_md`, `aiden_md`. Two execution modes: `prompt_injection` (skills loaded into agent context) and `sandbox_execution` (code tools run in sandbox). Fields include `content`, `instructions`, `triggerConditions`, `inputContract`, `outputContract`, `sourceCode`, `entryPoint`, `runtimeEnvironment`, `sandboxConfig`.
+- **Tool Onboarding (Enhanced)**: Tools table now includes full onboarding fields: `skillContent` (SKILL.md body), `skillInstructions`, `triggerConditions`, `executionMode`, `runtimeEnvironment`, `sourceCode`, `entryPoint`, `sandboxConfig`, `credentials` (jsonb array of {key, value, isSecret, description}), `usageInstructions`, `mcpConfig`. Seven tool types supported: Claude Skill, Python Code, Slash Command, CLI, API, Webhook, MCP Server. Multi-tab form UI: Identity, Skill Content, Code, MCP, Credentials, Contracts, Governance, Agent Access.
 - **API Namespace**: All locker routes under `/api/locker/*` — inventory, tags, leases, checkout/return, keys, audit, skills, restrict/unrestrict.
 
 ## External Dependencies
