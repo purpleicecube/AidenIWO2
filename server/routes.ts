@@ -2176,7 +2176,14 @@ Statistics:
 - Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed} | Reopened: ${stats.reopened} | Deferred: ${stats.deferred}
 
 All Work Orders (${workOrders.length} total):
-${recentOrders.map(o => `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""})`).join("\n") || "No work orders"}
+${recentOrders.map(o => {
+      const gcc = (o.gccMemory || {}) as Record<string, any>;
+      const gccAction = gcc["gcc.last_action"] || gcc.lastAction;
+      const gccInfo = gccAction
+        ? ` | GCC: ${gccAction} (${gcc["gcc.context_commit_count"] || 0} commits, branch: ${gcc["gcc.branch"] || "main"})`
+        : "";
+      return `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""}${gccInfo})`;
+    }).join("\n") || "No work orders"}
 ${workOrders.length > 25 ? `... and ${workOrders.length - 25} more work orders` : ""}
 
 === SUB-AGENTS (TIER 2 WORKERS) ===
@@ -2264,7 +2271,7 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
       const gcc = (session.gccMemory as any) || {};
       const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || []), "user_message", "llm_processing"];
 
-      let reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext);
+      let reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext, gcc);
 
       const actionResults: Array<{ type: string; workOrderId?: string; correlationId?: string; autoProcessed?: boolean }> = [];
       const actor = getActor(req);
@@ -2528,6 +2535,63 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
     } catch (err: any) {
       console.error("Chat error:", err.message);
       res.status(500).json({ message: `Aiden encountered an error: ${err.message}` });
+    }
+  });
+
+  // ==================== GCC Memory Retrieval ====================
+
+  app.get("/api/gcc/session/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const session = await storage.getChatSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      const gcc = (session.gccMemory || {}) as Record<string, any>;
+      res.json({
+        entityType: "chat_session",
+        entityId: session.id,
+        correlationId: session.correlationId,
+        projectId: gcc["gcc.project_id"],
+        branch: gcc["gcc.branch"] || "main",
+        tier: gcc["gcc.tier"] || "tier1",
+        lastAction: gcc["gcc.last_action"] || gcc.lastAction,
+        lastCommitId: gcc["gcc.last_commit_id"],
+        lastCommitSummary: gcc["gcc.last_commit_summary"],
+        commitCount: gcc["gcc.context_commit_count"] || 0,
+        breadcrumbs: gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || [],
+        commitIndex: gcc["gcc.commit_index"] || [],
+        log: gcc["gcc.log"] || [],
+        metadata: gcc["gcc.metadata"] || {},
+        raw: gcc,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to retrieve GCC memory" });
+    }
+  });
+
+  app.get("/api/gcc/workorder/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      res.json({
+        entityType: "work_order",
+        entityId: order.id,
+        correlationId: order.correlationId,
+        status: order.status,
+        projectId: gcc["gcc.project_id"],
+        branch: gcc["gcc.branch"] || "main",
+        tier: gcc["gcc.tier"] || "tier1",
+        lastAction: gcc["gcc.last_action"] || gcc.lastAction,
+        lastCommitId: gcc["gcc.last_commit_id"],
+        lastCommitSummary: gcc["gcc.last_commit_summary"],
+        commitCount: gcc["gcc.context_commit_count"] || 0,
+        breadcrumbs: gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || [],
+        commitIndex: gcc["gcc.commit_index"] || [],
+        log: gcc["gcc.log"] || [],
+        metadata: gcc["gcc.metadata"] || {},
+        raw: gcc,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to retrieve GCC memory" });
     }
   });
 

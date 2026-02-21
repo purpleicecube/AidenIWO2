@@ -300,15 +300,56 @@ async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage:
   ], apiKeyEnvVarOverride);
 }
 
+function formatGccMemoryForPrompt(gcc: Record<string, any>): string {
+  if (!gcc || Object.keys(gcc).length === 0) return "";
+
+  const projectId = gcc["gcc.project_id"] || "unknown";
+  const branch = gcc["gcc.branch"] || "main";
+  const lastCommitId = gcc["gcc.last_commit_id"] || "none";
+  const lastCommitSummary = gcc["gcc.last_commit_summary"] || "none";
+  const lastAction = gcc["gcc.last_action"] || gcc.lastAction || "unknown";
+  const commitCount = gcc["gcc.context_commit_count"] || 0;
+  const breadcrumbs = gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || [];
+  const commitIndex = gcc["gcc.commit_index"] || [];
+  const logEntries = gcc["gcc.log"] || [];
+  const metadata = gcc["gcc.metadata"] || {};
+  const correlationId = gcc.correlationId || metadata.correlationId || "";
+
+  const recentCommits = commitIndex.slice(-10).map((c: any) =>
+    `  - [${c.commit_id}] ${c.summary || "no summary"}${c.tags ? ` (${c.tags.join(", ")})` : ""} @ ${c.timestamp || "?"}`
+  ).join("\n");
+
+  const recentLogs = logEntries.slice(-10).map((l: any) =>
+    `  - [${l.source_node || l.type || "log"}] ${l.entry || l.detail || "no detail"}`
+  ).join("\n");
+
+  return `
+=== GCC MEMORY (Session Context) ===
+Project: ${projectId} | Branch: ${branch} | Commits: ${commitCount}
+Last Commit: ${lastCommitId} — "${lastCommitSummary}"
+Last Action: ${lastAction}
+Breadcrumbs: ${breadcrumbs.slice(-15).join(" → ")}
+Status: ${metadata.status || "unknown"}
+
+Recent Commits (last 10):
+${recentCommits || "  (none)"}
+
+Recent Log (last 10):
+${recentLogs || "  (none)"}`;
+}
+
 export async function chatWithAiden(
   settings: LlmSettings,
   userMessage: string,
   conversationHistory: Array<{ role: string; content: string }>,
-  systemContext: string
+  systemContext: string,
+  sessionGccMemory?: Record<string, any>
 ): Promise<string> {
+  const gccContext = sessionGccMemory ? formatGccMemoryForPrompt(sessionGccMemory) : "";
   const chatSystemPrompt = `${settings.systemPrompt}
 
 ${systemContext}
+${gccContext}
 
 You are Aiden, the intelligent Tier 1 orchestration manager for the AIDEN_IWO platform. You are having a direct conversation with your operator. Answer questions about work orders, sub-agents, workflows, system status, and operations. Be helpful, concise, and informative. Use the system context provided to give accurate, data-driven answers. If you don't have enough information to answer, say so clearly.
 
@@ -462,6 +503,7 @@ export async function runTier1WithLLM(
   const gcc = (order.gccMemory || {}) as Record<string, any>;
   const isReopened = order.status === "reopened" || gcc["gcc.last_action"] === "reopened";
   const reopenContext = isReopened ? buildReopenContext(gcc) : "";
+  const gccContext = formatGccMemoryForPrompt(gcc);
 
   const prompt = `You are Aiden, the Tier 1 orchestration manager. Evaluate this work order and decide whether to approve or block it. If approved, choose which sub-agent or handler to route it to.
 
@@ -475,7 +517,7 @@ Respond with ONLY a JSON object in this exact format:
 
 Available handlers: general_executor, deploy_executor, maintenance_executor, incident_executor, change_executor, security_executor
 ${subAgentInfo}
-${reopenContext}
+${reopenContext}${gccContext}
 Work Order:
 - Title: ${order.title}
 - Description: ${order.description}
@@ -518,6 +560,7 @@ export async function runTier2WithLLM(
   const gcc = (order.gccMemory || {}) as Record<string, any>;
   const isReopened = gcc["gcc.last_action"] === "reopened" || gcc.lastAction === "reopened";
   const reopenContext = isReopened ? buildReopenContext(gcc) : "";
+  const gccContext = formatGccMemoryForPrompt(gcc);
 
   const prompt = `${agentLabel} The work order has passed the Tier 1 policy gate and was routed to handler "${tier1Result.handler}".
 
@@ -556,7 +599,8 @@ Work Order:
 - Type: ${order.type}
 - Priority: ${order.priority}
 - Tier 1 Mode: ${tier1Result.mode}
-- Handler: ${tier1Result.handler}`;
+- Handler: ${tier1Result.handler}
+${gccContext}`;
 
   try {
     const raw = await callLLM(effectiveSettings, effectiveSystemPrompt, prompt, effectiveApiKey);
@@ -693,12 +737,13 @@ export async function llmExecStep(
   const gcc = (order.gccMemory || {}) as Record<string, any>;
   const isReopened = gcc["gcc.last_action"] === "reopened" || gcc.lastAction === "reopened";
   const reopenContext = isReopened ? buildReopenContext(gcc) : "";
+  const gccContext = formatGccMemoryForPrompt(gcc);
 
   const prompt = `You are executing step "${step.name}" of a work order.
 
 Step description: ${step.description}
 ${prevContext}
-${reopenContext}
+${reopenContext}${gccContext}
 Work Order Context:
 - Title: ${order.title}
 - Description: ${order.description}

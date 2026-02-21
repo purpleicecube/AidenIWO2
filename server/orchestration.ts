@@ -4,6 +4,54 @@ import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, type Tier1R
 import { fileWorkOrderOutput } from "./workspace-filing";
 import { pocketflowExecute } from "./pocketflow";
 
+function updateWorkOrderGcc(
+  existing: object | null | undefined,
+  action: string,
+  breadcrumbs: string[],
+  extras: Record<string, any> = {},
+): Record<string, any> {
+  const gcc = (existing || {}) as Record<string, any>;
+  const now = new Date().toISOString();
+  const commitId = `gcc-${Math.random().toString(16).slice(2, 10)}`;
+
+  const existingCommitIndex = gcc["gcc.commit_index"] || [];
+  const existingLog = gcc["gcc.log"] || [];
+  const existingBreadcrumbs = gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || [];
+
+  const legacyCorrelationId = gcc.correlationId;
+  const legacyPocketflow = gcc.pocketflow;
+
+  const result: Record<string, any> = {
+    "gcc.project_id": gcc["gcc.project_id"] || `wo-${extras.correlationId?.slice(0, 8) || legacyCorrelationId?.slice(0, 8) || "unknown"}`,
+    "gcc.branch": gcc["gcc.branch"] || "main",
+    "gcc.tier": extras.tier || gcc["gcc.tier"] || "tier1",
+    "gcc.last_action": action,
+    "gcc.last_commit_id": commitId,
+    "gcc.last_commit_summary": action,
+    "gcc.breadcrumbs": [...existingBreadcrumbs, ...breadcrumbs].slice(-50),
+    "gcc.commit_index": [
+      ...existingCommitIndex,
+      { commit_id: commitId, timestamp: now, summary: action, tags: breadcrumbs },
+    ].slice(-100),
+    "gcc.log": [
+      ...existingLog,
+      { timestamp: now, source_node: "OrchestrationEngine", type: "COMMIT", entry: action, detail: JSON.stringify(extras) },
+    ].slice(-200),
+    "gcc.context_scope": "branch",
+    "gcc.context_commit_count": existingCommitIndex.length + 1,
+    "gcc.metadata": {
+      ...(gcc["gcc.metadata"] || {}),
+      status: extras.status || "active",
+      last_commit: now,
+      ...(legacyCorrelationId ? { correlationId: legacyCorrelationId } : {}),
+      ...(legacyPocketflow ? { pocketflow: legacyPocketflow } : {}),
+      ...extras,
+    },
+  };
+
+  return result;
+}
+
 export async function processWorkOrder(orderId: string): Promise<WorkOrder | undefined> {
   const order = await storage.getWorkOrder(orderId);
   if (!order) return undefined;
@@ -56,12 +104,9 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       status: "blocked",
       tier1Result,
       bdmMarker,
-      gccMemory: {
-        ...((order.gccMemory as object) || {}),
-        lastAction: "tier1_policy_block",
-        correlationId: order.correlationId,
-        blockedAt: new Date().toISOString(),
-      },
+      gccMemory: updateWorkOrderGcc(order.gccMemory as object, "tier1_policy_block", ["tier1_policy_block"], {
+        correlationId: order.correlationId, status: "blocked", reason: tier1Result.reason,
+      }),
     });
   }
 
@@ -71,18 +116,11 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     tier1Result,
     assignedSubAgentId: targetSubAgent?.id || null,
     executionMode: targetSubAgent?.controlMode || "aiden",
-    gccMemory: {
-      ...((order.gccMemory as object) || {}),
-      routingContext: {
-        handler: tier1Result.handler,
-        mode: tier1Result.mode,
-        subAgentId: targetSubAgent?.id,
-        subAgentName: targetSubAgent?.name,
-        controlMode: targetSubAgent?.controlMode,
-      },
-      correlationId: order.correlationId,
-      tier1CompletedAt: new Date().toISOString(),
-    },
+    gccMemory: updateWorkOrderGcc(order.gccMemory as object, "tier1_policy_pass", ["tier1_policy_pass", "routing_dispatched"], {
+      correlationId: order.correlationId, status: "routing",
+      handler: tier1Result.handler, mode: tier1Result.mode,
+      subAgentId: targetSubAgent?.id, subAgentName: targetSubAgent?.name, controlMode: targetSubAgent?.controlMode,
+    }),
   });
 
   await storage.createExecutionLog({
@@ -116,14 +154,10 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
 
     return storage.updateWorkOrder(orderId, {
       status: "awaiting_operator",
-      gccMemory: {
-        ...((order.gccMemory as object) || {}),
-        lastAction: "awaiting_independent_operator",
-        correlationId: order.correlationId,
-        assignedSubAgent: targetSubAgent.name,
-        assignedTo: targetSubAgent.assignedTo,
-        breadcrumbs: ["tier1_policy_pass", "dispatched_to_independent_sub_agent"],
-      },
+      gccMemory: updateWorkOrderGcc(order.gccMemory as object, "awaiting_independent_operator", ["tier1_policy_pass", "dispatched_to_independent_sub_agent"], {
+        correlationId: order.correlationId, status: "awaiting_operator",
+        assignedSubAgent: targetSubAgent.name, assignedTo: targetSubAgent.assignedTo,
+      }),
     });
   }
 
@@ -174,14 +208,10 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       status: "blocked",
       tier2Result,
       bdmMarker,
-      gccMemory: {
-        ...((order.gccMemory as object) || {}),
-        lastAction: "tier2_execution_block",
-        correlationId: order.correlationId,
-        blockedAt: new Date().toISOString(),
-        breadcrumbs: ["tier1_policy_pass", "pocketflow_execution_block"],
+      gccMemory: updateWorkOrderGcc(order.gccMemory as object, "tier2_execution_block", ["tier1_policy_pass", "pocketflow_execution_block"], {
+        correlationId: order.correlationId, status: "blocked", tier: "tier2",
         pocketflow: tier2Result.pocketflow,
-      },
+      }),
     });
   }
 
@@ -212,14 +242,10 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   const completedOrder = await storage.updateWorkOrder(orderId, {
     status: "completed",
     tier2Result,
-    gccMemory: {
-      ...((order.gccMemory as object) || {}),
-      lastAction: "completed",
-      correlationId: order.correlationId,
-      completedAt: new Date().toISOString(),
-      breadcrumbs: ["tier1_policy_pass", "pocketflow_validated", "pocketflow_execution_complete", "aiden_resolution"],
+    gccMemory: updateWorkOrderGcc(order.gccMemory as object, "completed", ["tier1_policy_pass", "pocketflow_validated", "pocketflow_execution_complete", "aiden_resolution"], {
+      correlationId: order.correlationId, status: "completed",
       pocketflow: tier2Result.pocketflow,
-    },
+    }),
   });
 
   if (completedOrder) {
@@ -441,14 +467,12 @@ export async function advanceWorkflowExecution(executionId: string) {
         completedAt: new Date(),
       });
       if (execution.workOrderId) {
+        const woForGcc = await storage.getWorkOrder(execution.workOrderId);
         const completedOrder = await storage.updateWorkOrder(execution.workOrderId, {
           status: "completed",
-          gccMemory: {
-            ...((await storage.getWorkOrder(execution.workOrderId))?.gccMemory as object || {}),
-            lastAction: "workflow_completed",
-            workflowExecutionId: executionId,
-            completedAt: new Date().toISOString(),
-          },
+          gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
+            workflowExecutionId: executionId, status: "completed",
+          }),
         });
         await storage.createExecutionLog({
           workOrderId: execution.workOrderId,
