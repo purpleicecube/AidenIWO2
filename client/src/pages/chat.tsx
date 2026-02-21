@@ -79,6 +79,12 @@ export default function ChatPage() {
         setActiveSessionId(data.sessionId);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions"] });
+      if (data.actions && data.actions.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/work-orders?includeArchived=true"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+      }
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions", activeSessionId] });

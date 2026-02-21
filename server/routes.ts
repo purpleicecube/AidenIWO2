@@ -2248,7 +2248,104 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
       const gcc = (session.gccMemory as any) || {};
       const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || []), "user_message", "llm_processing"];
 
-      const reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext);
+      let reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext);
+
+      const actionResults: Array<{ type: string; workOrderId?: string; correlationId?: string; autoProcessed?: boolean }> = [];
+      const actor = getActor(req);
+      const userRole = (req as any).user?.role || "viewer";
+      const canCreateOrders = userRole === "admin" || userRole === "operator";
+
+      const lines = reply.split("\n");
+      const actionLines: string[] = [];
+      const contentLines: string[] = [];
+      const actionLineRegex = /^<!-- AIDEN_ACTION:CREATE_WORK_ORDER:(\{.*\}) -->$/;
+      for (const line of lines) {
+        const match = line.trim().match(actionLineRegex);
+        if (match) {
+          actionLines.push(match[1]);
+        } else {
+          contentLines.push(line);
+        }
+      }
+
+      if (actionLines.length > 0 && canCreateOrders) {
+        for (const actionJson of actionLines.slice(0, 3)) {
+          try {
+            const actionData = JSON.parse(actionJson);
+            const validTypes = ["general", "technical", "creative", "research", "compliance", "financial", "hr", "operations", "strategic", "process documentation", "training", "security", "infrastructure"];
+            const validPriorities = ["low", "medium", "high", "critical"];
+            const safeTitle = String(actionData.title || "Untitled Work Order").slice(0, 200);
+            const safeDescription = String(actionData.description || "").slice(0, 5000);
+            const safeType = validTypes.includes(actionData.type) ? actionData.type : "general";
+            const safePriority = validPriorities.includes(actionData.priority) ? actionData.priority : "medium";
+
+            const { gccMemory: initialGcc, commitId: woCommitId } = buildGccCommit(
+              {}, "new", "created_via_chat",
+              `Work order created via chat by ${actor.actorName}`,
+              `Aiden created work order "${safeTitle}" during chat session ${sessionId}`,
+              { submittedBy: { ...actor, source: "aiden_chat" }, chatSessionId: sessionId },
+            );
+
+            const orderData = {
+              title: safeTitle,
+              description: safeDescription,
+              type: safeType,
+              priority: safePriority,
+              submittedBy: actor.actorName || "aiden",
+            };
+            const newOrder = await storage.createWorkOrder(orderData);
+            await storage.updateWorkOrder(newOrder.id, { gccMemory: initialGcc });
+            await storage.createExecutionLog({
+              workOrderId: newOrder.id,
+              tier: 1,
+              action: "Submitted via Chat",
+              message: `Work order created by Aiden during chat with ${actor.actorName}`,
+              metadata: { actor, chatSessionId: sessionId, source: "aiden_chat", commitId: woCommitId },
+            });
+
+            let autoProcessed = false;
+            if (actionData.autoProcess) {
+              try {
+                processWorkOrder(newOrder.id);
+                autoProcessed = true;
+                await storage.createExecutionLog({
+                  workOrderId: newOrder.id,
+                  tier: 1,
+                  action: "Auto-Processing Initiated",
+                  message: `Auto-processing triggered from chat action`,
+                  metadata: { source: "aiden_chat", chatSessionId: sessionId },
+                });
+              } catch (procErr: any) {
+                console.error("Auto-process failed for chat-created order:", procErr);
+                await storage.createExecutionLog({
+                  workOrderId: newOrder.id,
+                  tier: 1,
+                  action: "Auto-Processing Failed",
+                  message: `Auto-processing failed: ${procErr?.message || "Unknown error"}`,
+                  metadata: { source: "aiden_chat", error: procErr?.message },
+                });
+              }
+            }
+
+            actionResults.push({
+              type: "CREATE_WORK_ORDER",
+              workOrderId: newOrder.id,
+              correlationId: newOrder.correlationId,
+              autoProcessed,
+            });
+
+            reply = contentLines.join("\n");
+            reply = reply.replace("{{WORK_ORDER_ID}}", newOrder.id);
+            reply = reply.replace("{{CORRELATION_ID}}", newOrder.correlationId);
+          } catch (parseErr) {
+            console.error("Failed to parse chat action:", parseErr);
+          }
+        }
+      } else {
+        reply = contentLines.join("\n");
+      }
+
+      reply = reply.trimEnd();
 
       const assistantMsg = await storage.addChatMessage({
         sessionId,
@@ -2262,11 +2359,13 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
       const commitSummary = message.length > 100 ? message.slice(0, 97) + "..." : message;
 
       const commitIndex = [...(gcc["gcc.commit_index"] || [])];
+      const commitTags = ["chat_exchange"];
+      if (actionResults.length > 0) commitTags.push("chat_action_executed");
       commitIndex.push({
         commit_id: commitId,
         timestamp: now,
         summary: commitSummary,
-        tags: ["chat_exchange"],
+        tags: commitTags,
       });
 
       const logEntries = [...(gcc["gcc.log"] || [])];
@@ -2279,11 +2378,19 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
         {
           timestamp: now,
           source_node: "ContextCommitNode",
-          entry: `Committed exchange as ${commitId}. Aiden responded (${reply.length} chars).`,
+          entry: `Committed exchange as ${commitId}. Aiden responded (${reply.length} chars).${actionResults.length > 0 ? ` Actions executed: ${actionResults.map(a => a.type).join(", ")}` : ""}`,
         }
       );
 
-      const updatedBreadcrumbs = [...breadcrumbs, "assistant_reply", "committed"];
+      if (actionResults.length > 0) {
+        logEntries.push({
+          timestamp: now,
+          source_node: "ChatActionNode",
+          entry: `Chat actions executed: ${JSON.stringify(actionResults)}`,
+        });
+      }
+
+      const updatedBreadcrumbs = [...breadcrumbs, "assistant_reply", ...(actionResults.length > 0 ? ["action_executed"] : []), "committed"];
       await storage.updateChatSession(sessionId, {
         gccMemory: {
           "gcc.project_id": gcc["gcc.project_id"] || `aiden-chat-${session.correlationId.slice(0, 8)}`,
@@ -2296,17 +2403,18 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
           "gcc.context_scope": "branch",
           "gcc.context_commit_count": commitIndex.length,
           "gcc.breadcrumbs": updatedBreadcrumbs.slice(-50),
-          "gcc.last_action": "committed",
+          "gcc.last_action": actionResults.length > 0 ? "action_executed" : "committed",
           "gcc.metadata": {
             ...(gcc["gcc.metadata"] || {}),
             status: "active",
             last_commit: now,
+            ...(actionResults.length > 0 ? { lastActions: actionResults } : {}),
           },
         },
         title: session.messageCount === 0 ? message.slice(0, 80) : session.title,
       });
 
-      res.json({ reply, messageId: assistantMsg.id, sessionId, commitId });
+      res.json({ reply, messageId: assistantMsg.id, sessionId, commitId, actions: actionResults.length > 0 ? actionResults : undefined });
     } catch (err: any) {
       console.error("Chat error:", err.message);
       res.status(500).json({ message: `Aiden encountered an error: ${err.message}` });
