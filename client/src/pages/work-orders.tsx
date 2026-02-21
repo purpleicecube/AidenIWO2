@@ -1,10 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { StatusBadge, PriorityBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -14,8 +20,10 @@ import {
 } from "@/components/ui/select";
 import { Link } from "wouter";
 import { useState } from "react";
-import { Search, Plus, ClipboardList, ArrowUpDown } from "lucide-react";
+import { Search, Plus, ClipboardList, AlertTriangle, RefreshCw, XCircle, Eye, Loader2, UserCheck } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WorkOrder } from "@shared/schema";
 
 function OrdersTableSkeleton() {
@@ -34,6 +42,185 @@ function OrdersTableSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct: boolean }) {
+  const { toast } = useToast();
+  const [actioningId, setActioningId] = useState<string | null>(null);
+
+  const attentionOrders = orders.filter(o =>
+    o.status === "blocked" || o.status === "awaiting_operator" || o.status === "failed"
+  );
+
+  const reissueMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/work-orders/${id}/unblock`, {
+        resolution: "Re-issued to Aiden for re-processing.",
+        reprocess: true,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+      toast({ title: "Re-issued to Aiden", description: "Work order cleared and re-submitted." });
+      setActioningId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to re-issue.", variant: "destructive" });
+      setActioningId(null);
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/work-orders/${id}/retry`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+      toast({ title: "Retrying", description: "Work order re-submitted for processing." });
+      setActioningId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to retry.", variant: "destructive" });
+      setActioningId(null);
+    },
+  });
+
+  if (attentionOrders.length === 0) return null;
+
+  const blockedCount = attentionOrders.filter(o => o.status === "blocked").length;
+  const awaitingCount = attentionOrders.filter(o => o.status === "awaiting_operator").length;
+  const failedCount = attentionOrders.filter(o => o.status === "failed").length;
+
+  return (
+    <Card className="border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-900/10" data-testid="banner-needs-attention">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400" />
+          <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            Needs Attention
+          </span>
+          <Badge variant="outline" className="border-transparent bg-amber-200/80 text-amber-800 dark:bg-amber-800/40 dark:text-amber-300 no-default-hover-elevate no-default-active-elevate text-xs ml-1">
+            {attentionOrders.length}
+          </Badge>
+          <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+            {blockedCount > 0 && <span>{blockedCount} blocked</span>}
+            {awaitingCount > 0 && <span>{awaitingCount} awaiting</span>}
+            {failedCount > 0 && <span>{failedCount} failed</span>}
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          {attentionOrders.slice(0, 8).map(order => {
+            const isActioning = actioningId === order.id;
+            return (
+              <div
+                key={order.id}
+                className="flex items-center gap-3 p-2.5 rounded-md bg-white dark:bg-card border border-border/60 hover:border-border transition-colors"
+                data-testid={`attention-item-${order.id}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{order.title}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <StatusBadge status={order.status} />
+                    <PriorityBadge priority={order.priority} />
+                    {(() => {
+                      const marker = order.bdmMarker as Record<string, string> | null;
+                      return marker?.reason ? (
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">
+                          {marker.reason}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {canAct && order.status === "blocked" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 text-xs px-2.5"
+                          disabled={isActioning}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActioningId(order.id);
+                            reissueMutation.mutate(order.id);
+                          }}
+                          data-testid={`button-quick-reissue-${order.id}`}
+                        >
+                          {isActioning && reissueMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                          )}
+                          Re-issue
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="text-xs">Re-issue to Aiden for re-processing</p></TooltipContent>
+                    </Tooltip>
+                  )}
+                  {canAct && order.status === "failed" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 text-xs px-2.5"
+                          disabled={isActioning}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActioningId(order.id);
+                            retryMutation.mutate(order.id);
+                          }}
+                          data-testid={`button-quick-retry-${order.id}`}
+                        >
+                          {isActioning && retryMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                          )}
+                          Retry
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="text-xs">Retry this failed work order</p></TooltipContent>
+                    </Tooltip>
+                  )}
+                  {order.status === "awaiting_operator" && (
+                    <Badge variant="outline" className="border-transparent bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate text-[10px] h-6">
+                      <UserCheck className="w-3 h-3 mr-1" />
+                      Awaiting
+                    </Badge>
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link href={`/work-orders/${order.id}`}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs px-2"
+                          onClick={(e) => e.stopPropagation()}
+                          data-testid={`button-quick-view-${order.id}`}
+                        >
+                          <Eye className="w-3 h-3" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent><p className="text-xs">View details</p></TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            );
+          })}
+          {attentionOrders.length > 8 && (
+            <p className="text-xs text-muted-foreground text-center pt-1">
+              +{attentionOrders.length - 8} more items need attention
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -83,6 +270,8 @@ export default function WorkOrders() {
         )}
       </div>
 
+      {workOrders && <NeedsAttentionBanner orders={workOrders} canAct={canSubmit || false} />}
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-3 flex-wrap">
@@ -107,6 +296,7 @@ export default function WorkOrders() {
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="blocked">Blocked</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="awaiting_operator">Awaiting Operator</SelectItem>
                 <SelectItem value="reopened">Reopened</SelectItem>
               </SelectContent>
             </Select>
