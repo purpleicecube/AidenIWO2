@@ -154,7 +154,7 @@ export default function LandingPage() {
 
       <footer className="py-8 px-6 border-t border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground space-y-1">
-          <p>AIDEN_PTIB v0.3.0 — Intelligent Work Orchestration</p>
+          <p>AIDEN_PTIB v0.5.2 — Intelligent Work Orchestration</p>
           <p className="text-xs">designed by LuaAzullaB | darrel vaughn</p>
         </div>
       </footer>
