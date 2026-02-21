@@ -38,9 +38,9 @@ I want to be kept informed about the status of work orders, particularly when hu
 - **Workspace Filing Engine:** Automates routing of deliverables to specific folders and deployment of HTML artifacts to the sandbox.
 
 **Feature Specifications:**
-- **Work Order Lifecycle Management:** Comprehensive states including `pending`, `processing`, `completed`, `blocked`, `failed`, `awaiting_operator`.
+- **Work Order Lifecycle Management:** Comprehensive states including `pending`, `processing`, `completed`, `blocked`, `failed`, `awaiting_operator`, `reopened`, `deferred`.
 - **Per-Sub-Agent LLM Configuration:** Allows independent LLM settings (model, prompt, provider) for individual sub-agents, enabling specialized AI worker behaviors.
-- **HITL Capabilities:** Features for re-issuing work orders to Aiden, closing without output, and inline editing of order details during intervention.
+- **HITL Capabilities:** Three intervention actions: (1) Override Block & Continue — clears block/deferral and resubmits for processing, (2) Close Without Processing — marks complete with resolution notes, (3) Defer Decision — postpones decision to a future review date with reason. Available on blocked, failed, and awaiting_operator orders. Deferred orders show review date with overdue detection. Inline editing of order details also supported.
 - **Admin Tooling:** Includes user management with role assignment and system health monitoring.
 
 **Universal Components:**

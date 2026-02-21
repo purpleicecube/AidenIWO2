@@ -467,10 +467,10 @@ export async function registerRoutes(
       if (!order) {
         return res.status(404).json({ message: "Work order not found" });
       }
-      if (order.status !== "blocked") {
-        return res.status(400).json({ message: `Cannot unblock order in '${order.status}' status — only 'blocked' orders can be unblocked` });
+      if (order.status !== "blocked" && order.status !== "deferred") {
+        return res.status(400).json({ message: `Cannot unblock order in '${order.status}' status — only 'blocked' or 'deferred' orders can be unblocked` });
       }
-      if (!order.bdmMarker) {
+      if (order.status !== "deferred" && !order.bdmMarker) {
         return res.status(400).json({ message: "No BDM marker to resolve on this work order" });
       }
 
@@ -531,6 +531,8 @@ export async function registerRoutes(
           status: "pending",
           bdmMarker: null,
           tier2Result: null,
+          deferredUntil: null,
+          deferredReason: null,
           gccMemory,
         });
 
@@ -551,6 +553,8 @@ export async function registerRoutes(
         await storage.updateWorkOrder(req.params.id, {
           status: "completed",
           bdmMarker: null,
+          deferredUntil: null,
+          deferredReason: null,
           gccMemory,
         });
 
@@ -567,6 +571,99 @@ export async function registerRoutes(
       }
     } catch (err) {
       res.status(500).json({ message: "Failed to unblock work order" });
+    }
+  });
+
+  const deferSchema = z.object({
+    reason: z.string().min(1, "A reason for deferring is required"),
+    deferUntil: z.string().min(1, "A defer-until date is required"),
+  });
+
+  app.post("/api/work-orders/:id/defer", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const parsed = deferSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { reason, deferUntil } = parsed.data;
+
+      const deferDate = new Date(deferUntil);
+      if (isNaN(deferDate.getTime())) {
+        return res.status(400).json({ message: "Invalid date format for deferUntil" });
+      }
+      if (deferDate <= new Date()) {
+        return res.status(400).json({ message: "Defer date must be in the future" });
+      }
+
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      if (order.status !== "blocked" && order.status !== "awaiting_operator" && order.status !== "failed") {
+        return res.status(400).json({ message: `Cannot defer order in '${order.status}' status — only blocked, awaiting_operator, or failed orders can be deferred` });
+      }
+
+      const now = new Date().toISOString();
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      const actor = getActor(req);
+
+      const commitId = `gcc-${Math.random().toString(16).slice(2, 10)}`;
+      const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || []), "hitl_defer"];
+      const commitIndex = [...(gcc["gcc.commit_index"] || [])];
+      commitIndex.push({
+        commit_id: commitId,
+        timestamp: now,
+        summary: `HITL defer until ${deferDate.toISOString().split("T")[0]}: ${reason.slice(0, 60)}`,
+        command: "COMMIT",
+      });
+      const logEntries = [...(gcc["gcc.log"] || [])];
+      logEntries.push({
+        timestamp: now,
+        type: "COMMIT",
+        commit_id: commitId,
+        detail: `HITL operator deferred decision. Reason: ${reason}. Until: ${deferDate.toISOString()}`,
+      });
+
+      const gccMemory: Record<string, any> = {
+        "gcc.project_id": gcc["gcc.project_id"] || `wo-${order.correlationId.slice(0, 8)}`,
+        "gcc.branch": gcc["gcc.branch"] || "main",
+        "gcc.tier": "tier1",
+        "gcc.commit_index": commitIndex.slice(-100),
+        "gcc.last_commit_id": commitId,
+        "gcc.last_commit_summary": `HITL defer: ${reason.slice(0, 80)}`,
+        "gcc.log": logEntries.slice(-200),
+        "gcc.context_scope": "branch",
+        "gcc.context_commit_count": commitIndex.length,
+        "gcc.breadcrumbs": breadcrumbs.slice(-50),
+        "gcc.last_action": "hitl_defer",
+        "gcc.metadata": {
+          ...(gcc["gcc.metadata"] || {}),
+          deferredAt: now,
+          deferredUntil: deferDate.toISOString(),
+          deferredBy: actor,
+          deferReason: reason,
+        },
+      };
+
+      await storage.updateWorkOrder(req.params.id, {
+        status: "deferred",
+        deferredUntil: deferDate,
+        deferredReason: reason,
+        gccMemory,
+      });
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "HITL Defer",
+        message: `Deferred by ${actor.actorName} until ${deferDate.toLocaleDateString()}. Reason: ${reason}`,
+        metadata: { commitId, deferUntil: deferDate.toISOString(), actor },
+      });
+
+      const updated = await storage.getWorkOrder(req.params.id);
+      res.json({ ...updated, deferred: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to defer work order" });
     }
   });
 
@@ -1885,7 +1982,7 @@ export async function registerRoutes(
 === WORK ORDER OVERVIEW ===
 Statistics:
 - Total: ${stats.total} | Pending: ${stats.pending} | Processing: ${stats.processing}
-- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed} | Reopened: ${stats.reopened}
+- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed} | Reopened: ${stats.reopened} | Deferred: ${stats.deferred}
 
 All Work Orders (${workOrders.length} total):
 ${recentOrders.map(o => `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""})`).join("\n") || "No work orders"}

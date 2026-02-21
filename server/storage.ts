@@ -94,6 +94,7 @@ export interface IStorage {
     blocked: number;
     failed: number;
     reopened: number;
+    deferred: number;
   }>;
   createWorkOrder(order: InsertWorkOrder): Promise<WorkOrder>;
   updateWorkOrder(id: string, updates: Partial<WorkOrder>): Promise<WorkOrder | undefined>;
@@ -271,6 +272,7 @@ export class DatabaseStorage implements IStorage {
       failed: 0,
       awaiting_operator: 0,
       reopened: 0,
+      deferred: 0,
     };
     for (const order of allOrders) {
       if (order.status in stats) {

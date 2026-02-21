@@ -43,6 +43,8 @@ import {
   Pencil,
   Save,
   X,
+  CalendarClock,
+  ArrowRightCircle,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
 import { useState } from "react";
@@ -275,6 +277,9 @@ export default function WorkOrderDetail() {
   const [closeReason, setCloseReason] = useState("");
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
+  const [deferDialogOpen, setDeferDialogOpen] = useState(false);
+  const [deferReason, setDeferReason] = useState("");
+  const [deferUntil, setDeferUntil] = useState("");
 
   const reopenMutation = useMutation({
     mutationFn: (reason: string) =>
@@ -337,6 +342,27 @@ export default function WorkOrderDetail() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to close work order.", variant: "destructive" });
+    },
+  });
+
+  const deferMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${params.id}/defer`, {
+        reason: deferReason,
+        deferUntil: deferUntil,
+      }),
+    onSuccess: () => {
+      invalidateOrderQueries();
+      setDeferDialogOpen(false);
+      setDeferReason("");
+      setDeferUntil("");
+      toast({
+        title: "Decision deferred",
+        description: "Work order deferred until the selected date.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to defer work order.", variant: "destructive" });
     },
   });
 
@@ -463,7 +489,7 @@ export default function WorkOrderDetail() {
                   {processMutation.isPending ? "Processing..." : "Process"}
                 </Button>
               )}
-              {order.status === "blocked" && order.bdmMarker && (
+              {(order.status === "blocked" || order.status === "deferred") && (
                 <>
                   <Button
                     onClick={() => reissueMutation.mutate()}
@@ -473,9 +499,9 @@ export default function WorkOrderDetail() {
                     {reissueMutation.isPending ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
+                      <ArrowRightCircle className="w-4 h-4 mr-2" />
                     )}
-                    {reissueMutation.isPending ? "Re-issuing..." : "Re-issue to Aiden"}
+                    {reissueMutation.isPending ? "Overriding..." : "Override & Continue"}
                   </Button>
                   <Button
                     variant="outline"
@@ -486,22 +512,64 @@ export default function WorkOrderDetail() {
                     data-testid="button-close-order"
                   >
                     <XCircle className="w-4 h-4 mr-2" />
-                    Close Without Output
+                    Close Without Processing
                   </Button>
+                  {order.status === "blocked" && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setDeferReason("");
+                        setDeferUntil("");
+                        setDeferDialogOpen(true);
+                      }}
+                      data-testid="button-defer"
+                    >
+                      <CalendarClock className="w-4 h-4 mr-2" />
+                      Defer Decision
+                    </Button>
+                  )}
                 </>
               )}
               {order.status === "failed" && (
+                <>
+                  <Button
+                    onClick={() => retryMutation.mutate()}
+                    disabled={retryMutation.isPending}
+                    data-testid="button-retry"
+                  >
+                    {retryMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                    )}
+                    {retryMutation.isPending ? "Retrying..." : "Retry"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDeferReason("");
+                      setDeferUntil("");
+                      setDeferDialogOpen(true);
+                    }}
+                    data-testid="button-defer-failed"
+                  >
+                    <CalendarClock className="w-4 h-4 mr-2" />
+                    Defer Decision
+                  </Button>
+                </>
+              )}
+              {order.status === "awaiting_operator" && (
                 <Button
-                  onClick={() => retryMutation.mutate()}
-                  disabled={retryMutation.isPending}
-                  data-testid="button-retry"
+                  variant="outline"
+                  onClick={() => {
+                    setDeferReason("");
+                    setDeferUntil("");
+                    setDeferDialogOpen(true);
+                  }}
+                  data-testid="button-defer-awaiting"
                 >
-                  {retryMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                  )}
-                  {retryMutation.isPending ? "Retrying..." : "Retry"}
+                  <CalendarClock className="w-4 h-4 mr-2" />
+                  Defer Decision
                 </Button>
               )}
             </>
@@ -549,6 +617,65 @@ export default function WorkOrderDetail() {
                 <XCircle className="w-4 h-4 mr-2" />
               )}
               {closeMutation.isPending ? "Closing..." : "Close Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deferDialogOpen} onOpenChange={setDeferDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="w-5 h-5 text-sky-600" />
+              Defer Decision
+            </DialogTitle>
+            <DialogDescription>
+              Defer the decision on this work order to a future date. The order will be placed on hold until then. You can override or close it at any time before the defer date.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="defer-until">Review Date</Label>
+              <Input
+                id="defer-until"
+                type="date"
+                value={deferUntil}
+                min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
+                onChange={(e) => setDeferUntil(e.target.value)}
+                data-testid="input-defer-until"
+              />
+              <p className="text-xs text-muted-foreground">When should this work order be revisited?</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="defer-reason">Reason for Deferral</Label>
+              <Textarea
+                id="defer-reason"
+                value={deferReason}
+                onChange={(e) => setDeferReason(e.target.value)}
+                placeholder="e.g., Waiting for vendor response, pending budget approval, need more information..."
+                className="min-h-[100px]"
+                data-testid="input-defer-reason"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeferDialogOpen(false)} data-testid="button-cancel-defer">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => deferMutation.mutate()}
+              disabled={deferMutation.isPending || deferReason.trim().length === 0 || !deferUntil}
+              data-testid="button-confirm-defer"
+            >
+              {deferMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CalendarClock className="w-4 h-4 mr-2" />
+              )}
+              {deferMutation.isPending ? "Deferring..." : "Defer Decision"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -624,7 +751,41 @@ export default function WorkOrderDetail() {
                 <BlockedSummary order={order} />
               )}
 
-              {order.status !== "blocked" && order.bdmMarker && (
+              {order.status === "deferred" && (
+                <div className="rounded-md border border-sky-200 dark:border-sky-800/40 overflow-hidden" data-testid="deferred-summary">
+                  <div className="flex items-start gap-3 p-4 bg-sky-50 dark:bg-sky-900/10">
+                    <CalendarClock className="w-5 h-5 text-sky-600 dark:text-sky-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1 min-w-0">
+                      <p className="text-sm font-medium text-sky-700 dark:text-sky-400">
+                        Decision Deferred
+                      </p>
+                      <p className="text-sm text-sky-600 dark:text-sky-300">
+                        {order.deferredReason || "No reason provided"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="px-4 py-3 bg-sky-50/50 dark:bg-sky-900/5 space-y-2">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                      {order.deferredUntil && (
+                        <span>Review date: <span className="font-medium text-foreground">{new Date(order.deferredUntil).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span></span>
+                      )}
+                    </div>
+                    {order.deferredUntil && new Date(order.deferredUntil) <= new Date() && (
+                      <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        <AlertTriangle className="w-3 h-3" />
+                        Defer date has passed — this order is ready for review
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-4 py-3 border-t border-sky-100 dark:border-sky-800/20 bg-muted/30">
+                    <p className="text-xs text-muted-foreground">
+                      Use "Override & Continue" to resume processing, or "Close Without Processing" if no longer needed.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {order.status !== "blocked" && order.status !== "deferred" && order.bdmMarker && (
                 <div className="p-3 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/10 dark:border-amber-800/30">
                   <div className="flex items-center gap-2 mb-1">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />

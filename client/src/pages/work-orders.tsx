@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Link } from "wouter";
 import { useState } from "react";
-import { Search, Plus, ClipboardList, AlertTriangle, RefreshCw, XCircle, Eye, Loader2, UserCheck } from "lucide-react";
+import { Search, Plus, ClipboardList, AlertTriangle, RefreshCw, XCircle, Eye, Loader2, UserCheck, CalendarClock } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -50,7 +50,7 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
   const [actioningId, setActioningId] = useState<string | null>(null);
 
   const attentionOrders = orders.filter(o =>
-    o.status === "blocked" || o.status === "awaiting_operator" || o.status === "failed"
+    o.status === "blocked" || o.status === "awaiting_operator" || o.status === "failed" || o.status === "deferred"
   );
 
   const reissueMutation = useMutation({
@@ -62,7 +62,7 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
-      toast({ title: "Re-issued to Aiden", description: "Work order cleared and re-submitted." });
+      toast({ title: "Override & Continue", description: "Block overridden — work order re-submitted for processing." });
       setActioningId(null);
     },
     onError: () => {
@@ -90,6 +90,7 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
   const blockedCount = attentionOrders.filter(o => o.status === "blocked").length;
   const awaitingCount = attentionOrders.filter(o => o.status === "awaiting_operator").length;
   const failedCount = attentionOrders.filter(o => o.status === "failed").length;
+  const deferredCount = attentionOrders.filter(o => o.status === "deferred").length;
 
   return (
     <Card className="border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-900/10" data-testid="banner-needs-attention">
@@ -106,6 +107,7 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
             {blockedCount > 0 && <span>{blockedCount} blocked</span>}
             {awaitingCount > 0 && <span>{awaitingCount} awaiting</span>}
             {failedCount > 0 && <span>{failedCount} failed</span>}
+            {deferredCount > 0 && <span>{deferredCount} deferred</span>}
           </div>
         </div>
         <div className="space-y-1.5">
@@ -191,6 +193,39 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
                     <Badge variant="outline" className="border-transparent bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate text-[10px] h-6">
                       <UserCheck className="w-3 h-3 mr-1" />
                       Awaiting
+                    </Badge>
+                  )}
+                  {canAct && order.status === "deferred" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 text-xs px-2.5"
+                          disabled={isActioning}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActioningId(order.id);
+                            reissueMutation.mutate(order.id);
+                          }}
+                          data-testid={`button-quick-override-${order.id}`}
+                        >
+                          {isActioning && reissueMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                          )}
+                          Override
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="text-xs">Override deferral and continue processing</p></TooltipContent>
+                    </Tooltip>
+                  )}
+                  {!canAct && order.status === "deferred" && order.deferredUntil && (
+                    <Badge variant="outline" className="border-transparent bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 no-default-hover-elevate no-default-active-elevate text-[10px] h-6">
+                      <CalendarClock className="w-3 h-3 mr-1" />
+                      Until {new Date(order.deferredUntil).toLocaleDateString()}
                     </Badge>
                   )}
                   <Tooltip>
@@ -297,6 +332,7 @@ export default function WorkOrders() {
                 <SelectItem value="blocked">Blocked</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
                 <SelectItem value="awaiting_operator">Awaiting Operator</SelectItem>
+                <SelectItem value="deferred">Deferred</SelectItem>
                 <SelectItem value="reopened">Reopened</SelectItem>
               </SelectContent>
             </Select>

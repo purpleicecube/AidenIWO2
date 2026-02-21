@@ -49,6 +49,8 @@ export const workOrders = pgTable("work_orders", {
   effectiveMode: text("effective_mode"),
   impactScore: integer("impact_score"),
   approvalStatus: text("approval_status"),
+  deferredUntil: timestamp("deferred_until"),
+  deferredReason: text("deferred_reason"),
   submittedBy: text("submitted_by").default("system"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

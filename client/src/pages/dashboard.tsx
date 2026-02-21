@@ -18,6 +18,7 @@ import {
   GitBranch,
   Wrench,
   RotateCcw,
+  CalendarClock,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import type { WorkOrder, WorkflowExecution, Tool } from "@shared/schema";
@@ -31,6 +32,7 @@ interface DashboardStats {
   failed: number;
   awaiting_operator: number;
   reopened: number;
+  deferred: number;
 }
 
 function StatCard({
@@ -179,6 +181,13 @@ export default function Dashboard() {
             icon={AlertTriangle}
             description="Requires attention"
             iconClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+          />
+          <StatCard
+            title="Deferred"
+            value={stats.deferred}
+            icon={CalendarClock}
+            description="Decision postponed"
+            iconClass="bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
           />
         </div>
       ) : null}
