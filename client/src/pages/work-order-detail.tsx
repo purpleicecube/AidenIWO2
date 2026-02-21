@@ -45,9 +45,12 @@ import {
   X,
   CalendarClock,
   ArrowRightCircle,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { ExpandablePanel } from "@/components/expandable-panel";
 
 function DetailSkeleton() {
@@ -193,7 +196,11 @@ function BlockedSummary({ order }: { order: WorkOrder }) {
 export default function WorkOrderDetail() {
   const params = useParams<{ id: string }>();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [copied, setCopied] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
 
   const { data: order, isLoading: orderLoading } = useQuery<WorkOrder>({
     queryKey: ["/api/work-orders", params.id],
@@ -305,6 +312,7 @@ export default function WorkOrderDetail() {
     queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
     queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
     queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/work-orders?includeArchived=true"] });
   };
 
   const reissueMutation = useMutation({
@@ -363,6 +371,33 @@ export default function WorkOrderDetail() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to defer work order.", variant: "destructive" });
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${params.id}/archive`, {
+        reason: archiveReason,
+      }),
+    onSuccess: () => {
+      invalidateOrderQueries();
+      setArchiveDialogOpen(false);
+      setArchiveReason("");
+      toast({ title: "Archived", description: "Work order has been archived." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to archive work order.", variant: "destructive" });
+    },
+  });
+
+  const unarchiveMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/work-orders/${params.id}/unarchive`),
+    onSuccess: () => {
+      invalidateOrderQueries();
+      toast({ title: "Restored", description: "Work order has been restored from archive." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to restore work order.", variant: "destructive" });
     },
   });
 
@@ -572,10 +607,60 @@ export default function WorkOrderDetail() {
                   Defer Decision
                 </Button>
               )}
+              {isAdmin && !order.isArchived && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setArchiveReason("");
+                    setArchiveDialogOpen(true);
+                  }}
+                  data-testid="button-archive"
+                >
+                  <Archive className="w-4 h-4 mr-2" />
+                  Archive
+                </Button>
+              )}
+              {isAdmin && order.isArchived && (
+                <Button
+                  variant="outline"
+                  onClick={() => unarchiveMutation.mutate()}
+                  disabled={unarchiveMutation.isPending}
+                  data-testid="button-unarchive"
+                >
+                  {unarchiveMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <ArchiveRestore className="w-4 h-4 mr-2" />
+                  )}
+                  {unarchiveMutation.isPending ? "Restoring..." : "Restore from Archive"}
+                </Button>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {order.isArchived && (
+        <Card className="border-muted bg-muted/30" data-testid="archived-banner">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Archive className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">This work order is archived</span>
+              {order.archivedBy && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  by {order.archivedBy}
+                  {order.archivedAt && ` on ${new Date(order.archivedAt).toLocaleDateString()}`}
+                </span>
+              )}
+            </div>
+            {order.archivedReason && (
+              <p className="text-xs text-muted-foreground mt-1.5 ml-6">
+                Reason: {order.archivedReason}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -721,6 +806,47 @@ export default function WorkOrderDetail() {
                 <RotateCcw className="w-4 h-4 mr-2" />
               )}
               {reopenMutation.isPending ? "Reopening..." : "Reopen Work Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5" />
+              Archive Work Order
+            </DialogTitle>
+            <DialogDescription>
+              This will hide the work order from dashboards and active lists. It can be restored later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="archive-reason">Reason for archiving</Label>
+            <Textarea
+              id="archive-reason"
+              placeholder="e.g. Completed and no longer relevant..."
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+              data-testid="input-archive-reason"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveDialogOpen(false)} data-testid="button-cancel-archive">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => archiveMutation.mutate()}
+              disabled={archiveMutation.isPending || archiveReason.trim().length === 0}
+              data-testid="button-confirm-archive"
+            >
+              {archiveMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Archive className="w-4 h-4 mr-2" />
+              )}
+              {archiveMutation.isPending ? "Archiving..." : "Archive"}
             </Button>
           </DialogFooter>
         </DialogContent>

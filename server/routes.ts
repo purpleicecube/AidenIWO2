@@ -204,9 +204,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/work-orders", isAuth, requireRole("viewer"), async (_req, res) => {
+  app.get("/api/work-orders", isAuth, requireRole("viewer"), async (req, res) => {
     try {
-      const orders = await storage.getWorkOrders();
+      const includeArchived = req.query.includeArchived === "true";
+      const orders = await storage.getWorkOrders(includeArchived);
       res.json(orders);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch work orders" });
@@ -737,6 +738,92 @@ export async function registerRoutes(
       res.json({ ...updated, deferred: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to defer work order" });
+    }
+  });
+
+  // ==================== Archive / Unarchive ====================
+
+  const archiveSchema = z.object({
+    reason: z.string().min(1, "Reason is required").max(500),
+  });
+
+  app.post("/api/work-orders/:id/archive", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = archiveSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten().fieldErrors });
+      }
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      if (order.isArchived) return res.status(400).json({ message: "Work order is already archived" });
+
+      const actor = getActor(req);
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, order.correlationId, "archived",
+        `Archived by ${actor.actorName}`,
+        `Work order archived by ${actor.actorName}. Reason: ${parsed.data.reason}`,
+        { archivedAt: new Date().toISOString(), archivedBy: actor, archiveReason: parsed.data.reason },
+      );
+
+      await storage.updateWorkOrder(req.params.id, {
+        isArchived: true,
+        archivedAt: new Date(),
+        archivedBy: actor.actorName,
+        archivedReason: parsed.data.reason,
+        gccMemory,
+      });
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Archived",
+        message: `Work order archived by ${actor.actorName}. Reason: ${parsed.data.reason}`,
+        metadata: { actor, reason: parsed.data.reason, commitId },
+      });
+
+      const updated = await storage.getWorkOrder(req.params.id);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to archive work order" });
+    }
+  });
+
+  app.post("/api/work-orders/:id/unarchive", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      if (!order.isArchived) return res.status(400).json({ message: "Work order is not archived" });
+
+      const actor = getActor(req);
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, order.correlationId, "unarchived",
+        `Unarchived by ${actor.actorName}`,
+        `Work order restored from archive by ${actor.actorName}`,
+        { unarchivedAt: new Date().toISOString(), unarchivedBy: actor },
+      );
+
+      await storage.updateWorkOrder(req.params.id, {
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null,
+        archivedReason: null,
+        gccMemory,
+      });
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Unarchived",
+        message: `Work order restored from archive by ${actor.actorName}`,
+        metadata: { actor, commitId },
+      });
+
+      const updated = await storage.getWorkOrder(req.params.id);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to unarchive work order" });
     }
   });
 

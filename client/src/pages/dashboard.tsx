@@ -19,6 +19,7 @@ import {
   Wrench,
   RotateCcw,
   CalendarClock,
+  Archive,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import type { WorkOrder, WorkflowExecution, Tool } from "@shared/schema";
@@ -33,6 +34,7 @@ interface DashboardStats {
   awaiting_operator: number;
   reopened: number;
   deferred: number;
+  archived: number;
 }
 
 function StatCard({
@@ -188,6 +190,13 @@ export default function Dashboard() {
             icon={CalendarClock}
             description="Decision postponed"
             iconClass="bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
+          />
+          <StatCard
+            title="Archived"
+            value={stats.archived}
+            icon={Archive}
+            description="Removed from active view"
+            iconClass="bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-400"
           />
         </div>
       ) : null}

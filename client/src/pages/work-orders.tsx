@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Link } from "wouter";
 import { useState } from "react";
-import { Search, Plus, ClipboardList, AlertTriangle, RefreshCw, XCircle, Eye, Loader2, UserCheck, CalendarClock } from "lucide-react";
+import { Search, Plus, ClipboardList, AlertTriangle, RefreshCw, XCircle, Eye, Loader2, UserCheck, CalendarClock, Archive } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -61,6 +62,7 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders?includeArchived=true"] });
       queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
       toast({ title: "Override & Continue", description: "Block overridden — work order re-submitted for processing." });
       setActioningId(null);
@@ -75,6 +77,7 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
     mutationFn: (id: string) => apiRequest("POST", `/api/work-orders/${id}/retry`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders?includeArchived=true"] });
       queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
       toast({ title: "Retrying", description: "Work order re-submitted for processing." });
       setActioningId(null);
@@ -263,12 +266,15 @@ export default function WorkOrders() {
   usePageTitle("Work Orders");
   const { user } = useAuth();
   const canSubmit = user?.role === "admin" || user?.role === "operator";
+  const isAdmin = user?.role === "admin";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
 
+  const includeArchived = showArchived || statusFilter === "archived";
   const { data: workOrders, isLoading } = useQuery<WorkOrder[]>({
-    queryKey: ["/api/work-orders"],
+    queryKey: [includeArchived ? "/api/work-orders?includeArchived=true" : "/api/work-orders"],
   });
 
   const filteredOrders = workOrders?.filter((order) => {
@@ -278,10 +284,13 @@ export default function WorkOrders() {
       order.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.correlationId.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesStatus = statusFilter === "all" ? true
+      : statusFilter === "archived" ? order.isArchived
+      : order.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || order.priority === priorityFilter;
+    const matchesArchive = statusFilter === "archived" ? true : !order.isArchived;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesPriority && matchesArchive;
   });
 
   return (
@@ -334,6 +343,7 @@ export default function WorkOrders() {
                 <SelectItem value="awaiting_operator">Awaiting Operator</SelectItem>
                 <SelectItem value="deferred">Deferred</SelectItem>
                 <SelectItem value="reopened">Reopened</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -369,14 +379,24 @@ export default function WorkOrders() {
                     data-testid={`row-work-order-${order.id}`}
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{order.title}</p>
+                      <p className={`text-sm font-medium truncate ${order.isArchived ? "text-muted-foreground" : ""}`}>
+                        {order.isArchived && <Archive className="w-3 h-3 inline mr-1.5 opacity-50" />}
+                        {order.title}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {order.correlationId.slice(0, 8)}...
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground capitalize">{order.type}</span>
                     <PriorityBadge priority={order.priority} />
-                    <StatusBadge status={order.status} />
+                    {order.isArchived ? (
+                      <Badge variant="outline" className="text-xs">
+                        <Archive className="w-3 h-3 mr-1" />
+                        Archived
+                      </Badge>
+                    ) : (
+                      <StatusBadge status={order.status} />
+                    )}
                     <span className="text-xs text-muted-foreground">
                       {new Date(order.createdAt).toLocaleDateString()}
                     </span>

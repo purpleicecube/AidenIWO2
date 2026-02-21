@@ -83,7 +83,7 @@ export interface IStorage {
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
 
-  getWorkOrders(): Promise<WorkOrder[]>;
+  getWorkOrders(includeArchived?: boolean): Promise<WorkOrder[]>;
   getWorkOrder(id: string): Promise<WorkOrder | undefined>;
   getRecentWorkOrders(limit?: number): Promise<WorkOrder[]>;
   getWorkOrderStats(): Promise<{
@@ -95,6 +95,7 @@ export interface IStorage {
     failed: number;
     reopened: number;
     deferred: number;
+    archived: number;
   }>;
   createWorkOrder(order: InsertWorkOrder): Promise<WorkOrder>;
   updateWorkOrder(id: string, updates: Partial<WorkOrder>): Promise<WorkOrder | undefined>;
@@ -248,8 +249,11 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getWorkOrders(): Promise<WorkOrder[]> {
-    return db.select().from(workOrders).orderBy(desc(workOrders.createdAt));
+  async getWorkOrders(includeArchived = false): Promise<WorkOrder[]> {
+    if (includeArchived) {
+      return db.select().from(workOrders).orderBy(desc(workOrders.createdAt));
+    }
+    return db.select().from(workOrders).where(eq(workOrders.isArchived, false)).orderBy(desc(workOrders.createdAt));
   }
 
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
@@ -258,13 +262,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentWorkOrders(limit = 8): Promise<WorkOrder[]> {
-    return db.select().from(workOrders).orderBy(desc(workOrders.createdAt)).limit(limit);
+    return db.select().from(workOrders).where(eq(workOrders.isArchived, false)).orderBy(desc(workOrders.createdAt)).limit(limit);
   }
 
   async getWorkOrderStats() {
     const allOrders = await db.select().from(workOrders);
+    const activeOrders = allOrders.filter(o => !o.isArchived);
     const stats = {
-      total: allOrders.length,
+      total: activeOrders.length,
       pending: 0,
       processing: 0,
       completed: 0,
@@ -273,8 +278,9 @@ export class DatabaseStorage implements IStorage {
       awaiting_operator: 0,
       reopened: 0,
       deferred: 0,
+      archived: allOrders.filter(o => o.isArchived).length,
     };
-    for (const order of allOrders) {
+    for (const order of activeOrders) {
       if (order.status in stats) {
         (stats as any)[order.status]++;
       }
