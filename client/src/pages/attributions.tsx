@@ -191,7 +191,7 @@ export default function AttributionsPage() {
                 <div className="rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 p-3 mb-3">
                   <p className="text-xs font-semibold text-rose-800 dark:text-rose-300 mb-1">PRECEDENCE NOTE</p>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Darrel Vaughn began Agent Commander (multi-agent orchestration framework) architecture planning in Jun 2024, with prompt language, infrastructure, and multi-agent team structure built through Aug 2024 — all prior to the introduction of the Aiden Zephyr concept.
+                    Darrel Vaughn began Agent Commander (multi-agent orchestration framework) architecture planning in Jun 2024, with prompt language, infrastructure, and multi-agent team structure built through Aug 2024 — most of this work prior to the introduction of the Aiden Zephyr concept.
                   </p>
                 </div>
                 <div className="flex gap-3"><span className="text-xs font-mono w-24 shrink-0 text-right">Late 2024</span><span>Aiden Zephyr agentic concepts evolved (Appling)</span></div>
