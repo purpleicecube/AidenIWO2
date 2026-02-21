@@ -49,6 +49,7 @@ import {
   FileJson,
   File,
   Save,
+  GripVertical,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
 import { ExpandablePanel } from "@/components/expandable-panel";
@@ -106,6 +107,9 @@ export default function WorkspacePage() {
   const [newFileContent, setNewFileContent] = useState("");
   const [editContent, setEditContent] = useState("");
   const [renameFolderName, setRenameFolderName] = useState("");
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
+  const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
+  const [isDraggingOverParent, setIsDraggingOverParent] = useState(false);
 
   const folderQueryKey = currentFolderId
     ? ["/api/artifact-folders", { parentId: currentFolderId }]
@@ -206,6 +210,71 @@ export default function WorkspacePage() {
     },
   });
 
+  const moveFileMutation = useMutation({
+    mutationFn: ({ id, folderId }: { id: string; folderId: string | null }) =>
+      apiRequest("PUT", `/api/artifacts/${id}`, { folderId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/artifacts"] });
+      toast({ title: "File moved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to move file", variant: "destructive" });
+    },
+  });
+
+  const handleDragStart = (e: React.DragEvent, fileId: string) => {
+    e.dataTransfer.setData("text/plain", fileId);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedFileId(fileId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedFileId(null);
+    setDropTargetFolderId(null);
+    setIsDraggingOverParent(false);
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTargetFolderId(folderId);
+  };
+
+  const handleFolderDragLeave = () => {
+    setDropTargetFolderId(null);
+  };
+
+  const handleFolderDrop = (e: React.DragEvent, targetFolderId: string) => {
+    e.preventDefault();
+    const fileId = e.dataTransfer.getData("text/plain");
+    if (fileId) {
+      moveFileMutation.mutate({ id: fileId, folderId: targetFolderId });
+    }
+    setDropTargetFolderId(null);
+    setDraggedFileId(null);
+  };
+
+  const handleParentDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setIsDraggingOverParent(true);
+  };
+
+  const handleParentDragLeave = () => {
+    setIsDraggingOverParent(false);
+  };
+
+  const handleParentDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const fileId = e.dataTransfer.getData("text/plain");
+    if (fileId && breadcrumbs.length > 1) {
+      const parentFolderId = breadcrumbs[breadcrumbs.length - 2].id;
+      moveFileMutation.mutate({ id: fileId, folderId: parentFolderId });
+    }
+    setIsDraggingOverParent(false);
+    setDraggedFileId(null);
+  };
+
   const navigateToFolder = (folder: ArtifactFolder) => {
     setCurrentFolderId(folder.id);
     setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.name }]);
@@ -272,36 +341,64 @@ export default function WorkspacePage() {
         <div className="p-4 border-b sticky top-0 z-10 bg-background">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
-              {breadcrumbs.map((crumb, i) => (
-                <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />}
-                  <button
-                    onClick={() => navigateToBreadcrumb(i)}
-                    className="text-sm hover-elevate rounded px-1.5 py-0.5 truncate max-w-[160px]"
-                    data-testid={`breadcrumb-${i}`}
-                  >
-                    {i === 0 ? (
-                      <span className="flex items-center gap-1">
-                        <Home className="w-3.5 h-3.5" />
-                        <span>{crumb.name}</span>
-                      </span>
-                    ) : (
-                      crumb.name
-                    )}
-                  </button>
-                </div>
-              ))}
+              {breadcrumbs.map((crumb, i) => {
+                const isLastBreadcrumb = i === breadcrumbs.length - 1;
+                const isBreadcrumbDropTarget = draggedFileId && !isLastBreadcrumb;
+                return (
+                  <div key={i} className="flex items-center gap-1">
+                    {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />}
+                    <button
+                      onClick={() => navigateToBreadcrumb(i)}
+                      onDragOver={(e) => {
+                        if (isBreadcrumbDropTarget) {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }
+                      }}
+                      onDrop={(e) => {
+                        if (isBreadcrumbDropTarget) {
+                          e.preventDefault();
+                          const fileId = e.dataTransfer.getData("text/plain");
+                          if (fileId) {
+                            moveFileMutation.mutate({ id: fileId, folderId: crumb.id });
+                          }
+                          setDraggedFileId(null);
+                        }
+                      }}
+                      className={`text-sm hover-elevate rounded px-1.5 py-0.5 truncate max-w-[160px] transition-all duration-150 ${
+                        isBreadcrumbDropTarget ? "ring-1 ring-primary/50 bg-primary/5" : ""
+                      }`}
+                      data-testid={`breadcrumb-${i}`}
+                    >
+                      {i === 0 ? (
+                        <span className="flex items-center gap-1">
+                          <Home className="w-3.5 h-3.5" />
+                          <span>{crumb.name}</span>
+                        </span>
+                      ) : (
+                        crumb.name
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
             <div className="flex items-center gap-2">
               {breadcrumbs.length > 1 && (
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant={isDraggingOverParent ? "default" : "ghost"}
+                  className={`transition-all duration-150 ${
+                    isDraggingOverParent ? "ring-2 ring-primary scale-105" : ""
+                  }`}
                   onClick={() => navigateToBreadcrumb(breadcrumbs.length - 2)}
+                  onDragOver={handleParentDragOver}
+                  onDragLeave={handleParentDragLeave}
+                  onDrop={handleParentDrop}
                   data-testid="button-go-back"
                 >
                   <ArrowLeft className="w-4 h-4 mr-1" />
-                  Back
+                  {draggedFileId ? "Drop here to move up" : "Back"}
                 </Button>
               )}
               <DropdownMenu>
@@ -379,8 +476,15 @@ export default function WorkspacePage() {
               {folders.map((folder) => (
                 <Card
                   key={folder.id}
-                  className="group p-3 hover-elevate cursor-pointer"
+                  className={`group p-3 hover-elevate cursor-pointer transition-all duration-150 ${
+                    dropTargetFolderId === folder.id
+                      ? "ring-2 ring-primary bg-primary/10 scale-105"
+                      : ""
+                  }`}
                   onClick={() => navigateToFolder(folder)}
+                  onDragOver={(e) => handleFolderDragOver(e, folder.id)}
+                  onDragLeave={handleFolderDragLeave}
+                  onDrop={(e) => handleFolderDrop(e, folder.id)}
                   data-testid={`folder-${folder.id}`}
                 >
                   <div className="flex items-start justify-between gap-1">
@@ -431,15 +535,22 @@ export default function WorkspacePage() {
               {files.map((file) => {
                 const IconComponent = getFileIcon(file.mimeType);
                 const isSelected = selectedArtifact?.id === file.id;
+                const isDragging = draggedFileId === file.id;
                 return (
                   <Card
                     key={file.id}
-                    className={`group p-3 hover-elevate cursor-pointer ${isSelected ? "ring-2 ring-primary" : ""}`}
+                    className={`group p-3 hover-elevate cursor-pointer transition-all duration-150 ${
+                      isSelected ? "ring-2 ring-primary" : ""
+                    } ${isDragging ? "opacity-40 scale-95" : ""}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, file.id)}
+                    onDragEnd={handleDragEnd}
                     onClick={() => setSelectedArtifact(file)}
                     data-testid={`file-${file.id}`}
                   >
                     <div className="flex items-start justify-between gap-1">
-                      <div className="flex flex-col items-center w-full text-center">
+                      <div className="flex flex-col items-center w-full text-center relative">
+                        <GripVertical className="w-3 h-3 text-muted-foreground/40 absolute -left-1 top-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         <IconComponent className="w-10 h-10 text-muted-foreground mb-2 shrink-0" />
                         <span className="text-xs font-medium truncate w-full" title={file.name}>
                           {file.name}
