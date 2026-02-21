@@ -28,7 +28,7 @@ import {
 } from "@shared/schema";
 import type { LlmSettings } from "@shared/schema";
 import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
-import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig } from "./llm-client";
+import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig, extractWorkOrderFromChat } from "./llm-client";
 
 const startTime = Date.now();
 
@@ -2255,10 +2255,13 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
       const userRole = (req as any).appUser?.role || "viewer";
       const canCreateOrders = userRole === "admin" || userRole === "operator";
 
+      const validTypes = ["general", "technical", "creative", "research", "compliance", "financial", "hr", "operations", "strategic", "process documentation", "process_documentation", "training", "security", "infrastructure"];
+      const validPriorities = ["low", "medium", "high", "critical"];
+
       const lines = reply.split("\n");
       const actionLines: string[] = [];
       const contentLines: string[] = [];
-      const actionLineRegex = /^<!-- AIDEN_ACTION:CREATE_WORK_ORDER:(\{.*\}) -->$/;
+      const actionLineRegex = /^<!--\s*AIDEN_ACTION:CREATE_WORK_ORDER:(\{.*\})\s*-->$/;
       for (const line of lines) {
         const match = line.trim().match(actionLineRegex);
         if (match) {
@@ -2267,55 +2270,78 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
           contentLines.push(line);
         }
       }
+      let extractionMethod = actionLines.length > 0 ? "action_block" : "none";
 
       if (actionLines.length === 0 && canCreateOrders) {
-        const userMsgLower = message.toLowerCase();
-        const replyLower = reply.toLowerCase();
-        const userWantsWorkOrder = /\b(create|open|submit|make|start|raise|file)\b.*\b(work\s*order|wo|ticket|order)\b/i.test(message) ||
-          /\b(work\s*order|wo|ticket)\b.*\b(for|to|about)\b/i.test(message);
-        const aidenDescribesCreation = /\*\*title\*\*/i.test(reply) && /\*\*type\*\*/i.test(reply) && /\*\*priority\*\*/i.test(reply);
+        const titleMatch = reply.match(/\*\*Title\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
+          reply.match(/\bTitle\b[:\s]+([^\n|]+)/im);
+        const descMatch = reply.match(/\*\*Description\s*(?:\/\s*Prompt)?\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
+          reply.match(/\bDescription\b[:\s]+([^\n|]+)/im);
+        const typeMatch = reply.match(/\*\*Type\*\*\s*\|\s*\*?\*?([^\n|*]+)/im) ||
+          reply.match(/\bType\b[:\s]+([^\n|]+)/im);
+        const priorityMatch = reply.match(/\*\*Priority\*\*\s*\|\s*\*?\*?([^\n|*]+)/im) ||
+          reply.match(/\bPriority\b[:\s]+([^\n|]+)/im);
 
-        if (userWantsWorkOrder || aidenDescribesCreation) {
-          const titleMatch = reply.match(/\*\*Title\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
-            reply.match(/Title[:\s]+(.+?)(?:\n|$)/im);
-          const descMatch = reply.match(/\*\*Description\s*(?:\/\s*Prompt)?\*\*\s*\|\s*(.+?)(?:\s*\||\s*$)/im) ||
-            reply.match(/Description[:\s]+(.+?)(?:\n|$)/im);
-          const typeMatch = reply.match(/\*\*Type\*\*\s*\|\s*\*?\*?(.+?)\*?\*?\s*(?:\(.*?\))?\s*(?:\||\s*$)/im) ||
-            reply.match(/Type[:\s]+(.+?)(?:\n|$)/im);
-          const priorityMatch = reply.match(/\*\*Priority\*\*\s*\|\s*\*?\*?(.+?)\*?\*?\s*(?:[\u2013\u2014–—-].*?)?\s*(?:\||\s*$)/im) ||
-            reply.match(/Priority[:\s]+(.+?)(?:\n|$)/im);
-
-          if (titleMatch) {
-            const extracted: Record<string, any> = {
-              title: titleMatch[1].replace(/\*+/g, "").trim(),
-              description: descMatch ? descMatch[1].replace(/\*+/g, "").trim() : "",
-              type: typeMatch ? typeMatch[1].replace(/\*+/g, "").replace(/\(.*?\)/g, "").trim().toLowerCase() : "general",
-              priority: priorityMatch ? priorityMatch[1].replace(/\*+/g, "").replace(/[\u2013\u2014–—-].*/g, "").trim().toLowerCase() : "medium",
-              submittedBy: "aiden",
-              autoProcess: true,
-            };
+        if (titleMatch) {
+          const cleanField = (s: string) => s.replace(/\*+/g, "").replace(/\(.*?\)/g, "").replace(/[\u2013\u2014\u2015–—].*/g, "").trim();
+          const extracted = {
+            title: cleanField(titleMatch[1]),
+            description: descMatch ? cleanField(descMatch[1]) : "",
+            type: typeMatch ? cleanField(typeMatch[1]).toLowerCase().replace(/\s+/g, "_") : "general",
+            priority: priorityMatch ? cleanField(priorityMatch[1]).toLowerCase() : "medium",
+            submittedBy: "aiden",
+            autoProcess: true,
+          };
+          if (extracted.title.length >= 3) {
             actionLines.push(JSON.stringify(extracted));
-            console.log("[Chat Action Fallback] Extracted work order from LLM visible text:", extracted.title);
+            extractionMethod = "regex_fallback";
+            console.log("[Chat Action T2 Regex] Extracted work order:", extracted.title);
+          }
+        }
+      }
+
+      if (actionLines.length === 0 && canCreateOrders) {
+        const userWantsWorkOrder = /\b(create|open|submit|make|start|raise|file|assign)\b.*\b(work\s*order|wo|ticket|order|task)\b/i.test(message) ||
+          /\b(work\s*order|wo|ticket)\b.*\b(for|to|about)\b/i.test(message);
+        const aidenConfirmsCreation = /\b(creat|submit|open|rais|draft)\w*\b.*\b(work\s*order|order|ticket)\b/i.test(reply);
+
+        if (userWantsWorkOrder || aidenConfirmsCreation) {
+          console.log("[Chat Action T3 LLM] User intent or Aiden confirmation detected, running extraction call...");
+          try {
+            const extracted = await extractWorkOrderFromChat(settings, message, reply);
+            if (extracted && extracted.shouldCreate) {
+              actionLines.push(JSON.stringify({
+                ...extracted,
+                submittedBy: "aiden",
+                autoProcess: true,
+              }));
+              extractionMethod = "llm_extraction";
+              console.log("[Chat Action T3 LLM] Extracted work order:", extracted.title);
+            } else {
+              console.log("[Chat Action T3 LLM] Extraction returned shouldCreate=false, skipping.");
+            }
+          } catch (extractErr) {
+            console.error("[Chat Action T3 LLM] Extraction call failed:", extractErr);
           }
         }
       }
 
       if (actionLines.length > 0 && canCreateOrders) {
+        console.log(`[Chat Action] Creating ${actionLines.length} work order(s) via ${extractionMethod}`);
         for (const actionJson of actionLines.slice(0, 3)) {
           try {
             const actionData = JSON.parse(actionJson);
-            const validTypes = ["general", "technical", "creative", "research", "compliance", "financial", "hr", "operations", "strategic", "process documentation", "process_documentation", "training", "security", "infrastructure"];
-            const validPriorities = ["low", "medium", "high", "critical"];
             const safeTitle = String(actionData.title || "Untitled Work Order").slice(0, 200);
             const safeDescription = String(actionData.description || "").slice(0, 5000);
-            const safeType = validTypes.includes(actionData.type) ? actionData.type : "general";
-            const safePriority = validPriorities.includes(actionData.priority) ? actionData.priority : "medium";
+            const normalizedType = String(actionData.type || "general").toLowerCase().replace(/\s+/g, "_");
+            const safeType = validTypes.includes(normalizedType) || validTypes.includes(normalizedType.replace(/_/g, " ")) ? normalizedType : "general";
+            const safePriority = validPriorities.includes(String(actionData.priority || "").toLowerCase()) ? String(actionData.priority).toLowerCase() : "medium";
 
             const { gccMemory: initialGcc, commitId: woCommitId } = buildGccCommit(
               {}, "new", "created_via_chat",
               `Work order created via chat by ${actor.actorName}`,
               `Aiden created work order "${safeTitle}" during chat session ${sessionId}`,
-              { submittedBy: { ...actor, source: "aiden_chat" }, chatSessionId: sessionId },
+              { submittedBy: { ...actor, source: "aiden_chat" }, chatSessionId: sessionId, extractionMethod },
             );
 
             const orderData = {
@@ -2331,8 +2357,8 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
               workOrderId: newOrder.id,
               tier: 1,
               action: "Submitted via Chat",
-              message: `Work order created by Aiden during chat with ${actor.actorName}`,
-              metadata: { actor, chatSessionId: sessionId, source: "aiden_chat", commitId: woCommitId },
+              message: `Work order created by Aiden during chat with ${actor.actorName} [${extractionMethod}]`,
+              metadata: { actor, chatSessionId: sessionId, source: "aiden_chat", commitId: woCommitId, extractionMethod },
             });
 
             let autoProcessed = false;
@@ -2370,7 +2396,7 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
             reply = reply.replaceAll("{{WORK_ORDER_ID}}", newOrder.id);
             reply = reply.replaceAll("{{CORRELATION_ID}}", newOrder.correlationId);
           } catch (parseErr) {
-            console.error("Failed to parse chat action:", parseErr);
+            console.error("Failed to parse/create chat action:", parseErr);
           }
         }
       } else {

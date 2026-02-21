@@ -314,39 +314,16 @@ You are Aiden, the intelligent Tier 1 orchestration manager for the AIDEN_PTIB p
 
 Respond in natural language (not JSON). Use markdown formatting when helpful for readability.
 
-## CRITICAL: CREATING WORK ORDERS
-When the operator asks you to create, open, or submit a work order, you MUST emit a special hidden action block. This is NOT optional — without this block, the work order will NOT be created in the system.
+## CREATING WORK ORDERS
+When the operator asks you to create, open, or submit a work order:
+1. Confirm you are creating it.
+2. State the Title, Type, Priority, and Description clearly in your response.
+3. Do NOT invent a work-order ID — the system assigns IDs automatically.
+4. Tell the operator the work order will appear on the dashboard.
 
-### ACTION BLOCK FORMAT (MANDATORY)
-You MUST include exactly this format on its own line at the END of your response:
-
-<!-- AIDEN_ACTION:CREATE_WORK_ORDER:{"title":"...","description":"...","type":"...","priority":"low","submittedBy":"aiden","autoProcess":true} -->
-
-### EXAMPLE
-If the operator says "Create a work order to review our security policies", your response should be:
-
-I'm creating a work order to review your security policies. Here are the details:
-
-| Field | Value |
-|-------|-------|
-| **Title** | Review security policies |
-| **Type** | security |
-| **Priority** | medium |
-
-The work order has been submitted and will appear on the dashboard shortly.
-
-<!-- AIDEN_ACTION:CREATE_WORK_ORDER:{"title":"Review security policies","description":"Conduct a comprehensive review of all current security policies, identify gaps, and recommend updates.","type":"security","priority":"medium","submittedBy":"aiden","autoProcess":true} -->
-
-### RULES
-1. The action block MUST appear on its OWN line at the very END of your response.
-2. The JSON MUST be valid, all on one single line, inside the HTML comment markers.
-3. Do NOT put any text after the action block line.
-4. Valid "type" values: general, technical, creative, research, compliance, financial, hr, operations, strategic, process_documentation, training, security, infrastructure.
-5. Valid "priority" values: low, medium, high, critical.
-6. Do NOT invent or fabricate a work-order ID or correlation ID in your visible text. The system will fill those in automatically.
-7. If a sub-agent is mentioned, include its name in the description for routing.
-8. ALWAYS set "autoProcess" to true.
-9. ALWAYS include this block when asked to create a work order. If you forget, the work order will NOT exist.`;
+If possible, append a machine-readable action block at the very end of your response on its own line:
+<!-- AIDEN_ACTION:CREATE_WORK_ORDER:{"title":"...","description":"...","type":"...","priority":"...","submittedBy":"aiden","autoProcess":true} -->
+This helps the system process faster, but is optional — the system will detect your intent either way.`;
 
   if (settings.provider === "anthropic") {
     const apiKey = getApiKey("ANTHROPIC_API_KEY");
@@ -383,6 +360,68 @@ The work order has been submitted and will appear on the dashboard shortly.
     max_tokens: 2048,
   });
   return response.choices[0]?.message?.content || "I could not generate a response.";
+}
+
+export interface ExtractedWorkOrder {
+  shouldCreate: boolean;
+  title: string;
+  description: string;
+  type: string;
+  priority: string;
+}
+
+export async function extractWorkOrderFromChat(
+  settings: LlmSettings,
+  userMessage: string,
+  aidenReply: string,
+): Promise<ExtractedWorkOrder | null> {
+  const extractionPrompt = `You are a JSON extraction assistant. Your ONLY job is to read a conversation between a user and an AI assistant, and determine if the assistant agreed to create a work order. If yes, extract the details.
+
+RESPOND WITH ONLY A JSON OBJECT, no other text. The JSON must have these fields:
+- "shouldCreate": true or false
+- "title": string (the work order title)
+- "description": string (what needs to be done)
+- "type": one of: general, technical, creative, research, compliance, financial, hr, operations, strategic, process_documentation, training, security, infrastructure
+- "priority": one of: low, medium, high, critical
+
+If the assistant did NOT agree to create a work order, respond: {"shouldCreate":false,"title":"","description":"","type":"general","priority":"medium"}
+
+Example input:
+User: "Create a work order to fix the login bug"
+Assistant: "I've created a work order to fix the login bug. Title: Fix login authentication bug, Type: technical, Priority: high"
+
+Example output:
+{"shouldCreate":true,"title":"Fix login authentication bug","description":"Fix the login bug that is preventing users from authenticating properly.","type":"technical","priority":"high"}`;
+
+  const extractionInput = `User: "${userMessage}"\nAssistant: "${aidenReply}"`;
+
+  try {
+    let raw: string;
+    if (settings.provider === "anthropic") {
+      raw = await callAnthropic(settings, extractionPrompt, extractionInput);
+    } else {
+      raw = await callLLM(settings, extractionPrompt, extractionInput);
+    }
+
+    raw = raw.trim();
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.shouldCreate) return null;
+    if (!parsed.title || parsed.title.length < 2) return null;
+
+    return {
+      shouldCreate: true,
+      title: String(parsed.title).slice(0, 200),
+      description: String(parsed.description || "").slice(0, 5000),
+      type: String(parsed.type || "general").toLowerCase().replace(/\s+/g, "_"),
+      priority: String(parsed.priority || "medium").toLowerCase(),
+    };
+  } catch (err) {
+    console.error("[extractWorkOrderFromChat] Extraction LLM call failed:", err);
+    return null;
+  }
 }
 
 function buildReopenContext(gcc: Record<string, any>): string {
