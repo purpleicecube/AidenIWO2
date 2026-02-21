@@ -33,7 +33,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
     className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   },
   awaiting_operator: {
-    label: "Awaiting Operator",
+    label: "Operator",
     variant: "outline",
     icon: UserCheck,
     className: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
