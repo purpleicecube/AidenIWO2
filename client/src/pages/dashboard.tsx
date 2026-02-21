@@ -306,6 +306,14 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <footer className="mt-8 pb-4 text-center">
+        <Link href="/attributions">
+          <span className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer" data-testid="link-attributions-dashboard">
+            Attributions &amp; Licenses
+          </span>
+        </Link>
+      </footer>
     </div>
   );
 }

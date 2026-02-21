@@ -156,6 +156,9 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground space-y-1">
           <p>AIDEN_PTIB v0.5.2 — Intelligent Work Orchestration</p>
           <p className="text-xs">designed by LuaAzullaB | darrel vaughn</p>
+          <a href="/attributions" className="inline-block mt-2 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors" data-testid="link-attributions-landing">
+            Attributions &amp; Licenses
+          </a>
         </div>
       </footer>
     </div>
