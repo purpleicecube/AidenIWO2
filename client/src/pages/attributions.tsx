@@ -83,25 +83,6 @@ export default function AttributionsPage() {
           <p className="text-xs text-muted-foreground mt-1">Collected 2026-02-21</p>
         </div>
 
-        <Card className="mb-8 bg-gradient-to-r from-amber-50 via-white to-blue-50 dark:from-amber-950/30 dark:via-slate-800 dark:to-blue-950/30 border-amber-200/60 dark:border-amber-700/40" data-testid="card-lead-developer">
-          <CardContent className="py-6">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-amber-100 dark:bg-amber-900/50 border border-amber-200 dark:border-amber-700/50">
-                <Sparkles className="w-7 h-7 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400">Lead Developer &amp; Principal Technical Architect</p>
-                <h2 className="text-2xl font-serif font-bold text-slate-900 dark:text-white mt-0.5">Darrel Vaughn</h2>
-                <p className="text-sm text-muted-foreground mt-1">LuaAzullaB (R&amp;D Lab) &middot; 10Touros (Consulting) &middot; AIDEN_IWO / PDOE Platform</p>
-              </div>
-            </div>
-            <Separator className="my-4" />
-            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-              Darrel Vaughn is the lead developer and principal technical architect of the AIDEN_IWO platform. From the original Agent Commander concept (mid-2024) through the AgentGoPro/AgentGoFlow orchestration framework and into the current IWO/PDOE two-tier architecture, Vaughn has designed, built, and led every layer of the system — including the orchestration engine, GCC Memory integration, PocketFlow execution substrate, Agentic Tools Locker, workspace filing, and the BeginnersMind cognitive model that governs agent reasoning.
-            </p>
-          </CardContent>
-        </Card>
-
         <div className="space-y-8">
 
           <AttributionSection
@@ -400,9 +381,28 @@ export default function AttributionsPage() {
           </AttributionSection>
         </div>
 
+        <Card className="mt-8 bg-gradient-to-r from-amber-50 via-white to-blue-50 dark:from-amber-950/30 dark:via-slate-800 dark:to-blue-950/30 border-amber-200/60 dark:border-amber-700/40" data-testid="card-lead-developer">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-amber-100 dark:bg-amber-900/50 border border-amber-200 dark:border-amber-700/50">
+                <Sparkles className="w-7 h-7 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400">Lead Developer &amp; Principal Technical Architect</p>
+                <h2 className="text-2xl font-serif font-bold text-slate-900 dark:text-white mt-0.5">Darrel Vaughn</h2>
+                <p className="text-sm text-muted-foreground mt-1">LuaAzullaB (R&amp;D Lab) &middot; 10Touros (Consulting) &middot; AIDEN_IWO / PDOE Platform</p>
+              </div>
+            </div>
+            <Separator className="my-4" />
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+              Darrel Vaughn is the lead developer and principal technical architect of the AIDEN_IWO platform. From the original Agent Commander concept (mid-2024) through the AgentGoPro/AgentGoFlow orchestration framework and into the current IWO/PDOE two-tier architecture, Vaughn has designed, built, and led every layer of the system — including the orchestration engine, GCC Memory integration, PocketFlow execution substrate, Agentic Tools Locker, workspace filing, and the BeginnersMind cognitive model that governs agent reasoning.
+            </p>
+          </CardContent>
+        </Card>
+
         <footer className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-muted-foreground space-y-1">
           <p>AIDEN_IWO v0.5.7 — Intelligent Work Orchestration</p>
-          <p className="text-xs">designed by LuaAzullaB | darrel vaughn</p>
+          <p className="text-xs">Lead Developer &amp; Principal Technical Architect: Darrel Vaughn | LuaAzullaB</p>
         </footer>
       </div>
     </div>
