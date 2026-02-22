@@ -244,7 +244,8 @@ function getApiKey(envVarOrDirectKey: string): string {
 async function callOpenAICompatible(
   settings: LlmSettings,
   messages: Array<{ role: string; content: string }>,
-  apiKeyEnvVarOverride?: string
+  apiKeyEnvVarOverride?: string,
+  options?: { jsonMode?: boolean }
 ): Promise<string> {
   const config = getProviderConfig(settings);
   const apiKey = getApiKey(apiKeyEnvVarOverride || config.apiKeyEnvVar);
@@ -254,16 +255,18 @@ async function callOpenAICompatible(
     baseURL: config.baseURL,
   });
 
+  const useJsonMode = options?.jsonMode !== false;
+
   const params: any = {
     model: settings.model,
     messages: messages as any,
     temperature: 0.3,
-    response_format: { type: "json_object" },
+    ...(useJsonMode ? { response_format: { type: "json_object" } } : {}),
   };
 
   const response = await client.chat.completions.create(params);
 
-  return response.choices[0]?.message?.content || "{}";
+  return response.choices[0]?.message?.content || (useJsonMode ? "{}" : "");
 }
 
 async function callAnthropic(
@@ -298,6 +301,17 @@ async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage:
     { role: "system", content: systemPrompt },
     { role: "user", content: userMessage },
   ], apiKeyEnvVarOverride);
+}
+
+async function callLLMPlainText(settings: LlmSettings, systemPrompt: string, userMessage: string, apiKeyEnvVarOverride?: string): Promise<string> {
+  if (settings.provider === "anthropic") {
+    return callAnthropic(settings, systemPrompt, userMessage, apiKeyEnvVarOverride);
+  }
+
+  return callOpenAICompatible(settings, [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMessage },
+  ], apiKeyEnvVarOverride, { jsonMode: false });
 }
 
 function formatGccMemoryForPrompt(gcc: Record<string, any>): string {
@@ -760,11 +774,37 @@ Respond with ONLY a JSON object:
   "output": "THE ACTUAL CONTENT/DELIVERABLE FOR THIS STEP in markdown"
 }`;
 
-  const raw = await callLLM(settings, systemPrompt, prompt, apiKeyOverride);
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  const jsonStr = jsonMatch ? jsonMatch[0] : raw;
-  const parsed = safeJsonParse(jsonStr);
-  return execStepResultSchema.parse(parsed);
+  try {
+    const raw = await callLLM(settings, systemPrompt, prompt, apiKeyOverride);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+    const parsed = safeJsonParse(jsonStr);
+    return execStepResultSchema.parse(parsed);
+  } catch (jsonErr: any) {
+    const fallbackPrompt = `You are executing step "${step.name}" of a work order.
+
+Step description: ${step.description}
+${prevContext}
+${reopenContext}${gccContext}
+Work Order Context:
+- Title: ${order.title}
+- Description: ${order.description}
+- Type: ${order.type}
+- Priority: ${order.priority}
+
+Produce the ACTUAL deliverable content for this step. Write the real work product in markdown format. Do NOT wrap your response in JSON — just output the content directly.`;
+
+    try {
+      const fallbackRaw = await callLLMPlainText(settings, systemPrompt, fallbackPrompt, apiKeyOverride);
+      if (fallbackRaw && fallbackRaw.trim().length > 0) {
+        return { blocked: false, reason: null, output: fallbackRaw.trim() };
+      }
+    } catch (fallbackErr: any) {
+      console.error(`Step "${step.name}" fallback also failed:`, fallbackErr.message);
+    }
+
+    throw jsonErr;
+  }
 }
 
 export async function llmEvaluate(

@@ -498,6 +498,25 @@ async function nodeEvaluate(dict: SharedDict): Promise<NodeResult> {
     return { action: "refine" };
   }
 
+  const completedSteps = dict.planSteps.filter(s => s.status === "completed");
+  const allFailed = completedSteps.length === 0 && dict.planSteps.length > 0;
+
+  if (allFailed) {
+    dict.evaluationScore = 0.0;
+    dict.evaluationResult = {
+      score: 0.0,
+      meetsCriteria: false,
+      gaps: dict.planSteps.map(s => `Step "${s.name}" ${s.status}: ${s.error || "no output"}`),
+      strengths: [],
+      reasoning: "All steps failed — no deliverable produced",
+    };
+    await emitNodeLog(dict, "Evaluate", `All ${dict.planSteps.length} steps failed — best effort with empty output`, {
+      score: 0.0,
+      failedCount: dict.planSteps.length,
+    });
+    return { action: "best_effort" };
+  }
+
   if (!settings || !combinedOutput) {
     dict.evaluationScore = 1.0;
     dict.evaluationResult = {
@@ -606,7 +625,11 @@ async function nodeRefine(dict: SharedDict): Promise<NodeResult> {
 
 async function nodeBuildResponse(dict: SharedDict): Promise<NodeResult> {
   const allOutputs = Object.values(dict.accumulatedOutputs);
-  const combinedDeliverable = allOutputs.join("\n\n");
+  let combinedDeliverable = allOutputs.join("\n\n");
+
+  if (!combinedDeliverable.trim() && dict.stepResults.length === 0) {
+    combinedDeliverable = generateFallbackDeliverable(dict.workOrder);
+  }
 
   const typeToDeliverableType: Record<string, "document" | "code" | "image" | "mixed"> = {
     deployment: "document",
