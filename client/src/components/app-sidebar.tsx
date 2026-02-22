@@ -163,7 +163,7 @@ export function AppSidebar() {
           </div>
         )}
         <div className="text-xs text-muted-foreground">
-          v0.3.0 MVP
+          AIDEN_IWO v0.5.7
         </div>
       </SidebarFooter>
     </Sidebar>
