@@ -107,7 +107,7 @@ export async function setupAuth(app: Express) {
     console.log(`[auth] Login initiated. hostname=${domain}, protocol=${req.protocol}, headers.host=${req.headers.host}`);
     ensureStrategy(domain);
     passport.authenticate(`replitauth:${domain}`, {
-      prompt: "login consent",
+      prompt: "login",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
