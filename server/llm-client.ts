@@ -408,13 +408,23 @@ This helps the system process faster, but is optional — the system will detect
     ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
     { role: "user", content: userMessage },
   ];
-  const response = await client.chat.completions.create({
-    model: settings.model,
-    messages: messages as any,
-    temperature: 0.5,
-    max_tokens: 2048,
-  });
-  return response.choices[0]?.message?.content || "I could not generate a response.";
+  try {
+    const response = await client.chat.completions.create({
+      model: settings.model,
+      messages: messages as any,
+      temperature: 0.5,
+      max_tokens: 2048,
+    });
+    const content = response.choices[0]?.message?.content;
+    if (content && content.trim().length > 0) {
+      return content;
+    }
+    console.error(`[chatWithAiden] LLM returned empty content. Model: ${settings.model}, Provider: ${settings.provider}, finish_reason: ${response.choices[0]?.finish_reason}`);
+    return `I'm sorry, I wasn't able to process that request. The ${settings.model} model returned an empty response. This can happen with certain types of queries. Please try rephrasing your question or try again.`;
+  } catch (err: any) {
+    console.error(`[chatWithAiden] LLM call failed. Model: ${settings.model}, Provider: ${settings.provider}, Error: ${err.message}`);
+    return `I encountered an error while processing your request: ${err.message}. Please try again or check Aiden Settings if this persists.`;
+  }
 }
 
 export interface ExtractedWorkOrder {
