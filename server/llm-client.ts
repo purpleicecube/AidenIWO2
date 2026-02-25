@@ -717,8 +717,15 @@ export async function llmPlanSteps(
     ? `\nThis is a REFINEMENT pass. Only plan steps to address these gaps:\n${existingGaps.map(g => `- ${g}`).join("\n")}${existingContext}`
     : "";
 
+  const orderText = `${order.title} ${order.description}`;
+  const isSandboxTargeted = /sandbox/i.test(orderText) ||
+    (/\b(game|animation|interactive\s+demo|canvas\s+app)\b/i.test(orderText) && /\b(build|create|make|develop|write)\b/i.test(orderText));
+  const sandboxGuidance = isSandboxTargeted
+    ? `\n\nSANDBOX EXECUTION NOTICE: This work order targets the Sandbox environment. The Sandbox renders content in a browser iframe. You MUST produce self-contained HTML5 + JavaScript (using Canvas, DOM, or vanilla JS). Do NOT use Python, pygame, server-side languages, or frameworks requiring npm/build tools. All code must run directly in a browser with zero dependencies. For games, use HTML5 Canvas. For data/charts, use inline SVG or Canvas. For utilities, use vanilla JavaScript with DOM output.`
+    : "";
+
   const prompt = `You are executing a work order as a Tier 2 sub-agent. Break the work order into concrete execution steps.
-${gapsContext}
+${gapsContext}${sandboxGuidance}
 Each step should be a discrete unit of work. Steps can declare dependencies on other steps by ID.
 Independent steps (no dependencies) will be executed in PARALLEL for efficiency.
 
@@ -763,11 +770,18 @@ export async function llmExecStep(
   const reopenContext = isReopened ? buildReopenContext(gcc) : "";
   const gccContext = formatGccMemoryForPrompt(gcc);
 
+  const execOrderText = `${order.title} ${order.description}`;
+  const isSandboxTargeted = /sandbox/i.test(execOrderText) ||
+    (/\b(game|animation|interactive\s+demo|canvas\s+app)\b/i.test(execOrderText) && /\b(build|create|make|develop|write)\b/i.test(execOrderText));
+  const sandboxExecGuidance = isSandboxTargeted
+    ? `\nSANDBOX EXECUTION: This runs in a browser iframe. Output MUST be self-contained HTML5 + JavaScript. Use Canvas API for graphics/games, vanilla JS for logic, inline CSS for styling. NO Python, NO server-side code, NO npm packages. The code must work in a single HTML file with zero external dependencies.\n`
+    : "";
+
   const prompt = `You are executing step "${step.name}" of a work order.
 
 Step description: ${step.description}
 ${prevContext}
-${reopenContext}${gccContext}
+${reopenContext}${gccContext}${sandboxExecGuidance}
 Work Order Context:
 - Title: ${order.title}
 - Description: ${order.description}
@@ -795,7 +809,7 @@ Respond with ONLY a JSON object:
 
 Step description: ${step.description}
 ${prevContext}
-${reopenContext}${gccContext}
+${reopenContext}${gccContext}${sandboxExecGuidance}
 Work Order Context:
 - Title: ${order.title}
 - Description: ${order.description}

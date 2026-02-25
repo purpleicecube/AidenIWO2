@@ -85,7 +85,91 @@ function extractCodeBlocksFromDeliverable(content: string): ExtractedCodeBlock[]
   return blocks;
 }
 
+function isRunnableBrowserJs(codeBlocks: ExtractedCodeBlock[]): boolean {
+  const jsBlocks = codeBlocks.filter(b =>
+    ["javascript", "js"].includes(b.language)
+  );
+  if (jsBlocks.length === 0) return false;
+  const combinedJs = jsBlocks.map(b => b.code).join("\n");
+  const browserIndicators = [
+    /document\.(getElementById|querySelector|createElement|body|head)/,
+    /canvas|getContext\s*\(\s*['"]2d['"]\s*\)|requestAnimationFrame/i,
+    /addEventListener\s*\(/,
+    /window\./,
+    /\.innerHTML|\.textContent|\.appendChild/,
+    /new\s+(Audio|Image|XMLHttpRequest|WebSocket)\b/,
+    /fetch\s*\(/,
+    /setInterval|setTimeout/,
+  ];
+  const browserScore = browserIndicators.filter(r => r.test(combinedJs)).length;
+  const nodeIndicators = [/require\s*\(/, /module\.exports/, /process\.env/, /fs\./, /__dirname/];
+  const nodeScore = nodeIndicators.filter(r => r.test(combinedJs)).length;
+  return browserScore >= 2 && nodeScore === 0;
+}
+
+function buildRunnableJsHtml(title: string, codeBlocks: ExtractedCodeBlock[]): string {
+  const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const jsBlocks = codeBlocks.filter(b =>
+    ["javascript", "js", "typescript", "ts", "jsx", "tsx"].includes(b.language)
+  );
+  const cssBlocks = codeBlocks.filter(b => b.language === "css");
+
+  const combinedJs = jsBlocks.map(b => b.code).join("\n\n");
+  const combinedCss = cssBlocks.map(b => b.code).join("\n\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; }
+  #app-container { width: 100%; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  canvas { display: block; background: #000; border: 2px solid #334155; border-radius: 4px; }
+  #console-output { position: fixed; bottom: 0; left: 0; right: 0; max-height: 150px; overflow-y: auto; background: #0c1222; border-top: 1px solid #334155; padding: 0.5rem 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #4ade80; }
+  #console-output .log-line { padding: 1px 0; }
+  #console-output .log-error { color: #f87171; }
+  ${combinedCss}
+</style>
+</head>
+<body>
+<div id="app-container"></div>
+<div id="console-output"></div>
+<script>
+(function() {
+  var consoleEl = document.getElementById('console-output');
+  var origLog = console.log;
+  var origError = console.error;
+  var origWarn = console.warn;
+  function appendLog(msg, cls) {
+    var div = document.createElement('div');
+    div.className = 'log-line' + (cls ? ' ' + cls : '');
+    div.textContent = typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
+    consoleEl.appendChild(div);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+  console.log = function() { var args = Array.from(arguments); origLog.apply(console, args); appendLog(args.join(' ')); };
+  console.error = function() { var args = Array.from(arguments); origError.apply(console, args); appendLog(args.join(' '), 'log-error'); };
+  console.warn = function() { var args = Array.from(arguments); origWarn.apply(console, args); appendLog(args.join(' '), 'log-error'); };
+  window.onerror = function(msg) { appendLog('Error: ' + msg, 'log-error'); };
+})();
+</script>
+<script>
+try {
+${combinedJs}
+} catch(e) { console.error('Runtime error:', e.message); }
+</script>
+</body>
+</html>`;
+}
+
 function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlock[], fullContent: string): string {
+  if (isRunnableBrowserJs(codeBlocks)) {
+    return buildRunnableJsHtml(title, codeBlocks);
+  }
+
   const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const blocksHtml = codeBlocks.map((block, i) => {

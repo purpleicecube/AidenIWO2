@@ -643,7 +643,13 @@ async function nodeBuildResponse(dict: SharedDict): Promise<NodeResult> {
 
   dict.finalDeliverable = combinedDeliverable;
   dict.finalMessage = `Work order "${dict.workOrder.title}" processed successfully.`;
-  dict.deliverableType = typeToDeliverableType[dict.workOrder.type] || "document";
+  let detectedType = typeToDeliverableType[dict.workOrder.type] || "document";
+  const codeBlockMatches = combinedDeliverable.match(/```(html|javascript|js|css)\b[\s\S]*?```/gi) || [];
+  const totalCodeLength = codeBlockMatches.reduce((sum, m) => sum + m.length, 0);
+  if (totalCodeLength > 200 || /<!DOCTYPE\s+html|<html[\s>]/i.test(combinedDeliverable)) {
+    detectedType = "code";
+  }
+  dict.deliverableType = detectedType;
   dict.deliverableTitle = dict.workOrder.title;
 
   if (dict.stepResults.length > 0) {
