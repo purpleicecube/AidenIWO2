@@ -401,6 +401,18 @@ export default function WorkOrderDetail() {
     },
   });
 
+  const refileMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/work-orders/${params.id}/refile`),
+    onSuccess: () => {
+      invalidateOrderQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
+      toast({ title: "Re-filed", description: "Work order output has been re-filed to Workspace and Sandbox." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to re-file work order.", variant: "destructive" });
+    },
+  });
+
   const copyCorrelationId = () => {
     if (order) {
       navigator.clipboard.writeText(order.correlationId);
@@ -497,18 +509,33 @@ export default function WorkOrderDetail() {
                 </Button>
               )}
               {order.status === "completed" && (
-                <Button
-                  variant="outline"
-                  className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20"
-                  onClick={() => {
-                    setReopenReason("");
-                    setReopenDialogOpen(true);
-                  }}
-                  data-testid="button-reopen"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Reopen
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                    onClick={() => {
+                      setReopenReason("");
+                      setReopenDialogOpen(true);
+                    }}
+                    data-testid="button-reopen"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reopen
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => refileMutation.mutate()}
+                    disabled={refileMutation.isPending}
+                    data-testid="button-refile"
+                  >
+                    {refileMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    {refileMutation.isPending ? "Re-filing..." : "Re-file to Sandbox"}
+                  </Button>
+                </>
               )}
               {(order.status === "pending" || order.status === "reopened") && (
                 <Button

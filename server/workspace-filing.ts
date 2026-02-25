@@ -68,6 +68,77 @@ function extractHtmlFromDeliverable(content: string): string | null {
   return null;
 }
 
+interface ExtractedCodeBlock {
+  language: string;
+  code: string;
+}
+
+function extractCodeBlocksFromDeliverable(content: string): ExtractedCodeBlock[] {
+  const blocks: ExtractedCodeBlock[] = [];
+  const regex = /```(\w+)?\s*\n([\s\S]*?)```/g;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const lang = (match[1] || "text").toLowerCase();
+    if (lang === "html" || lang === "htm") continue;
+    blocks.push({ language: lang, code: match[2].trim() });
+  }
+  return blocks;
+}
+
+function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlock[], fullContent: string): string {
+  const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const blocksHtml = codeBlocks.map((block, i) => {
+    const langLabel = block.language.charAt(0).toUpperCase() + block.language.slice(1);
+    return `<div class="code-section">
+      <div class="code-header">${langLabel}${codeBlocks.length > 1 ? ` (Block ${i + 1})` : ""}</div>
+      <pre><code>${escapeHtml(block.code)}</code></pre>
+    </div>`;
+  }).join("\n");
+
+  const outputSections = fullContent.split(/#{2,3}\s/).filter(s => /execution|output|result|log/i.test(s));
+  const outputHtml = outputSections.map(section => {
+    const outputMatch = section.match(/```\s*\n([\s\S]*?)```/);
+    if (outputMatch) {
+      return `<div class="output-section">
+        <div class="output-header">Output</div>
+        <pre class="output"><code>${escapeHtml(outputMatch[1].trim())}</code></pre>
+      </div>`;
+    }
+    return "";
+  }).filter(Boolean).join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; }
+  .badge { display: inline-block; background: #1e40af; color: #93c5fd; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 1rem; }
+  .code-section, .output-section { margin-bottom: 1.5rem; border: 1px solid #334155; border-radius: 8px; overflow: hidden; }
+  .code-header, .output-header { background: #1e293b; padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 600; color: #94a3b8; border-bottom: 1px solid #334155; }
+  .output-header { background: #1a2332; color: #4ade80; }
+  pre { padding: 1rem; overflow-x: auto; font-size: 0.875rem; line-height: 1.6; }
+  pre code { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; }
+  pre.output { background: #0c1222; }
+  pre.output code { color: #4ade80; }
+  .footer { margin-top: 2rem; font-size: 0.75rem; color: #64748b; border-top: 1px solid #1e293b; padding-top: 1rem; }
+</style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <span class="badge">AIDEN_IWO Sandbox Preview</span>
+  ${blocksHtml}
+  ${outputHtml}
+  <div class="footer">Auto-deployed by AIDEN_IWO Workspace Filing Engine</div>
+</body>
+</html>`;
+}
+
 function resolveOutputFolder(deliverableType: string, deliverableContent: string | null): string {
   if (deliverableType === "code") return "#Code_Blocks";
   if (deliverableType === "image") return "#Images";
@@ -237,17 +308,28 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
         console.log(`  Deliverable saved to ${deliverableFilePath}`);
       }
 
-      const htmlContent = extractHtmlFromDeliverable(deliverable);
-      if (htmlContent) {
+      let sandboxHtml: string | null = extractHtmlFromDeliverable(deliverable);
+      let sandboxType = "html_preview";
+
+      if (!sandboxHtml) {
+        const codeBlocks = extractCodeBlocksFromDeliverable(deliverable);
+        if (codeBlocks.length > 0) {
+          sandboxHtml = buildCodePreviewHtml(deliverableTitle, codeBlocks, deliverable);
+          sandboxType = "code_preview";
+        }
+      }
+
+      if (sandboxHtml) {
         try {
           const sandboxSession = await storage.createSandboxSession({
             name: `Preview: ${order.title}`,
-            description: `Auto-deployed from work order "${order.title}" — renderable HTML preview.`,
+            description: `Auto-deployed from work order "${order.title}" — ${sandboxType === "code_preview" ? "code execution preview" : "renderable HTML preview"}.`,
             environment: {
               sourceType: "work_order",
               sourceId: order.id,
               deliverableTitle,
               autoDeployed: true,
+              previewType: sandboxType,
             },
             createdBy: "aiden",
           });
@@ -256,17 +338,17 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
             timestamp: new Date().toISOString(),
             command: "deploy-preview",
             input: { workOrderId: order.id, title: order.title },
-            output: { message: `HTML preview deployed for "${order.title}"`, status: "success" },
+            output: { message: `${sandboxType === "code_preview" ? "Code preview" : "HTML preview"} deployed for "${order.title}"`, status: "success" },
           };
 
           await storage.updateSandboxSession(sandboxSession.id, {
             status: "completed",
-            result: { html: htmlContent, renderable: true, title: deliverableTitle },
+            result: { html: sandboxHtml, renderable: true, title: deliverableTitle },
             logs: [previewLog],
             completedAt: new Date(),
           });
 
-          console.log(`  Sandbox preview deployed: session ${sandboxSession.id}`);
+          console.log(`  Sandbox ${sandboxType} deployed: session ${sandboxSession.id}`);
         } catch (sandboxErr: any) {
           console.error("Sandbox auto-deploy failed:", sandboxErr.message);
         }

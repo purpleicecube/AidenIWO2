@@ -37,7 +37,7 @@ I want to be kept informed about the status of work orders, particularly when hu
 - **Agentic Tools Platform:** Provides a standardized way to integrate and assign diverse tools to sub-agents, enhancing their capabilities.
 - **Replit Auth Integration:** Secure user authentication with RBAC for granular control over system functionalities.
 - **Responsive UI/UX:** Designed with `shadcn/ui` and Tailwind CSS for a modern, responsive, and accessible user experience across various devices.
-- **Workspace Filing Engine:** Automates routing of deliverables to specific folders and deployment of HTML artifacts to the sandbox.
+- **Workspace Filing Engine:** Automates routing of deliverables to specific folders and deployment of artifacts to the sandbox. Supports both HTML previews (direct rendering) and code block previews (Python, JS, etc. wrapped in styled HTML with output sections). `extractHtmlFromDeliverable` handles HTML; `extractCodeBlocksFromDeliverable` + `buildCodePreviewHtml` handles non-HTML code blocks. Re-file button available on completed work orders in the detail view.
 
 **Feature Specifications:**
 - **Work Order Lifecycle Management:** Comprehensive states including `pending`, `processing`, `completed`, `blocked`, `failed`, `awaiting_operator`, `reopened`, `deferred`. Work orders can also be archived (boolean flag, separate from status) with `isArchived`, `archivedAt`, `archivedBy`, `archivedReason` fields. Admin-only archive/unarchive with full GCC tracking. Archived orders excluded from dashboard stats and default queries.
