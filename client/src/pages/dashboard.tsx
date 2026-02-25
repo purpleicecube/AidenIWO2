@@ -111,10 +111,14 @@ export default function Dashboard() {
   const canSubmit = user?.role === "admin" || user?.role === "operator";
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/work-orders/stats"],
+    staleTime: 5000,
+    refetchOnMount: "always",
   });
 
   const { data: recentOrders, isLoading: ordersLoading } = useQuery<WorkOrder[]>({
     queryKey: ["/api/work-orders/recent"],
+    staleTime: 5000,
+    refetchOnMount: "always",
   });
 
   return (

@@ -84,6 +84,17 @@ export default function ChatPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/work-orders?includeArchived=true"] });
         queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
         queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+        }, 15000);
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+        }, 30000);
       }
     },
     onError: () => {

@@ -275,6 +275,8 @@ export default function WorkOrders() {
   const includeArchived = showArchived || statusFilter === "archived";
   const { data: workOrders, isLoading } = useQuery<WorkOrder[]>({
     queryKey: [includeArchived ? "/api/work-orders?includeArchived=true" : "/api/work-orders"],
+    staleTime: 5000,
+    refetchOnMount: "always",
   });
 
   const filteredOrders = workOrders?.filter((order) => {

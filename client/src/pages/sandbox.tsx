@@ -88,6 +88,8 @@ export default function SandboxPage() {
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
     queryKey: ["/api/sandbox-sessions"],
+    staleTime: 5000,
+    refetchOnMount: "always",
   });
 
   const createMutation = useMutation({
