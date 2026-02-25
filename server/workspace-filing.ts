@@ -52,7 +52,7 @@ function containsHtmlDocument(content: string): boolean {
   return /<!DOCTYPE\s+html|<html[\s>]/i.test(content);
 }
 
-function extractHtmlFromDeliverable(content: string): string | null {
+export function extractHtmlFromDeliverable(content: string): string | null {
   const htmlBlockMatch = content.match(/```html?\s*\n([\s\S]*?)```/i);
   if (htmlBlockMatch) return htmlBlockMatch[1].trim();
 
@@ -73,7 +73,7 @@ interface ExtractedCodeBlock {
   code: string;
 }
 
-function extractCodeBlocksFromDeliverable(content: string): ExtractedCodeBlock[] {
+export function extractCodeBlocksFromDeliverable(content: string): ExtractedCodeBlock[] {
   const blocks: ExtractedCodeBlock[] = [];
   const regex = /```(\w+)?\s*\n([\s\S]*?)```/g;
   let match;
@@ -165,7 +165,7 @@ ${combinedJs}
 </html>`;
 }
 
-function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlock[], fullContent: string): string {
+export function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlock[], fullContent: string): string {
   if (isRunnableBrowserJs(codeBlocks)) {
     return buildRunnableJsHtml(title, codeBlocks);
   }

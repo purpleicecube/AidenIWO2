@@ -85,6 +85,7 @@ export default function SandboxPage() {
   const [execCommand, setExecCommand] = useState("");
   const [execInput, setExecInput] = useState("");
   const [viewMode, setViewMode] = useState<"terminal" | "preview">("terminal");
+  const [iframeKey, setIframeKey] = useState(0);
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
     queryKey: ["/api/sandbox-sessions"],
@@ -121,6 +122,21 @@ export default function SandboxPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
       if (selectedSession) setSelectedSession(null);
       toast({ title: "Session deleted" });
+    },
+  });
+
+  const rerenderMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/sandbox-sessions/${id}/rerender`),
+    onSuccess: async (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
+      const res = await fetch(`/api/sandbox-sessions/${id}`);
+      const updated = await res.json();
+      setSelectedSession(updated);
+      setIframeKey(k => k + 1);
+      toast({ title: "Preview re-rendered with updated engine" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Re-render failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -313,14 +329,39 @@ export default function SandboxPage() {
                   <span className="font-medium">{sessionResult.title || "HTML Preview"}</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setIframeKey(k => k + 1)}
+                    title="Run / Reload preview"
+                    data-testid="button-run-preview"
+                    className="text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => rerenderMutation.mutate(selectedSession.id)}
+                    disabled={rerenderMutation.isPending}
+                    title="Re-render preview with updated engine"
+                    data-testid="button-rerender-preview"
+                  >
+                    {rerenderMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
                   <ExpandablePanel
                     title={`Preview: ${sessionResult.title || selectedSession.name}`}
                   >
                     <iframe
+                      key={`expanded-${iframeKey}`}
                       src={`/api/sandbox-sessions/${selectedSession.id}/preview`}
                       className="w-full h-full border-0"
                       title={`Preview: ${selectedSession.name}`}
-                      sandbox="allow-scripts"
+                      sandbox="allow-scripts allow-same-origin"
                       data-testid="iframe-preview-expanded"
                     />
                   </ExpandablePanel>
@@ -339,10 +380,11 @@ export default function SandboxPage() {
               </div>
               <div className="flex-1 min-h-0 bg-white">
                 <iframe
+                  key={`preview-${iframeKey}`}
                   src={`/api/sandbox-sessions/${selectedSession.id}/preview`}
                   className="w-full h-full border-0"
                   title={`Preview: ${selectedSession.name}`}
-                  sandbox="allow-scripts"
+                  sandbox="allow-scripts allow-same-origin"
                   data-testid="iframe-preview"
                 />
               </div>

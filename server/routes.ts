@@ -2041,6 +2041,62 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/sandbox-sessions/:id/rerender", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const session = await storage.getSandboxSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+
+      const env = session.environment as any;
+      const workOrderId = env?.sourceId;
+      if (!workOrderId) {
+        return res.status(400).json({ message: "No linked work order found for this session" });
+      }
+
+      const order = await storage.getWorkOrder(workOrderId);
+      if (!order) {
+        return res.status(404).json({ message: "Linked work order not found" });
+      }
+
+      const deliverable = order.deliverable as string;
+      if (!deliverable) {
+        return res.status(400).json({ message: "Work order has no deliverable content" });
+      }
+
+      const { extractHtmlFromDeliverable, extractCodeBlocksFromDeliverable, buildCodePreviewHtml } = await import("./workspace-filing");
+      const title = env?.deliverableTitle || order.title;
+
+      let newHtml: string | null = extractHtmlFromDeliverable(deliverable);
+      if (!newHtml) {
+        const codeBlocks = extractCodeBlocksFromDeliverable(deliverable);
+        if (codeBlocks.length > 0) {
+          newHtml = buildCodePreviewHtml(title, codeBlocks, deliverable);
+        }
+      }
+
+      if (!newHtml) {
+        return res.status(400).json({ message: "No renderable content found in deliverable" });
+      }
+
+      const reRenderLog = {
+        timestamp: new Date().toISOString(),
+        command: "re-render",
+        input: { workOrderId: order.id, title: order.title },
+        output: { message: `Preview re-rendered with updated engine`, status: "success" },
+      };
+
+      const existingLogs = Array.isArray(session.logs) ? session.logs : [];
+      await storage.updateSandboxSession(session.id, {
+        result: { html: newHtml, renderable: true, title },
+        logs: [...existingLogs, reRenderLog],
+      });
+
+      const updated = await storage.getSandboxSession(session.id);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to re-render preview", error: err.message });
+    }
+  });
+
   // ==================== Chat Sessions (GCC Memory Protocol) ====================
 
   function generateCommitId(): string {
