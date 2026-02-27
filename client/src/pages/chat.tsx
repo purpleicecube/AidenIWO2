@@ -454,6 +454,21 @@ export default function ChatPage() {
           )}
           <span className="flex-1 truncate">{group.name}</span>
           <span className="text-[10px] text-muted-foreground/50">{groupSessions.length}</span>
+          {!hasContent && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100 text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteGroupMutation.mutate(group.id);
+              }}
+              title="Delete empty folder"
+              data-testid={`button-delete-empty-group-${group.id}`}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -497,9 +512,13 @@ export default function ChatPage() {
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (hasContent) {
+                    toast({ title: "Cannot delete", description: "Move or remove all chats from this folder first." });
+                    return;
+                  }
                   deleteGroupMutation.mutate(group.id);
                 }}
-                className="text-destructive focus:text-destructive"
+                className={hasContent ? "text-muted-foreground" : "text-destructive focus:text-destructive"}
                 data-testid={`menu-delete-group-${group.id}`}
               >
                 <Trash2 className="w-3.5 h-3.5 mr-2" />
