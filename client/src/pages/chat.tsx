@@ -295,9 +295,26 @@ export default function ChatPage() {
         <span className="flex-1 truncate text-xs">
           {session.title || "New Conversation"}
         </span>
-        {session.isArchived && (
-          <Archive className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-        )}
+        <Button
+          size="icon"
+          variant="ghost"
+          className={`h-5 w-5 flex-shrink-0 transition-opacity ${session.isArchived ? "opacity-70" : "opacity-0 group-hover:opacity-100"}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            const archiving = !session.isArchived;
+            updateSessionMutation.mutate({ id: session.id, isArchived: archiving });
+            if (archiving && activeSessionId === session.id) setActiveSessionId(null);
+            toast({ title: archiving ? "Chat archived" : "Chat unarchived" });
+          }}
+          title={session.isArchived ? "Unarchive" : "Archive"}
+          data-testid={`button-archive-toggle-${session.id}`}
+        >
+          {session.isArchived ? (
+            <ArchiveRestore className="w-3 h-3" />
+          ) : (
+            <Archive className="w-3 h-3" />
+          )}
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
