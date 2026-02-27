@@ -581,6 +581,28 @@ export const insertArtifactSchema = createInsertSchema(artifacts).omit({
 export type InsertArtifact = z.infer<typeof insertArtifactSchema>;
 export type Artifact = typeof artifacts.$inferSelect;
 
+// ==================== Chat Groups ====================
+
+export const chatGroups = pgTable("chat_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  parentId: varchar("parent_id"),
+  color: text("color"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isCollapsed: boolean("is_collapsed").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertChatGroupSchema = createInsertSchema(chatGroups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertChatGroup = z.infer<typeof insertChatGroupSchema>;
+export type ChatGroup = typeof chatGroups.$inferSelect;
+
 // ==================== Chat Sessions (GCC Memory Protocol) ====================
 
 export const chatSessions = pgTable("chat_sessions", {
@@ -588,6 +610,9 @@ export const chatSessions = pgTable("chat_sessions", {
   correlationId: varchar("correlation_id").notNull().default(sql`gen_random_uuid()`),
   title: text("title").notNull().default("New Conversation"),
   status: text("status").notNull().default("active"),
+  groupId: varchar("group_id"),
+  isArchived: boolean("is_archived").notNull().default(false),
+  archivedAt: timestamp("archived_at"),
   gccMemory: jsonb("gcc_memory").default(sql`'{}'::jsonb`),
   messageCount: integer("message_count").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -600,6 +625,8 @@ export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
   status: true,
   gccMemory: true,
   messageCount: true,
+  isArchived: true,
+  archivedAt: true,
   createdAt: true,
   updatedAt: true,
 });

@@ -28,6 +28,8 @@ import {
   type InsertSandboxSession,
   type ChatSession,
   type InsertChatSession,
+  type ChatGroup,
+  type InsertChatGroup,
   type ChatMessage,
   type InsertChatMessage,
   type OperationalSettings,
@@ -62,6 +64,7 @@ import {
   artifactFolders,
   artifacts,
   sandboxSessions,
+  chatGroups,
   chatSessions,
   chatMessages,
   operationalSettings,
@@ -165,7 +168,13 @@ export interface IStorage {
   updateSandboxSession(id: string, updates: Partial<SandboxSession>): Promise<SandboxSession | undefined>;
   deleteSandboxSession(id: string): Promise<boolean>;
 
-  getChatSessions(): Promise<ChatSession[]>;
+  getChatGroups(): Promise<ChatGroup[]>;
+  getChatGroup(id: string): Promise<ChatGroup | undefined>;
+  createChatGroup(group: InsertChatGroup): Promise<ChatGroup>;
+  updateChatGroup(id: string, updates: Partial<ChatGroup>): Promise<ChatGroup | undefined>;
+  deleteChatGroup(id: string): Promise<boolean>;
+
+  getChatSessions(includeArchived?: boolean): Promise<ChatSession[]>;
   getChatSession(id: string): Promise<ChatSession | undefined>;
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   updateChatSession(id: string, updates: Partial<ChatSession>): Promise<ChatSession | undefined>;
@@ -635,8 +644,58 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async getChatSessions(): Promise<ChatSession[]> {
-    return db.select().from(chatSessions).orderBy(desc(chatSessions.updatedAt));
+  async getChatGroups(): Promise<ChatGroup[]> {
+    return db.select().from(chatGroups).orderBy(asc(chatGroups.sortOrder), asc(chatGroups.name));
+  }
+
+  async getChatGroup(id: string): Promise<ChatGroup | undefined> {
+    const [group] = await db.select().from(chatGroups).where(eq(chatGroups.id, id));
+    return group;
+  }
+
+  async createChatGroup(group: InsertChatGroup): Promise<ChatGroup> {
+    const [created] = await db.insert(chatGroups).values(group).returning();
+    return created;
+  }
+
+  async updateChatGroup(id: string, updates: Partial<ChatGroup>): Promise<ChatGroup | undefined> {
+    const [updated] = await db
+      .update(chatGroups)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(chatGroups.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteChatGroup(id: string): Promise<boolean> {
+    const allDescendants = async (parentId: string): Promise<string[]> => {
+      const children = await db.select().from(chatGroups).where(eq(chatGroups.parentId, parentId));
+      const ids: string[] = [];
+      for (const child of children) {
+        ids.push(child.id);
+        ids.push(...await allDescendants(child.id));
+      }
+      return ids;
+    };
+    const descendantIds = await allDescendants(id);
+    const allIds = [id, ...descendantIds];
+    for (const gid of allIds) {
+      await db.update(chatSessions).set({ groupId: null }).where(eq(chatSessions.groupId, gid));
+    }
+    for (const gid of [...descendantIds].reverse()) {
+      await db.delete(chatGroups).where(eq(chatGroups.id, gid));
+    }
+    await db.delete(chatGroups).where(eq(chatGroups.id, id));
+    return true;
+  }
+
+  async getChatSessions(includeArchived = false): Promise<ChatSession[]> {
+    if (includeArchived) {
+      return db.select().from(chatSessions).orderBy(desc(chatSessions.updatedAt));
+    }
+    return db.select().from(chatSessions)
+      .where(and(eq(chatSessions.isArchived, false), sql`${chatSessions.status} != 'archived'`))
+      .orderBy(desc(chatSessions.updatedAt));
   }
 
   async getChatSession(id: string): Promise<ChatSession | undefined> {

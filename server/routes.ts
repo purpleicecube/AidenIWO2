@@ -2142,9 +2142,65 @@ export async function registerRoutes(
     };
   }
 
-  app.get("/api/chat/sessions", isAuth, requireRole("viewer"), async (_req, res) => {
+  app.get("/api/chat/groups", isAuth, requireRole("viewer"), async (_req, res) => {
     try {
-      const sessions = await storage.getChatSessions();
+      const groups = await storage.getChatGroups();
+      res.json(groups);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch chat groups" });
+    }
+  });
+
+  app.post("/api/chat/groups", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(1),
+        parentId: z.string().nullable().optional(),
+        color: z.string().nullable().optional(),
+        sortOrder: z.number().optional(),
+        isCollapsed: z.boolean().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+      const group = await storage.createChatGroup(parsed.data);
+      res.json(group);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create chat group" });
+    }
+  });
+
+  app.put("/api/chat/groups/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(1).optional(),
+        parentId: z.string().nullable().optional(),
+        color: z.string().nullable().optional(),
+        sortOrder: z.number().optional(),
+        isCollapsed: z.boolean().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+      const updated = await storage.updateChatGroup(req.params.id, parsed.data);
+      if (!updated) return res.status(404).json({ message: "Group not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update chat group" });
+    }
+  });
+
+  app.delete("/api/chat/groups/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      await storage.deleteChatGroup(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete chat group" });
+    }
+  });
+
+  app.get("/api/chat/sessions", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const includeArchived = req.query.includeArchived === "true";
+      const sessions = await storage.getChatSessions(includeArchived);
       res.json(sessions);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch chat sessions" });
@@ -2180,14 +2236,46 @@ export async function registerRoutes(
       const updateSchema = z.object({
         title: z.string().optional(),
         status: z.enum(["active", "archived"]).optional(),
+        groupId: z.string().nullable().optional(),
+        isArchived: z.boolean().optional(),
       });
       const parsed = updateSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
-      const updated = await storage.updateChatSession(req.params.id, parsed.data);
+      const updates: any = { ...parsed.data };
+      if (parsed.data.isArchived === true) {
+        updates.archivedAt = new Date();
+      } else if (parsed.data.isArchived === false) {
+        updates.archivedAt = null;
+      }
+      const updated = await storage.updateChatSession(req.params.id, updates);
       if (!updated) return res.status(404).json({ message: "Session not found" });
       res.json(updated);
     } catch (err) {
       res.status(500).json({ message: "Failed to update chat session" });
+    }
+  });
+
+  app.post("/api/chat/sessions/bulk-update", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const schema = z.object({
+        sessionIds: z.array(z.string()),
+        groupId: z.string().nullable().optional(),
+        isArchived: z.boolean().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+      const updates: any = {};
+      if (parsed.data.groupId !== undefined) updates.groupId = parsed.data.groupId;
+      if (parsed.data.isArchived !== undefined) {
+        updates.isArchived = parsed.data.isArchived;
+        updates.archivedAt = parsed.data.isArchived ? new Date() : null;
+      }
+      const results = await Promise.all(
+        parsed.data.sessionIds.map(id => storage.updateChatSession(id, updates))
+      );
+      res.json({ updated: results.filter(Boolean).length });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to bulk update sessions" });
     }
   });
 
