@@ -298,7 +298,7 @@ export default function ChatPage() {
             <Button
               size="icon"
               variant="ghost"
-              className="invisible group-hover:visible h-6 w-6 flex-shrink-0"
+              className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100"
               onClick={(e) => e.stopPropagation()}
               data-testid={`button-session-menu-${session.id}`}
             >
@@ -474,7 +474,7 @@ export default function ChatPage() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="invisible group-hover:visible h-5 w-5 flex-shrink-0"
+                className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
                 data-testid={`button-group-menu-${group.id}`}
               >
