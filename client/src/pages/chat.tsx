@@ -298,7 +298,7 @@ export default function ChatPage() {
         <Button
           size="icon"
           variant="ghost"
-          className={`h-5 w-5 flex-shrink-0 transition-opacity ${session.isArchived ? "opacity-70" : "opacity-0 group-hover:opacity-100"}`}
+          className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
           onClick={(e) => {
             e.stopPropagation();
             const archiving = !session.isArchived;
