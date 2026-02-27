@@ -295,26 +295,6 @@ export default function ChatPage() {
         <span className="flex-1 truncate text-xs">
           {session.title || "New Conversation"}
         </span>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation();
-            const archiving = !session.isArchived;
-            updateSessionMutation.mutate({ id: session.id, isArchived: archiving });
-            if (archiving && activeSessionId === session.id) setActiveSessionId(null);
-            toast({ title: archiving ? "Chat archived" : "Chat unarchived" });
-          }}
-          title={session.isArchived ? "Unarchive" : "Archive"}
-          data-testid={`button-archive-toggle-${session.id}`}
-        >
-          {session.isArchived ? (
-            <ArchiveRestore className="w-3 h-3" />
-          ) : (
-            <Archive className="w-3 h-3" />
-          )}
-        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -567,6 +547,25 @@ export default function ChatPage() {
               data-testid="button-new-group"
             >
               <FolderPlus className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              disabled={!activeSessionId}
+              onClick={() => {
+                if (!activeSessionId) return;
+                const session = sessions.find(s => s.id === activeSessionId);
+                if (!session) return;
+                const archiving = !session.isArchived;
+                updateSessionMutation.mutate({ id: activeSessionId, isArchived: archiving });
+                if (archiving) setActiveSessionId(null);
+                toast({ title: archiving ? "Chat archived" : "Chat unarchived" });
+              }}
+              title={activeSessionId ? (sessions.find(s => s.id === activeSessionId)?.isArchived ? "Unarchive current chat" : "Archive current chat") : "Select a chat to archive"}
+              data-testid="button-archive-current"
+            >
+              <Archive className="w-3.5 h-3.5" />
             </Button>
             <Button
               size="icon"
