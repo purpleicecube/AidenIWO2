@@ -8,6 +8,7 @@ import {
   llmRefine,
   effectiveConfigToSettings,
 } from "./llm-client";
+import { executeTool, getAvailableToolsForAgent, type ToolExecResult } from "./tool-executor";
 
 function shouldBlockFallback(order: WorkOrder): { blocked: boolean; reason: string | null } {
   if (order.type === "incident" && order.priority === "critical") {
@@ -106,6 +107,8 @@ export interface SharedDict {
   deliverableType: "document" | "code" | "image" | "mixed";
   deliverableTitle: string;
 
+  availableTools: Array<{ slug: string; name: string; type: string; description: string }>;
+  toolResults: ToolExecResult[];
   logs: Array<{ node: string; message: string; metadata?: any }>;
 }
 
@@ -146,6 +149,8 @@ function createSharedDict(
     finalMessage: "",
     deliverableType: "document",
     deliverableTitle: "",
+    availableTools: [],
+    toolResults: [],
     logs: [],
   };
 }
@@ -261,7 +266,8 @@ async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
       dict.tier1Result,
       isRefinement ? existingGaps : [],
       isRefinement ? existingOutputs : {},
-      apiKey
+      apiKey,
+      dict.availableTools
     );
 
     if (isRefinement) {
@@ -380,6 +386,7 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
       stepId: step.id,
       stepName: step.name,
       parallel: readySteps.length > 1,
+      availableTools: dict.availableTools.map(t => t.slug),
     });
 
     try {
@@ -392,7 +399,8 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
           dict.workOrder,
           step,
           dict.accumulatedOutputs,
-          apiKey
+          apiKey,
+          dict.availableTools
         );
 
         if (result.blocked) {
@@ -415,6 +423,61 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
         }
 
         step.output = result.output || "";
+
+        if (result.toolCalls && result.toolCalls.length > 0) {
+          for (const tc of result.toolCalls) {
+            await emitNodeLog(dict, "ToolCall", `Executing tool "${tc.toolSlug}" with input: ${tc.input.slice(0, 100)}`, {
+              stepId: step.id,
+              toolSlug: tc.toolSlug,
+            });
+
+            const agentId = dict.workOrder.assignedSubAgentId || "aiden-tier2";
+            const toolResult = await executeTool(tc.toolSlug, tc.input, agentId, dict.workOrder.id);
+            dict.toolResults.push(toolResult);
+
+            if (toolResult.success) {
+              await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" returned ${toolResult.output.length} chars in ${toolResult.durationMs}ms`, {
+                stepId: step.id,
+                toolSlug: tc.toolSlug,
+                leaseId: toolResult.leaseId,
+                durationMs: toolResult.durationMs,
+              });
+
+              const toolOutputSection = `\n\n---\n### Tool Result: ${toolResult.toolName}\n${toolResult.output}`;
+              const combinedOutput = (step.output || "") + toolOutputSection;
+
+              if (settings) {
+                try {
+                  const synthesisResult = await llmExecStep(
+                    settings,
+                    systemPrompt,
+                    dict.workOrder,
+                    { ...step, description: `${step.description}\n\nTool "${toolResult.toolName}" returned the following data. Synthesize it into your deliverable:\n${toolResult.output.slice(0, 3000)}` },
+                    dict.accumulatedOutputs,
+                    apiKey
+                  );
+                  if (!synthesisResult.blocked && synthesisResult.output) {
+                    step.output = synthesisResult.output;
+                  } else {
+                    step.output = combinedOutput;
+                  }
+                } catch (synthErr: any) {
+                  await emitNodeLog(dict, "ToolCall", `Synthesis after tool call failed, keeping raw output: ${synthErr.message}`, { stepId: step.id });
+                  step.output = combinedOutput;
+                }
+              } else {
+                step.output = combinedOutput;
+              }
+            } else {
+              await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" failed: ${toolResult.error}`, {
+                stepId: step.id,
+                toolSlug: tc.toolSlug,
+                error: toolResult.error,
+              });
+              step.output = (step.output || "") + `\n\n> Tool "${toolResult.toolName}" failed: ${toolResult.error}`;
+            }
+          }
+        }
       }
 
       step.status = "completed";
@@ -429,6 +492,7 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
       await emitNodeLog(dict, "ExecStep", `Step "${step.name}" completed`, {
         stepId: step.id,
         outputLength: (step.output || "").length,
+        toolsUsed: dict.toolResults.filter(r => r.success).map(r => r.toolSlug),
       });
     } catch (err: any) {
       step.status = "failed";
@@ -689,10 +753,18 @@ export async function pocketflowExecute(
     options?.convergenceThreshold ?? 0.8
   );
 
+  try {
+    const tools = await getAvailableToolsForAgent(order.assignedSubAgentId || undefined);
+    dict.availableTools = tools;
+  } catch (err: any) {
+    console.error("Failed to load available tools:", err.message);
+  }
+
   await emitNodeLog(dict, "PocketFlow", `Starting iterative execution for "${order.title}"`, {
     maxIterations: dict.maxIterations,
     convergenceThreshold: dict.convergenceThreshold,
     hasLLM: !!llmConfig || !!settings?.enabled,
+    availableTools: dict.availableTools.map(t => t.slug),
   });
 
   const validateResult = await nodeValidateWorkOrder(dict);
@@ -776,6 +848,13 @@ function buildBlockedResult(dict: SharedDict): Tier2Result {
 }
 
 function buildSuccessResult(dict: SharedDict): Tier2Result {
+  const toolsUsed = dict.toolResults.filter(r => r.success).map(r => ({
+    slug: r.toolSlug,
+    name: r.toolName,
+    durationMs: r.durationMs,
+    leaseId: r.leaseId,
+  }));
+
   return {
     blocked: false,
     reason: null,
@@ -792,6 +871,7 @@ function buildSuccessResult(dict: SharedDict): Tier2Result {
       convergenceScore: dict.evaluationScore,
       stepResults: dict.stepResults,
       refinementHistory: dict.refinementHistory,
+      toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
     },
   };
 }

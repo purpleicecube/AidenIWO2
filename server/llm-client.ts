@@ -175,10 +175,17 @@ const planStepsSchema = z.array(z.object({
   dependencies: z.array(z.string()).default([]),
 }));
 
+const toolCallSchema = z.object({
+  toolSlug: z.string(),
+  input: z.string(),
+});
+
 const execStepResultSchema = z.object({
   blocked: z.boolean(),
   reason: z.string().nullable().optional(),
   output: z.string().optional(),
+  tool_calls: z.array(toolCallSchema).optional(),
+  toolCalls: z.array(toolCallSchema).optional(),
 });
 
 const evaluateResultSchema = z.object({
@@ -707,7 +714,8 @@ export async function llmPlanSteps(
   tier1Result: Tier1Result,
   existingGaps: string[],
   existingOutputs: Record<string, string>,
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  availableTools?: Array<{ slug: string; name: string; type: string; description: string }>
 ): Promise<Array<{ id: string; name: string; description: string; dependencies: string[] }>> {
   const isRefinement = existingGaps.length > 0;
   const existingContext = Object.entries(existingOutputs).length > 0
@@ -724,8 +732,15 @@ export async function llmPlanSteps(
     ? `\n\nSANDBOX EXECUTION NOTICE: This work order targets the Sandbox environment. The Sandbox renders content in a browser iframe. You MUST produce self-contained HTML5 + JavaScript (using Canvas, DOM, or vanilla JS). Do NOT use Python, pygame, server-side languages, or frameworks requiring npm/build tools. All code must run directly in a browser with zero dependencies. For games, use HTML5 Canvas. For data/charts, use inline SVG or Canvas. For utilities, use vanilla JavaScript with DOM output.`
     : "";
 
+  const toolsContext = availableTools && availableTools.length > 0
+    ? `\n\nAVAILABLE TOOLS (you can use these during step execution):
+${availableTools.map(t => `- **${t.name}** (slug: "${t.slug}", type: ${t.type}): ${t.description}`).join("\n")}
+
+When planning steps, if a step would benefit from using a tool (e.g., web search, data processing), mention the tool by slug in the step description like: "Use tool [brave-search] to research X". The execution engine will detect tool references and execute them automatically.`
+    : "";
+
   const prompt = `You are executing a work order as a Tier 2 sub-agent. Break the work order into concrete execution steps.
-${gapsContext}${sandboxGuidance}
+${gapsContext}${sandboxGuidance}${toolsContext}
 Each step should be a discrete unit of work. Steps can declare dependencies on other steps by ID.
 Independent steps (no dependencies) will be executed in PARALLEL for efficiency.
 
@@ -758,8 +773,9 @@ export async function llmExecStep(
   order: WorkOrder,
   step: { id: string; name: string; description: string },
   previousOutputs: Record<string, string>,
-  apiKeyOverride?: string
-): Promise<{ blocked: boolean; reason?: string | null; output?: string }> {
+  apiKeyOverride?: string,
+  availableTools?: Array<{ slug: string; name: string; type: string; description: string }>
+): Promise<{ blocked: boolean; reason?: string | null; output?: string; toolCalls?: Array<{ toolSlug: string; input: string }> }> {
   const contextEntries = Object.entries(previousOutputs);
   const prevContext = contextEntries.length > 0
     ? `\nPrevious step outputs available:\n${contextEntries.map(([id, out]) => `--- ${id} ---\n${out}`).join("\n\n")}`
@@ -777,11 +793,20 @@ export async function llmExecStep(
     ? `\nSANDBOX EXECUTION: This runs in a browser iframe. Output MUST be self-contained HTML5 + JavaScript. Use Canvas API for graphics/games, vanilla JS for logic, inline CSS for styling. NO Python, NO server-side code, NO npm packages. The code must work in a single HTML file with zero external dependencies.\n`
     : "";
 
+  const toolsSection = availableTools && availableTools.length > 0
+    ? `\n\nAVAILABLE TOOLS you can invoke:
+${availableTools.map(t => `- "${t.slug}" — ${t.name}: ${t.description}`).join("\n")}
+
+To use a tool, include a "tool_calls" array in your JSON response. Each tool call needs a "toolSlug" and "input" string.
+Example: "tool_calls": [{"toolSlug": "brave-search", "input": "your search query"}]
+The tool results will be provided back to you for synthesis. You can include both "output" (your initial content) and "tool_calls" in the same response.`
+    : "";
+
   const prompt = `You are executing step "${step.name}" of a work order.
 
 Step description: ${step.description}
 ${prevContext}
-${reopenContext}${gccContext}${sandboxExecGuidance}
+${reopenContext}${gccContext}${sandboxExecGuidance}${toolsSection}
 Work Order Context:
 - Title: ${order.title}
 - Description: ${order.description}
@@ -790,12 +815,14 @@ Work Order Context:
 
 IMPORTANT: Produce the ACTUAL deliverable content for this step. Write the real work product — not a summary or status.
 If this step cannot be executed (missing info, external dependency, etc.), set blocked=true.
+If the step description mentions using a tool, you SHOULD include tool_calls in your response.
 
 Respond with ONLY a JSON object:
 {
   "blocked": false,
   "reason": null,
-  "output": "THE ACTUAL CONTENT/DELIVERABLE FOR THIS STEP in markdown"
+  "output": "THE ACTUAL CONTENT/DELIVERABLE FOR THIS STEP in markdown",
+  "tool_calls": []
 }`;
 
   try {
@@ -803,7 +830,9 @@ Respond with ONLY a JSON object:
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : raw;
     const parsed = safeJsonParse(jsonStr);
-    return execStepResultSchema.parse(parsed);
+    const result = execStepResultSchema.parse(parsed);
+    const toolCalls = result.toolCalls || result.tool_calls || [];
+    return { blocked: result.blocked, reason: result.reason, output: result.output, toolCalls };
   } catch (jsonErr: any) {
     const fallbackPrompt = `You are executing step "${step.name}" of a work order.
 
