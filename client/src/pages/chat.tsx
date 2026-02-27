@@ -42,8 +42,6 @@ import {
   ArchiveRestore,
   Pencil,
   FolderInput,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -81,9 +79,9 @@ export default function ChatPage() {
   });
 
   const sessionsQuery = useQuery<ChatSession[]>({
-    queryKey: ["/api/chat/sessions", showArchived ? "all" : "active"],
+    queryKey: ["/api/chat/sessions", "all"],
     queryFn: async () => {
-      const res = await fetch(`/api/chat/sessions${showArchived ? "?includeArchived=true" : ""}`);
+      const res = await fetch("/api/chat/sessions?includeArchived=true");
       if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
     },
@@ -569,16 +567,6 @@ export default function ChatPage() {
             </Button>
             <Button
               size="icon"
-              variant={showArchived ? "secondary" : "ghost"}
-              className="h-7 w-7"
-              onClick={() => setShowArchived(!showArchived)}
-              title={showArchived ? "Hide archived" : "Show archived"}
-              data-testid="button-toggle-archived"
-            >
-              {showArchived ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </Button>
-            <Button
-              size="icon"
               variant="ghost"
               className="h-7 w-7"
               onClick={handleNewChat}
@@ -591,6 +579,42 @@ export default function ChatPage() {
         </div>
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-0.5">
+            <div data-testid="archive-folder">
+              <div
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors"
+                onClick={() => setShowArchived(!showArchived)}
+                onDragOver={(e) => {
+                  if (!dragSessionId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragSessionId) {
+                    updateSessionMutation.mutate({ id: dragSessionId, isArchived: true, groupId: null });
+                    if (activeSessionId === dragSessionId) setActiveSessionId(null);
+                    toast({ title: "Chat archived" });
+                  }
+                  setDragSessionId(null);
+                }}
+                data-testid="archive-folder-header"
+              >
+                {showArchived ? (
+                  <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                )}
+                <Archive className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                <span className="flex-1 truncate">Archive</span>
+                <span className="text-[10px] text-muted-foreground/50">{archivedSessions.length}</span>
+              </div>
+              {showArchived && archivedSessions.length > 0 && (
+                <div className="ml-2">
+                  {archivedSessions.map(renderSessionItem)}
+                </div>
+              )}
+            </div>
+            <div className="border-t my-2" />
             {rootGroups.map((g) => renderGroup(g))}
             {rootGroups.length > 0 && ungroupedSessions.length > 0 && (
               <div className="border-t my-2" />
@@ -627,16 +651,6 @@ export default function ChatPage() {
               )}
             </div>
             {ungroupedSessions.map(renderSessionItem)}
-            {showArchived && archivedSessions.length > 0 && (
-              <>
-                <div className="border-t my-2" />
-                <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                  <Archive className="w-3 h-3" />
-                  Archived ({archivedSessions.length})
-                </div>
-                {archivedSessions.map(renderSessionItem)}
-              </>
-            )}
             {sessions.length === 0 && !sessionsQuery.isLoading && (
               <p className="text-xs text-muted-foreground text-center py-4">
                 No conversations yet
