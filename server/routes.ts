@@ -541,11 +541,9 @@ export async function registerRoutes(
       if (!order) {
         return res.status(404).json({ message: "Work order not found" });
       }
-      if (order.status !== "blocked" && order.status !== "deferred") {
-        return res.status(400).json({ message: `Cannot unblock order in '${order.status}' status — only 'blocked' or 'deferred' orders can be unblocked` });
-      }
-      if (order.status !== "deferred" && !order.bdmMarker) {
-        return res.status(400).json({ message: "No BDM marker to resolve on this work order" });
+      const unblockableStatuses = ["blocked", "deferred", "awaiting_operator", "failed"];
+      if (!unblockableStatuses.includes(order.status)) {
+        return res.status(400).json({ message: `Cannot unblock order in '${order.status}' status — only blocked, deferred, awaiting_operator, or failed orders can be re-issued` });
       }
 
       const bdmSnapshot = order.bdmMarker;
@@ -553,7 +551,8 @@ export async function registerRoutes(
       const gcc = (order.gccMemory || {}) as Record<string, any>;
 
       const commitId = `gcc-${Math.random().toString(16).slice(2, 10)}`;
-      const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || []), "hitl_unblock"];
+      const breadcrumbLabel = order.bdmMarker ? "hitl_unblock" : `hitl_reissue_from_${order.status}`;
+      const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || gcc.breadcrumbs || []), breadcrumbLabel];
       const commitIndex = [...(gcc["gcc.commit_index"] || [])];
       commitIndex.push({
         commit_id: commitId,
@@ -586,7 +585,7 @@ export async function registerRoutes(
           unblockedAt: now,
           unblockedBy: getActor(req),
           resolution,
-          bdmCleared: true,
+          bdmCleared: !!bdmSnapshot,
           reprocessed: reprocess,
         },
       };

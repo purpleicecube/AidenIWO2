@@ -621,18 +621,43 @@ export default function WorkOrderDetail() {
                 </>
               )}
               {order.status === "awaiting_operator" && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDeferReason("");
-                    setDeferUntil("");
-                    setDeferDialogOpen(true);
-                  }}
-                  data-testid="button-defer-awaiting"
-                >
-                  <CalendarClock className="w-4 h-4 mr-2" />
-                  Defer Decision
-                </Button>
+                <>
+                  <Button
+                    onClick={() => reissueMutation.mutate()}
+                    disabled={reissueMutation.isPending}
+                    data-testid="button-reissue-awaiting"
+                  >
+                    {reissueMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <ArrowRightCircle className="w-4 h-4 mr-2" />
+                    )}
+                    {reissueMutation.isPending ? "Re-issuing..." : "Re-issue to Aiden"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCloseReason("");
+                      setCloseDialogOpen(true);
+                    }}
+                    data-testid="button-close-awaiting"
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Close Without Processing
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDeferReason("");
+                      setDeferUntil("");
+                      setDeferDialogOpen(true);
+                    }}
+                    data-testid="button-defer-awaiting"
+                  >
+                    <CalendarClock className="w-4 h-4 mr-2" />
+                    Defer Decision
+                  </Button>
+                </>
               )}
               {isAdmin && !order.isArchived && (
                 <Button

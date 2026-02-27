@@ -192,7 +192,34 @@ function NeedsAttentionBanner({ orders, canAct }: { orders: WorkOrder[]; canAct:
                       <TooltipContent><p className="text-xs">Retry this failed work order</p></TooltipContent>
                     </Tooltip>
                   )}
-                  {order.status === "awaiting_operator" && (
+                  {canAct && order.status === "awaiting_operator" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 text-xs px-2.5"
+                          disabled={isActioning}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActioningId(order.id);
+                            reissueMutation.mutate(order.id);
+                          }}
+                          data-testid={`button-quick-reissue-awaiting-${order.id}`}
+                        >
+                          {isActioning && reissueMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                          )}
+                          Re-issue
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="text-xs">Re-issue to Aiden for re-processing</p></TooltipContent>
+                    </Tooltip>
+                  )}
+                  {!canAct && order.status === "awaiting_operator" && (
                     <Badge variant="outline" className="border-transparent bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate text-[10px] h-6">
                       <UserCheck className="w-3 h-3 mr-1" />
                       Awaiting
