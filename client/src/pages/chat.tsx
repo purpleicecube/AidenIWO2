@@ -298,11 +298,12 @@ export default function ChatPage() {
             <Button
               size="icon"
               variant="ghost"
-              className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100"
+              className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+              style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, padding: 0 }}
               onClick={(e) => e.stopPropagation()}
               data-testid={`button-session-menu-${session.id}`}
             >
-              <MoreHorizontal className="w-3 h-3" />
+              <MoreHorizontal style={{ width: 14, height: 14 }} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
@@ -458,7 +459,8 @@ export default function ChatPage() {
             <Button
               size="icon"
               variant="ghost"
-              className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100 text-destructive"
+              className="flex-shrink-0 text-destructive hover:text-destructive"
+              style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, padding: 0 }}
               onClick={(e) => {
                 e.stopPropagation();
                 deleteGroupMutation.mutate(group.id);
@@ -466,7 +468,7 @@ export default function ChatPage() {
               title="Delete empty folder"
               data-testid={`button-delete-empty-group-${group.id}`}
             >
-              <Trash2 className="w-3 h-3" />
+              <Trash2 style={{ width: 14, height: 14 }} />
             </Button>
           )}
           <DropdownMenu>
@@ -474,11 +476,12 @@ export default function ChatPage() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-5 w-5 flex-shrink-0 opacity-50 hover:opacity-100"
+                className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+                style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, padding: 0 }}
                 onClick={(e) => e.stopPropagation()}
                 data-testid={`button-group-menu-${group.id}`}
               >
-                <MoreHorizontal className="w-3 h-3" />
+                <MoreHorizontal style={{ width: 14, height: 14 }} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
