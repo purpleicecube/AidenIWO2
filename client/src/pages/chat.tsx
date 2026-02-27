@@ -66,6 +66,9 @@ export default function ChatPage() {
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [dragSessionId, setDragSessionId] = useState<string | null>(null);
+  const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null);
+  const [dropTargetUngrouped, setDropTargetUngrouped] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -269,11 +272,22 @@ export default function ChatPage() {
     return (
       <div
         key={session.id}
+        draggable={!session.isArchived}
+        onDragStart={(e) => {
+          setDragSessionId(session.id);
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", session.id);
+        }}
+        onDragEnd={() => {
+          setDragSessionId(null);
+          setDropTargetGroupId(null);
+          setDropTargetUngrouped(false);
+        }}
         className={`group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm transition-colors ${
           activeSessionId === session.id
             ? "bg-accent text-accent-foreground"
             : "hover:bg-muted/60"
-        }`}
+        } ${dragSessionId === session.id ? "opacity-50" : ""}`}
         onClick={() => setActiveSessionId(session.id)}
         data-testid={`session-item-${session.id}`}
       >
@@ -396,8 +410,37 @@ export default function ChatPage() {
     return (
       <div key={group.id} style={{ paddingLeft: depth > 0 ? `${depth * 12}px` : undefined }}>
         <div
-          className="group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors"
+          className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors ${
+            dropTargetGroupId === group.id ? "bg-primary/15 ring-1 ring-primary/40" : ""
+          }`}
           onClick={() => toggleGroupCollapsed(group.id)}
+          onDragOver={(e) => {
+            if (!dragSessionId) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            setDropTargetGroupId(group.id);
+            setDropTargetUngrouped(false);
+          }}
+          onDragEnter={() => {
+            if (!dragSessionId) return;
+            if (collapsedGroups.has(group.id)) {
+              toggleGroupCollapsed(group.id);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (dropTargetGroupId === group.id && !e.currentTarget.contains(e.relatedTarget as Node)) {
+              setDropTargetGroupId(null);
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragSessionId) {
+              updateSessionMutation.mutate({ id: dragSessionId, groupId: group.id });
+              toast({ title: `Moved to ${group.name}` });
+            }
+            setDragSessionId(null);
+            setDropTargetGroupId(null);
+          }}
           data-testid={`group-${group.id}`}
         >
           {hasContent ? (
@@ -536,6 +579,37 @@ export default function ChatPage() {
             {rootGroups.length > 0 && ungroupedSessions.length > 0 && (
               <div className="border-t my-2" />
             )}
+            <div
+              className={`min-h-[8px] rounded-md transition-colors ${
+                dropTargetUngrouped && dragSessionId ? "bg-primary/10 ring-1 ring-primary/30 min-h-[32px] flex items-center justify-center" : ""
+              }`}
+              onDragOver={(e) => {
+                if (!dragSessionId) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDropTargetUngrouped(true);
+                setDropTargetGroupId(null);
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setDropTargetUngrouped(false);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragSessionId) {
+                  updateSessionMutation.mutate({ id: dragSessionId, groupId: null });
+                  toast({ title: "Removed from group" });
+                }
+                setDragSessionId(null);
+                setDropTargetUngrouped(false);
+              }}
+              data-testid="drop-zone-ungrouped"
+            >
+              {dropTargetUngrouped && dragSessionId && (
+                <span className="text-[10px] text-primary/60">Drop here to ungroup</span>
+              )}
+            </div>
             {ungroupedSessions.map(renderSessionItem)}
             {showArchived && archivedSessions.length > 0 && (
               <>
