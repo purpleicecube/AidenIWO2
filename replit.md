@@ -28,7 +28,7 @@ I want to be kept informed about the status of work orders, particularly when hu
 **Styling:** Tailwind CSS with Inter font family, offering dark/light theme support.
 
 **Core Architectural Patterns & Design Decisions:**
-- **Two-Tier Orchestration:** Clear separation of concerns with Aiden managing high-level decisions and sub-agents handling execution.
+- **Two-Tier Orchestration:** Clear separation of concerns with Aiden managing high-level decisions and sub-agents handling execution. Aiden performs a mandatory Tier 1 quality review (`runAidenQualityReview` in `llm-client.ts`) before any work order is marked complete. The review evaluates the deliverable against original requirements, produces a score/recommendation, and can gate completion: `approve` → completed, `request_revision` → awaiting_operator, `block` → blocked with BDM marker. Quality review results are recorded in execution logs and GCC memory.
 - **Multi-Provider LLM Abstraction:** Supports various LLM providers with a unified interface and structured JSON parsing for robust decision-making.
 - **PocketFlow Iterative Execution Engine:** A sophisticated Tier 2 execution engine that enables iterative planning, execution, evaluation, and refinement of steps, supporting parallel execution and delta-only refinement for efficiency.
 - **GCC Memory Protocol:** Utilizes a shared context mechanism (WS014 P_PODE contract) for consistent state management across tiers.

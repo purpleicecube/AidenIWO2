@@ -1020,3 +1020,88 @@ export async function fetchAvailableModels(provider: string): Promise<ProviderMo
     return [];
   }
 }
+
+export interface AidenQualityReview {
+  approved: boolean;
+  score: number;
+  summary: string;
+  issues: string[];
+  recommendation: "approve" | "request_revision" | "block";
+}
+
+export async function runAidenQualityReview(
+  settings: LlmSettings,
+  order: WorkOrder,
+  deliverable: string,
+  convergenceScore: number,
+  iterations: number,
+  stepCount: number,
+  executorName: string
+): Promise<AidenQualityReview> {
+  const deliverablePreview = deliverable.length > 4000
+    ? deliverable.substring(0, 4000) + "\n... [truncated for review]"
+    : deliverable;
+
+  const prompt = `You are Aiden, the Tier 1 orchestration manager. A sub-agent has completed execution on a work order. You must perform a final quality review before approving completion.
+
+Review the deliverable against the original work order requirements and provide your assessment.
+
+Respond with ONLY a JSON object:
+{
+  "approved": true/false,
+  "score": 0.0-1.0,
+  "summary": "brief assessment of deliverable quality",
+  "issues": ["issue1", "issue2"],
+  "recommendation": "approve" | "request_revision" | "block"
+}
+
+Rules:
+- "approve" if the deliverable adequately addresses the work order requirements
+- "request_revision" if the deliverable is partially complete but has significant gaps
+- "block" only if the deliverable is fundamentally wrong or harmful
+- Be pragmatic — good-enough deliverables should be approved with noted improvements
+- Score reflects overall quality: 0.8+ is good, 0.6-0.8 needs improvement, below 0.6 is inadequate
+
+Work Order:
+- Title: ${order.title}
+- Description: ${order.description || "No description"}
+- Type: ${order.type}
+- Priority: ${order.priority}
+
+Execution Metadata:
+- Executor: ${executorName}
+- PocketFlow Score: ${convergenceScore.toFixed(2)}
+- Iterations: ${iterations}
+- Steps Completed: ${stepCount}
+
+Deliverable:
+${deliverablePreview}`;
+
+  try {
+    const raw = await callLLM(settings, settings.systemPrompt || "You are Aiden, the Tier 1 orchestration manager.", prompt);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+    const parsed = safeJsonParse(jsonStr);
+
+    const approved = parsed.approved === true;
+    const hasValidRecommendation = ["approve", "request_revision", "block"].includes(parsed.recommendation);
+    const recommendation = hasValidRecommendation ? parsed.recommendation : (approved ? "approve" : "request_revision");
+
+    return {
+      approved,
+      score: typeof parsed.score === "number" ? Math.min(1, Math.max(0, parsed.score)) : 0.7,
+      summary: parsed.summary || "Review completed",
+      issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+      recommendation,
+    };
+  } catch (err: any) {
+    console.error("Aiden quality review LLM error:", err.message);
+    return {
+      approved: true,
+      score: convergenceScore,
+      summary: `Auto-approved (review LLM unavailable: ${err.message}). Manual review recommended.`,
+      issues: ["Quality review LLM call failed — deliverable not independently verified"],
+      recommendation: "approve",
+    };
+  }
+}

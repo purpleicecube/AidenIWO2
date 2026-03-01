@@ -1,6 +1,6 @@
 import { storage } from "./storage";
 import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun } from "@shared/schema";
-import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, type Tier1Result, type Tier2Result } from "./llm-client";
+import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, runAidenQualityReview, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
 import { pocketflowExecute } from "./pocketflow";
 
@@ -225,11 +225,110 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     metadata: { ...tier2Result, llmSource, llmProvider: effectiveLlmConfig?.provider, llmModel: effectiveLlmConfig?.model },
   });
 
+  const deliverable = tier2Result.output?.deliverable || "";
+  const convergenceScore = pfMeta?.convergenceScore ?? 0;
+  const iterations = pfMeta?.iterations ?? 1;
+  const stepCount = pfMeta?.stepResults?.length ?? 0;
+
+  let qualityReview;
+  if (useLLM && settings) {
+    await storage.createExecutionLog({
+      workOrderId: orderId,
+      tier: 1,
+      action: "Aiden: Quality Review",
+      message: `Aiden (Tier 1) initiating final quality review of deliverable before completion approval.`,
+      metadata: { deliverableLength: deliverable.length, convergenceScore, iterations, stepCount },
+    });
+
+    qualityReview = await runAidenQualityReview(
+      settings,
+      order,
+      deliverable,
+      convergenceScore,
+      iterations,
+      stepCount,
+      executorLabel
+    );
+
+    await storage.createExecutionLog({
+      workOrderId: orderId,
+      tier: 1,
+      action: `Aiden: Quality ${qualityReview.approved ? "Approved" : "Flagged"}`,
+      message: `Aiden quality review: ${qualityReview.summary} | Score: ${qualityReview.score.toFixed(2)} | Recommendation: ${qualityReview.recommendation}${qualityReview.issues.length > 0 ? ` | Issues: ${qualityReview.issues.join("; ")}` : ""}`,
+      metadata: {
+        qualityScore: qualityReview.score,
+        recommendation: qualityReview.recommendation,
+        issues: qualityReview.issues,
+        summary: qualityReview.summary,
+        approved: qualityReview.approved,
+      },
+    });
+  } else {
+    qualityReview = {
+      approved: true,
+      score: convergenceScore,
+      summary: "Auto-approved (LLM not enabled for Tier 1 review)",
+      issues: [] as string[],
+      recommendation: "approve" as const,
+    };
+  }
+
+  if (qualityReview.recommendation === "block") {
+    await storage.createExecutionLog({
+      workOrderId: orderId,
+      tier: 1,
+      action: "Aiden: Quality Blocked",
+      message: `Aiden blocked deliverable from ${executorLabel} — quality score: ${qualityReview.score.toFixed(2)}. Issues: ${qualityReview.issues.join("; ") || qualityReview.summary}. Requires HITL intervention.`,
+      metadata: {
+        finalStatus: "blocked",
+        executedBy: llmSource,
+        executorName: targetSubAgent?.name,
+        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues, summary: qualityReview.summary },
+      },
+    });
+
+    return storage.updateWorkOrder(orderId, {
+      status: "blocked",
+      tier2Result,
+      bdmMarker: { type: "quality_block", reason: `Aiden quality review: ${qualityReview.summary}`, tier: 1, timestamp: new Date().toISOString(), issues: qualityReview.issues },
+      gccMemory: updateWorkOrderGcc(order.gccMemory as object, "quality_blocked", ["tier1_policy_pass", "pocketflow_execution_complete", "aiden_quality_review", "aiden_quality_blocked"], {
+        correlationId: order.correlationId, status: "blocked",
+        pocketflow: tier2Result.pocketflow,
+        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues },
+      }),
+    });
+  }
+
+  if (qualityReview.recommendation === "request_revision" && !qualityReview.approved) {
+    await storage.createExecutionLog({
+      workOrderId: orderId,
+      tier: 1,
+      action: "Aiden: Revision Requested",
+      message: `Aiden requests revision from ${executorLabel} — quality score: ${qualityReview.score.toFixed(2)}. Issues: ${qualityReview.issues.join("; ") || qualityReview.summary}. Awaiting operator review.`,
+      metadata: {
+        finalStatus: "awaiting_operator",
+        executedBy: llmSource,
+        executorName: targetSubAgent?.name,
+        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues, summary: qualityReview.summary },
+      },
+    });
+
+    return storage.updateWorkOrder(orderId, {
+      status: "awaiting_operator",
+      tier2Result,
+      gccMemory: updateWorkOrderGcc(order.gccMemory as object, "revision_requested", ["tier1_policy_pass", "pocketflow_execution_complete", "aiden_quality_review", "aiden_revision_requested"], {
+        correlationId: order.correlationId, status: "awaiting_operator",
+        pocketflow: tier2Result.pocketflow,
+        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues },
+      }),
+    });
+  }
+
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 1,
     action: "Aiden: Resolution",
-    message: `Aiden confirmed successful PocketFlow execution by ${executorLabel} — work order completed.`,
+    message: `Aiden approved deliverable from ${executorLabel} — quality score: ${qualityReview.score.toFixed(2)}. Work order completed.${qualityReview.issues.length > 0 ? ` Minor notes: ${qualityReview.issues.join("; ")}` : ""}`,
     metadata: {
       finalStatus: "completed",
       executedBy: llmSource,
@@ -237,15 +336,26 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       executorModel: effectiveLlmConfig?.model,
       convergenceScore: pfMeta?.convergenceScore,
       iterations: pfMeta?.iterations,
+      qualityReview: {
+        score: qualityReview.score,
+        recommendation: qualityReview.recommendation,
+        issues: qualityReview.issues,
+        summary: qualityReview.summary,
+      },
     },
   });
 
   const completedOrder = await storage.updateWorkOrder(orderId, {
     status: "completed",
     tier2Result,
-    gccMemory: updateWorkOrderGcc(order.gccMemory as object, "completed", ["tier1_policy_pass", "pocketflow_validated", "pocketflow_execution_complete", "aiden_resolution"], {
+    gccMemory: updateWorkOrderGcc(order.gccMemory as object, "completed", ["tier1_policy_pass", "pocketflow_validated", "pocketflow_execution_complete", "aiden_quality_review", "aiden_approved", "aiden_resolution"], {
       correlationId: order.correlationId, status: "completed",
       pocketflow: tier2Result.pocketflow,
+      qualityReview: {
+        score: qualityReview.score,
+        recommendation: qualityReview.recommendation,
+        issues: qualityReview.issues,
+      },
     }),
   });
 
