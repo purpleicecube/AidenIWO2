@@ -300,28 +300,144 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   }
 
   if (qualityReview.recommendation === "request_revision" && !qualityReview.approved) {
-    await storage.createExecutionLog({
-      workOrderId: orderId,
-      tier: 1,
-      action: "Aiden: Revision Requested",
-      message: `Aiden requests revision from ${executorLabel} — quality score: ${qualityReview.score.toFixed(2)}. Issues: ${qualityReview.issues.join("; ") || qualityReview.summary}. Awaiting operator review.`,
-      metadata: {
-        finalStatus: "awaiting_operator",
-        executedBy: llmSource,
-        executorName: targetSubAgent?.name,
-        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues, summary: qualityReview.summary },
-      },
-    });
+    const controlMode = targetSubAgent?.controlMode || "aiden";
+    const maxAutoRevisions = 2;
+    const baseRevisionCount = ((order.gccMemory as any)?.["gcc.metadata"]?.revisionAttempts || 0);
+    const canAutoRevise = controlMode === "aiden" && baseRevisionCount < maxAutoRevisions && hasLlm;
 
-    return storage.updateWorkOrder(orderId, {
-      status: "awaiting_operator",
-      tier2Result,
-      gccMemory: updateWorkOrderGcc(order.gccMemory as object, "revision_requested", ["tier1_policy_pass", "pocketflow_execution_complete", "aiden_quality_review", "aiden_revision_requested"], {
-        correlationId: order.correlationId, status: "awaiting_operator",
-        pocketflow: tier2Result.pocketflow,
-        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues },
-      }),
-    });
+    if (canAutoRevise) {
+      let currentQR = qualityReview;
+      let currentTier2 = tier2Result;
+      let revisionsDone = baseRevisionCount;
+      let revisionApproved = false;
+
+      while (revisionsDone < maxAutoRevisions && !revisionApproved) {
+        revisionsDone++;
+
+        await storage.createExecutionLog({
+          workOrderId: orderId,
+          tier: 1,
+          action: "Aiden: Auto-Revision Request",
+          message: `Aiden autonomously requesting revision ${revisionsDone}/${maxAutoRevisions} from ${executorLabel} — quality score: ${currentQR.score.toFixed(2)}. Issues: ${currentQR.issues.join("; ") || currentQR.summary}. Re-executing with revision guidance.`,
+          metadata: {
+            revisionAttempt: revisionsDone,
+            maxAutoRevisions,
+            controlMode,
+            executedBy: llmSource,
+            executorName: targetSubAgent?.name,
+            qualityReview: { score: currentQR.score, recommendation: currentQR.recommendation, issues: currentQR.issues, summary: currentQR.summary },
+          },
+        });
+
+        const latestOrder = await storage.getWorkOrder(orderId);
+        const revisionGcc = updateWorkOrderGcc((latestOrder?.gccMemory || order.gccMemory) as object, "auto_revision_dispatched", ["tier1_policy_pass", "pocketflow_execution_complete", "aiden_quality_review", "aiden_auto_revision"], {
+          correlationId: order.correlationId, status: "processing",
+          revisionAttempt: revisionsDone,
+          previousScore: currentQR.score,
+          revisionGuidance: currentQR.issues,
+          revisionSummary: currentQR.summary,
+        });
+        (revisionGcc as any)["gcc.metadata"] = { ...((revisionGcc as any)["gcc.metadata"] || {}), revisionAttempts: revisionsDone };
+
+        await storage.updateWorkOrder(orderId, {
+          status: "processing",
+          gccMemory: revisionGcc,
+        });
+
+        const revisionContext = `\n\n--- AIDEN QUALITY REVIEW (Revision ${revisionsDone}) ---\nThe previous deliverable was rejected by Aiden's quality review.\nScore: ${currentQR.score.toFixed(2)}/1.0\nIssues:\n${currentQR.issues.map((i: string) => `- ${i}`).join("\n")}\nSummary: ${currentQR.summary}\n\nYou MUST address ALL issues listed above. Produce a complete, corrected deliverable that resolves every item.`;
+
+        const revisedOrder = await storage.getWorkOrder(orderId);
+        if (!revisedOrder) throw new Error("Work order not found after revision update");
+        const revisedOrderWithAgent = { ...revisedOrder, assignedSubAgentId: targetSubAgent?.id || null };
+
+        const revisedTier1 = { ...tier1Result, revisionGuidance: revisionContext };
+        const revisionResult: Tier2Result = await pocketflowExecute(
+          revisedOrderWithAgent,
+          revisedTier1,
+          effectiveLlmConfig,
+          settings || null,
+          { maxIterations: 3, convergenceThreshold: 0.8, revisionContext }
+        );
+
+        await storage.createExecutionLog({
+          workOrderId: orderId,
+          tier: 2,
+          action: `${targetSubAgent?.name || "Sub-Agent"}: Revision ${revisionsDone} Complete`,
+          message: `${executorLabel} completed revision attempt ${revisionsDone} — score: ${revisionResult.pocketflow?.convergenceScore?.toFixed(2) || "N/A"}.`,
+          metadata: { revisionAttempt: revisionsDone, ...revisionResult },
+        });
+
+        const revDeliverable = revisionResult.output?.deliverable || "";
+        const revPfMeta = revisionResult.pocketflow;
+
+        let revQualityReview;
+        try {
+          revQualityReview = await runAidenQualityReview(settings!, revisedOrder, revDeliverable, revPfMeta?.convergenceScore ?? 0, revPfMeta?.iterations ?? 1, revPfMeta?.stepResults?.length ?? 0, executorLabel);
+          await storage.createExecutionLog({
+            workOrderId: orderId, tier: 1,
+            action: `Aiden: Revision ${revisionsDone} Quality ${revQualityReview.approved ? "Approved" : "Flagged"}`,
+            message: `Revision ${revisionsDone} quality review: ${revQualityReview.summary} | Score: ${revQualityReview.score.toFixed(2)} | Recommendation: ${revQualityReview.recommendation}`,
+            metadata: { revisionAttempt: revisionsDone, qualityScore: revQualityReview.score, recommendation: revQualityReview.recommendation, issues: revQualityReview.issues },
+          });
+        } catch (revErr: any) {
+          revQualityReview = { approved: true, score: 0.5, summary: `Revision review failed: ${revErr.message}`, issues: [] as string[], recommendation: "approve" as const };
+        }
+
+        currentTier2 = revisionResult;
+        currentQR = revQualityReview;
+
+        if (revQualityReview.approved || revQualityReview.recommendation === "approve") {
+          revisionApproved = true;
+        } else {
+          await storage.createExecutionLog({
+            workOrderId: orderId, tier: 1,
+            action: "Aiden: Revision Still Below Quality",
+            message: `Revision ${revisionsDone} from ${executorLabel} still below quality threshold — score: ${revQualityReview.score.toFixed(2)}. ${revisionsDone >= maxAutoRevisions ? "Max auto-revisions reached. Escalating to operator." : "Attempting another revision."}`,
+            metadata: { revisionAttempt: revisionsDone, maxAutoRevisions, qualityReview: revQualityReview },
+          });
+        }
+      }
+
+      if (!revisionApproved) {
+        return storage.updateWorkOrder(orderId, {
+          status: "awaiting_operator",
+          tier2Result: currentTier2,
+          gccMemory: updateWorkOrderGcc((await storage.getWorkOrder(orderId))?.gccMemory as object || {}, "revision_exhausted", ["tier1_policy_pass", "pocketflow_execution_complete", "aiden_quality_review", "aiden_auto_revision_exhausted"], {
+            correlationId: order.correlationId, status: "awaiting_operator",
+            revisionAttempts: revisionsDone,
+            pocketflow: currentTier2.pocketflow,
+            qualityReview: { score: currentQR.score, recommendation: currentQR.recommendation, issues: currentQR.issues, summary: currentQR.summary },
+          }),
+        });
+      }
+
+      tier2Result = currentTier2;
+      qualityReview = currentQR;
+    } else {
+      await storage.createExecutionLog({
+        workOrderId: orderId,
+        tier: 1,
+        action: "Aiden: Revision Requested",
+        message: `Aiden requests revision from ${executorLabel} — quality score: ${qualityReview.score.toFixed(2)}. Issues: ${qualityReview.issues.join("; ") || qualityReview.summary}. ${controlMode !== "aiden" ? `Sub-agent in "${controlMode}" mode — ` : "Max revisions reached — "}Awaiting operator review.`,
+        metadata: {
+          finalStatus: "awaiting_operator",
+          executedBy: llmSource,
+          executorName: targetSubAgent?.name,
+          controlMode,
+          qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues, summary: qualityReview.summary },
+        },
+      });
+
+      return storage.updateWorkOrder(orderId, {
+        status: "awaiting_operator",
+        tier2Result,
+        gccMemory: updateWorkOrderGcc(order.gccMemory as object, "revision_requested", ["tier1_policy_pass", "pocketflow_execution_complete", "aiden_quality_review", "aiden_revision_requested"], {
+          correlationId: order.correlationId, status: "awaiting_operator",
+          pocketflow: tier2Result.pocketflow,
+          qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues },
+        }),
+      });
+    }
   }
 
   await storage.createExecutionLog({

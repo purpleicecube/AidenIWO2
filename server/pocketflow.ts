@@ -107,6 +107,7 @@ export interface SharedDict {
   deliverableType: "document" | "code" | "image" | "mixed";
   deliverableTitle: string;
 
+  revisionContext?: string;
   availableTools: Array<{ slug: string; name: string; type: string; description: string }>;
   toolResults: ToolExecResult[];
   logs: Array<{ node: string; message: string; metadata?: any }>;
@@ -267,7 +268,8 @@ async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
       isRefinement ? existingGaps : [],
       isRefinement ? existingOutputs : {},
       apiKey,
-      dict.availableTools
+      dict.availableTools,
+      dict.revisionContext
     );
 
     if (isRefinement) {
@@ -400,7 +402,8 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
           step,
           dict.accumulatedOutputs,
           apiKey,
-          dict.availableTools
+          dict.availableTools,
+          dict.revisionContext
         );
 
         if (result.blocked) {
@@ -742,7 +745,7 @@ export async function pocketflowExecute(
   tier1Result: Tier1Result,
   llmConfig: EffectiveLlmConfig | null,
   settings: LlmSettings | null,
-  options?: { maxIterations?: number; convergenceThreshold?: number }
+  options?: { maxIterations?: number; convergenceThreshold?: number; revisionContext?: string }
 ): Promise<Tier2Result> {
   const dict = createSharedDict(
     order,
@@ -752,6 +755,10 @@ export async function pocketflowExecute(
     options?.maxIterations ?? 3,
     options?.convergenceThreshold ?? 0.8
   );
+
+  if (options?.revisionContext) {
+    dict.revisionContext = options.revisionContext;
+  }
 
   try {
     const tools = await getAvailableToolsForAgent(order.assignedSubAgentId || undefined);

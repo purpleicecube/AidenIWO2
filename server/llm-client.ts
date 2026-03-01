@@ -715,7 +715,8 @@ export async function llmPlanSteps(
   existingGaps: string[],
   existingOutputs: Record<string, string>,
   apiKeyOverride?: string,
-  availableTools?: Array<{ slug: string; name: string; type: string; description: string }>
+  availableTools?: Array<{ slug: string; name: string; type: string; description: string }>,
+  revisionContext?: string
 ): Promise<Array<{ id: string; name: string; description: string; dependencies: string[] }>> {
   const isRefinement = existingGaps.length > 0;
   const existingContext = Object.entries(existingOutputs).length > 0
@@ -739,8 +740,10 @@ ${availableTools.map(t => `- **${t.name}** (slug: "${t.slug}", type: ${t.type}):
 When planning steps, if a step would benefit from using a tool (e.g., web search, data processing), mention the tool by slug in the step description like: "Use tool [brave-search] to research X". The execution engine will detect tool references and execute them automatically.`
     : "";
 
+  const revisionGuidance = revisionContext ? `\n${revisionContext}` : "";
+
   const prompt = `You are executing a work order as a Tier 2 sub-agent. Break the work order into concrete execution steps.
-${gapsContext}${sandboxGuidance}${toolsContext}
+${gapsContext}${sandboxGuidance}${toolsContext}${revisionGuidance}
 Each step should be a discrete unit of work. Steps can declare dependencies on other steps by ID.
 Independent steps (no dependencies) will be executed in PARALLEL for efficiency.
 
@@ -774,7 +777,8 @@ export async function llmExecStep(
   step: { id: string; name: string; description: string },
   previousOutputs: Record<string, string>,
   apiKeyOverride?: string,
-  availableTools?: Array<{ slug: string; name: string; type: string; description: string }>
+  availableTools?: Array<{ slug: string; name: string; type: string; description: string }>,
+  revisionContext?: string
 ): Promise<{ blocked: boolean; reason?: string | null; output?: string; toolCalls?: Array<{ toolSlug: string; input: string }> }> {
   const contextEntries = Object.entries(previousOutputs);
   const prevContext = contextEntries.length > 0
@@ -802,11 +806,13 @@ Example: "tool_calls": [{"toolSlug": "brave-search", "input": "your search query
 The tool results will be provided back to you for synthesis. You can include both "output" (your initial content) and "tool_calls" in the same response.`
     : "";
 
+  const revisionGuidance = revisionContext ? `\n${revisionContext}` : "";
+
   const prompt = `You are executing step "${step.name}" of a work order.
 
 Step description: ${step.description}
 ${prevContext}
-${reopenContext}${gccContext}${sandboxExecGuidance}${toolsSection}
+${reopenContext}${gccContext}${sandboxExecGuidance}${toolsSection}${revisionGuidance}
 Work Order Context:
 - Title: ${order.title}
 - Description: ${order.description}
