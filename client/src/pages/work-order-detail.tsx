@@ -277,10 +277,15 @@ export default function WorkOrderDetail() {
 
   const { data: order, isLoading: orderLoading } = useQuery<WorkOrder>({
     queryKey: ["/api/work-orders", params.id],
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "processing" ? 3000 : false;
+    },
   });
 
   const { data: logs, isLoading: logsLoading } = useQuery<ExecutionLog[]>({
     queryKey: ["/api/work-orders", params.id, "logs"],
+    refetchInterval: order?.status === "processing" ? 5000 : false,
   });
 
   usePageTitle(order?.title || "Work Order");
