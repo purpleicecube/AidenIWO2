@@ -75,6 +75,16 @@ app.use((req, res, next) => {
 
   await registerRoutes(httpServer, app);
 
+  try {
+    const { recoverOrphanedProcessingOrders } = await import("./orchestration");
+    const recovered = await recoverOrphanedProcessingOrders();
+    if (recovered > 0) {
+      log(`Recovered ${recovered} orphaned work order(s) stuck in "processing"`, "recovery");
+    }
+  } catch (err) {
+    console.error("Failed to recover orphaned processing orders:", err);
+  }
+
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

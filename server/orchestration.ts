@@ -52,6 +52,57 @@ function updateWorkOrderGcc(
   return result;
 }
 
+export async function recoverOrphanedProcessingOrders(): Promise<number> {
+  const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+  const allOrders = await storage.getWorkOrders();
+  const staleOrders = allOrders.filter(
+    (o) => o.status === "processing" && o.updatedAt && (Date.now() - new Date(o.updatedAt).getTime() > STALE_THRESHOLD_MS)
+  );
+
+  for (const order of staleOrders) {
+    await storage.updateWorkOrder(order.id, { status: "failed" });
+    await storage.createExecutionLog({
+      workOrderId: order.id,
+      tier: 1,
+      action: "System: Orphan Recovery",
+      message: `Work order was stuck in "processing" for over ${Math.round(STALE_THRESHOLD_MS / 60000)} minutes (likely due to server restart). Status reset to "failed" — you can retry it.`,
+      metadata: { previousStatus: "processing", recoveredAt: new Date().toISOString(), reason: "server_restart_recovery" },
+    });
+    console.log(`[recovery] Recovered orphaned WO ${order.id} ("${order.title}") — set to failed`);
+  }
+  return staleOrders.length;
+}
+
+export function isStaleProcessing(order: { status: string; updatedAt: Date | string | null }): boolean {
+  if (order.status !== "processing") return false;
+  if (!order.updatedAt) return false;
+  const elapsed = Date.now() - new Date(order.updatedAt).getTime();
+  return elapsed > 10 * 60 * 1000;
+}
+
+export async function processWorkOrderSafe(orderId: string): Promise<void> {
+  try {
+    await processWorkOrder(orderId);
+  } catch (err: any) {
+    console.error(`[orchestration] processWorkOrder crashed for ${orderId}:`, err);
+    try {
+      const current = await storage.getWorkOrder(orderId);
+      if (current && current.status === "processing") {
+        await storage.updateWorkOrder(orderId, { status: "failed" });
+        await storage.createExecutionLog({
+          workOrderId: orderId,
+          tier: 1,
+          action: "System: Processing Failed",
+          message: `Background processing crashed: ${err?.message || "Unknown error"}. Status set to "failed" — you can retry.`,
+          metadata: { error: err?.message, stack: err?.stack?.substring(0, 500), failedAt: new Date().toISOString() },
+        });
+      }
+    } catch (recoveryErr) {
+      console.error(`[orchestration] Failed to recover crashed WO ${orderId}:`, recoveryErr);
+    }
+  }
+}
+
 export async function processWorkOrder(orderId: string): Promise<WorkOrder | undefined> {
   const order = await storage.getWorkOrder(orderId);
   if (!order) return undefined;

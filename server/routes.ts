@@ -27,7 +27,7 @@ import {
   insertSkillTemplateSchema,
 } from "@shared/schema";
 import type { LlmSettings } from "@shared/schema";
-import { processWorkOrder, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
+import { processWorkOrder, processWorkOrderSafe, isStaleProcessing, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig, extractWorkOrderFromChat } from "./llm-client";
 
 const startTime = Date.now();
@@ -331,22 +331,24 @@ export async function registerRoutes(
       if (!order) {
         return res.status(404).json({ message: "Work order not found" });
       }
-      if (order.status !== "pending" && order.status !== "reopened") {
+      const allowedStatuses = ["pending", "reopened"];
+      const stale = isStaleProcessing(order);
+      if (!allowedStatuses.includes(order.status) && !stale) {
         return res.status(400).json({ message: `Cannot process order in '${order.status}' status` });
       }
       const actor = getActor(req);
       await storage.createExecutionLog({
         workOrderId: req.params.id,
         tier: 1,
-        action: "Processing Initiated",
-        message: `Processing started by ${actor.actorName}`,
-        metadata: { actor },
+        action: stale ? "Processing Re-initiated (Stale Recovery)" : "Processing Initiated",
+        message: stale
+          ? `Work order was stuck in "processing" — re-initiated by ${actor.actorName}`
+          : `Processing started by ${actor.actorName}`,
+        metadata: { actor, staleRecovery: stale },
       });
       await storage.updateWorkOrder(req.params.id, { status: "processing" });
       res.json({ message: "Processing started", status: "processing", workOrderId: req.params.id });
-      processWorkOrder(req.params.id).catch((err) => {
-        console.error(`[orchestration] Background processing failed for ${req.params.id}:`, err);
-      });
+      processWorkOrderSafe(req.params.id);
     } catch (err) {
       res.status(500).json({ message: "Failed to initiate processing" });
     }
@@ -388,9 +390,7 @@ export async function registerRoutes(
 
       await storage.updateWorkOrder(req.params.id, { status: "processing" });
       res.json({ message: "Retry processing started", status: "processing", workOrderId: req.params.id });
-      processWorkOrder(req.params.id).catch((err) => {
-        console.error(`[orchestration] Background retry failed for ${req.params.id}:`, err);
-      });
+      processWorkOrderSafe(req.params.id);
     } catch (err) {
       res.status(500).json({ message: "Failed to retry work order" });
     }
@@ -624,9 +624,7 @@ export async function registerRoutes(
         });
 
         res.json({ message: "Re-processing started after HITL unblock", status: "processing", workOrderId: req.params.id, unblocked: true, reprocessed: true });
-        processWorkOrder(req.params.id).catch((err) => {
-          console.error(`[orchestration] Background re-process after HITL unblock failed for ${req.params.id}:`, err);
-        });
+        processWorkOrderSafe(req.params.id);
       } else {
         gccMemory["gcc.last_action"] = "hitl_resolved";
         gccMemory["gcc.metadata"].completedAt = now;
@@ -2632,7 +2630,7 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
             let autoProcessed = false;
             if (actionData.autoProcess) {
               try {
-                processWorkOrder(newOrder.id);
+                processWorkOrderSafe(newOrder.id);
                 autoProcessed = true;
                 await storage.createExecutionLog({
                   workOrderId: newOrder.id,
