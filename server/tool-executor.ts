@@ -129,9 +129,126 @@ async function executeApiTool(tool: Tool, input: string): Promise<string> {
   return text.slice(0, 4000);
 }
 
+async function executeWebScraper(input: string): Promise<string> {
+  const urls = input.match(/https?:\/\/[^\s,\n]+/g);
+  if (!urls || urls.length === 0) {
+    return `No valid URLs found in input. Provide one or more URLs to scrape. Input received: ${input}`;
+  }
+
+  const results: string[] = [];
+  for (const url of urls.slice(0, 5)) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const resp = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; AidenBot/1.0; +https://aiden-iwo.replit.app)",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        signal: controller.signal,
+        redirect: "follow",
+      });
+      clearTimeout(timeout);
+
+      if (!resp.ok) {
+        results.push(`## ${url}\nHTTP ${resp.status} ${resp.statusText}`);
+        continue;
+      }
+
+      const html = await resp.text();
+      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "No title";
+      const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
+      const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : "";
+
+      let text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+        .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+        .replace(/<header[\s\S]*?<\/header>/gi, " [HEADER] ")
+        .replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, "\n## $1\n")
+        .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
+        .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, "$1\n\n")
+        .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, "[$2]($1)")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/[ \t]+/g, " ")
+        .trim();
+
+      text = text.slice(0, 6000);
+      results.push(`## ${url}\n**Title:** ${title}\n${metaDesc ? `**Description:** ${metaDesc}\n` : ""}\n**Content:**\n${text}`);
+    } catch (err: any) {
+      results.push(`## ${url}\nFetch failed: ${err.message}`);
+    }
+  }
+  return results.join("\n\n---\n\n");
+}
+
+async function executeHealthCheck(input: string): Promise<string> {
+  const urls = input.match(/https?:\/\/[^\s,\n]+/g);
+  if (!urls || urls.length === 0) {
+    return `No valid URLs found. Provide URLs to health-check. Input: ${input}`;
+  }
+  const results: string[] = [];
+  for (const url of urls.slice(0, 10)) {
+    const start = Date.now();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const resp = await fetch(url, { method: "HEAD", signal: controller.signal, redirect: "follow" });
+      clearTimeout(timeout);
+      const latency = Date.now() - start;
+      results.push(`${url} — ${resp.ok ? "UP" : "DOWN"} (HTTP ${resp.status}, ${latency}ms)`);
+    } catch (err: any) {
+      const latency = Date.now() - start;
+      results.push(`${url} — DOWN (${err.message}, ${latency}ms)`);
+    }
+  }
+  return `## Health Check Results\n\n${results.join("\n")}`;
+}
+
+async function executeDataValidator(input: string): Promise<string> {
+  const lines = input.trim().split("\n");
+  if (lines.length < 2) {
+    return `Data validation requires at least a header row and one data row (CSV format). Received ${lines.length} line(s).\n\nInput:\n${input}`;
+  }
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+  const rows: Record<string, string>[] = [];
+  const issues: string[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].match(/("(?:[^"\\]|\\.)*"|[^,]*)/g) || [];
+    const row: Record<string, string> = {};
+    headers.forEach((h, j) => { row[h] = (vals[j] || "").trim().replace(/^"|"$/g, ""); });
+    if (Object.values(row).every(v => !v)) {
+      issues.push(`Row ${i}: all fields empty`);
+      continue;
+    }
+    for (const [key, val] of Object.entries(row)) {
+      if (!val) issues.push(`Row ${i}: missing "${key}"`);
+    }
+    rows.push(row);
+  }
+  return `## Data Validation Report\n\n**Columns:** ${headers.join(", ")}\n**Rows parsed:** ${rows.length}\n**Issues found:** ${issues.length}\n${issues.length > 0 ? `\n### Issues\n${issues.map(i => `- ${i}`).join("\n")}` : "\nAll rows valid."}\n\n### Sample Data (first 5 rows)\n${rows.slice(0, 5).map((r, i) => `**Row ${i + 1}:** ${JSON.stringify(r)}`).join("\n")}`;
+}
+
 async function executeSkillTool(tool: Tool, input: string): Promise<string> {
   if (tool.slug === "brave-search") {
     return executeBraveSearch(tool, input);
+  }
+  if (tool.slug === "webscrapper") {
+    return executeWebScraper(input);
+  }
+  if (tool.slug === "pdf-processor") {
+    return executePdfProcessor(input);
   }
 
   const content = tool.skillContent || tool.sourceCode || "";
@@ -142,7 +259,36 @@ async function executeSkillTool(tool: Tool, input: string): Promise<string> {
   return `## Skill: ${tool.name}\n\nSkill content loaded for context:\n${content.slice(0, 2000)}\n\nInput: ${input}\n\nNote: This skill operates in prompt_injection mode — its content has been injected into the execution context.`;
 }
 
+async function executePdfProcessor(input: string): Promise<string> {
+  const urls = input.match(/https?:\/\/[^\s,\n]+\.pdf/gi);
+  if (urls && urls.length > 0) {
+    const results: string[] = [];
+    for (const url of urls.slice(0, 3)) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!resp.ok) {
+          results.push(`${url} — HTTP ${resp.status}`);
+          continue;
+        }
+        const buf = await resp.arrayBuffer();
+        const text = Buffer.from(buf).toString("utf-8").replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s{3,}/g, " ").trim();
+        results.push(`## PDF: ${url}\n**Size:** ${buf.byteLength} bytes\n**Extracted text (first 4000 chars):**\n${text.slice(0, 4000)}`);
+      } catch (err: any) {
+        results.push(`${url} — Fetch failed: ${err.message}`);
+      }
+    }
+    return results.join("\n\n---\n\n");
+  }
+  return `PDF Processor: No PDF URLs found in input. Provide URLs ending in .pdf to extract text.\n\nInput: ${input}`;
+}
+
 async function executeCliTool(tool: Tool, input: string): Promise<string> {
+  if (tool.slug === "health-check-cli") {
+    return executeHealthCheck(input);
+  }
   const config = (tool.executionConfig || tool.config || {}) as Record<string, any>;
   const command = config.command || tool.entryPoint;
   if (!command) return `CLI tool "${tool.name}" has no configured command.`;
@@ -150,6 +296,9 @@ async function executeCliTool(tool: Tool, input: string): Promise<string> {
 }
 
 async function executePythonTool(tool: Tool, input: string): Promise<string> {
+  if (tool.slug === "data-validator") {
+    return executeDataValidator(input);
+  }
   const code = tool.sourceCode;
   if (!code) return `Python tool "${tool.name}" has no source code.`;
   return `Python tool "${tool.name}" source code available (${code.length} chars).\n\nNote: Sandbox Python execution is not yet enabled. The code has been loaded as context.\n\nInput: ${input}`;
