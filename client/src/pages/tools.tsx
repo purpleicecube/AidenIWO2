@@ -443,6 +443,271 @@ function ToolDetailView({ tool, onClose, onEdit }: { tool: Tool; onClose: () => 
   );
 }
 
+function McpConfigTab({ form, activeTab }: { form: any; activeTab: string }) {
+  const { toast } = useToast();
+  const [mcpTransport, setMcpTransport] = useState<"stdio" | "sse">("stdio");
+  const [mcpServerName, setMcpServerName] = useState("");
+  const [mcpCommand, setMcpCommand] = useState("");
+  const [mcpArgs, setMcpArgs] = useState("");
+  const [mcpUrl, setMcpUrl] = useState("");
+  const [mcpEnvPairs, setMcpEnvPairs] = useState<Array<{ key: string; value: string }>>([]);
+  const [showRawJson, setShowRawJson] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; tools: any[] } | null>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  const currentConfig = form.watch("mcpConfig");
+
+  useEffect(() => {
+    if (initialized) return;
+    if (currentConfig && typeof currentConfig === "object" && Object.keys(currentConfig).length > 0) {
+      setMcpTransport(currentConfig.transport || "stdio");
+      setMcpServerName(currentConfig.serverName || "");
+      setMcpCommand(currentConfig.command || "");
+      setMcpArgs(Array.isArray(currentConfig.args) ? currentConfig.args.join(", ") : currentConfig.args || "");
+      setMcpUrl(currentConfig.url || "");
+      const env = currentConfig.env || {};
+      setMcpEnvPairs(Object.entries(env).map(([key, value]) => ({ key, value: String(value) })));
+    }
+    setInitialized(true);
+  }, [currentConfig, initialized]);
+
+  function syncToForm() {
+    const config: any = {
+      serverName: mcpServerName || "mcp-server",
+      transport: mcpTransport,
+    };
+    if (mcpTransport === "stdio") {
+      config.command = mcpCommand;
+      config.args = mcpArgs.split(",").map(a => a.trim()).filter(Boolean);
+    } else {
+      config.url = mcpUrl;
+    }
+    if (mcpEnvPairs.length > 0) {
+      config.env = {};
+      for (const p of mcpEnvPairs) {
+        if (p.key) config.env[p.key] = p.value;
+      }
+    }
+    form.setValue("mcpConfig", config);
+    form.setValue("accessTier", "tier2");
+    return config;
+  }
+
+  useEffect(() => {
+    if (initialized) syncToForm();
+  }, [mcpTransport, mcpServerName, mcpCommand, mcpArgs, mcpUrl, mcpEnvPairs, initialized]);
+
+  async function handleTestConnection() {
+    setTestLoading(true);
+    setTestResult(null);
+    const config = syncToForm();
+    try {
+      const resp = await apiRequest("POST", "/api/locker/mcp/test", { mcpConfig: config });
+      const data = await resp.json();
+      setTestResult(data);
+      if (data.success) {
+        toast({ title: "Connection Successful", description: data.message });
+      } else {
+        toast({ title: "Connection Failed", description: data.message, variant: "destructive" });
+      }
+    } catch (err: any) {
+      setTestResult({ success: false, message: err.message, tools: [] });
+      toast({ title: "Test Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setTestLoading(false);
+    }
+  }
+
+  return (
+    <TabsContent value="mcp" forceMount className={`space-y-4 mt-4 ${activeTab !== "mcp" ? "hidden" : ""}`}>
+      <div className="p-3 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-xs">
+        <p className="font-medium mb-1">MCP Server Configuration</p>
+        <p>Configure the Model Context Protocol server connection. Sub-agents connect to this server to access the tools and resources it exposes.</p>
+      </div>
+
+      <div className="p-3 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs flex items-start gap-2">
+        <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <p>MCP tools are sub-agent only. Aiden routes through a sub-agent to access MCP servers. Access tier is automatically set to Tier 2.</p>
+      </div>
+
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs">Server Name</Label>
+            <Input
+              value={mcpServerName}
+              onChange={(e) => setMcpServerName(e.target.value)}
+              placeholder="my-mcp-server"
+              className="text-xs mt-1"
+              data-testid="input-mcp-server-name"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Transport</Label>
+            <Select value={mcpTransport} onValueChange={(v) => setMcpTransport(v as "stdio" | "sse")}>
+              <SelectTrigger className="text-xs mt-1" data-testid="select-mcp-transport">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stdio">stdio (local process)</SelectItem>
+                <SelectItem value="sse">SSE (remote HTTP)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {mcpTransport === "stdio" ? (
+          <div className="space-y-3 p-3 rounded-md border bg-muted/20">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Terminal className="w-3 h-3" /> stdio Transport</p>
+            <div>
+              <Label className="text-xs">Command</Label>
+              <Input
+                value={mcpCommand}
+                onChange={(e) => setMcpCommand(e.target.value)}
+                placeholder="npx"
+                className="text-xs mt-1 font-mono"
+                data-testid="input-mcp-command"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Arguments (comma-separated)</Label>
+              <Input
+                value={mcpArgs}
+                onChange={(e) => setMcpArgs(e.target.value)}
+                placeholder="-y, @modelcontextprotocol/server-filesystem, /tmp"
+                className="text-xs mt-1 font-mono"
+                data-testid="input-mcp-args"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 p-3 rounded-md border bg-muted/20">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Globe className="w-3 h-3" /> SSE Transport</p>
+            <div>
+              <Label className="text-xs">Server URL</Label>
+              <Input
+                value={mcpUrl}
+                onChange={(e) => setMcpUrl(e.target.value)}
+                placeholder="https://mcp.example.com/sse"
+                className="text-xs mt-1 font-mono"
+                data-testid="input-mcp-url"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Environment Variables</Label>
+            <Button type="button" variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setMcpEnvPairs([...mcpEnvPairs, { key: "", value: "" }])} data-testid="button-add-mcp-env">
+              <Plus className="w-3 h-3 mr-1" /> Add
+            </Button>
+          </div>
+          {mcpEnvPairs.map((pair, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <Input
+                value={pair.key}
+                onChange={(e) => {
+                  const updated = [...mcpEnvPairs];
+                  updated[i] = { ...updated[i], key: e.target.value };
+                  setMcpEnvPairs(updated);
+                }}
+                placeholder="KEY"
+                className="text-xs font-mono flex-1"
+                data-testid={`input-mcp-env-key-${i}`}
+              />
+              <Input
+                value={pair.value}
+                onChange={(e) => {
+                  const updated = [...mcpEnvPairs];
+                  updated[i] = { ...updated[i], value: e.target.value };
+                  setMcpEnvPairs(updated);
+                }}
+                placeholder="value or env:VAR_NAME"
+                className="text-xs font-mono flex-1"
+                data-testid={`input-mcp-env-value-${i}`}
+              />
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setMcpEnvPairs(mcpEnvPairs.filter((_, j) => j !== i))} data-testid={`button-remove-mcp-env-${i}`}>
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 pt-2 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleTestConnection}
+            disabled={testLoading || (mcpTransport === "stdio" && !mcpCommand) || (mcpTransport === "sse" && !mcpUrl)}
+            className="text-xs"
+            data-testid="button-test-mcp-connection"
+          >
+            {testLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Zap className="w-3 h-3 mr-1" />}
+            Test Connection
+          </Button>
+          <div className="flex items-center gap-2 ml-auto">
+            <Label className="text-xs text-muted-foreground">Raw JSON</Label>
+            <Switch checked={showRawJson} onCheckedChange={setShowRawJson} data-testid="switch-mcp-raw-json" />
+          </div>
+        </div>
+
+        {testResult && (
+          <div className={`p-3 rounded-md text-xs ${testResult.success ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"}`} data-testid="mcp-test-result">
+            <p className="font-medium">{testResult.success ? "Connected" : "Connection Failed"}</p>
+            <p className="mt-1">{testResult.message}</p>
+            {testResult.tools?.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="font-medium">Discovered Tools:</p>
+                {testResult.tools.map((t: any, i: number) => (
+                  <div key={i} className="flex items-baseline gap-2">
+                    <code className="font-mono text-[11px] bg-black/5 dark:bg-white/5 px-1 rounded">{t.name}</code>
+                    <span className="text-[10px] text-muted-foreground">{t.description || "No description"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {showRawJson && (
+          <FormField control={form.control} name="mcpConfig" render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs">Raw JSON Config</FormLabel>
+              <FormControl>
+                <Textarea
+                  value={typeof field.value === "object" ? JSON.stringify(field.value, null, 2) : field.value || ""}
+                  onChange={(e) => {
+                    try {
+                      const parsed = JSON.parse(e.target.value);
+                      field.onChange(parsed);
+                      setMcpTransport(parsed.transport || "stdio");
+                      setMcpServerName(parsed.serverName || "");
+                      setMcpCommand(parsed.command || "");
+                      setMcpArgs(Array.isArray(parsed.args) ? parsed.args.join(", ") : "");
+                      setMcpUrl(parsed.url || "");
+                      const env = parsed.env || {};
+                      setMcpEnvPairs(Object.entries(env).map(([key, value]) => ({ key, value: String(value) })));
+                    } catch {
+                      field.onChange(e.target.value);
+                    }
+                  }}
+                  className="resize-none font-mono text-xs bg-slate-50 dark:bg-slate-900"
+                  rows={10}
+                  data-testid="input-mcp-config-raw"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+        )}
+      </div>
+    </TabsContent>
+  );
+}
+
 export default function ToolsPage() {
   usePageTitle("Tools Locker");
   const { toast } = useToast();
@@ -504,6 +769,9 @@ export default function ToolsPage() {
       form.setValue("executionMode", "prompt_injection");
     } else if (watchType === "python_code" || watchType === "cli") {
       form.setValue("executionMode", "sandbox_execution");
+    }
+    if (watchType === "mcp_server") {
+      form.setValue("accessTier", "tier2");
     }
   }, [watchType, form]);
 
@@ -966,44 +1234,7 @@ export default function ToolsPage() {
 
                 {/* === MCP Server Tab === */}
                 {showMcpTab && (
-                  <TabsContent value="mcp" forceMount className={`space-y-4 mt-4 ${activeTab !== "mcp" ? "hidden" : ""}`}>
-                    <div className="p-3 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-xs">
-                      <p className="font-medium mb-1">MCP Server Configuration</p>
-                      <p>Configure the Model Context Protocol server connection. The agent will connect to this server to access tools and resources it exposes.</p>
-                    </div>
-
-                    <FormField control={form.control} name="mcpConfig" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>MCP Server Config (JSON)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            value={typeof field.value === "object" ? JSON.stringify(field.value, null, 2) : field.value || ""}
-                            onChange={(e) => {
-                              try {
-                                field.onChange(JSON.parse(e.target.value));
-                              } catch {
-                                field.onChange(e.target.value);
-                              }
-                            }}
-                            placeholder={JSON.stringify({
-                              serverName: "my-mcp-server",
-                              transport: "stdio",
-                              command: "npx",
-                              args: ["-y", "@modelcontextprotocol/server-my-tool"],
-                              env: { API_KEY: "env:MY_API_KEY" },
-                              tools: ["tool1", "tool2"],
-                              resources: ["resource1"],
-                            }, null, 2)}
-                            className="resize-none font-mono text-xs bg-slate-50 dark:bg-slate-900"
-                            rows={12}
-                            data-testid="input-mcp-config"
-                          />
-                        </FormControl>
-                        <FormDescription className="text-[10px]">Server name, transport type, command, args, environment, and exposed tools/resources.</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  </TabsContent>
+                  <McpConfigTab form={form} activeTab={activeTab} />
                 )}
 
                 {/* === Credentials Tab === */}

@@ -1706,6 +1706,32 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== MCP Server Routes ====================
+
+  app.post("/api/locker/mcp/test", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const { mcpConfig } = req.body;
+      if (!mcpConfig) return res.status(400).json({ message: "mcpConfig is required" });
+      const { testConnection } = await import("./mcp-client");
+      const result = await testConnection(mcpConfig);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: `MCP test failed: ${err.message}`, tools: [] });
+    }
+  });
+
+  app.post("/api/locker/mcp/list-tools", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const { mcpConfig } = req.body;
+      if (!mcpConfig) return res.status(400).json({ message: "mcpConfig is required" });
+      const { connectAndListTools } = await import("./mcp-client");
+      const result = await connectAndListTools(mcpConfig);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: `Failed to list MCP tools: ${err.message}` });
+    }
+  });
+
   // ==================== Skill Templates Routes ====================
 
   app.get("/api/locker/skills", isAuth, requireRole("viewer"), async (req, res) => {
@@ -2088,7 +2114,7 @@ export async function registerRoutes(
       }
 
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src * data:; font-src * data:; style-src 'self' 'unsafe-inline' *;");
+      res.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.pyodide.org https://pyodide-cdn2.iodide.io; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;");
       res.setHeader("X-Frame-Options", "SAMEORIGIN");
       res.send(result.html);
     } catch (err) {
@@ -2117,7 +2143,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Work order has no deliverable content" });
       }
 
-      const { extractHtmlFromDeliverable, extractCodeBlocksFromDeliverable, buildCodePreviewHtml } = await import("./workspace-filing");
+      const { extractHtmlFromDeliverable, extractCodeBlocksFromDeliverable, buildCodePreviewHtml, buildMarkdownPreviewHtml } = await import("./workspace-filing");
       const title = env?.deliverableTitle || order.title;
 
       let newHtml: string | null = extractHtmlFromDeliverable(deliverable);
@@ -2126,6 +2152,10 @@ export async function registerRoutes(
         if (codeBlocks.length > 0) {
           newHtml = buildCodePreviewHtml(title, codeBlocks, deliverable);
         }
+      }
+
+      if (!newHtml && deliverable.length > 50) {
+        newHtml = buildMarkdownPreviewHtml(title, deliverable);
       }
 
       if (!newHtml) {

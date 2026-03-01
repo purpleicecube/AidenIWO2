@@ -1,18 +1,16 @@
 # AIDEN_IWO - Intelligent Work Order Orchestration
 
-**Lead Developer & Principal Technical Architect:** Darrel Vaughn (LuaAzullaB / 10Touros)
-
 ## Overview
-AIDEN_IWO is a 2-tier work order orchestration platform designed to streamline and automate complex operational workflows. Its primary purpose is to intelligently route and manage work orders using AI-powered policy evaluation and routing, human-in-the-loop (HITL) intervention, and specialized sub-agents. The platform aims to reduce manual effort, improve efficiency, and provide comprehensive visibility into work order lifecycles.
+AIDEN_IWO is a two-tier work order orchestration platform designed to streamline and automate complex operational workflows. It intelligently routes and manages work orders using AI-powered policy evaluation, human-in-the-loop (HITL) intervention, and specialized sub-agents. The platform aims to reduce manual effort, improve efficiency, and provide comprehensive visibility into work order lifecycles.
 
-**Key Capabilities:**
-- **Two-Tier Orchestration:** Aiden (Tier 1) acts as an LLM-powered manager for policy evaluation and routing, while specialized Sub-Agents (Tier 2) execute work orders.
-- **LLM-Powered Routing:** Utilizes multiple LLM providers for dynamic policy evaluation and routing of work orders.
-- **Human-in-the-Loop (HITL):** Allows for intervention on blocked, failed, or pending work orders, enabling re-issuing or closing with explanations.
-- **Multi-step Workflow Templates:** Supports the creation and execution of complex workflows with step dependencies, conditions, and retry mechanisms.
-- **Agentic Tools Platform:** Provides a framework for integrating and assigning various tools (slash commands, skills, CLI, API, webhooks) to sub-agents.
-- **Workspace & Sandbox:** Offers artifact/folder management and sandboxed environments for command execution.
-- **Role-Based Access Control (RBAC):** Manages user permissions (admin, operator, viewer) for secure platform access.
+Key capabilities include:
+- Two-Tier Orchestration: Aiden (Tier 1) manages policy evaluation and routing, while specialized Sub-Agents (Tier 2) execute work orders.
+- LLM-Powered Routing: Utilizes multiple LLM providers for dynamic policy evaluation and routing.
+- Human-in-the-Loop (HITL): Allows intervention on blocked, failed, or pending work orders.
+- Multi-step Workflow Templates: Supports complex workflows with dependencies, conditions, and retry mechanisms.
+- Agentic Tools Platform: Provides a framework for integrating and assigning various tools to sub-agents.
+- Workspace & Sandbox: Offers artifact/folder management and sandboxed environments for command execution.
+- Role-Based Access Control (RBAC): Manages user permissions for secure platform access.
 
 ## User Preferences
 I want iterative development.
@@ -22,54 +20,31 @@ I prefer a clean, readable codebase and clear documentation.
 I want to be kept informed about the status of work orders, particularly when human intervention is required.
 
 ## System Architecture
-**Frontend:** React, TypeScript, Vite, TanStack Query, Wouter, shadcn/ui.
-**Backend:** Express.js, Drizzle ORM, PostgreSQL.
-**LLM Integration:** OpenAI SDK (for OpenAI, OpenRouter, Groq), Anthropic SDK (for Claude).
-**Styling:** Tailwind CSS with Inter font family, offering dark/light theme support.
+AIDEN_IWO employs a modern web stack with React, TypeScript, Vite, TanStack Query, Wouter, and shadcn/ui for the frontend, and Express.js with Drizzle ORM and PostgreSQL for the backend. Styling is managed with Tailwind CSS, offering dark/light theme support. LLM integration is handled via the OpenAI SDK (for OpenAI, OpenRouter, Groq) and Anthropic SDK (for Claude).
 
 **Core Architectural Patterns & Design Decisions:**
-- **Two-Tier Orchestration:** Clear separation of concerns with Aiden managing high-level decisions and sub-agents handling execution. Aiden performs a mandatory Tier 1 quality review (`runAidenQualityReview` in `llm-client.ts`) before any work order is marked complete. The review evaluates the deliverable against original requirements, produces a score/recommendation, and can gate completion: `approve` → completed, `request_revision` → auto-revision or awaiting_operator, `block` → blocked with BDM marker. Quality review results are recorded in execution logs and GCC memory.
-- **Autonomous Revision Loop:** When a sub-agent's `controlMode` is `"aiden"` (Aiden-controlled), quality review rejections trigger an automatic revision cycle instead of stopping for operator approval. Aiden re-dispatches PocketFlow with the quality review issues injected as revision guidance. Up to 2 auto-revisions are attempted. Each revision gets a fresh quality review. If revisions still fail quality after max attempts, the WO escalates to `awaiting_operator`. The revision attempt count is tracked in `gcc.metadata.revisionAttempts`. Independent-mode sub-agents always escalate to operator.
-- **Multi-Provider LLM Abstraction:** Supports various LLM providers with a unified interface and structured JSON parsing for robust decision-making.
-- **PocketFlow Iterative Execution Engine:** A sophisticated Tier 2 execution engine that enables iterative planning, execution, evaluation, and refinement of steps, supporting parallel execution and delta-only refinement for efficiency.
-- **GCC Memory Protocol:** Utilizes a shared context mechanism (WS014 P_PODE contract) for consistent state management across tiers.
-- **BDM (Blocked Decision Marker) System:** Structured approach to signal and manage work order blockages, enabling informed HITL intervention.
+- **Two-Tier Orchestration:** Clear separation between Aiden (high-level decisions, mandatory Tier 1 quality review) and sub-agents (execution). Features an autonomous revision loop for Aiden-controlled sub-agents to automatically address quality review rejections.
+- **Multi-Provider LLM Abstraction:** A unified interface supports various LLM providers for robust decision-making.
+- **PocketFlow Iterative Execution Engine:** A sophisticated Tier 2 engine enabling iterative planning, execution, evaluation, and refinement of steps, supporting parallel execution and delta-only refinement.
+- **GCC Memory Protocol:** A shared context mechanism for consistent state management across tiers.
+- **BDM (Blocked Decision Marker) System:** A structured approach for managing work order blockages and facilitating HITL intervention.
 - **Workflow Engine:** Manages multi-step workflow templates with dependency resolution, conditional execution, and retry logic.
-- **Agentic Tools Platform:** Provides a standardized way to integrate and assign diverse tools to sub-agents, enhancing their capabilities.
-- **Replit Auth Integration:** Secure user authentication with RBAC for granular control over system functionalities.
-- **Responsive UI/UX:** Designed with `shadcn/ui` and Tailwind CSS for a modern, responsive, and accessible user experience across various devices.
-- **Workspace Filing Engine:** Automates routing of deliverables to specific folders and deployment of artifacts to the sandbox. Supports both HTML previews (direct rendering) and code block previews (Python, JS, etc. wrapped in styled HTML with output sections). `extractHtmlFromDeliverable` handles HTML; `extractCodeBlocksFromDeliverable` + `buildCodePreviewHtml` handles non-HTML code blocks. Re-file button available on completed work orders in the detail view. **Executable JS Sandbox:** `isRunnableBrowserJs` detects browser-compatible JS (Canvas, DOM, addEventListener, etc. — 2+ indicators, no Node.js patterns) and `buildRunnableJsHtml` wraps it in a self-contained HTML page with console capture and error display. Non-browser JS/TS falls back to static code display. **PocketFlow Sandbox Awareness:** `llmPlanSteps` and `llmExecStep` detect sandbox-targeted work orders (explicit "sandbox" keyword or "build/create game/animation") and inject HTML5/JS guidance to prevent Python/server-side output. `nodeBuildResponse` auto-detects deliverables with >200 chars of HTML/JS/CSS code blocks and upgrades `deliverableType` to "code".
-
-**Feature Specifications:**
-- **Work Order Lifecycle Management:** Comprehensive states including `pending`, `processing`, `completed`, `blocked`, `failed`, `awaiting_operator`, `reopened`, `deferred`. Work orders can also be archived (boolean flag, separate from status) with `isArchived`, `archivedAt`, `archivedBy`, `archivedReason` fields. Admin-only archive/unarchive with full GCC tracking. Archived orders excluded from dashboard stats and default queries.
-- **Chat Organization:** Chat history supports grouping by subject, nesting (sub-groups), and archiving. `chat_groups` table provides folder-like organization with `parentId` for nesting, `color` labels, `sortOrder`, and `isCollapsed` state. `chat_sessions` table has `groupId` (nullable FK to groups), `isArchived` (boolean), `archivedAt`. UI features: collapsible folder tree with session counts, context menu per chat (rename, move to group, archive/unarchive, delete), context menu per group (edit, add sub-group, delete), toggle to show/hide archived chats. API: `/api/chat/groups` CRUD, `/api/chat/sessions/bulk-update` for batch operations.
-- **Chat Action Execution:** Aiden can create work orders directly from chat conversations. Uses a model-agnostic three-tier extraction architecture: (T1) Parse structured `<!-- AIDEN_ACTION:CREATE_WORK_ORDER:{...} -->` blocks for fast-path zero-cost detection, (T2) Regex fallback that extracts Title/Type/Priority/Description from markdown tables in the LLM visible text, (T3) Second lightweight LLM extraction call with a simple JSON-only prompt that works with any model size (7B to frontier). Role-gated (operator/admin only), input-sanitized, with proper GCC commit initialization and execution logging. Supports `autoProcess` flag for immediate pipeline submission. Action blocks are stripped from visible chat output. Placeholder tokens `{{WORK_ORDER_ID}}` and `{{CORRELATION_ID}}` are replaced with real values. Extraction method tracked in GCC metadata and execution logs.
-- **Per-Sub-Agent LLM Configuration:** Allows independent LLM settings (model, prompt, provider) for individual sub-agents, enabling specialized AI worker behaviors.
-- **HITL Capabilities:** Three intervention actions: (1) Override Block & Continue — clears block/deferral and resubmits for processing, (2) Close Without Processing — marks complete with resolution notes, (3) Defer Decision — postpones decision to a future review date with reason. Available on blocked, failed, and awaiting_operator orders. Deferred orders show review date with overdue detection. Inline editing of order details also supported.
-- **Admin Tooling:** Includes user management with role assignment and system health monitoring.
-
-**Universal Components:**
-- **ImagePlaceholder** (`client/src/components/image-placeholder.tsx`): Reusable image placeholder with drag-and-drop upload. Uses `placeholderId` for persistence. Images stored as base64 in `uploaded_images` table. Supports click/drag upload, replace, remove. API: POST `/api/images/upload`, GET `/api/images/:placeholderId`, GET `/api/images/:placeholderId/meta`, DELETE `/api/images/:placeholderId`.
-- **ExpandablePanel** (`client/src/components/expandable-panel.tsx`): Universal fullscreen expand/contract button. Uses React portals for overlay. ESC key to close. Wired into Sandbox preview, Workspace file preview, and Work Order execution timeline.
-
-**Tools Locker System (Phase 1 — Data Foundation + Phase 2 — Live Execution):**
-A governed, shared repository of callable tools and reusable skills that agents can check out, execute, and return with results and metadata. **Phase 2** adds live tool execution during PocketFlow work order processing via `server/tool-executor.ts`. Tools are automatically discovered, injected into LLM planning/execution prompts, and executed when the LLM requests tool calls. Supported execution types: `skill` (including Brave Search API), `api` (HTTP endpoint), `cli` (stubbed), `python_code` (stubbed). Auto-checkout/return of leases with full audit trail. Tool results are synthesized back into step deliverables by the LLM. `getAvailableToolsForAgent()` respects sub-agent tool entitlements and access tiers.
-- **Locker Governance Fields** on `tools` table: `accessTier` (any/tier1/tier2), `maxConcurrent` (0=unlimited), `defaultLeaseSeconds`, `maxLeaseSeconds`, `dailyUsageLimit`, `costCeilingPerDay`, `requiresApproval`, `restricted`, `restrictedReason`, `restrictedBy`.
-- **Tool Tags** (`tool_tags`, `tool_tag_assignments`): Discovery metadata (capability, cost, risk, latency) for categorizing tools.
-- **Tool Leases** (`tool_leases`): Checkout/return/lease tracking with agent info, tier, expiry, heartbeat, result/error.
-- **Locker Keys** (`locker_keys`): Agent permissions with scopes, tool/tag access, concurrency limits, revocation support.
-- **Tool Audit Logs** (`tool_audit_logs`): Full audit trail of checkout, return, restrict, unrestrict actions.
-- **Skill Templates** (`skill_templates`): Supports three formats — `claude_md`, `agents_md`, `aiden_md`. Two execution modes: `prompt_injection` (skills loaded into agent context) and `sandbox_execution` (code tools run in sandbox). Fields include `content`, `instructions`, `triggerConditions`, `inputContract`, `outputContract`, `sourceCode`, `entryPoint`, `runtimeEnvironment`, `sandboxConfig`.
-- **Tool Onboarding (Enhanced)**: Tools table now includes full onboarding fields: `skillContent` (SKILL.md body), `skillInstructions`, `triggerConditions`, `executionMode`, `runtimeEnvironment`, `sourceCode`, `entryPoint`, `sandboxConfig`, `credentials` (jsonb array of {key, value, isSecret, description}), `usageInstructions`, `mcpConfig`. Seven tool types supported: Claude Skill, Python Code, Slash Command, CLI, API, Webhook, MCP Server. Multi-tab form UI: Identity, Skill Content, Code, MCP, Credentials, Contracts, Governance, Agent Access.
-- **Per-Agent Tool Entitlements**: Sub-agent edit dialog includes a "Tool Access" section with toggle on/off for each available tool. Uses `sub_agent_tools` table with `enabled` boolean. `getAvailableToolsForAgent()` respects disabled assignments to override default access. API: `PUT /api/sub-agents/:id/tools/:toolId/toggle`, `GET /api/sub-agents/:id/tools`.
-- **Per-Agent Tool History**: Sub-agent edit dialog includes a "Tool History" section showing all tool lease history for that agent. Merges direct leases (by agentId) with work-order-based leases (via `assigned_sub_agent_id` on work orders). Shows usage counts per tool, active leases, and a scrollable usage log. API: `GET /api/sub-agents/:id/tool-history`.
-- **API Namespace**: All locker routes under `/api/locker/*` — inventory, tags, leases, checkout/return, keys, audit, skills, restrict/unrestrict.
+- **Agentic Tools Platform:** Standardized integration and assignment of diverse tools to sub-agents, enhancing capabilities.
+- **Replit Auth Integration:** Secure user authentication with RBAC.
+- **Responsive UI/UX:** Built with `shadcn/ui` and Tailwind CSS for a modern, accessible user experience.
+- **Workspace Filing Engine & Sandbox:** Automates deliverable routing and artifact deployment. Supports HTML, code block, JavaScript (browser-compatible with console capture), Python (Pyodide), and Markdown previews within a secure sandboxed environment with a Content Security Policy (CSP).
+- **Work Order Lifecycle Management:** Comprehensive states including `pending`, `processing`, `completed`, `blocked`, `failed`, `awaiting_operator`, `reopened`, `deferred`, and archiving capabilities.
+- **Chat Organization:** Chat history supports grouping, nesting, and archiving, with a robust UI and API for management.
+- **Chat Action Execution:** Aiden can create work orders from chat using a model-agnostic three-tier extraction architecture for flexible and reliable command processing.
+- **Per-Sub-Agent LLM Configuration:** Allows independent LLM settings for individual sub-agents, enabling specialized AI behaviors.
+- **HITL Capabilities:** Three intervention actions: Override Block & Continue, Close Without Processing, and Defer Decision, applicable to blocked, failed, and awaiting_operator orders.
+- **Tools Locker System:** A governed, shared repository of callable tools and reusable skills. Tools are automatically discovered, injected into LLM prompts, and executed during work order processing. Includes features for governance (access tiers, limits), leasing, audit logs, and per-agent entitlements and history. Supports various tool types including MCP (Model Context Protocol) servers, skills, API calls, and code execution.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database for persistent storage.
-- **OpenAI:** LLM provider.
-- **Anthropic:** LLM provider (Claude).
-- **OpenRouter:** LLM provider.
-- **Groq:** LLM provider.
-- **Replit Auth:** User authentication and authorization service (Google, GitHub login).
-- **SendGrid:** Email integration for user invitations and notifications (via Replit Connectors).
+- **OpenAI:** Large Language Model provider.
+- **Anthropic:** Large Language Model provider (Claude).
+- **OpenRouter:** Large Language Model provider.
+- **Groq:** Large Language Model provider.
+- **Replit Auth:** User authentication and authorization service.
+- **SendGrid:** Email integration for notifications.

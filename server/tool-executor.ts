@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import type { Tool, ToolLease } from "@shared/schema";
+import { connectAndListTools, connectAndCallTool } from "./mcp-client";
 
 export interface ToolExecResult {
   success: boolean;
@@ -154,6 +155,67 @@ async function executePythonTool(tool: Tool, input: string): Promise<string> {
   return `Python tool "${tool.name}" source code available (${code.length} chars).\n\nNote: Sandbox Python execution is not yet enabled. The code has been loaded as context.\n\nInput: ${input}`;
 }
 
+async function executeMcpTool(tool: Tool, input: string): Promise<string> {
+  const mcpConfig = tool.mcpConfig as any;
+  if (!mcpConfig || (typeof mcpConfig === "object" && Object.keys(mcpConfig).length === 0)) {
+    return `MCP tool "${tool.name}" has no MCP configuration. Configure transport, command/URL, and other settings.`;
+  }
+
+  let targetToolName: string | null = null;
+  let toolArgs: Record<string, any> = {};
+
+  const toolNameMatch = input.match(/^toolName:\s*(.+?)(?:\n|$)/i);
+  const argsMatch = input.match(/^args:\s*(.+)/im);
+
+  if (toolNameMatch) {
+    targetToolName = toolNameMatch[1].trim();
+    if (argsMatch) {
+      try {
+        toolArgs = JSON.parse(argsMatch[1].trim());
+      } catch {
+        toolArgs = { query: argsMatch[1].trim() };
+      }
+    }
+  } else {
+    const jsonMatch = input.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        targetToolName = parsed.toolName || parsed.tool || parsed.name || null;
+        toolArgs = parsed.args || parsed.arguments || parsed.input || {};
+        if (typeof toolArgs === "string") toolArgs = { query: toolArgs };
+      } catch {}
+    }
+  }
+
+  if (!targetToolName) {
+    try {
+      const { tools, serverName } = await connectAndListTools(mcpConfig);
+      if (tools.length === 0) {
+        return `MCP server "${serverName}" connected but exposes no tools.`;
+      }
+      const listing = tools.map((t, i) => {
+        const schema = t.inputSchema ? `\n     Input: ${JSON.stringify(t.inputSchema)}` : "";
+        return `  ${i + 1}. ${t.name} — ${t.description || "No description"}${schema}`;
+      }).join("\n");
+      return `## MCP Server: ${serverName}\n\nAvailable tools:\n${listing}\n\nTo call a tool, use format:\ntoolName: <name>\nargs: {"key": "value"}`;
+    } catch (err: any) {
+      return `MCP tool discovery failed for "${tool.name}": ${err.message}`;
+    }
+  }
+
+  try {
+    const result = await connectAndCallTool(mcpConfig, targetToolName, toolArgs);
+    if (result.success) {
+      return `## MCP Tool Result: ${result.toolName} (via ${result.serverName})\n\n${result.output}`;
+    } else {
+      return `MCP tool "${result.toolName}" returned error: ${result.error || result.output}`;
+    }
+  } catch (err: any) {
+    return `MCP tool execution failed for "${targetToolName}" on "${tool.name}": ${err.message}`;
+  }
+}
+
 export async function executeTool(
   toolSlug: string,
   input: string,
@@ -193,6 +255,9 @@ export async function executeTool(
         break;
       case "python_code":
         output = await executePythonTool(tool, input);
+        break;
+      case "mcp_server":
+        output = await executeMcpTool(tool, input);
         break;
       default:
         output = `Tool type "${tool.type}" is not yet supported for execution. Tool: ${tool.name}, Input: ${input}`;

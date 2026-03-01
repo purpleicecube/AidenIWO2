@@ -735,9 +735,12 @@ export async function llmPlanSteps(
 
   const toolsContext = availableTools && availableTools.length > 0
     ? `\n\nAVAILABLE TOOLS (you can use these during step execution):
-${availableTools.map(t => `- **${t.name}** (slug: "${t.slug}", type: ${t.type}): ${t.description}`).join("\n")}
+${availableTools.map(t => {
+  const mcpNote = t.type === "mcp_server" ? " [MCP Server — call specific MCP tools via 'toolName: <name>\\nargs: {\"key\": \"value\"}' format]" : "";
+  return `- **${t.name}** (slug: "${t.slug}", type: ${t.type}): ${t.description}${mcpNote}`;
+}).join("\n")}
 
-When planning steps, if a step would benefit from using a tool (e.g., web search, data processing), mention the tool by slug in the step description like: "Use tool [brave-search] to research X". The execution engine will detect tool references and execute them automatically.`
+When planning steps, if a step would benefit from using a tool (e.g., web search, data processing), mention the tool by slug in the step description like: "Use tool [brave-search] to research X". The execution engine will detect tool references and execute them automatically.${availableTools.some(t => t.type === "mcp_server") ? "\nFor MCP server tools, specify the MCP tool name and arguments. If unsure which MCP tools are available, reference the tool without specifying a tool name to get a listing of available MCP tools." : ""}`
     : "";
 
   const revisionGuidance = revisionContext ? `\n${revisionContext}` : "";
@@ -799,7 +802,10 @@ export async function llmExecStep(
 
   const toolsSection = availableTools && availableTools.length > 0
     ? `\n\nAVAILABLE TOOLS you can invoke:
-${availableTools.map(t => `- "${t.slug}" — ${t.name}: ${t.description}`).join("\n")}
+${availableTools.map(t => {
+  const mcpNote = t.type === "mcp_server" ? " [MCP Server — for input use 'toolName: <mcpToolName>\\nargs: {\"key\": \"value\"}']" : "";
+  return `- "${t.slug}" — ${t.name}: ${t.description}${mcpNote}`;
+}).join("\n")}
 
 To use a tool, include a "tool_calls" array in your JSON response. Each tool call needs a "toolSlug" and "input" string.
 Example: "tool_calls": [{"toolSlug": "brave-search", "input": "your search query"}]

@@ -87,6 +87,133 @@ export function extractCodeBlocksFromDeliverable(content: string): ExtractedCode
   return blocks;
 }
 
+function isPythonCode(codeBlocks: ExtractedCodeBlock[]): boolean {
+  return codeBlocks.some(b => ["python", "py", "python3"].includes(b.language));
+}
+
+function buildPythonRunnerHtml(title: string, codeBlocks: ExtractedCodeBlock[]): string {
+  const pyBlocks = codeBlocks.filter(b => ["python", "py", "python3"].includes(b.language));
+  const combinedPy = pyBlocks.map(b => b.code).join("\n\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; flex-direction: column; height: 100vh; }
+  .header { background: #1e293b; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
+  .header h1 { font-size: 0.9rem; color: #f8fafc; }
+  .badge { display: inline-block; background: #166534; color: #4ade80; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+  .status { font-size: 0.75rem; color: #94a3b8; }
+  .content { display: flex; flex: 1; min-height: 0; }
+  .code-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #334155; }
+  .output-panel { flex: 1; display: flex; flex-direction: column; }
+  .panel-header { background: #1e293b; padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 600; color: #94a3b8; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 0.5rem; }
+  .panel-header .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot-blue { background: #3b82f6; }
+  .dot-green { background: #4ade80; }
+  pre { flex: 1; padding: 1rem; overflow: auto; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; }
+  .code-display { background: #0c1222; color: #e2e8f0; }
+  .output-display { background: #0a0f1a; color: #4ade80; }
+  .output-display .err { color: #f87171; }
+  .output-display .info { color: #60a5fa; }
+  .run-btn { background: #166534; color: #4ade80; border: 1px solid #22c55e40; padding: 0.35rem 0.75rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; font-weight: 600; }
+  .run-btn:hover { background: #15803d; }
+  .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .loading-bar { height: 2px; background: #1e293b; overflow: hidden; }
+  .loading-bar .fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6); width: 30%; animation: loading 1.5s ease-in-out infinite; }
+  @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>${escapeHtml(title)}</h1>
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <span class="badge">Python Sandbox</span>
+    <span class="status" id="status">Loading Pyodide...</span>
+    <button class="run-btn" id="runBtn" disabled onclick="runCode()">Run</button>
+  </div>
+</div>
+<div class="loading-bar" id="loadingBar"><div class="fill"></div></div>
+<div class="content">
+  <div class="code-panel">
+    <div class="panel-header"><span class="dot dot-blue"></span> Source Code</div>
+    <pre class="code-display" id="codeDisplay"></pre>
+  </div>
+  <div class="output-panel">
+    <div class="panel-header"><span class="dot dot-green"></span> Output</div>
+    <pre class="output-display" id="outputDisplay">Waiting for execution...</pre>
+  </div>
+</div>
+<script>
+var pyCode = ${JSON.stringify(combinedPy)};
+document.getElementById('codeDisplay').textContent = pyCode;
+var pyodideReady = false;
+var pyodide = null;
+
+async function loadPyodideRuntime() {
+  try {
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+    document.head.appendChild(script);
+    await new Promise(function(resolve, reject) {
+      script.onload = resolve;
+      script.onerror = function() { reject(new Error('Failed to load Pyodide CDN')); };
+    });
+    pyodide = await loadPyodide({
+      indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
+      stdout: function(text) { appendOutput(text, ''); },
+      stderr: function(text) { appendOutput(text, 'err'); }
+    });
+    pyodideReady = true;
+    document.getElementById('status').textContent = 'Ready';
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('loadingBar').style.display = 'none';
+    runCode();
+  } catch (e) {
+    document.getElementById('status').textContent = 'Load failed';
+    document.getElementById('loadingBar').style.display = 'none';
+    appendOutput('Failed to load Python runtime: ' + e.message, 'err');
+    appendOutput('Showing source code only.', 'info');
+  }
+}
+
+function appendOutput(text, cls) {
+  var el = document.getElementById('outputDisplay');
+  if (el.textContent === 'Waiting for execution...' || el.textContent === 'Running...') el.textContent = '';
+  var span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = text + '\\n';
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function runCode() {
+  if (!pyodideReady) return;
+  var el = document.getElementById('outputDisplay');
+  el.textContent = 'Running...';
+  document.getElementById('status').textContent = 'Running...';
+  try {
+    var result = await pyodide.runPythonAsync(pyCode);
+    if (result !== undefined && result !== null) {
+      appendOutput(String(result), '');
+    }
+    document.getElementById('status').textContent = 'Completed';
+  } catch (e) {
+    appendOutput(e.message, 'err');
+    document.getElementById('status').textContent = 'Error';
+  }
+}
+
+loadPyodideRuntime();
+</script>
+</body>
+</html>`;
+}
+
 function isRunnableBrowserJs(codeBlocks: ExtractedCodeBlock[]): boolean {
   const jsBlocks = codeBlocks.filter(b =>
     ["javascript", "js"].includes(b.language)
@@ -167,6 +294,9 @@ ${combinedJs}
 }
 
 export function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlock[], fullContent: string): string {
+  if (isPythonCode(codeBlocks)) {
+    return buildPythonRunnerHtml(title, codeBlocks);
+  }
   if (isRunnableBrowserJs(codeBlocks)) {
     return buildRunnableJsHtml(title, codeBlocks);
   }
@@ -222,7 +352,7 @@ export function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlo
 </html>`;
 }
 
-function buildMarkdownPreviewHtml(title: string, markdown: string): string {
+export function buildMarkdownPreviewHtml(title: string, markdown: string): string {
   let html = escapeHtml(markdown);
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');

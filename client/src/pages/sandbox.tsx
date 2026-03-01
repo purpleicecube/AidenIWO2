@@ -84,7 +84,7 @@ export default function SandboxPage() {
   const [newDesc, setNewDesc] = useState("");
   const [execCommand, setExecCommand] = useState("");
   const [execInput, setExecInput] = useState("");
-  const [viewMode, setViewMode] = useState<"terminal" | "preview">("terminal");
+  const [viewMode, setViewMode] = useState<"terminal" | "preview">("preview");
   const [iframeKey, setIframeKey] = useState(0);
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
