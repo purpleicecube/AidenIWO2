@@ -538,6 +538,15 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
 function findSubAgent(agents: SubAgent[], handler: string | null): SubAgent | undefined {
   if (!handler || agents.length === 0) return undefined;
 
+  const h = handler.trim();
+  const hLower = h.toLowerCase();
+
+  const byId = agents.find((a) => a.id === h);
+  if (byId) return byId;
+
+  const byExactName = agents.find((a) => a.name.toLowerCase() === hLower);
+  if (byExactName) return byExactName;
+
   const typeMap: Record<string, string> = {
     deploy_executor: "deployment",
     maintenance_executor: "maintenance",
@@ -547,8 +556,36 @@ function findSubAgent(agents: SubAgent[], handler: string | null): SubAgent | un
     general_executor: "general",
   };
 
-  const targetType = typeMap[handler] || "general";
-  return agents.find((a) => a.type === targetType) || agents.find((a) => a.type === "general") || agents[0];
+  if (typeMap[h] || typeMap[hLower]) {
+    const targetType = typeMap[h] || typeMap[hLower];
+    const byType = agents.find((a) => a.type === targetType);
+    if (byType) return byType;
+  }
+
+  const byTypeField = agents.find((a) => a.type === hLower);
+  if (byTypeField) return byTypeField;
+
+  if (h.length >= 5) {
+    const hWords = hLower.split(/[\s_-]+/).filter(w => w.length >= 3);
+    if (hWords.length > 0) {
+      let bestMatch: SubAgent | undefined;
+      let bestScore = 0;
+      for (const agent of agents) {
+        const nameWords = agent.name.toLowerCase().split(/[\s_-]+/);
+        const descWords = (agent.description || "").toLowerCase().split(/[\s_-]+/);
+        const allWords = [...nameWords, ...descWords];
+        const matchCount = hWords.filter(w => allWords.some(aw => aw.includes(w) || w.includes(aw))).length;
+        const score = matchCount / hWords.length;
+        if (score > bestScore && score >= 0.5) {
+          bestScore = score;
+          bestMatch = agent;
+        }
+      }
+      if (bestMatch) return bestMatch;
+    }
+  }
+
+  return agents.find((a) => a.type === "general") || agents[0];
 }
 
 function runTier1PolicyGate(order: WorkOrder, subAgents: SubAgent[]): Tier1Result {

@@ -543,10 +543,14 @@ Respond with ONLY a JSON object in this exact format:
   "approved": true/false,
   "reason": "explanation of your decision",
   "mode": "auto" or "manual_review",
-  "handler": "handler_name" or null if blocked
+  "handler": "sub_agent_name_or_handler" or null if blocked
 }
 
-Available handlers: general_executor, deploy_executor, maintenance_executor, incident_executor, change_executor, security_executor
+For the "handler" field, you can use EITHER:
+1. A specific sub-agent NAME (preferred when a sub-agent's description/capabilities match the work order) — e.g. "A011_Design uiux_minimal_mobile"
+2. A generic handler type: general_executor, deploy_executor, maintenance_executor, incident_executor, change_executor, security_executor
+
+IMPORTANT: Always prefer routing to the sub-agent whose name, description, or specialization best matches the work order. Only fall back to generic handlers if no sub-agent is a good match.
 ${subAgentInfo}
 ${reopenContext}${gccContext}
 Work Order:
