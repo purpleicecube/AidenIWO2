@@ -1,6 +1,8 @@
 import { storage } from "./storage";
 import type { WorkOrder, ExecutionLog } from "@shared/schema";
 
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -108,7 +110,6 @@ function isRunnableBrowserJs(codeBlocks: ExtractedCodeBlock[]): boolean {
 }
 
 function buildRunnableJsHtml(title: string, codeBlocks: ExtractedCodeBlock[]): string {
-  const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const jsBlocks = codeBlocks.filter(b =>
     ["javascript", "js", "typescript", "ts", "jsx", "tsx"].includes(b.language)
   );
@@ -170,8 +171,6 @@ export function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlo
     return buildRunnableJsHtml(title, codeBlocks);
   }
 
-  const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
   const blocksHtml = codeBlocks.map((block, i) => {
     const langLabel = block.language.charAt(0).toUpperCase() + block.language.slice(1);
     return `<div class="code-section">
@@ -218,6 +217,52 @@ export function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlo
   <span class="badge">AIDEN_IWO Sandbox Preview</span>
   ${blocksHtml}
   ${outputHtml}
+  <div class="footer">Auto-deployed by AIDEN_IWO Workspace Filing Engine</div>
+</body>
+</html>`;
+}
+
+function buildMarkdownPreviewHtml(title: string, markdown: string): string {
+  let html = escapeHtml(markdown);
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 class="doc-title">$1</h1>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`);
+  html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+  html = html.replace(/\n{2,}/g, '</p><p>');
+  html = `<p>${html}</p>`;
+  html = html.replace(/<p>\s*(<h[123]>)/g, '$1');
+  html = html.replace(/(<\/h[123]>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*<ul>/g, '<ul>');
+  html = html.replace(/<\/ul>\s*<\/p>/g, '</ul>');
+  html = html.replace(/<p>\s*<\/p>/g, '');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; max-width: 800px; margin: 0 auto; }
+  .badge { display: inline-block; background: #1e40af; color: #93c5fd; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 1.5rem; }
+  .doc-title { font-size: 1.5rem; margin-bottom: 0.5rem; color: #f8fafc; }
+  h2 { font-size: 1.25rem; margin: 1.5rem 0 0.75rem; color: #93c5fd; border-bottom: 1px solid #334155; padding-bottom: 0.4rem; }
+  h3 { font-size: 1.1rem; margin: 1.25rem 0 0.5rem; color: #a5b4fc; }
+  p { margin-bottom: 0.75rem; line-height: 1.7; color: #cbd5e1; }
+  strong { color: #f1f5f9; }
+  ul, ol { margin: 0.5rem 0 1rem 1.5rem; }
+  li { margin-bottom: 0.35rem; line-height: 1.6; color: #cbd5e1; }
+  .footer { margin-top: 2rem; font-size: 0.75rem; color: #64748b; border-top: 1px solid #1e293b; padding-top: 1rem; }
+</style>
+</head>
+<body>
+  <span class="badge">AIDEN_IWO Document Preview</span>
+  ${html}
   <div class="footer">Auto-deployed by AIDEN_IWO Workspace Filing Engine</div>
 </body>
 </html>`;
@@ -403,36 +448,64 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
         }
       }
 
+      if (!sandboxHtml && deliverable.length > 50) {
+        sandboxHtml = buildMarkdownPreviewHtml(deliverableTitle, deliverable);
+        sandboxType = "document_preview";
+      }
+
       if (sandboxHtml) {
         try {
-          const sandboxSession = await storage.createSandboxSession({
-            name: `Preview: ${order.title}`,
-            description: `Auto-deployed from work order "${order.title}" — ${sandboxType === "code_preview" ? "code execution preview" : "renderable HTML preview"}.`,
-            environment: {
-              sourceType: "work_order",
-              sourceId: order.id,
-              deliverableTitle,
-              autoDeployed: true,
-              previewType: sandboxType,
-            },
-            createdBy: "aiden",
+          const allSessions = await storage.getSandboxSessions();
+          const existingSession = allSessions.find((s) => {
+            const env = s.environment as any;
+            return env?.sourceType === "work_order" && env?.sourceId === order.id;
           });
 
           const previewLog = {
             timestamp: new Date().toISOString(),
             command: "deploy-preview",
             input: { workOrderId: order.id, title: order.title },
-            output: { message: `${sandboxType === "code_preview" ? "Code preview" : "HTML preview"} deployed for "${order.title}"`, status: "success" },
+            output: { message: `${sandboxType === "code_preview" ? "Code preview" : sandboxType === "document_preview" ? "Document preview" : "HTML preview"} deployed for "${order.title}"`, status: "success" },
           };
 
-          await storage.updateSandboxSession(sandboxSession.id, {
-            status: "completed",
-            result: { html: sandboxHtml, renderable: true, title: deliverableTitle },
-            logs: [previewLog],
-            completedAt: new Date(),
-          });
+          if (existingSession) {
+            const existingLogs = Array.isArray(existingSession.logs) ? existingSession.logs : [];
+            await storage.updateSandboxSession(existingSession.id, {
+              status: "completed",
+              result: { html: sandboxHtml, renderable: true, title: deliverableTitle },
+              logs: [...existingLogs, previewLog],
+              environment: {
+                sourceType: "work_order",
+                sourceId: order.id,
+                deliverableTitle,
+                autoDeployed: true,
+                previewType: sandboxType,
+              },
+              completedAt: new Date(),
+            });
+            console.log(`  Sandbox ${sandboxType} updated: session ${existingSession.id}`);
+          } else {
+            const sandboxSession = await storage.createSandboxSession({
+              name: `Preview: ${order.title}`,
+              description: `Auto-deployed from work order "${order.title}" — ${sandboxType === "code_preview" ? "code execution preview" : sandboxType === "document_preview" ? "document preview" : "renderable HTML preview"}.`,
+              environment: {
+                sourceType: "work_order",
+                sourceId: order.id,
+                deliverableTitle,
+                autoDeployed: true,
+                previewType: sandboxType,
+              },
+              createdBy: "aiden",
+            });
 
-          console.log(`  Sandbox ${sandboxType} deployed: session ${sandboxSession.id}`);
+            await storage.updateSandboxSession(sandboxSession.id, {
+              status: "completed",
+              result: { html: sandboxHtml, renderable: true, title: deliverableTitle },
+              logs: [previewLog],
+              completedAt: new Date(),
+            });
+            console.log(`  Sandbox ${sandboxType} deployed: session ${sandboxSession.id}`);
+          }
         } catch (sandboxErr: any) {
           console.error("Sandbox auto-deploy failed:", sandboxErr.message);
         }

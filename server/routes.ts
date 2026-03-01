@@ -640,6 +640,16 @@ export async function registerRoutes(
         });
 
         const updated = await storage.getWorkOrder(req.params.id);
+
+        if (updated) {
+          try {
+            const { fileWorkOrderOutput } = await import("./workspace-filing");
+            await fileWorkOrderOutput(updated);
+          } catch (fileErr: any) {
+            console.error("Workspace filing after accept failed:", fileErr.message);
+          }
+        }
+
         res.json({ ...updated, unblocked: true, reprocessed: false });
       }
     } catch (err) {
