@@ -913,7 +913,7 @@ export async function registerRoutes(
         });
       }
 
-      const apiKey = process.env[config.apiKeyEnvVar];
+      const apiKey = config.directApiKey || process.env[config.apiKeyEnvVar];
       if (!apiKey) {
         return res.json({
           operational: false,
@@ -932,7 +932,7 @@ export async function registerRoutes(
         updatedAt: new Date(),
       };
 
-      const result = await testLLMConnection(testSettings);
+      const result = await testLLMConnection(testSettings, config.directApiKey);
       res.json({
         operational: result.success,
         source: config.source,

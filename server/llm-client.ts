@@ -654,9 +654,9 @@ ${gccContext}`;
   }
 }
 
-export async function testLLMConnection(settings: LlmSettings): Promise<{ success: boolean; message: string }> {
+export async function testLLMConnection(settings: LlmSettings, directApiKey?: string): Promise<{ success: boolean; message: string }> {
   const config = getProviderConfig(settings);
-  const apiKey = getApiKey(config.apiKeyEnvVar);
+  const apiKey = directApiKey || getApiKey(config.apiKeyEnvVar);
 
   const testPrompt = "Respond with exactly this JSON: {\"status\": \"ok\"}";
 
