@@ -342,10 +342,13 @@ export async function registerRoutes(
         message: `Processing started by ${actor.actorName}`,
         metadata: { actor },
       });
-      const result = await processWorkOrder(req.params.id);
-      res.json(result);
+      await storage.updateWorkOrder(req.params.id, { status: "processing" });
+      res.json({ message: "Processing started", status: "processing", workOrderId: req.params.id });
+      processWorkOrder(req.params.id).catch((err) => {
+        console.error(`[orchestration] Background processing failed for ${req.params.id}:`, err);
+      });
     } catch (err) {
-      res.status(500).json({ message: "Failed to process work order" });
+      res.status(500).json({ message: "Failed to initiate processing" });
     }
   });
 
@@ -383,8 +386,11 @@ export async function registerRoutes(
         metadata: { previousStatus: order.status, actor, commitId },
       });
 
-      const result = await processWorkOrder(req.params.id);
-      res.json(result);
+      await storage.updateWorkOrder(req.params.id, { status: "processing" });
+      res.json({ message: "Retry processing started", status: "processing", workOrderId: req.params.id });
+      processWorkOrder(req.params.id).catch((err) => {
+        console.error(`[orchestration] Background retry failed for ${req.params.id}:`, err);
+      });
     } catch (err) {
       res.status(500).json({ message: "Failed to retry work order" });
     }
@@ -617,8 +623,10 @@ export async function registerRoutes(
           metadata: { commitId },
         });
 
-        const result = await processWorkOrder(req.params.id);
-        res.json({ ...result, unblocked: true, reprocessed: true });
+        res.json({ message: "Re-processing started after HITL unblock", status: "processing", workOrderId: req.params.id, unblocked: true, reprocessed: true });
+        processWorkOrder(req.params.id).catch((err) => {
+          console.error(`[orchestration] Background re-process after HITL unblock failed for ${req.params.id}:`, err);
+        });
       } else {
         gccMemory["gcc.last_action"] = "hitl_resolved";
         gccMemory["gcc.metadata"].completedAt = now;
