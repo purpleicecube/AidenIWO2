@@ -193,6 +193,77 @@ function BlockedSummary({ order }: { order: WorkOrder }) {
   );
 }
 
+function QualityReviewSummary({ order }: { order: WorkOrder }) {
+  const gcc = (order.gccMemory || {}) as Record<string, any>;
+  const meta = gcc["gcc.metadata"] || {};
+  const qr = meta.qualityReview as { score?: number; recommendation?: string; issues?: string[] } | undefined;
+  const bdm = order.bdmMarker as Record<string, any> | null;
+  const isQualityBlock = bdm?.type === "quality_block";
+  const tier2 = order.tier2Result as Record<string, any> | null;
+  const hasOutput = tier2 && !tier2.blocked && tier2.output;
+
+  if (!qr && !isQualityBlock) return null;
+
+  const score = qr?.score ?? 0;
+  const recommendation = qr?.recommendation || bdm?.type || "unknown";
+  const issues = qr?.issues || bdm?.issues || [];
+  const reason = bdm?.reason || "";
+
+  const isRevision = order.status === "awaiting_operator";
+  const borderColor = isRevision
+    ? "border-amber-200 dark:border-amber-800/40"
+    : "border-red-200 dark:border-red-800/40";
+  const bgColor = isRevision
+    ? "bg-amber-50 dark:bg-amber-900/10"
+    : "bg-red-50 dark:bg-red-900/10";
+  const textColor = isRevision
+    ? "text-amber-700 dark:text-amber-400"
+    : "text-red-700 dark:text-red-400";
+  const subtextColor = isRevision
+    ? "text-amber-600 dark:text-amber-300"
+    : "text-red-600 dark:text-red-300";
+
+  return (
+    <div className={`rounded-md border ${borderColor} overflow-hidden`} data-testid="quality-review-summary">
+      <div className={`flex items-start gap-3 p-4 ${bgColor}`}>
+        <ShieldCheck className={`w-5 h-5 ${textColor} mt-0.5 flex-shrink-0`} />
+        <div className="space-y-1 min-w-0">
+          <p className={`text-sm font-medium ${textColor}`}>
+            {isRevision ? "Aiden Quality Review — Revision Requested" : "Aiden Quality Review — Blocked"}
+          </p>
+          <p className={`text-sm ${subtextColor}`}>
+            {reason || `Aiden reviewed the deliverable and recommends ${recommendation.replace(/_/g, " ")}.`}
+          </p>
+        </div>
+      </div>
+      <div className={`px-4 py-3 ${bgColor.replace("50", "50/50").replace("/10", "/5")} space-y-2`}>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+          <span>Quality Score: <span className="font-medium text-foreground">{(score * 100).toFixed(0)}%</span></span>
+          <span>Recommendation: <span className="font-medium text-foreground capitalize">{recommendation.replace(/_/g, " ")}</span></span>
+          <span>Deliverable: <span className="font-medium text-foreground">{hasOutput ? "Available" : "None"}</span></span>
+        </div>
+        {issues.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Issues Identified:</p>
+            <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
+              {issues.map((issue: string, i: number) => (
+                <li key={i}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+      <div className={`px-4 py-3 border-t ${borderColor} bg-muted/30`}>
+        <p className="text-xs text-muted-foreground">
+          {isRevision
+            ? "Review the deliverable below. You can Accept it as-is, Re-issue to Aiden for another attempt, Close the order, or Defer the decision."
+            : "Aiden blocked this deliverable at quality review. You can Override and re-process, Close the order, or Defer."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkOrderDetail() {
   const params = useParams<{ id: string }>();
   const { toast } = useToast();
@@ -201,6 +272,8 @@ export default function WorkOrderDetail() {
   const [copied, setCopied] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [archiveReason, setArchiveReason] = useState("");
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [acceptNotes, setAcceptNotes] = useState("");
 
   const { data: order, isLoading: orderLoading } = useQuery<WorkOrder>({
     queryKey: ["/api/work-orders", params.id],
@@ -350,6 +423,26 @@ export default function WorkOrderDetail() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to close work order.", variant: "destructive" });
+    },
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${params.id}/unblock`, {
+        resolution: `Operator accepted deliverable despite Aiden quality review concerns.${acceptNotes.trim() ? ` Notes: ${acceptNotes.trim()}` : ""}`,
+        reprocess: false,
+      }),
+    onSuccess: () => {
+      invalidateOrderQueries();
+      setAcceptDialogOpen(false);
+      setAcceptNotes("");
+      toast({
+        title: "Deliverable accepted",
+        description: "Work order marked as completed with operator approval.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to accept deliverable.", variant: "destructive" });
     },
   });
 
@@ -623,6 +716,18 @@ export default function WorkOrderDetail() {
               {order.status === "awaiting_operator" && (
                 <>
                   <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      setAcceptNotes("");
+                      setAcceptDialogOpen(true);
+                    }}
+                    data-testid="button-accept-deliverable"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Accept Deliverable
+                  </Button>
+                  <Button
+                    variant="outline"
                     onClick={() => reissueMutation.mutate()}
                     disabled={reissueMutation.isPending}
                     data-testid="button-reissue-awaiting"
@@ -643,7 +748,7 @@ export default function WorkOrderDetail() {
                     data-testid="button-close-awaiting"
                   >
                     <XCircle className="w-4 h-4 mr-2" />
-                    Close Without Processing
+                    Reject & Close
                   </Button>
                   <Button
                     variant="outline"
@@ -719,20 +824,24 @@ export default function WorkOrderDetail() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="w-5 h-5" />
-              Close Without Output
+              {order.status === "awaiting_operator" ? "Reject & Close" : "Close Without Output"}
             </DialogTitle>
             <DialogDescription>
-              This will mark the work order as complete without producing any output. Please explain why you are closing it instead of re-issuing.
+              {order.status === "awaiting_operator"
+                ? "This will reject the deliverable and close the work order. The existing output will be discarded. Please explain why you are rejecting it."
+                : "This will mark the work order as complete without producing any output. Please explain why you are closing it instead of re-issuing."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="close-reason">Why are you closing this?</Label>
+            <Label htmlFor="close-reason">{order.status === "awaiting_operator" ? "Reason for rejection" : "Why are you closing this?"}</Label>
             <Textarea
               id="close-reason"
               value={closeReason}
               onChange={(e) => setCloseReason(e.target.value)}
-              placeholder="e.g., No longer needed, handled externally, duplicate of another order..."
+              placeholder={order.status === "awaiting_operator"
+                ? "e.g., Deliverable doesn't meet requirements, wrong approach taken, no longer needed..."
+                : "e.g., No longer needed, handled externally, duplicate of another order..."}
               className="min-h-[100px]"
               data-testid="input-close-reason"
             />
@@ -754,6 +863,51 @@ export default function WorkOrderDetail() {
                 <XCircle className="w-4 h-4 mr-2" />
               )}
               {closeMutation.isPending ? "Closing..." : "Close Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              Accept Deliverable
+            </DialogTitle>
+            <DialogDescription>
+              Aiden flagged this deliverable during quality review, but you can override and accept it as complete. The existing output will be kept and the work order will be marked as completed.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="accept-notes">Operator Notes (optional)</Label>
+            <Textarea
+              id="accept-notes"
+              value={acceptNotes}
+              onChange={(e) => setAcceptNotes(e.target.value)}
+              placeholder="e.g., Reviewed the deliverable — quality is acceptable for this use case, minor issues noted but not blocking..."
+              className="min-h-[100px]"
+              data-testid="input-accept-notes"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAcceptDialogOpen(false)} data-testid="button-cancel-accept">
+              Cancel
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => acceptMutation.mutate()}
+              disabled={acceptMutation.isPending}
+              data-testid="button-confirm-accept"
+            >
+              {acceptMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4 mr-2" />
+              )}
+              {acceptMutation.isPending ? "Accepting..." : "Accept & Complete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -925,7 +1079,11 @@ export default function WorkOrderDetail() {
                 )}
               </div>
 
-              {order.status === "blocked" && order.bdmMarker && (
+              {(order.status === "awaiting_operator" || order.status === "blocked") && (
+                <QualityReviewSummary order={order} />
+              )}
+
+              {order.status === "blocked" && order.bdmMarker && !(order.bdmMarker as Record<string, any>).type?.includes("quality") && (
                 <BlockedSummary order={order} />
               )}
 
