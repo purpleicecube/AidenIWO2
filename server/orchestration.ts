@@ -178,8 +178,9 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     metadata: { llmSource, llmModel: effectiveLlmConfig?.model, llmProvider: effectiveLlmConfig?.provider, subAgentName: targetSubAgent?.name },
   });
 
+  const orderWithAgent = { ...order, assignedSubAgentId: targetSubAgent?.id || null };
   const tier2Result: Tier2Result = await pocketflowExecute(
-    order,
+    orderWithAgent,
     tier1Result,
     effectiveLlmConfig,
     settings || null,

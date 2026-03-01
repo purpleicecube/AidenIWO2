@@ -78,7 +78,7 @@ import {
   skillTemplates,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, and, asc } from "drizzle-orm";
+import { eq, desc, sql, and, asc, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -148,6 +148,7 @@ export interface IStorage {
 
   getSubAgentTools(subAgentId: string): Promise<(SubAgentTool & { tool: Tool })[]>;
   assignToolToSubAgent(assignment: InsertSubAgentTool): Promise<SubAgentTool>;
+  updateSubAgentTool(id: string, updates: Partial<SubAgentTool>): Promise<SubAgentTool | undefined>;
   removeToolFromSubAgent(subAgentId: string, toolId: string): Promise<boolean>;
 
   getArtifactFolders(parentId?: string | null): Promise<ArtifactFolder[]>;
@@ -208,6 +209,7 @@ export interface IStorage {
 
   // Tools Locker: Leases
   getToolLeases(filters?: { toolId?: string; agentId?: string; status?: string }): Promise<ToolLease[]>;
+  getToolLeasesBySubAgent(subAgentId: string): Promise<ToolLease[]>;
   getToolLease(id: string): Promise<ToolLease | undefined>;
   getActiveLeases(toolId: string): Promise<ToolLease[]>;
   createToolLease(lease: InsertToolLease): Promise<ToolLease>;
@@ -534,6 +536,11 @@ export class DatabaseStorage implements IStorage {
   async assignToolToSubAgent(assignment: InsertSubAgentTool): Promise<SubAgentTool> {
     const [created] = await db.insert(subAgentTools).values(assignment).returning();
     return created;
+  }
+
+  async updateSubAgentTool(id: string, updates: Partial<SubAgentTool>): Promise<SubAgentTool | undefined> {
+    const [updated] = await db.update(subAgentTools).set(updates).where(eq(subAgentTools.id, id)).returning();
+    return updated;
   }
 
   async removeToolFromSubAgent(subAgentId: string, toolId: string): Promise<boolean> {
@@ -868,6 +875,17 @@ export class DatabaseStorage implements IStorage {
     if (filters.status) conditions.push(eq(toolLeases.status, filters.status));
     if (conditions.length === 0) return db.select().from(toolLeases).orderBy(desc(toolLeases.issuedAt));
     return db.select().from(toolLeases).where(and(...conditions)).orderBy(desc(toolLeases.issuedAt));
+  }
+
+  async getToolLeasesBySubAgent(subAgentId: string): Promise<ToolLease[]> {
+    const assignedWOs = await db.select({ id: workOrders.id })
+      .from(workOrders)
+      .where(eq(workOrders.assignedSubAgentId, subAgentId));
+    if (assignedWOs.length === 0) return [];
+    const woIds = assignedWOs.map(wo => wo.id);
+    return db.select().from(toolLeases)
+      .where(inArray(toolLeases.workOrderId, woIds))
+      .orderBy(desc(toolLeases.issuedAt));
   }
 
   async getToolLease(id: string): Promise<ToolLease | undefined> {

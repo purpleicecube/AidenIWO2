@@ -1263,6 +1263,23 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sub-agents/:id/tool-history", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+      const directLeases = await storage.getToolLeases({ agentId: req.params.id });
+      const woLeases = await storage.getToolLeasesBySubAgent(req.params.id);
+      const leaseMap = new Map<string, any>();
+      [...directLeases, ...woLeases].forEach(l => leaseMap.set(l.id, l));
+      const merged = Array.from(leaseMap.values()).sort(
+        (a: any, b: any) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime()
+      );
+      res.json(merged);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch tool history" });
+    }
+  });
+
   app.post("/api/sub-agents/:id/tools", isAuth, requireRole("admin"), async (req, res) => {
     try {
       const agent = await storage.getSubAgent(req.params.id);
@@ -1289,6 +1306,35 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to remove tool" });
+    }
+  });
+
+  app.put("/api/sub-agents/:id/tools/:toolId/toggle", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const agent = await storage.getSubAgent(req.params.id);
+      if (!agent) return res.status(404).json({ message: "Sub-agent not found" });
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") return res.status(400).json({ message: "enabled (boolean) is required" });
+
+      const existing = await storage.getSubAgentTools(req.params.id);
+      const assignment = existing.find(a => a.toolId === req.params.toolId);
+
+      if (assignment) {
+        await storage.updateSubAgentTool(assignment.id, { enabled });
+        res.json({ ...assignment, enabled });
+      } else {
+        const tool = await storage.getTool(req.params.toolId);
+        if (!tool) return res.status(404).json({ message: "Tool not found" });
+        const created = await storage.assignToolToSubAgent({
+          subAgentId: req.params.id,
+          toolId: req.params.toolId,
+          enabled,
+          config: {},
+        });
+        res.json(created);
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Failed to toggle tool" });
     }
   });
 

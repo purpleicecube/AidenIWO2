@@ -230,8 +230,9 @@ export async function getAvailableToolsForAgent(subAgentId?: string): Promise<Ar
   if (subAgentId) {
     const assigned = await storage.getSubAgentTools(subAgentId);
     if (assigned.length > 0) {
-      const assignedIds = new Set(assigned.map(a => a.toolId));
-      const entitledTools = activeTools.filter(t => assignedIds.has(t.id) || t.accessTier === "any");
+      const enabledIds = new Set(assigned.filter(a => a.enabled !== false).map(a => a.toolId));
+      const disabledIds = new Set(assigned.filter(a => a.enabled === false).map(a => a.toolId));
+      const entitledTools = activeTools.filter(t => !disabledIds.has(t.id) && (enabledIds.has(t.id) || t.accessTier === "any" || t.accessTier === "tier2"));
       return entitledTools.map(t => ({
         slug: t.slug,
         name: t.name,

@@ -40,9 +40,9 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu, CheckCircle2, XCircle, AlertTriangle, Zap, Lock, Wrench, Clock, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu, CheckCircle2, XCircle, AlertTriangle, Zap, Lock, Wrench, Clock, ArrowUpRight, ArrowDownLeft, ToggleLeft, ToggleRight, Search, Package } from "lucide-react";
 import { ModelSelector, providers } from "@/components/model-selector";
-import type { SubAgent, ToolLease, Tool } from "@shared/schema";
+import type { SubAgent, SubAgentTool, ToolLease, Tool } from "@shared/schema";
 
 const subAgentFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -166,9 +166,126 @@ function formatTimeAgo(date: string | Date) {
   return `${days}d ago`;
 }
 
+function ToolEntitlementsSection({ agentId }: { agentId: string }) {
+  const { toast } = useToast();
+  const { data: allTools, isLoading: toolsLoading } = useQuery<Tool[]>({
+    queryKey: ["/api/tools"],
+  });
+  const { data: agentTools, isLoading: assignmentsLoading } = useQuery<(SubAgentTool & { tool: Tool })[]>({
+    queryKey: ["/api/sub-agents", agentId, "tools"],
+    queryFn: async () => {
+      const res = await fetch(`/api/sub-agents/${agentId}/tools`);
+      return res.json();
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ toolId, enabled }: { toolId: string; enabled: boolean }) => {
+      await apiRequest("PUT", `/api/sub-agents/${agentId}/tools/${toolId}/toggle`, { enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sub-agents", agentId, "tools"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update tool access", variant: "destructive" });
+    },
+  });
+
+  const activeTools = allTools?.filter(t => t.status === "active" && !t.restricted) || [];
+  const assignmentMap = new Map<string, SubAgentTool>();
+  agentTools?.forEach(at => assignmentMap.set(at.toolId, at));
+
+  const isLoading = toolsLoading || assignmentsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="border rounded-md p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Package className="w-4 h-4" />
+          <span className="text-sm font-medium">Tool Access</span>
+        </div>
+        <div className="flex items-center justify-center py-3">
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  const enabledCount = activeTools.filter(t => {
+    const assignment = assignmentMap.get(t.id);
+    if (!assignment) return t.accessTier === "any" || t.accessTier === "tier2";
+    return assignment.enabled !== false;
+  }).length;
+
+  return (
+    <div className="border rounded-md p-4 space-y-3" data-testid="section-tool-entitlements">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Package className="w-4 h-4" />
+          <span className="text-sm font-medium">Tool Access</span>
+          <Badge variant="outline" className="border-transparent bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate text-xs">
+            {enabledCount}/{activeTools.length}
+          </Badge>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Toggle tools on/off for this agent</p>
+      </div>
+
+      <div className="space-y-1">
+        {activeTools.map(tool => {
+          const assignment = assignmentMap.get(tool.id);
+          const isEnabled = assignment ? assignment.enabled !== false : (tool.accessTier === "any" || tool.accessTier === "tier2");
+          const isAutoAccess = !assignment && isEnabled;
+
+          return (
+            <div key={tool.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors" data-testid={`tool-toggle-${tool.id}`}>
+              <button
+                type="button"
+                onClick={() => toggleMutation.mutate({ toolId: tool.id, enabled: !isEnabled })}
+                disabled={toggleMutation.isPending}
+                className="flex-shrink-0"
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+              >
+                {isEnabled ? (
+                  <ToggleRight className="w-5 h-5 text-emerald-500" />
+                ) : (
+                  <ToggleLeft className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className={`text-xs font-medium truncate ${!isEnabled ? "text-muted-foreground" : ""}`}>{tool.name}</p>
+                  <Badge variant="outline" className="border-transparent no-default-hover-elevate no-default-active-elevate text-[10px] h-4 px-1">
+                    {tool.type}
+                  </Badge>
+                  {isAutoAccess && (
+                    <Badge variant="outline" className="border-transparent bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate text-[10px] h-4 px-1">
+                      auto
+                    </Badge>
+                  )}
+                </div>
+                {tool.description && (
+                  <p className="text-[10px] text-muted-foreground truncate">{tool.description}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {activeTools.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-2">No tools available in the locker</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ToolActivitySection({ agentId }: { agentId: string }) {
+  const [showAll, setShowAll] = useState(false);
   const { data: allLeases, isLoading } = useQuery<ToolLease[]>({
-    queryKey: [`/api/locker/leases?agentId=${agentId}`],
+    queryKey: ["/api/sub-agents", agentId, "tool-history"],
+    queryFn: async () => {
+      const res = await fetch(`/api/sub-agents/${agentId}/tool-history`);
+      return res.json();
+    },
   });
 
   const { data: tools } = useQuery<Tool[]>({
@@ -179,14 +296,15 @@ function ToolActivitySection({ agentId }: { agentId: string }) {
   tools?.forEach(t => toolMap.set(t.id, t));
 
   const activeLeases = allLeases?.filter(l => l.status === "active") || [];
-  const recentLeases = allLeases?.filter(l => l.status !== "active").slice(0, 5) || [];
+  const historyLeases = allLeases?.filter(l => l.status !== "active") || [];
+  const displayLeases = showAll ? historyLeases : historyLeases.slice(0, 10);
 
   if (isLoading) {
     return (
       <div className="border rounded-md p-4">
         <div className="flex items-center gap-2 mb-3">
           <Wrench className="w-4 h-4" />
-          <span className="text-sm font-medium">Tool Activity</span>
+          <span className="text-sm font-medium">Tool History</span>
         </div>
         <div className="flex items-center justify-center py-3">
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -195,17 +313,43 @@ function ToolActivitySection({ agentId }: { agentId: string }) {
     );
   }
 
+  const totalUsages = historyLeases.length;
+  const toolUsageCounts = new Map<string, number>();
+  historyLeases.forEach(l => {
+    const name = toolMap.get(l.toolId)?.name || l.toolId;
+    toolUsageCounts.set(name, (toolUsageCounts.get(name) || 0) + 1);
+  });
+
   return (
     <div className="border rounded-md p-4 space-y-3" data-testid="section-tool-activity">
-      <div className="flex items-center gap-2">
-        <Wrench className="w-4 h-4" />
-        <span className="text-sm font-medium">Tool Activity</span>
-        {activeLeases.length > 0 && (
-          <Badge variant="outline" className="border-transparent bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 no-default-hover-elevate no-default-active-elevate text-xs">
-            {activeLeases.length} active
-          </Badge>
-        )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wrench className="w-4 h-4" />
+          <span className="text-sm font-medium">Tool History</span>
+          {activeLeases.length > 0 && (
+            <Badge variant="outline" className="border-transparent bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 no-default-hover-elevate no-default-active-elevate text-xs">
+              {activeLeases.length} active
+            </Badge>
+          )}
+          {totalUsages > 0 && (
+            <Badge variant="outline" className="border-transparent bg-muted no-default-hover-elevate no-default-active-elevate text-xs">
+              {totalUsages} total
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {toolUsageCounts.size > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from(toolUsageCounts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, count]) => (
+              <Badge key={name} variant="outline" className="border-transparent bg-primary/5 no-default-hover-elevate no-default-active-elevate text-[10px]">
+                {name}: {count}x
+              </Badge>
+            ))}
+        </div>
+      )}
 
       {activeLeases.length > 0 && (
         <div className="space-y-1.5">
@@ -230,20 +374,24 @@ function ToolActivitySection({ agentId }: { agentId: string }) {
         </div>
       )}
 
-      {recentLeases.length > 0 && (
+      {displayLeases.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent History</p>
-          {recentLeases.map(lease => {
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Usage Log</p>
+          {displayLeases.map(lease => {
             const tool = toolMap.get(lease.toolId);
             const isReturned = lease.status === "returned";
             const isExpired = lease.status === "expired";
+            const resultData = lease.result as any;
+            const charCount = resultData?.output?.length;
             return (
-              <div key={lease.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50" data-testid={`recent-lease-${lease.id}`}>
+              <div key={lease.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50" data-testid={`history-lease-${lease.id}`}>
                 <ArrowDownLeft className={`w-3.5 h-3.5 flex-shrink-0 ${isReturned ? "text-emerald-500" : isExpired ? "text-amber-500" : "text-red-500"}`} />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{tool?.name || lease.toolId}</p>
                   <p className="text-[10px] text-muted-foreground">
                     {isReturned ? "Returned" : isExpired ? "Expired" : lease.status} {lease.returnedAt ? formatTimeAgo(lease.returnedAt) : formatTimeAgo(lease.issuedAt)}
+                    {charCount ? ` · ${charCount} chars` : ""}
+                    {lease.workOrderId ? ` · WO: ${lease.workOrderId.slice(0, 8)}` : ""}
                   </p>
                 </div>
                 <Badge
@@ -259,10 +407,32 @@ function ToolActivitySection({ agentId }: { agentId: string }) {
               </div>
             );
           })}
+          {historyLeases.length > 10 && !showAll && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="text-xs text-primary hover:underline w-full text-center py-1"
+              style={{ background: "none", border: "none", cursor: "pointer" }}
+              data-testid="button-show-all-history"
+            >
+              Show all {historyLeases.length} entries
+            </button>
+          )}
+          {showAll && historyLeases.length > 10 && (
+            <button
+              type="button"
+              onClick={() => setShowAll(false)}
+              className="text-xs text-primary hover:underline w-full text-center py-1"
+              style={{ background: "none", border: "none", cursor: "pointer" }}
+              data-testid="button-collapse-history"
+            >
+              Show less
+            </button>
+          )}
         </div>
       )}
 
-      {activeLeases.length === 0 && recentLeases.length === 0 && (
+      {activeLeases.length === 0 && historyLeases.length === 0 && (
         <p className="text-xs text-muted-foreground text-center py-2">No tool activity recorded</p>
       )}
     </div>
@@ -901,6 +1071,10 @@ export default function SubAgentsPage() {
                   </>
                 )}
               </div>
+
+              {editingAgent && (
+                <ToolEntitlementsSection agentId={editingAgent.id} />
+              )}
 
               {editingAgent && (
                 <ToolActivitySection agentId={editingAgent.id} />
