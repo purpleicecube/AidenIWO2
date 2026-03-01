@@ -91,6 +91,56 @@ function isPythonCode(codeBlocks: ExtractedCodeBlock[]): boolean {
   return codeBlocks.some(b => ["python", "py", "python3"].includes(b.language));
 }
 
+export function detectUnfencedCode(content: string): ExtractedCodeBlock[] {
+  const pythonIndicators = [
+    /^import\s+\w+/m,
+    /^from\s+\w+\s+import/m,
+    /^def\s+\w+\s*\(/m,
+    /^class\s+\w+[\s:(]/m,
+    /^print\s*\(/m,
+    /^\w+\s*=\s*.+/m,
+  ];
+  const pythonScore = pythonIndicators.filter(r => r.test(content)).length;
+
+  const jsIndicators = [
+    /^const\s+\w+/m,
+    /^let\s+\w+/m,
+    /^var\s+\w+/m,
+    /^function\s+\w+/m,
+    /^console\.log\s*\(/m,
+    /document\.\w+/,
+    /addEventListener\s*\(/,
+  ];
+  const jsScore = jsIndicators.filter(r => r.test(content)).length;
+
+  if (pythonScore < 2 && jsScore < 2) return [];
+
+  const lines = content.split("\n");
+  const codeLines: string[] = [];
+  let inCodeRegion = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isCodeLine = /^(import |from |def |class |if |elif |else:|for |while |try:|except |with |return |print\(|#|@|\w+\s*=\s*|os\.|sys\.|open\(|const |let |var |function |console\.|document\.|window\.|async |await |export |module\.)/.test(trimmed) ||
+      /^\s{2,}\S/.test(line) && inCodeRegion;
+
+    if (isCodeLine || (inCodeRegion && trimmed === "")) {
+      codeLines.push(line);
+      inCodeRegion = true;
+    } else if (trimmed === "") {
+      if (inCodeRegion) codeLines.push(line);
+    } else {
+      inCodeRegion = false;
+    }
+  }
+
+  const extractedCode = codeLines.join("\n").trim();
+  if (extractedCode.length < 20) return [];
+
+  const language = pythonScore >= jsScore ? "python" : "javascript";
+  return [{ language, code: extractedCode }];
+}
+
 function buildPythonRunnerHtml(title: string, codeBlocks: ExtractedCodeBlock[]): string {
   const pyBlocks = codeBlocks.filter(b => ["python", "py", "python3"].includes(b.language));
   const combinedPy = pyBlocks.map(b => b.code).join("\n\n");
@@ -574,6 +624,14 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
         const codeBlocks = extractCodeBlocksFromDeliverable(deliverable);
         if (codeBlocks.length > 0) {
           sandboxHtml = buildCodePreviewHtml(deliverableTitle, codeBlocks, deliverable);
+          sandboxType = "code_preview";
+        }
+      }
+
+      if (!sandboxHtml) {
+        const unfencedBlocks = detectUnfencedCode(deliverable);
+        if (unfencedBlocks.length > 0) {
+          sandboxHtml = buildCodePreviewHtml(deliverableTitle, unfencedBlocks, deliverable);
           sandboxType = "code_preview";
         }
       }

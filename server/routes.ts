@@ -2138,12 +2138,13 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Linked work order not found" });
       }
 
-      const deliverable = order.deliverable as string;
+      const tier2 = (order.tier2Result as any) || {};
+      const deliverable = (order.deliverable as string) || tier2.output?.deliverable || null;
       if (!deliverable) {
         return res.status(400).json({ message: "Work order has no deliverable content" });
       }
 
-      const { extractHtmlFromDeliverable, extractCodeBlocksFromDeliverable, buildCodePreviewHtml, buildMarkdownPreviewHtml } = await import("./workspace-filing");
+      const { extractHtmlFromDeliverable, extractCodeBlocksFromDeliverable, buildCodePreviewHtml, buildMarkdownPreviewHtml, detectUnfencedCode } = await import("./workspace-filing");
       const title = env?.deliverableTitle || order.title;
 
       let newHtml: string | null = extractHtmlFromDeliverable(deliverable);
@@ -2151,6 +2152,13 @@ export async function registerRoutes(
         const codeBlocks = extractCodeBlocksFromDeliverable(deliverable);
         if (codeBlocks.length > 0) {
           newHtml = buildCodePreviewHtml(title, codeBlocks, deliverable);
+        }
+      }
+
+      if (!newHtml) {
+        const unfencedBlocks = detectUnfencedCode(deliverable);
+        if (unfencedBlocks.length > 0) {
+          newHtml = buildCodePreviewHtml(title, unfencedBlocks, deliverable);
         }
       }
 
