@@ -358,7 +358,7 @@ export default function SandboxPage() {
                   >
                     <iframe
                       key={`expanded-${iframeKey}`}
-                      src={`/api/sandbox-sessions/${selectedSession.id}/preview`}
+                      srcDoc={sessionResult.html}
                       className="w-full h-full border-0"
                       title={`Preview: ${selectedSession.name}`}
                       sandbox="allow-scripts allow-same-origin"
@@ -381,7 +381,7 @@ export default function SandboxPage() {
               <div className="flex-1 min-h-0 bg-white">
                 <iframe
                   key={`preview-${iframeKey}`}
-                  src={`/api/sandbox-sessions/${selectedSession.id}/preview`}
+                  srcDoc={sessionResult.html}
                   className="w-full h-full border-0"
                   title={`Preview: ${selectedSession.name}`}
                   sandbox="allow-scripts allow-same-origin"

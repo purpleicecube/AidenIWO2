@@ -98,7 +98,7 @@ export function detectUnfencedCode(content: string): ExtractedCodeBlock[] {
     /^def\s+\w+\s*\(/m,
     /^class\s+\w+[\s:(]/m,
     /^print\s*\(/m,
-    /^\w+\s*=\s*.+/m,
+    /^[a-z_]\w*\s*=\s*(?!.*\*\*).+/m,
   ];
   const pythonScore = pythonIndicators.filter(r => r.test(content)).length;
 
@@ -115,22 +115,50 @@ export function detectUnfencedCode(content: string): ExtractedCodeBlock[] {
 
   if (pythonScore < 2 && jsScore < 2) return [];
 
+  const isMarkdownHeader = (line: string) => /^#{1,6}\s+\S/.test(line.trim());
+  const isMarkdownBullet = (line: string) => /^[-*]\s+\*?\*?[A-Z]/.test(line.trim());
+  const isMarkdownNumbered = (line: string) => /^\d+\.\s+\*?\*?[A-Z]/.test(line.trim());
+  const isProseText = (line: string) => {
+    const t = line.trim();
+    if (t.length < 10) return false;
+    const words = t.split(/\s+/).length;
+    return words >= 8 && !/[=(){}\[\];]/.test(t) && !/^(import|from|def|class|print|for|while|if|elif|else|try|except|with|return|const|let|var|function|console|document|window|async|await|export)[\s.(]/.test(t);
+  };
+
   const lines = content.split("\n");
   const codeLines: string[] = [];
   let inCodeRegion = false;
+  let consecutiveNonCode = 0;
 
   for (const line of lines) {
     const trimmed = line.trim();
-    const isCodeLine = /^(import |from |def |class |if |elif |else:|for |while |try:|except |with |return |print\(|#|@|\w+\s*=\s*|os\.|sys\.|open\(|const |let |var |function |console\.|document\.|window\.|async |await |export |module\.)/.test(trimmed) ||
-      /^\s{2,}\S/.test(line) && inCodeRegion;
 
-    if (isCodeLine || (inCodeRegion && trimmed === "")) {
+    if (isMarkdownHeader(trimmed) || isMarkdownBullet(trimmed) || isMarkdownNumbered(trimmed) || isProseText(trimmed)) {
+      if (inCodeRegion) consecutiveNonCode++;
+      if (consecutiveNonCode >= 2) {
+        inCodeRegion = false;
+        consecutiveNonCode = 0;
+      }
+      continue;
+    }
+
+    const isPyComment = /^#[^#!\s]/.test(trimmed) || /^#\s+(?![A-Z][a-z]+\s+[A-Z])/.test(trimmed);
+    const isCodeLine = /^(import |from |def |class |if |elif |else:|for |while |try:|except |with |return |print\(|@[a-z]|\w+\s*=\s*(?!.*\*\*)|\w+\.\w+\(|os\.|sys\.|open\(|const |let |var |function |console\.|document\.|window\.|async |await |export |module\.)/.test(trimmed) ||
+      (isPyComment && inCodeRegion) ||
+      (/^\s{2,}\S/.test(line) && inCodeRegion);
+
+    if (isCodeLine) {
       codeLines.push(line);
       inCodeRegion = true;
+      consecutiveNonCode = 0;
     } else if (trimmed === "") {
       if (inCodeRegion) codeLines.push(line);
     } else {
-      inCodeRegion = false;
+      if (inCodeRegion) consecutiveNonCode++;
+      if (consecutiveNonCode >= 2) {
+        inCodeRegion = false;
+        consecutiveNonCode = 0;
+      }
     }
   }
 
@@ -150,6 +178,7 @@ function buildPythonRunnerHtml(title: string, codeBlocks: ExtractedCodeBlock[]):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.pyodide.org https://pyodide-cdn2.iodide.io; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;">
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -300,6 +329,7 @@ function buildRunnableJsHtml(title: string, codeBlocks: ExtractedCodeBlock[]): s
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;">
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }

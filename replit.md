@@ -32,7 +32,7 @@ AIDEN_IWO employs a modern web stack with React, TypeScript, Vite, TanStack Quer
 - **Agentic Tools Platform:** Standardized integration and assignment of diverse tools to sub-agents, enhancing capabilities.
 - **Replit Auth Integration:** Secure user authentication with RBAC.
 - **Responsive UI/UX:** Built with `shadcn/ui` and Tailwind CSS for a modern, accessible user experience.
-- **Workspace Filing Engine & Sandbox:** Automates deliverable routing and artifact deployment. Supports HTML, code block, JavaScript (browser-compatible with console capture), Python (Pyodide), and Markdown previews within a secure sandboxed environment with a Content Security Policy (CSP).
+- **Workspace Filing Engine & Sandbox:** Automates deliverable routing and artifact deployment. Supports HTML, code block, JavaScript (browser-compatible with console capture), Python (Pyodide), and Markdown previews within a secure sandboxed environment with a Content Security Policy (CSP). Sandbox previews use `srcdoc` iframes to render HTML inline without requiring a separate authenticated fetch, with embedded CSP meta tags for CDN access. Unfenced code detection extracts Python/JS from mixed markdown-code deliverables using heuristic scoring.
 - **Work Order Lifecycle Management:** Comprehensive states including `pending`, `processing`, `completed`, `blocked`, `failed`, `awaiting_operator`, `reopened`, `deferred`, and archiving capabilities.
 - **Chat Organization:** Chat history supports grouping, nesting, and archiving, with a robust UI and API for management.
 - **Chat Action Execution:** Aiden can create work orders from chat using a model-agnostic three-tier extraction architecture for flexible and reliable command processing.
