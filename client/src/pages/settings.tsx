@@ -109,14 +109,20 @@ export default function Settings() {
     },
   });
 
+  const [testSuccess, setTestSuccess] = useState<boolean | null>(null);
+
   const testMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/llm-settings/test"),
     onSuccess: async (res) => {
       const body = await res.json();
+      setTestSuccess(true);
       toast({ title: "Connection successful", description: body.message });
+      setTimeout(() => setTestSuccess(null), 8000);
     },
     onError: (err: any) => {
+      setTestSuccess(false);
       toast({ title: "Connection failed", description: err.message, variant: "destructive" });
+      setTimeout(() => setTestSuccess(null), 8000);
     },
   });
 
@@ -320,17 +326,22 @@ export default function Settings() {
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={testSuccess === true ? "default" : testSuccess === false ? "destructive" : "outline"}
+                  className={testSuccess === true ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}
                   onClick={() => testMutation.mutate()}
                   disabled={testMutation.isPending || !data?.apiKeyConfigured}
                   data-testid="button-test-connection"
                 >
                   {testMutation.isPending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : testSuccess === true ? (
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                  ) : testSuccess === false ? (
+                    <AlertTriangle className="w-4 h-4 mr-2" />
                   ) : (
                     <Zap className="w-4 h-4 mr-2" />
                   )}
-                  {testMutation.isPending ? "Testing..." : "Test Connection"}
+                  {testMutation.isPending ? "Testing..." : testSuccess === true ? "Connected" : testSuccess === false ? "Failed" : "Test Connection"}
                 </Button>
               </div>
             </form>
