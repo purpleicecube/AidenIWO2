@@ -125,14 +125,26 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     ? await runTier1WithLLM(settings, order, activeSubAgents)
     : runTier1PolicyGate(order, activeSubAgents);
 
+  const gcc = (order.gccMemory || {}) as Record<string, any>;
+  const preferredAgent = gcc["gcc.preferredAgent"] || null;
+  if (preferredAgent && tier1Result.approved) {
+    const preferredResolved = findSubAgent(activeSubAgents, preferredAgent);
+    const llmResolved = findSubAgent(activeSubAgents, tier1Result.handler);
+    if (preferredResolved && (!llmResolved || llmResolved.id !== preferredResolved.id)) {
+      console.log(`[orchestration] Operator override: LLM chose "${tier1Result.handler}" but operator requested "${preferredAgent}" → forcing handler to "${preferredResolved.name}"`);
+      tier1Result.handler = preferredResolved.name;
+      tier1Result.reason = `${tier1Result.reason} [Operator override: routed to ${preferredResolved.name} as explicitly requested]`;
+    }
+  }
+
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 1,
     action: "Aiden: Policy Decision",
     message: tier1Result.approved
-      ? `Aiden approved — routing to sub-agent: ${tier1Result.handler}${useLLM ? " (LLM)" : ""}.`
+      ? `Aiden approved — routing to sub-agent: ${tier1Result.handler}${useLLM ? " (LLM)" : ""}${preferredAgent ? " (operator-directed)" : ""}.`
       : `Aiden blocked: ${tier1Result.reason}`,
-    metadata: tier1Result,
+    metadata: { ...tier1Result, ...(preferredAgent ? { operatorDirected: true, preferredAgent } : {}) },
   });
 
   if (!tier1Result.approved) {

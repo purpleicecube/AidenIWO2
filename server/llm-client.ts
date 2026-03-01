@@ -384,8 +384,10 @@ When the operator asks you to create, open, or submit a work order:
 4. Tell the operator the work order will appear on the dashboard.
 
 If possible, append a machine-readable action block at the very end of your response on its own line:
-<!-- AIDEN_ACTION:CREATE_WORK_ORDER:{"title":"...","description":"...","type":"...","priority":"...","submittedBy":"aiden","autoProcess":true} -->
-This helps the system process faster, but is optional — the system will detect your intent either way.`;
+<!-- AIDEN_ACTION:CREATE_WORK_ORDER:{"title":"...","description":"...","type":"...","priority":"...","submittedBy":"aiden","autoProcess":true,"preferredAgent":"exact_sub_agent_name_if_specified"} -->
+This helps the system process faster, but is optional — the system will detect your intent either way.
+
+CRITICAL ROUTING RULE: If the operator explicitly names or requests a specific sub-agent (e.g. "use A012", "assign to Deploy Worker Alpha", "have B06 handle this"), you MUST include the "preferredAgent" field with the exact sub-agent name in the action block. Never ignore an explicit sub-agent assignment from the operator.`;
 
   if (settings.provider === "anthropic") {
     const apiKey = getApiKey("ANTHROPIC_API_KEY");
@@ -440,6 +442,7 @@ export interface ExtractedWorkOrder {
   description: string;
   type: string;
   priority: string;
+  preferredAgent?: string;
 }
 
 export async function extractWorkOrderFromChat(
@@ -455,15 +458,16 @@ RESPOND WITH ONLY A JSON OBJECT, no other text. The JSON must have these fields:
 - "description": string (what needs to be done)
 - "type": one of: general, technical, creative, research, compliance, financial, hr, operations, strategic, process_documentation, training, security, infrastructure
 - "priority": one of: low, medium, high, critical
+- "preferredAgent": string or null (if the user explicitly named a sub-agent to use, e.g. "use A012", "assign to Deploy Worker Alpha", include the agent name/ID here; otherwise null)
 
-If the assistant did NOT agree to create a work order, respond: {"shouldCreate":false,"title":"","description":"","type":"general","priority":"medium"}
+If the assistant did NOT agree to create a work order, respond: {"shouldCreate":false,"title":"","description":"","type":"general","priority":"medium","preferredAgent":null}
 
 Example input:
-User: "Create a work order to fix the login bug"
-Assistant: "I've created a work order to fix the login bug. Title: Fix login authentication bug, Type: technical, Priority: high"
+User: "Use A012 to create a report on Manchester City"
+Assistant: "I've created a work order for A012 to generate the report. Title: Manchester City Report, Type: research, Priority: high"
 
 Example output:
-{"shouldCreate":true,"title":"Fix login authentication bug","description":"Fix the login bug that is preventing users from authenticating properly.","type":"technical","priority":"high"}`;
+{"shouldCreate":true,"title":"Manchester City Report","description":"Generate a report on Manchester City.","type":"research","priority":"high","preferredAgent":"A012"}`;
 
   const extractionInput = `User: "${userMessage}"\nAssistant: "${aidenReply}"`;
 
@@ -489,6 +493,7 @@ Example output:
       description: String(parsed.description || "").slice(0, 5000),
       type: String(parsed.type || "general").toLowerCase().replace(/\s+/g, "_"),
       priority: String(parsed.priority || "medium").toLowerCase(),
+      preferredAgent: parsed.preferredAgent ? String(parsed.preferredAgent) : undefined,
     };
   } catch (err) {
     console.error("[extractWorkOrderFromChat] Extraction LLM call failed:", err);
@@ -536,6 +541,17 @@ export async function runTier1WithLLM(
   const reopenContext = isReopened ? buildReopenContext(gcc) : "";
   const gccContext = formatGccMemoryForPrompt(gcc);
 
+  const preferredAgent = (order as any).preferredAgent || gcc["gcc.preferredAgent"] || null;
+  const assignedAgent = order.assignedSubAgentId || null;
+
+  let assignmentDirective = "";
+  if (preferredAgent) {
+    assignmentDirective = `\n\n*** MANDATORY ROUTING DIRECTIVE ***\nThe operator has EXPLICITLY requested this work order be handled by sub-agent: "${preferredAgent}". You MUST set "handler" to this sub-agent name. Do NOT override the operator's explicit assignment. This is non-negotiable.\n*** END DIRECTIVE ***\n`;
+  } else if (assignedAgent) {
+    const assignedName = subAgents.find(a => a.id === assignedAgent)?.name || assignedAgent;
+    assignmentDirective = `\n\n*** MANDATORY ROUTING DIRECTIVE ***\nThis work order has been pre-assigned to sub-agent: "${assignedName}" (ID: ${assignedAgent}). You MUST set "handler" to "${assignedName}". Do NOT override a pre-assigned sub-agent.\n*** END DIRECTIVE ***\n`;
+  }
+
   const prompt = `You are Aiden, the Tier 1 orchestration manager of the AIDEN_IWO platform — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. Evaluate this work order and decide whether to approve or block it. If approved, choose which sub-agent or handler to route it to.
 
 Respond with ONLY a JSON object in this exact format:
@@ -550,8 +566,8 @@ For the "handler" field, you can use EITHER:
 1. A specific sub-agent NAME (preferred when a sub-agent's description/capabilities match the work order) — e.g. "A011_Design uiux_minimal_mobile"
 2. A generic handler type: general_executor, deploy_executor, maintenance_executor, incident_executor, change_executor, security_executor
 
-IMPORTANT: Always prefer routing to the sub-agent whose name, description, or specialization best matches the work order. Only fall back to generic handlers if no sub-agent is a good match.
-${subAgentInfo}
+IMPORTANT: If the operator has explicitly assigned a sub-agent (see MANDATORY ROUTING DIRECTIVE below), you MUST honor that assignment. Otherwise, prefer routing to the sub-agent whose name, description, or specialization best matches the work order. Only fall back to generic handlers if no sub-agent is a good match.
+${assignmentDirective}${subAgentInfo}
 ${reopenContext}${gccContext}
 Work Order:
 - Title: ${order.title}

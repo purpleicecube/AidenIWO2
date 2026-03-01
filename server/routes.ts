@@ -2603,11 +2603,14 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
             const safeType = validTypes.includes(normalizedType) || validTypes.includes(normalizedType.replace(/_/g, " ")) ? normalizedType : "general";
             const safePriority = validPriorities.includes(String(actionData.priority || "").toLowerCase()) ? String(actionData.priority).toLowerCase() : "medium";
 
+            const preferredAgent = actionData.preferredAgent ? String(actionData.preferredAgent) : null;
+
             const { gccMemory: initialGcc, commitId: woCommitId } = buildGccCommit(
-              {}, "new", "created_via_chat",
+              preferredAgent ? { "gcc.preferredAgent": preferredAgent } : {},
+              "new", "created_via_chat",
               `Work order created via chat by ${actor.actorName}`,
-              `Aiden created work order "${safeTitle}" during chat session ${sessionId}`,
-              { submittedBy: { ...actor, source: "aiden_chat" }, chatSessionId: sessionId, extractionMethod },
+              `Aiden created work order "${safeTitle}" during chat session ${sessionId}${preferredAgent ? ` — operator requested sub-agent: ${preferredAgent}` : ""}`,
+              { submittedBy: { ...actor, source: "aiden_chat" }, chatSessionId: sessionId, extractionMethod, preferredAgent },
             );
 
             const orderData = {
