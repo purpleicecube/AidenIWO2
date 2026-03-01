@@ -179,9 +179,13 @@ function buildPythonRunnerHtml(title: string, codeBlocks: ExtractedCodeBlock[]):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.pyodide.org https://pyodide-cdn2.iodide.io; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;">
+<base target="_blank" rel="noopener noreferrer">
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  a { color: #60a5fa; text-decoration: underline; cursor: pointer; transition: color 0.15s; }
+  a:hover { color: #93c5fd; }
+  a:visited { color: #a78bfa; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; flex-direction: column; height: 100vh; }
   .header { background: #1e293b; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
   .header h1 { font-size: 0.9rem; color: #f8fafc; }
@@ -330,9 +334,13 @@ function buildRunnableJsHtml(title: string, codeBlocks: ExtractedCodeBlock[]): s
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;">
+<base target="_blank" rel="noopener noreferrer">
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  a { color: #60a5fa; text-decoration: underline; cursor: pointer; transition: color 0.15s; }
+  a:hover { color: #93c5fd; }
+  a:visited { color: #a78bfa; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; }
   #app-container { width: 100%; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   canvas { display: block; background: #000; border: 2px solid #334155; border-radius: 4px; }
@@ -406,9 +414,13 @@ export function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlo
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base target="_blank" rel="noopener noreferrer">
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  a { color: #60a5fa; text-decoration: underline; cursor: pointer; transition: color 0.15s; }
+  a:hover { color: #93c5fd; }
+  a:visited { color: #a78bfa; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
   h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; }
   .badge { display: inline-block; background: #1e40af; color: #93c5fd; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 1rem; }
@@ -455,9 +467,13 @@ export function buildMarkdownPreviewHtml(title: string, markdown: string): strin
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base target="_blank" rel="noopener noreferrer">
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  a { color: #60a5fa; text-decoration: underline; cursor: pointer; transition: color 0.15s; }
+  a:hover { color: #93c5fd; }
+  a:visited { color: #a78bfa; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; max-width: 800px; margin: 0 auto; }
   .badge { display: inline-block; background: #1e40af; color: #93c5fd; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 1.5rem; }
   .doc-title { font-size: 1.5rem; margin-bottom: 0.5rem; color: #f8fafc; }

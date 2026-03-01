@@ -361,7 +361,7 @@ export default function SandboxPage() {
                       srcDoc={sessionResult.html}
                       className="w-full h-full border-0"
                       title={`Preview: ${selectedSession.name}`}
-                      sandbox="allow-scripts allow-same-origin"
+                      sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
                       data-testid="iframe-preview-expanded"
                     />
                   </ExpandablePanel>
@@ -384,7 +384,7 @@ export default function SandboxPage() {
                   srcDoc={sessionResult.html}
                   className="w-full h-full border-0"
                   title={`Preview: ${selectedSession.name}`}
-                  sandbox="allow-scripts allow-same-origin"
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
                   data-testid="iframe-preview"
                 />
               </div>
