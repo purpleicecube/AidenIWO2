@@ -63,7 +63,7 @@ export default function ChatPage() {
   const [groupParentId, setGroupParentId] = useState<string | null>(null);
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string> | null>(null);
   const [dragSessionId, setDragSessionId] = useState<string | null>(null);
   const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null);
   const [dropTargetUngrouped, setDropTargetUngrouped] = useState(false);
@@ -93,6 +93,12 @@ export default function ChatPage() {
   });
 
   const messages = activeSessionQuery.data?.messages || [];
+
+  useEffect(() => {
+    if (collapsedGroups === null && groupsQuery.data) {
+      setCollapsedGroups(new Set(groupsQuery.data.map(g => g.id)));
+    }
+  }, [groupsQuery.data, collapsedGroups]);
 
   useEffect(() => {
     scrollToBottom();
@@ -207,7 +213,7 @@ export default function ChatPage() {
 
   const toggleGroupCollapsed = (groupId: string) => {
     setCollapsedGroups(prev => {
-      const next = new Set(prev);
+      const next = new Set(prev || []);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
       return next;
@@ -397,7 +403,7 @@ export default function ChatPage() {
   };
 
   const renderGroup = (group: ChatGroup, depth: number = 0) => {
-    const isCollapsed = collapsedGroups.has(group.id);
+    const isCollapsed = !collapsedGroups || collapsedGroups.has(group.id);
     const children = childGroups(group.id);
     const groupSessions = groupedSessions(group.id);
     const hasContent = children.length > 0 || groupSessions.length > 0;
@@ -418,7 +424,7 @@ export default function ChatPage() {
           }}
           onDragEnter={() => {
             if (!dragSessionId) return;
-            if (collapsedGroups.has(group.id)) {
+            if (!collapsedGroups || collapsedGroups.has(group.id)) {
               toggleGroupCollapsed(group.id);
             }
           }}
