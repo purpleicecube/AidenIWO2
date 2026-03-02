@@ -52,6 +52,7 @@ import type {
   WorkflowTemplate,
   WorkflowStep,
   WorkflowExecution,
+  SubAgent,
 } from "@shared/schema";
 
 const templateFormSchema = z.object({
@@ -60,6 +61,9 @@ const templateFormSchema = z.object({
   goal: z.string().nullable().optional(),
   category: z.string().min(1, "Category is required"),
   status: z.string().min(1, "Status is required"),
+  preferredPmId: z.string().nullable().optional(),
+  executionMode: z.string().default("autonomous"),
+  llmMode: z.string().default("inherited"),
 });
 
 type TemplateForm = z.infer<typeof templateFormSchema>;
@@ -70,6 +74,8 @@ const stepFormSchema = z.object({
   description: z.string().nullable().optional(),
   order: z.coerce.number().int().min(0),
   agentType: z.string().nullable().optional(),
+  assignedSubAgentId: z.string().nullable().optional(),
+  promptTemplate: z.string().nullable().optional(),
 });
 
 type StepForm = z.infer<typeof stepFormSchema>;
@@ -233,6 +239,16 @@ function TemplateCard({
                   <Clock className="w-3 h-3" />
                   {new Date(template.createdAt).toLocaleDateString()}
                 </div>
+                {template.executionMode && template.executionMode !== "autonomous" && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-transparent no-default-hover-elevate no-default-active-elevate bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" data-testid={`badge-exec-mode-${template.id}`}>
+                    {template.executionMode === "semi_autonomous" ? "Semi-Auto" : "Manual"}
+                  </Badge>
+                )}
+                {template.preferredPmId && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-transparent no-default-hover-elevate no-default-active-elevate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" data-testid={`badge-has-pm-${template.id}`}>
+                    PM Assigned
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -280,6 +296,11 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
     queryKey: ["/api/workflow-templates", templateId],
   });
 
+  const { data: allSubAgents } = useQuery<SubAgent[]>({
+    queryKey: ["/api/sub-agents"],
+  });
+  const activeAgents = (allSubAgents || []).filter((a) => a.status === "active");
+
   const stepForm = useForm<StepForm>({
     resolver: zodResolver(stepFormSchema),
     defaultValues: {
@@ -288,6 +309,8 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
       description: null,
       order: 0,
       agentType: null,
+      assignedSubAgentId: null,
+      promptTemplate: null,
     },
   });
 
@@ -373,6 +396,8 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
               description: null,
               order: sortedSteps.length,
               agentType: null,
+              assignedSubAgentId: null,
+              promptTemplate: null,
             });
             setStepDialogOpen(true);
           }}
@@ -486,32 +511,75 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
                 )}
               />
 
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={stepForm.control}
+                  name="agentType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Agent Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-step-agent-type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="project_manager">Project Manager</SelectItem>
+                          <SelectItem value="deployment">Deployment</SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
+                          <SelectItem value="incident">Incident</SelectItem>
+                          <SelectItem value="change_request">Change Request</SelectItem>
+                          <SelectItem value="security">Security</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={stepForm.control}
+                  name="assignedSubAgentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assign Sub-Agent</FormLabel>
+                      <Select onValueChange={(v) => field.onChange(v === "__auto__" ? null : v)} value={field.value || "__auto__"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-step-agent">
+                            <SelectValue placeholder="Auto (by type)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__auto__">Auto (by type)</SelectItem>
+                          {activeAgents.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={stepForm.control}
-                name="agentType"
+                name="promptTemplate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Agent Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-step-agent-type">
-                          <SelectValue placeholder="Select agent type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        <SelectItem value="deployment">Deployment</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="incident">Incident</SelectItem>
-                        <SelectItem value="change_request">
-                          Change Request
-                        </SelectItem>
-                        <SelectItem value="security">Security</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Prompt / Instructions</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        value={field.value || ""}
+                        placeholder="Specific instructions for this step's agent (optional)"
+                        className="resize-none text-xs"
+                        rows={3}
+                        data-testid="input-step-prompt"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -556,6 +624,12 @@ export default function WorkflowsPage() {
     queryKey: ["/api/workflow-templates"],
   });
 
+  const { data: subAgents } = useQuery<SubAgent[]>({
+    queryKey: ["/api/sub-agents"],
+  });
+
+  const pmAgents = (subAgents || []).filter((a) => a.type === "project_manager" && a.status === "active");
+
   const { data: executions, isLoading: executionsLoading } = useQuery<
     ExecutionWithTemplate[]
   >({
@@ -570,6 +644,9 @@ export default function WorkflowsPage() {
       goal: null,
       category: "general",
       status: "active",
+      preferredPmId: null,
+      executionMode: "autonomous",
+      llmMode: "inherited",
     },
   });
 
@@ -644,6 +721,9 @@ export default function WorkflowsPage() {
       goal: null,
       category: "general",
       status: "active",
+      preferredPmId: null,
+      executionMode: "autonomous",
+      llmMode: "inherited",
     });
     setDialogOpen(true);
   }
@@ -656,6 +736,9 @@ export default function WorkflowsPage() {
       goal: template.goal,
       category: template.category,
       status: template.status,
+      preferredPmId: template.preferredPmId || null,
+      executionMode: template.executionMode || "autonomous",
+      llmMode: template.llmMode || "inherited",
     });
     setDialogOpen(true);
   }
@@ -897,10 +980,7 @@ export default function WorkflowsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-workflow-category">
                             <SelectValue />
@@ -908,13 +988,9 @@ export default function WorkflowsPage() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="general">General</SelectItem>
-                          <SelectItem value="deployment">
-                            Deployment
-                          </SelectItem>
+                          <SelectItem value="deployment">Deployment</SelectItem>
                           <SelectItem value="security">Security</SelectItem>
-                          <SelectItem value="maintenance">
-                            Maintenance
-                          </SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
                           <SelectItem value="incident">Incident</SelectItem>
                         </SelectContent>
                       </Select>
@@ -929,10 +1005,7 @@ export default function WorkflowsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-workflow-status">
                             <SelectValue />
@@ -941,6 +1014,81 @@ export default function WorkflowsPage() {
                         <SelectContent>
                           <SelectItem value="active">Active</SelectItem>
                           <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator className="my-1" />
+              <p className="text-xs font-medium text-muted-foreground">PM & Execution Configuration</p>
+
+              <FormField
+                control={form.control}
+                name="preferredPmId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preferred PM</FormLabel>
+                    <Select onValueChange={(v) => field.onChange(v === "__auto__" ? null : v)} value={field.value || "__auto__"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-preferred-pm">
+                          <SelectValue placeholder="Let Aiden Decide" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__auto__">Let Aiden Decide</SelectItem>
+                        {pmAgents.map((pm) => (
+                          <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="executionMode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Execution Mode</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-execution-mode">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="autonomous">Autonomous</SelectItem>
+                          <SelectItem value="semi_autonomous">Semi-Autonomous</SelectItem>
+                          <SelectItem value="manual">Manual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="llmMode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PM LLM Mode</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-llm-mode">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="inherited">Inherited (Auto)</SelectItem>
+                          <SelectItem value="shared_with_aiden">Shared with Aiden</SelectItem>
+                          <SelectItem value="own_llm">PM's Own LLM</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

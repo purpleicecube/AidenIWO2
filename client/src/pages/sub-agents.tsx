@@ -472,7 +472,9 @@ function AgentCard({ agent, onEdit, onDelete }: { agent: SubAgent; onEdit: (a: S
               )}
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="font-medium">Type:</span> {agent.type}
+                  <span className="font-medium">Type:</span> {agent.type === "project_manager" ? (
+                    <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0 border-blue-500/50 text-blue-600 dark:text-blue-400" data-testid={`badge-pm-${agent.id}`}>PM</Badge>
+                  ) : agent.type}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs">
                   {agent.controlMode === "aiden" ? (
@@ -726,6 +728,7 @@ export default function SubAgentsPage() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="project_manager">Project Manager</SelectItem>
                           <SelectItem value="deployment">Deployment</SelectItem>
                           <SelectItem value="maintenance">Maintenance</SelectItem>
                           <SelectItem value="incident">Incident</SelectItem>
@@ -761,6 +764,13 @@ export default function SubAgentsPage() {
                   )}
                 />
               </div>
+
+              {form.watch("type") === "project_manager" && (
+                <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-3 text-xs text-blue-700 dark:text-blue-300" data-testid="pm-info-note">
+                  <p className="font-medium mb-1">Project Manager Role</p>
+                  <p>This agent will coordinate multi-step workflows, manage step workers, perform front-line quality reviews, and assemble final work products. Configure its own LLM for independent decision-making.</p>
+                </div>
+              )}
 
               <FormField
                 control={form.control}

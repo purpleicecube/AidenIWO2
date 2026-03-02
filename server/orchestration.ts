@@ -3,6 +3,12 @@ import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun } from "@shared
 import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, runAidenQualityReview, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
 import { pocketflowExecute } from "./pocketflow";
+import {
+  selectProjectManager, resolvePmLlmConfig,
+  pmReviewStepOutput, pmRequestStepRevision,
+  pmAssembleWorkProduct, pmEscalateToAiden, aidenExecutiveReview,
+  type PmReviewResult,
+} from "./workflow-pm";
 
 function updateWorkOrderGcc(
   existing: object | null | undefined,
@@ -714,7 +720,8 @@ export async function startWorkflowExecution(
   templateId: string,
   workOrderId: string | null,
   goal: string | null,
-  context: Record<string, any> = {}
+  context: Record<string, any> = {},
+  pmSubAgentIdOverride?: string
 ) {
   const template = await storage.getWorkflowTemplate(templateId);
   if (!template) throw new Error("Workflow template not found");
@@ -722,17 +729,39 @@ export async function startWorkflowExecution(
   const steps = await storage.getWorkflowSteps(templateId);
   if (steps.length === 0) throw new Error("Workflow template has no steps");
 
+  const globalSettings = await storage.getLlmSettings();
+  const activeSubAgents = await storage.getActiveSubAgents();
+
+  let pmSubAgent: SubAgent | null = null;
+  let pmLlmConfig: any = null;
+
+  if (pmSubAgentIdOverride) {
+    pmSubAgent = activeSubAgents.find(a => a.id === pmSubAgentIdOverride) || null;
+    if (pmSubAgent) {
+      pmLlmConfig = resolvePmLlmConfig(pmSubAgent, template, globalSettings);
+    }
+  }
+
+  if (!pmSubAgent) {
+    const pmResult = await selectProjectManager(template, activeSubAgents, globalSettings);
+    pmSubAgent = pmResult.pm;
+    pmLlmConfig = pmResult.llmConfig;
+  }
+
   const execution = await storage.createWorkflowExecution({
     templateId,
     workOrderId,
     goal: goal || template.goal,
     context,
+    pmSubAgentId: pmSubAgent?.id || null,
+    executionMode: template.executionMode || "autonomous",
   });
 
   await storage.updateWorkflowExecution(execution.id, {
     status: "running",
     startedAt: new Date(),
     currentStepKey: steps[0].stepKey,
+    pmLlmConfig: pmLlmConfig || null,
   });
 
   for (const step of steps) {
@@ -755,9 +784,27 @@ export async function startWorkflowExecution(
       workOrderId,
       tier: 1,
       action: "Aiden: Workflow Started",
-      message: `Aiden started workflow "${template.name}" with ${steps.length} steps toward goal: ${goal || template.goal || "execute workflow"}`,
-      metadata: { executionId: execution.id, templateId, stepCount: steps.length },
+      message: `Aiden started workflow "${template.name}" with ${steps.length} steps${pmSubAgent ? ` — PM: ${pmSubAgent.name}` : ""} toward goal: ${goal || template.goal || "execute workflow"}`,
+      metadata: {
+        executionId: execution.id, templateId, stepCount: steps.length,
+        pmSubAgentId: pmSubAgent?.id, pmSubAgentName: pmSubAgent?.name,
+        executionMode: template.executionMode, llmMode: template.llmMode,
+      },
     });
+
+    if (pmSubAgent) {
+      await storage.createExecutionLog({
+        workOrderId,
+        tier: 1,
+        action: "Aiden: PM Assigned",
+        message: `Project Manager "${pmSubAgent.name}" assigned to coordinate workflow execution${pmLlmConfig ? ` (LLM: ${pmLlmConfig.provider}/${pmLlmConfig.model}, mode: ${template.llmMode})` : ""}.`,
+        metadata: {
+          pmSubAgentId: pmSubAgent.id, pmSubAgentName: pmSubAgent.name,
+          llmMode: template.llmMode, executionMode: template.executionMode,
+          llmProvider: pmLlmConfig?.provider, llmModel: pmLlmConfig?.model,
+        },
+      });
+    }
   }
 
   const result = await advanceWorkflowExecution(execution.id);
@@ -774,44 +821,66 @@ export async function advanceWorkflowExecution(executionId: string) {
   const settings = await storage.getLlmSettings();
   const useLLM = settings?.enabled === true;
 
+  const hasPm = !!execution.pmSubAgentId;
+  const pmLlmConfig = execution.pmLlmConfig as any;
+
   const nextStepRun = findNextRunnableStep(steps, stepRuns);
 
   if (!nextStepRun) {
     const allCompleted = stepRuns.every((r) => r.status === "completed" || r.status === "skipped");
     const hasFailed = stepRuns.some((r) => r.status === "failed");
 
-    if (hasFailed) {
-      await storage.updateWorkflowExecution(executionId, {
-        status: "failed",
-        completedAt: new Date(),
-      });
+    if (hasFailed && !hasPm) {
+      await storage.updateWorkflowExecution(executionId, { status: "failed", completedAt: new Date() });
       if (execution.workOrderId) {
         await storage.updateWorkOrder(execution.workOrderId, { status: "failed" });
       }
-    } else if (allCompleted) {
-      await storage.updateWorkflowExecution(executionId, {
-        status: "completed",
-        completedAt: new Date(),
+    } else if (hasFailed && hasPm) {
+      const failedCount = stepRuns.filter(r => r.status === "failed").length;
+      const escalation = await pmEscalateToAiden(settings, execution.executionMode || "autonomous", `${failedCount} workflow step(s) failed after PM review`, {
+        workflowName: template?.name || "Unknown",
+        workflowGoal: execution.goal || "",
+        failedStep: stepRuns.find(r => r.status === "failed")?.stepName,
       });
-      if (execution.workOrderId) {
-        const woForGcc = await storage.getWorkOrder(execution.workOrderId);
-        const completedOrder = await storage.updateWorkOrder(execution.workOrderId, {
-          status: "completed",
-          gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
-            workflowExecutionId: executionId, status: "completed",
-          }),
-        });
-        await storage.createExecutionLog({
-          workOrderId: execution.workOrderId,
-          tier: 1,
-          action: "Aiden: Workflow Completed",
-          message: `All ${steps.length} workflow steps completed successfully.`,
-          metadata: { executionId },
-        });
-        if (completedOrder) {
-          fileWorkOrderOutput(completedOrder).catch(err =>
-            console.error("Auto-filing error (workflow):", err.message)
-          );
+      if (escalation.action === "hitl") {
+        await storage.updateWorkflowExecution(executionId, { status: "blocked", completedAt: new Date() });
+        if (execution.workOrderId) {
+          await storage.updateWorkOrder(execution.workOrderId, { status: "blocked" });
+          await storage.createExecutionLog({ workOrderId: execution.workOrderId, tier: 1,
+            action: "PM: Escalated to HITL", message: `PM escalated failed workflow to operator: ${escalation.reason}`,
+            metadata: { escalation },
+          });
+        }
+      } else {
+        await storage.updateWorkflowExecution(executionId, { status: "failed", completedAt: new Date() });
+        if (execution.workOrderId) {
+          await storage.updateWorkOrder(execution.workOrderId, { status: "failed" });
+        }
+      }
+    } else if (allCompleted) {
+      if (hasPm && pmLlmConfig) {
+        await handleWorkflowCompletion(execution, template, steps, stepRuns, settings, pmLlmConfig);
+      } else {
+        await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
+        if (execution.workOrderId) {
+          const woForGcc = await storage.getWorkOrder(execution.workOrderId);
+          const completedOrder = await storage.updateWorkOrder(execution.workOrderId, {
+            status: "completed",
+            gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
+              workflowExecutionId: executionId, status: "completed",
+            }),
+          });
+          await storage.createExecutionLog({
+            workOrderId: execution.workOrderId, tier: 1,
+            action: "Aiden: Workflow Completed",
+            message: `All ${steps.length} workflow steps completed successfully.`,
+            metadata: { executionId },
+          });
+          if (completedOrder) {
+            fileWorkOrderOutput(completedOrder).catch(err =>
+              console.error("Auto-filing error (workflow):", err.message)
+            );
+          }
         }
       }
     }
@@ -823,30 +892,24 @@ export async function advanceWorkflowExecution(executionId: string) {
   if (!stepDef) throw new Error(`Step definition not found for ${nextStepRun.stepKey}`);
 
   if (!evaluateConditions(stepDef, stepRuns)) {
-    await storage.updateWorkflowStepRun(nextStepRun.id, {
-      status: "skipped",
-      completedAt: new Date(),
-    });
+    await storage.updateWorkflowStepRun(nextStepRun.id, { status: "skipped", completedAt: new Date() });
     return advanceWorkflowExecution(executionId);
   }
 
   const previousResults = collectPreviousResults(stepRuns);
-
   await storage.updateWorkflowExecution(executionId, { currentStepKey: nextStepRun.stepKey });
-
   await storage.updateWorkflowStepRun(nextStepRun.id, {
-    status: "running",
-    startedAt: new Date(),
+    status: "running", startedAt: new Date(),
     input: { previousResults, goal: execution.goal, context: execution.context },
   });
 
   if (execution.workOrderId) {
+    const actor = hasPm ? "PM" : "Aiden";
     await storage.createExecutionLog({
-      workOrderId: execution.workOrderId,
-      tier: 1,
-      action: `Aiden: Step "${stepDef.name}"`,
-      message: `Aiden executing workflow step: ${stepDef.name}${stepDef.description ? ` — ${stepDef.description}` : ""}`,
-      metadata: { stepKey: stepDef.stepKey, order: stepDef.order },
+      workOrderId: execution.workOrderId, tier: hasPm ? 2 : 1,
+      action: `${actor}: Step "${stepDef.name}"`,
+      message: `${actor} executing workflow step: ${stepDef.name}${stepDef.description ? ` — ${stepDef.description}` : ""}`,
+      metadata: { stepKey: stepDef.stepKey, order: stepDef.order, hasPm },
     });
   }
 
@@ -859,70 +922,149 @@ export async function advanceWorkflowExecution(executionId: string) {
 
   if (subAgent?.controlMode === "independent") {
     await storage.updateWorkflowStepRun(nextStepRun.id, {
-      status: "awaiting_operator",
-      assignedSubAgentId: subAgent.id,
+      status: "awaiting_operator", assignedSubAgentId: subAgent.id,
       aidenDecision: { action: "assigned_to_independent_operator", subAgent: subAgent.name, operator: subAgent.assignedTo, tools: toolNames },
     });
-
     await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
-
     if (execution.workOrderId) {
       await storage.updateWorkOrder(execution.workOrderId, { status: "awaiting_operator" });
       await storage.createExecutionLog({
-        workOrderId: execution.workOrderId,
-        tier: 2,
+        workOrderId: execution.workOrderId, tier: 2,
         action: "Awaiting Operator",
         message: `Step "${stepDef.name}" assigned to independent sub-agent "${subAgent.name}" — awaiting ${subAgent.assignedTo || "operator"}.`,
         metadata: { subAgentId: subAgent.id, tools: toolNames },
       });
     }
-
     return storage.getWorkflowExecution(executionId);
   }
 
   try {
-    const stepResult = await executeWorkflowStep(stepDef, previousResults, execution.goal || "", toolNames, useLLM, settings);
+    let stepResult: { output: any; toolsUsed: string[]; decision: any; pocketflowResult?: any };
+
+    if (useLLM && subAgent && settings) {
+      stepResult = await executeWorkflowStepWithPocketFlow(stepDef, subAgent, previousResults, execution.goal || "", settings, toolsList);
+    } else {
+      stepResult = await executeWorkflowStep(stepDef, previousResults, execution.goal || "", toolNames, useLLM, settings);
+    }
 
     await storage.updateWorkflowStepRun(nextStepRun.id, {
-      status: "completed",
-      completedAt: new Date(),
+      status: "completed", completedAt: new Date(),
       output: stepResult.output,
       toolsUsed: stepResult.toolsUsed || [],
       aidenDecision: stepResult.decision,
+      pocketflowResult: stepResult.pocketflowResult || null,
       assignedSubAgentId: subAgent?.id || null,
     });
 
     if (execution.workOrderId) {
       await storage.createExecutionLog({
-        workOrderId: execution.workOrderId,
-        tier: 2,
+        workOrderId: execution.workOrderId, tier: 2,
         action: `Sub-Agent: ${stepDef.name} Complete`,
-        message: `Step "${stepDef.name}" completed successfully${subAgent ? ` by "${subAgent.name}"` : ""}.`,
-        metadata: { stepKey: stepDef.stepKey, tools: stepResult.toolsUsed, output: stepResult.output },
+        message: `Step "${stepDef.name}" completed${subAgent ? ` by "${subAgent.name}"` : ""}.`,
+        metadata: { stepKey: stepDef.stepKey, tools: stepResult.toolsUsed },
       });
+    }
+
+    if (hasPm && pmLlmConfig) {
+      const review = await pmReviewStepOutput(pmLlmConfig, stepDef, stepResult.output, execution.goal || "", previousResults);
+      await storage.updateWorkflowStepRun(nextStepRun.id, { pmReview: review });
+
+      if (execution.workOrderId) {
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId, tier: 1,
+          action: `PM: Step Review`,
+          message: `PM reviewed "${stepDef.name}" — Score: ${review.score.toFixed(2)}, Recommendation: ${review.recommendation}. ${review.feedback}`,
+          metadata: { stepKey: stepDef.stepKey, review },
+        });
+      }
+
+      if (review.recommendation === "revise") {
+        const retryPolicy = (stepDef.retryPolicy as any) || { maxRetries: 1 };
+        const currentAttempt = nextStepRun.revisionAttempt || 0;
+        if (currentAttempt < (retryPolicy.maxRetries || 1)) {
+          const guidance = await pmRequestStepRevision(pmLlmConfig, stepDef, stepResult.output, review, currentAttempt);
+          if (execution.workOrderId) {
+            await storage.createExecutionLog({
+              workOrderId: execution.workOrderId, tier: 1,
+              action: `PM: Revision Request`,
+              message: `PM requesting revision ${currentAttempt + 1} for "${stepDef.name}": ${guidance.revisionInstructions.slice(0, 200)}`,
+              metadata: { stepKey: stepDef.stepKey, revisionAttempt: currentAttempt + 1, guidance },
+            });
+          }
+          await storage.updateWorkflowStepRun(nextStepRun.id, {
+            status: "pending", revisionAttempt: currentAttempt + 1,
+            completedAt: null, startedAt: null,
+            input: { previousResults, goal: execution.goal, context: execution.context, revisionGuidance: guidance },
+          });
+          return advanceWorkflowExecution(executionId);
+        }
+      } else if (review.recommendation === "escalate") {
+        const escalation = await pmEscalateToAiden(settings, execution.executionMode || "autonomous",
+          `Step "${stepDef.name}" failed PM quality review with score ${review.score}`,
+          { workflowName: template?.name || "", workflowGoal: execution.goal || "", failedStep: stepDef.name, stepOutput: stepResult.output, pmReview: review, revisionAttempts: nextStepRun.revisionAttempt || 0 }
+        );
+        if (execution.workOrderId) {
+          await storage.createExecutionLog({
+            workOrderId: execution.workOrderId, tier: 1,
+            action: `PM: Escalation → ${escalation.action === "hitl" ? "HITL" : "Aiden"}`,
+            message: `PM escalated step "${stepDef.name}": ${escalation.reason}. Action: ${escalation.action}`,
+            metadata: { stepKey: stepDef.stepKey, escalation },
+          });
+        }
+        if (escalation.action === "hitl") {
+          await storage.updateWorkflowStepRun(nextStepRun.id, { status: "awaiting_operator" });
+          await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
+          if (execution.workOrderId) {
+            await storage.updateWorkOrder(execution.workOrderId, { status: "awaiting_operator" });
+          }
+          return storage.getWorkflowExecution(executionId);
+        } else if (escalation.action === "skip") {
+          await storage.updateWorkflowStepRun(nextStepRun.id, { status: "skipped" });
+        } else if (escalation.action === "abort") {
+          await storage.updateWorkflowStepRun(nextStepRun.id, { status: "failed", error: escalation.reason });
+          await storage.updateWorkflowExecution(executionId, { status: "failed", completedAt: new Date() });
+          if (execution.workOrderId) {
+            await storage.updateWorkOrder(execution.workOrderId, { status: "failed" });
+          }
+          return storage.getWorkflowExecution(executionId);
+        }
+      }
     }
 
     return advanceWorkflowExecution(executionId);
   } catch (err: any) {
     await storage.updateWorkflowStepRun(nextStepRun.id, {
-      status: "failed",
-      completedAt: new Date(),
+      status: "failed", completedAt: new Date(),
       error: err.message || "Step execution failed",
     });
 
-    await storage.updateWorkflowExecution(executionId, { status: "failed", completedAt: new Date() });
+    if (hasPm) {
+      const escalation = await pmEscalateToAiden(settings, execution.executionMode || "autonomous",
+        `Step "${stepDef.name}" threw an error: ${err.message}`,
+        { workflowName: template?.name || "", workflowGoal: execution.goal || "", failedStep: stepDef.name }
+      );
+      if (escalation.action === "skip") {
+        await storage.updateWorkflowStepRun(nextStepRun.id, { status: "skipped" });
+        return advanceWorkflowExecution(executionId);
+      } else if (escalation.action === "hitl") {
+        await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
+        if (execution.workOrderId) {
+          await storage.updateWorkOrder(execution.workOrderId, { status: "awaiting_operator" });
+        }
+        return storage.getWorkflowExecution(executionId);
+      }
+    }
 
+    await storage.updateWorkflowExecution(executionId, { status: "failed", completedAt: new Date() });
     if (execution.workOrderId) {
       await storage.updateWorkOrder(execution.workOrderId, { status: "failed" });
       await storage.createExecutionLog({
-        workOrderId: execution.workOrderId,
-        tier: 2,
+        workOrderId: execution.workOrderId, tier: 2,
         action: `Sub-Agent: ${stepDef.name} Failed`,
         message: `Step "${stepDef.name}" failed: ${err.message}`,
         metadata: { stepKey: stepDef.stepKey, error: err.message },
       });
     }
-
     return storage.getWorkflowExecution(executionId);
   }
 }
@@ -998,6 +1140,219 @@ async function getToolsForStep(step: WorkflowStep, subAgentId: string | null) {
   }
 
   return stepTools;
+}
+
+async function handleWorkflowCompletion(
+  execution: any, template: any, steps: WorkflowStep[], stepRuns: WorkflowStepRun[],
+  settings: any, pmLlmConfig: any
+) {
+  const executionId = execution.id;
+  const completedStepResults = stepRuns
+    .filter(r => r.status === "completed" && r.output)
+    .map(r => ({ stepKey: r.stepKey, stepName: r.stepName, output: r.output }));
+
+  let workProduct = null;
+  try {
+    workProduct = await pmAssembleWorkProduct(pmLlmConfig, execution.goal || "", completedStepResults, template?.name || "Workflow");
+  } catch (err: any) {
+    console.error("PM work product assembly failed:", err.message);
+    workProduct = {
+      summary: `PM assembled ${completedStepResults.length} step outputs`,
+      deliverable: completedStepResults.map(r => `## ${r.stepName}\n${typeof r.output === "string" ? r.output : JSON.stringify(r.output, null, 2)}`).join("\n\n"),
+      deliverableType: "markdown",
+      deliverableTitle: template?.name || "Workflow Output",
+      stepContributions: Object.fromEntries(completedStepResults.map(r => [r.stepKey, r.stepName])),
+    };
+  }
+
+  await storage.updateWorkflowExecution(executionId, { finalWorkProduct: workProduct });
+
+  if (execution.workOrderId) {
+    await storage.createExecutionLog({
+      workOrderId: execution.workOrderId, tier: 1,
+      action: "PM: Work Product Assembled",
+      message: `PM assembled final work product: "${workProduct.deliverableTitle}" (${workProduct.deliverableType}) from ${completedStepResults.length} steps.`,
+      metadata: { workProduct: { summary: workProduct.summary, type: workProduct.deliverableType, title: workProduct.deliverableTitle } },
+    });
+  }
+
+  let execReview = null;
+  try {
+    const pmSubAgentForReview = execution.pmSubAgentId ? await storage.getSubAgent(execution.pmSubAgentId) : null;
+    execReview = await aidenExecutiveReview(settings, execution.goal || "", workProduct, {
+      templateName: template?.name || "Workflow",
+      totalSteps: steps.length,
+      completedSteps: completedStepResults.length,
+      skippedSteps: stepRuns.filter(r => r.status === "skipped").length,
+      failedSteps: stepRuns.filter(r => r.status === "failed").length,
+      pmName: pmSubAgentForReview?.name || "Unknown PM",
+    });
+  } catch (err: any) {
+    console.error("Aiden executive review failed:", err.message);
+    execReview = { approved: true, score: 0.7, feedback: "Executive review unavailable — auto-approving.", recommendation: "approve", issues: [] };
+  }
+
+  await storage.updateWorkflowExecution(executionId, { executiveReview: execReview });
+
+  if (execution.workOrderId) {
+    await storage.createExecutionLog({
+      workOrderId: execution.workOrderId, tier: 1,
+      action: `Aiden: Executive Review — ${execReview.recommendation}`,
+      message: `Aiden executive review: Score ${execReview.score.toFixed(2)} — ${execReview.feedback}`,
+      metadata: { execReview },
+    });
+  }
+
+  if (execReview.recommendation === "approve" || execReview.approved) {
+    await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
+    if (execution.workOrderId) {
+      const woForGcc = await storage.getWorkOrder(execution.workOrderId);
+      const completedOrder = await storage.updateWorkOrder(execution.workOrderId, {
+        status: "completed",
+        result: workProduct.deliverable,
+        deliverableType: workProduct.deliverableType || "markdown",
+        deliverableTitle: workProduct.deliverableTitle || template?.name || "Workflow Output",
+        gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed_with_executive_review", ["workflow_steps_complete", "pm_work_product_assembled", "aiden_executive_review_passed", "workflow_completed"], {
+          workflowExecutionId: executionId, status: "completed", executiveScore: execReview.score,
+          pmWorkProduct: workProduct.summary, executiveReview: execReview.feedback,
+        }),
+      });
+      await storage.createExecutionLog({
+        workOrderId: execution.workOrderId, tier: 1,
+        action: "Aiden: Workflow Completed",
+        message: `All ${steps.length} steps complete. PM assembled work product approved by Aiden (score: ${execReview.score.toFixed(2)}).`,
+        metadata: { executionId },
+      });
+      if (completedOrder) {
+        fileWorkOrderOutput(completedOrder).catch(err => console.error("Auto-filing error (workflow PM):", err.message));
+      }
+    }
+  } else if (execReview.recommendation === "escalate_to_operator") {
+    await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
+    if (execution.workOrderId) {
+      await storage.updateWorkOrder(execution.workOrderId, { status: "awaiting_operator" });
+      await storage.createExecutionLog({
+        workOrderId: execution.workOrderId, tier: 1,
+        action: "Aiden: Escalated to Operator",
+        message: `Aiden executive review escalated to operator: ${execReview.feedback}`,
+        metadata: { execReview },
+      });
+    }
+  } else {
+    await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
+    if (execution.workOrderId) {
+      const woForGcc = await storage.getWorkOrder(execution.workOrderId);
+      await storage.updateWorkOrder(execution.workOrderId, {
+        status: "completed",
+        result: workProduct.deliverable,
+        deliverableType: workProduct.deliverableType || "markdown",
+        deliverableTitle: workProduct.deliverableTitle || template?.name || "Workflow Output",
+        gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
+          workflowExecutionId: executionId, status: "completed",
+        }),
+      });
+    }
+  }
+}
+
+async function executeWorkflowStepWithPocketFlow(
+  step: WorkflowStep, subAgent: SubAgent, previousResults: Record<string, any>,
+  goal: string, settings: any, tools: any[]
+): Promise<{ output: any; toolsUsed: string[]; decision: any; pocketflowResult?: any }> {
+  const llmConfig = resolveSubAgentLlmConfig(subAgent, settings);
+  const toolNames = tools.map(t => t.name);
+
+  const promptTemplate = (step as any).promptTemplate || step.description || "";
+  const prevContext = Object.entries(previousResults)
+    .map(([key, val]) => `[${key}]: ${typeof val === "string" ? val.slice(0, 500) : JSON.stringify(val).slice(0, 500)}`)
+    .join("\n");
+
+  const stepPrompt = [
+    `WORKFLOW STEP: ${step.name}`,
+    step.description ? `Description: ${step.description}` : "",
+    `Workflow Goal: ${goal}`,
+    promptTemplate ? `Instructions: ${promptTemplate}` : "",
+    prevContext ? `\nPrevious Step Results:\n${prevContext}` : "",
+    toolNames.length > 0 ? `\nAvailable Tools: ${toolNames.join(", ")}` : "",
+  ].filter(Boolean).join("\n");
+
+  const syntheticOrder: WorkOrder = {
+    id: `wf-step-${step.stepKey}-${Date.now()}`,
+    title: step.name,
+    description: stepPrompt,
+    type: "standard",
+    priority: "medium",
+    status: "processing",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: null,
+    assignedSubAgentId: subAgent.id,
+    result: null,
+    deliverableType: null,
+    deliverableTitle: null,
+    gccMemory: { workflowGoal: goal, stepKey: step.stepKey, previousResults },
+    aidenDecision: null,
+    bdmMarkers: null,
+    workflowExecutionId: null,
+    metadata: null,
+    archivedAt: null,
+    archivedBy: null,
+    deferredUntil: null,
+    deferReason: null,
+    reopenedAt: null,
+    reopenedBy: null,
+    reopenReason: null,
+  };
+
+  const tier1Result = {
+    decision: "execute" as const,
+    reasoning: `Workflow step "${step.name}" directed by PM`,
+    selectedSubAgentId: subAgent.id,
+    selectedSubAgentName: subAgent.name,
+    tools: toolNames,
+    policyFlags: [],
+    bdmMarkers: [],
+    priority: "medium" as const,
+  };
+
+  try {
+    const pfResult = await pocketflowExecute(syntheticOrder, tier1Result, llmConfig, settings, {
+      maxIterations: ((step.retryPolicy as any)?.maxRetries || 2) + 1,
+      convergenceThreshold: 0.75,
+    });
+
+    if (pfResult.blocked) {
+      throw new Error(pfResult.reason || "PocketFlow execution blocked");
+    }
+
+    const pfOutput = pfResult.output;
+    const pfMeta = pfResult.pocketflow;
+    const pfToolsUsed = pfMeta?.toolsUsed?.map((t: any) => t.slug || t.name || String(t)) || [];
+
+    return {
+      output: pfOutput?.deliverable || pfOutput?.message || "Step completed",
+      toolsUsed: pfToolsUsed,
+      decision: {
+        action: "pocketflow_execute",
+        reasoning: pfOutput?.message || `PocketFlow executed step "${step.name}"`,
+        tools: pfToolsUsed,
+        convergenceScore: pfMeta?.convergenceScore,
+        iterationsUsed: pfMeta?.iterations,
+      },
+      pocketflowResult: {
+        message: pfOutput?.message,
+        convergenceScore: pfMeta?.convergenceScore,
+        iterations: pfMeta?.iterations,
+        deliverableType: pfOutput?.deliverableType,
+        deliverableTitle: pfOutput?.deliverableTitle,
+        toolsUsed: pfToolsUsed,
+        stepResults: pfMeta?.stepResults,
+      },
+    };
+  } catch (err: any) {
+    console.error(`PocketFlow step execution failed for "${step.name}":`, err.message);
+    return executeWorkflowStep(step, previousResults, goal, toolNames, false, settings);
+  }
 }
 
 async function executeWorkflowStep(

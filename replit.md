@@ -28,7 +28,7 @@ AIDEN_IWO employs a modern web stack with React, TypeScript, Vite, TanStack Quer
 - **PocketFlow Iterative Execution Engine:** A sophisticated Tier 2 engine enabling iterative planning, execution, evaluation, and refinement of steps, supporting parallel execution and delta-only refinement.
 - **GCC Memory Protocol:** A shared context mechanism for consistent state management across tiers.
 - **BDM (Blocked Decision Marker) System:** A structured approach for managing work order blockages and facilitating HITL intervention.
-- **Workflow Engine:** Manages multi-step workflow templates with dependency resolution, conditional execution, and retry logic.
+- **Three-Tier Workflow Engine:** Full Aiden (Executive) → PM Sub-Agent → Step Workers hierarchy. PM sub-agents (`project_manager` type) coordinate multi-step workflows, perform front-line quality reviews of step outputs, request revisions, assemble final work products, and escalate to Aiden or HITL. Aiden performs final executive review. Steps execute via real PocketFlow with each step agent's LLM and tools. Templates support `preferredPmId`, `executionMode` (autonomous/semi_autonomous/manual), and `llmMode` (shared_with_aiden/own_llm/inherited). Step-level retry/skip/resolve API endpoints for operator control. PM coordination module: `server/workflow-pm.ts`.
 - **Agentic Tools Platform:** Standardized integration and assignment of diverse tools to sub-agents, enhancing capabilities.
 - **Replit Auth Integration:** Secure user authentication with RBAC.
 - **Responsive UI/UX:** Built with `shadcn/ui` and Tailwind CSS for a modern, accessible user experience.

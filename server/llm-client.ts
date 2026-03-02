@@ -276,7 +276,7 @@ async function callOpenAICompatible(
   return response.choices[0]?.message?.content || (useJsonMode ? "{}" : "");
 }
 
-async function callAnthropic(
+export async function callAnthropic(
   settings: LlmSettings,
   systemPrompt: string,
   userMessage: string,
@@ -299,7 +299,7 @@ async function callAnthropic(
   return textBlock?.text || "{}";
 }
 
-async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage: string, apiKeyEnvVarOverride?: string): Promise<string> {
+export async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage: string, apiKeyEnvVarOverride?: string): Promise<string> {
   if (settings.provider === "anthropic") {
     return callAnthropic(settings, systemPrompt, userMessage, apiKeyEnvVarOverride);
   }

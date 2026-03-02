@@ -48,7 +48,7 @@ import {
   Archive,
   ArchiveRestore,
 } from "lucide-react";
-import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun } from "@shared/schema";
+import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun, SubAgent } from "@shared/schema";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ExpandablePanel } from "@/components/expandable-panel";
@@ -1340,8 +1340,31 @@ export default function WorkOrderDetail() {
 }
 
 function WorkflowExecutionPanel({ executionId }: { executionId: string }) {
-  const { data: execution } = useQuery<WorkflowExecution & { stepRuns: WorkflowStepRun[] }>({
+  const { toast } = useToast();
+  const { data: execution, refetch } = useQuery<WorkflowExecution & { stepRuns: WorkflowStepRun[]; template?: any }>({
     queryKey: ["/api/workflow-executions", executionId],
+    refetchInterval: (query) => {
+      const d = query.state.data as any;
+      return d?.status === "running" || d?.status === "processing" ? 3000 : false;
+    },
+  });
+
+  const { data: subAgents } = useQuery<SubAgent[]>({ queryKey: ["/api/sub-agents"] });
+
+  const retryMutation = useMutation({
+    mutationFn: (stepRunId: string) => apiRequest("POST", `/api/workflow-executions/${executionId}/step-runs/${stepRunId}/retry`),
+    onSuccess: () => { refetch(); toast({ title: "Step retrying" }); },
+    onError: (e: any) => toast({ title: "Retry failed", description: e.message, variant: "destructive" }),
+  });
+  const skipMutation = useMutation({
+    mutationFn: (stepRunId: string) => apiRequest("POST", `/api/workflow-executions/${executionId}/step-runs/${stepRunId}/skip`),
+    onSuccess: () => { refetch(); toast({ title: "Step skipped" }); },
+    onError: (e: any) => toast({ title: "Skip failed", description: e.message, variant: "destructive" }),
+  });
+  const resolveMutation = useMutation({
+    mutationFn: (stepRunId: string) => apiRequest("POST", `/api/workflow-executions/${executionId}/step-runs/${stepRunId}/resolve`, { resolution: "Operator manual resolution" }),
+    onSuccess: () => { refetch(); toast({ title: "Step resolved" }); },
+    onError: (e: any) => toast({ title: "Resolve failed", description: e.message, variant: "destructive" }),
   });
 
   if (!execution) return null;
@@ -1357,6 +1380,9 @@ function WorkflowExecutionPanel({ executionId }: { executionId: string }) {
 
   const completedSteps = execution.stepRuns?.filter(s => s.status === "completed").length ?? 0;
   const totalSteps = execution.stepRuns?.length ?? 0;
+  const pmAgent = subAgents?.find(a => a.id === execution.pmSubAgentId);
+  const execReview = execution.executiveReview as any;
+  const workProduct = execution.finalWorkProduct as any;
 
   return (
     <Card data-testid="card-workflow-execution">
@@ -1365,34 +1391,119 @@ function WorkflowExecutionPanel({ executionId }: { executionId: string }) {
           <GitBranch className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           <CardTitle className="text-base font-medium">Workflow Execution</CardTitle>
         </div>
-        <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">
-          {completedSteps}/{totalSteps} steps
-        </Badge>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-xs text-muted-foreground">Goal</p>
-            <p className="text-sm">{execution.goal || "N/A"}</p>
-          </div>
-          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-step-count">
+            {completedSteps}/{totalSteps} steps
+          </Badge>
+          <Badge variant="outline" className={`no-default-hover-elevate no-default-active-elevate ${stepStatusColor[execution.status] || ""}`} data-testid="badge-execution-status">
+            {execution.status === "running" && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
             {execution.status}
           </Badge>
         </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">Goal</p>
+            <p className="text-sm">{execution.goal || "N/A"}</p>
+          </div>
+        </div>
+
+        {pmAgent && (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" data-testid="pm-assignment-info">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-500/50 text-blue-600 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate">PM</Badge>
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">{pmAgent.name}</span>
+            {execution.executionMode && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 no-default-hover-elevate no-default-active-elevate ml-auto">
+                {execution.executionMode}
+              </Badge>
+            )}
+          </div>
+        )}
+
         {execution.stepRuns && execution.stepRuns.length > 0 && (
           <div className="space-y-1.5 pt-2 border-t">
             <p className="text-xs text-muted-foreground mb-2">Steps</p>
-            {execution.stepRuns.map((step) => (
-              <div key={step.id} className="flex items-center justify-between gap-3 p-2 rounded-md bg-muted/30" data-testid={`step-run-${step.stepKey}`}>
-                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{step.stepName}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{step.stepKey}</p>
+            {execution.stepRuns.map((step) => {
+              const pmReview = step.pmReview as any;
+              const pfResult = step.pocketflowResult as any;
+              return (
+                <div key={step.id} className="rounded-md bg-muted/30 overflow-hidden" data-testid={`step-run-${step.stepKey}`}>
+                  <div className="flex items-center justify-between gap-3 p-2">
+                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{step.stepName}</p>
+                        {(step.revisionAttempt ?? 0) > 0 && (
+                          <span className="text-[10px] text-amber-600 dark:text-amber-400">rev {step.revisionAttempt}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">{step.stepKey}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {pfResult?.convergenceScore != null && (
+                        <span className="text-[10px] text-muted-foreground">{(pfResult.convergenceScore * 100).toFixed(0)}%</span>
+                      )}
+                      <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${stepStatusColor[step.status] || ""}`}>
+                        {step.status === "running" && <Loader2 className="w-2.5 h-2.5 animate-spin mr-1" />}
+                        {step.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  {pmReview && (
+                    <div className="px-2 pb-1.5 flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground">PM Review:</span>
+                      <Badge variant="outline" className={`text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate ${pmReview.recommendation === "advance" ? "text-emerald-600 dark:text-emerald-400" : pmReview.recommendation === "revise" ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                        {pmReview.recommendation} ({(pmReview.score * 100).toFixed(0)}%)
+                      </Badge>
+                      {pmReview.feedback && <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{pmReview.feedback}</span>}
+                    </div>
+                  )}
+                  {(step.status === "failed" || step.status === "awaiting_operator") && (
+                    <div className="px-2 pb-2 flex items-center gap-1.5">
+                      {step.error && <p className="text-[10px] text-red-600 dark:text-red-400 truncate flex-1">{step.error}</p>}
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => retryMutation.mutate(step.id)} disabled={retryMutation.isPending} data-testid={`button-retry-step-${step.stepKey}`}>
+                        {retryMutation.isPending ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : "Retry"}
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => skipMutation.mutate(step.id)} disabled={skipMutation.isPending} data-testid={`button-skip-step-${step.stepKey}`}>
+                        Skip
+                      </Button>
+                      {step.status === "awaiting_operator" && (
+                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => resolveMutation.mutate(step.id)} disabled={resolveMutation.isPending} data-testid={`button-resolve-step-${step.stepKey}`}>
+                          Resolve
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <Badge variant="outline" className={`text-xs no-default-hover-elevate no-default-active-elevate ${stepStatusColor[step.status] || ""}`}>
-                  {step.status}
+              );
+            })}
+          </div>
+        )}
+
+        {workProduct && (
+          <div className="pt-2 border-t space-y-2" data-testid="work-product-section">
+            <p className="text-xs text-muted-foreground font-medium">Work Product</p>
+            <div className="p-2 rounded-md bg-muted/30">
+              <p className="text-sm font-medium">{workProduct.deliverableTitle || "Deliverable"}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{workProduct.summary}</p>
+              {workProduct.deliverableType && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 mt-1 no-default-hover-elevate no-default-active-elevate">{workProduct.deliverableType}</Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {execReview && (
+          <div className="pt-2 border-t space-y-2" data-testid="executive-review-section">
+            <p className="text-xs text-muted-foreground font-medium">Executive Review</p>
+            <div className="p-2 rounded-md bg-muted/30">
+              <div className="flex items-center justify-between gap-2">
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 no-default-hover-elevate no-default-active-elevate ${execReview.approved ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {execReview.recommendation} ({(execReview.score * 100).toFixed(0)}%)
                 </Badge>
               </div>
-            ))}
+              <p className="text-xs text-muted-foreground mt-1">{execReview.feedback}</p>
+            </div>
           </div>
         )}
       </CardContent>

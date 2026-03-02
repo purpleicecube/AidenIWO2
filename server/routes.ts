@@ -1182,14 +1182,14 @@ export async function registerRoutes(
 
   app.post("/api/workflow-executions", isAuth, requireRole("admin"), async (req, res) => {
     try {
-      const { templateId, workOrderId, goal, context } = req.body;
+      const { templateId, workOrderId, goal, context, pmSubAgentId } = req.body;
       if (!templateId) {
         return res.status(400).json({ message: "templateId is required" });
       }
       const template = await storage.getWorkflowTemplate(templateId);
       if (!template) return res.status(404).json({ message: "Template not found" });
 
-      const execution = await startWorkflowExecution(templateId, workOrderId || null, goal || template.goal, context || {});
+      const execution = await startWorkflowExecution(templateId, workOrderId || null, goal || template.goal, context || {}, pmSubAgentId || undefined);
       res.status(201).json(execution);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to start workflow" });
@@ -1207,6 +1207,116 @@ export async function registerRoutes(
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to advance workflow" });
+    }
+  });
+
+  app.get("/api/workflow-executions/:id/work-product", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+      res.json({
+        finalWorkProduct: execution.finalWorkProduct,
+        executiveReview: execution.executiveReview,
+        pmSubAgentId: execution.pmSubAgentId,
+        executionMode: execution.executionMode,
+        status: execution.status,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch work product" });
+    }
+  });
+
+  app.post("/api/workflow-executions/:id/step-runs/:stepRunId/retry", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+      const stepRuns = await storage.getWorkflowStepRuns(req.params.id);
+      const stepRun = stepRuns.find(r => r.id === req.params.stepRunId);
+      if (!stepRun) return res.status(404).json({ message: "Step run not found" });
+      if (stepRun.status !== "failed" && stepRun.status !== "awaiting_operator") {
+        return res.status(400).json({ message: `Cannot retry step in '${stepRun.status}' status` });
+      }
+      await storage.updateWorkflowStepRun(stepRun.id, {
+        status: "pending", startedAt: null, completedAt: null, error: null,
+        revisionAttempt: (stepRun.revisionAttempt || 0) + 1,
+      });
+      if (execution.status !== "running") {
+        await storage.updateWorkflowExecution(req.params.id, { status: "running" });
+      }
+      if (execution.workOrderId) {
+        await storage.updateWorkOrder(execution.workOrderId, { status: "processing" });
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId, tier: 1,
+          action: `HITL: Step Retry`,
+          message: `Operator retried step "${stepRun.stepName}" (attempt ${(stepRun.revisionAttempt || 0) + 1})`,
+          metadata: { stepRunId: stepRun.id, stepKey: stepRun.stepKey, revisionAttempt: (stepRun.revisionAttempt || 0) + 1 },
+        });
+      }
+      const result = await advanceWorkflowExecution(req.params.id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to retry step" });
+    }
+  });
+
+  app.post("/api/workflow-executions/:id/step-runs/:stepRunId/skip", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+      const stepRuns = await storage.getWorkflowStepRuns(req.params.id);
+      const stepRun = stepRuns.find(r => r.id === req.params.stepRunId);
+      if (!stepRun) return res.status(404).json({ message: "Step run not found" });
+      await storage.updateWorkflowStepRun(stepRun.id, { status: "skipped", completedAt: new Date() });
+      if (execution.status !== "running") {
+        await storage.updateWorkflowExecution(req.params.id, { status: "running" });
+      }
+      if (execution.workOrderId) {
+        await storage.updateWorkOrder(execution.workOrderId, { status: "processing" });
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId, tier: 1,
+          action: `HITL: Step Skipped`,
+          message: `Operator skipped step "${stepRun.stepName}"`,
+          metadata: { stepRunId: stepRun.id, stepKey: stepRun.stepKey },
+        });
+      }
+      const result = await advanceWorkflowExecution(req.params.id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to skip step" });
+    }
+  });
+
+  app.post("/api/workflow-executions/:id/step-runs/:stepRunId/resolve", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+      const stepRuns = await storage.getWorkflowStepRuns(req.params.id);
+      const stepRun = stepRuns.find(r => r.id === req.params.stepRunId);
+      if (!stepRun) return res.status(404).json({ message: "Step run not found" });
+      if (stepRun.status !== "awaiting_operator") {
+        return res.status(400).json({ message: `Step is not awaiting operator (status: ${stepRun.status})` });
+      }
+      const { resolution, output } = req.body;
+      await storage.updateWorkflowStepRun(stepRun.id, {
+        status: "completed", completedAt: new Date(),
+        output: output || { message: resolution || "Resolved by operator", resolvedBy: "operator" },
+      });
+      if (execution.status !== "running") {
+        await storage.updateWorkflowExecution(req.params.id, { status: "running" });
+      }
+      if (execution.workOrderId) {
+        await storage.updateWorkOrder(execution.workOrderId, { status: "processing" });
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId, tier: 1,
+          action: `HITL: Step Resolved`,
+          message: `Operator resolved step "${stepRun.stepName}": ${resolution || "Manual resolution"}`,
+          metadata: { stepRunId: stepRun.id, resolution },
+        });
+      }
+      const result = await advanceWorkflowExecution(req.params.id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to resolve step" });
     }
   });
 
