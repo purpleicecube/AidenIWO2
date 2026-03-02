@@ -118,7 +118,7 @@ export async function registerRoutes(
       res.json({
         status: "ok",
         timestamp: new Date().toISOString(),
-        version: "0.6.1",
+        version: "0.7.2",
         uptime,
         services: {
           database: dbHealthy ? "healthy" : "unhealthy",
@@ -2574,7 +2574,7 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
 - Timestamp: ${new Date().toISOString()}
 
 === PLATFORM IDENTITY & ATTRIBUTIONS ===
-Platform: AIDEN_IWO v0.6.1 — Intelligent Work Orchestration
+Platform: AIDEN_IWO v0.7.2 — Intelligent Work Orchestration
 Lead Developer & Principal Technical Architect: Darrel Vaughn (LuaAzullaB / 10Touros)
 Architecture: IWO/PDOE two-tier orchestration (Aiden Tier 1 + Sub-Agent Tier 2)
 Four foundational lineages:

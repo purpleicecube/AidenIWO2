@@ -154,7 +154,7 @@ export default function LandingPage() {
 
       <footer className="py-8 px-6 border-t border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground space-y-1">
-          <p>AIDEN_IWO v0.6.1 — Intelligent Work Orchestration</p>
+          <p>AIDEN_IWO v0.7.2 — Intelligent Work Orchestration</p>
           <p className="text-xs">Lead Developer &amp; Principal Technical Architect: Darrel Vaughn | LuaAzullaB</p>
           <a href="/attributions" className="inline-block mt-2 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors" data-testid="link-attributions-landing">
             Attributions &amp; Licenses
