@@ -1100,6 +1100,49 @@ export interface AidenQualityReview {
   recommendation: "approve" | "request_revision" | "block";
 }
 
+function runStructuralPreCheck(order: WorkOrder, deliverable: string): { pass: boolean; issues: string[]; severity: "hard" | "soft" } {
+  const issues: string[] = [];
+  let severity: "hard" | "soft" = "soft";
+  const orderText = `${order.title} ${order.description}`;
+  const explicitlyHtml = /\b(html\s*page|html\s*file|single.file.*html|self.contained.*html|html\s*document)\b/i.test(orderText);
+  const likelyHtml = /\b(landing\s*page|homepage|website|web\s*page|dashboard\s*page|interactive\s*page)\b/i.test(orderText) ||
+    (/sandbox/i.test(orderText) && /\b(build|create|make)\b/i.test(orderText));
+  const expectsHtml = explicitlyHtml || likelyHtml;
+
+  if (expectsHtml) {
+    if (/\\n/.test(deliverable.substring(0, 500)) && !/<[a-z]/i.test(deliverable.substring(0, 200))) {
+      issues.push("Deliverable contains raw escape characters (\\n) instead of rendered content — output was not properly formatted");
+      severity = "hard";
+    }
+    if (/^\s*\[\s*\{.*"title"\s*:.*"(link|source|url)"\s*:/m.test(deliverable)) {
+      issues.push("Deliverable contains raw JSON array of data instead of rendered HTML content");
+      severity = "hard";
+    }
+    if (explicitlyHtml) {
+      if (!/<html[\s>]/i.test(deliverable) && !/<!DOCTYPE\s+html/i.test(deliverable)) {
+        issues.push("Work order explicitly requested HTML but output does not contain HTML structure (missing <html> or <!DOCTYPE html>)");
+        severity = "hard";
+      }
+      if (/<html[\s>]/i.test(deliverable) && !/<\/html>/i.test(deliverable)) {
+        issues.push("HTML document is incomplete — missing closing </html> tag");
+      }
+    }
+    if (/<body[\s>]/i.test(deliverable)) {
+      const bodyMatch = deliverable.match(/<body[\s>][\s\S]*<\/body>/i);
+      if (bodyMatch) {
+        const bodyContent = bodyMatch[0];
+        const placeholderCount = (bodyContent.match(/Headline \d+\s*[–—-]\s*Source/gi) || []).length;
+        if (placeholderCount >= 3) {
+          issues.push(`Body contains ${placeholderCount} generic placeholder entries ("Headline N – Source") instead of actual content`);
+          severity = "hard";
+        }
+      }
+    }
+  }
+
+  return { pass: issues.length === 0, issues, severity };
+}
+
 export async function runAidenQualityReview(
   settings: LlmSettings,
   order: WorkOrder,
@@ -1110,6 +1153,22 @@ export async function runAidenQualityReview(
   executorName: string,
   hadSearchTools?: boolean
 ): Promise<AidenQualityReview> {
+  const structuralCheck = runStructuralPreCheck(order, deliverable);
+  if (!structuralCheck.pass && structuralCheck.severity === "hard") {
+    const structuralScore = Math.max(0.1, 0.5 - (structuralCheck.issues.length * 0.1));
+    return {
+      approved: false,
+      score: structuralScore,
+      summary: `Structural pre-check failed: deliverable has fundamental formatting problems that must be fixed before LLM review.`,
+      issues: structuralCheck.issues,
+      recommendation: "request_revision",
+    };
+  }
+
+  const structuralWarnings = !structuralCheck.pass
+    ? `\n\nSTRUCTURAL WARNINGS (pre-check flagged these — weigh them in your review):\n${structuralCheck.issues.map(i => `- ${i}`).join("\n")}`
+    : "";
+
   const deliverablePreview = deliverable.length > 4000
     ? deliverable.substring(0, 4000) + "\n... [truncated for review]"
     : deliverable;
@@ -1142,6 +1201,8 @@ Rules:
 - Be pragmatic — good-enough deliverables should be approved with noted improvements
 - Score reflects overall quality: 0.8+ is good, 0.6-0.8 needs improvement, below 0.6 is inadequate
 - Only flag issues that the executor COULD reasonably fix given its capabilities (see below)
+- NEVER approve a deliverable that contains raw JSON data, escape characters (\n \t), or placeholder text like "Headline 1 – Source" — these indicate the deliverable was not properly rendered
+- If the work order asked for HTML, the deliverable MUST be a complete, well-formed HTML document — not markdown about HTML, not JSON describing HTML
 ${capabilitiesNote}
 
 Work Order:
@@ -1157,7 +1218,7 @@ Execution Metadata:
 - Steps Completed: ${stepCount}
 
 Deliverable:
-${deliverablePreview}`;
+${deliverablePreview}${structuralWarnings}`;
 
   try {
     const raw = await callLLM(settings, settings.systemPrompt || "You are Aiden, the Tier 1 orchestration manager.", prompt);

@@ -690,9 +690,84 @@ async function nodeRefine(dict: SharedDict): Promise<NodeResult> {
   }
 }
 
+function isIntermediateOutput(output: string): boolean {
+  const trimmed = output.trim();
+  if (trimmed.length < 20) return true;
+  if (/^\s*[\[{]/.test(trimmed) && /[\]}]\s*$/.test(trimmed)) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed) || (typeof parsed === "object" && parsed !== null)) {
+        const str = JSON.stringify(parsed);
+        if (!/<!DOCTYPE|<html|<body|<div|<section|<article/i.test(str)) {
+          return true;
+        }
+      }
+    } catch {}
+  }
+  const metadataPatterns = [
+    /^\s*\{?\s*"(title|headlines|sections|layout|structure|wireframe|components)"\s*:/i,
+    /^\s*(Step \d+ complete|Planning complete|Research complete|Data gathered)/i,
+  ];
+  if (metadataPatterns.some(p => p.test(trimmed))) return true;
+  return false;
+}
+
+function selectBestHtmlOutput(outputs: Record<string, string>): string | null {
+  let bestKey: string | null = null;
+  let bestScore = -1;
+  for (const [key, output] of Object.entries(outputs)) {
+    if (!output || output.trim().length < 50) continue;
+    let score = 0;
+    if (/<!DOCTYPE\s+html/i.test(output)) score += 100;
+    if (/<html[\s>]/i.test(output)) score += 80;
+    if (/<head[\s>]/i.test(output) && /<body[\s>]/i.test(output)) score += 60;
+    if (/<\/html>/i.test(output)) score += 40;
+    if (/<meta\s/i.test(output)) score += 10;
+    if (/<style[\s>]/i.test(output)) score += 10;
+    if (score > bestScore) {
+      bestScore = score;
+      bestKey = key;
+    }
+  }
+  return bestKey && bestScore >= 80 ? outputs[bestKey] : null;
+}
+
+function cleanDeliverable(raw: string): string {
+  let cleaned = raw;
+  if (/\\n/.test(cleaned) && !/<[a-z]/i.test(cleaned.substring(0, 200))) {
+    cleaned = cleaned.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"');
+  }
+  cleaned = cleaned.replace(/^[\s\S]*?(<!DOCTYPE\s+html)/i, "$1");
+  if (/<!DOCTYPE\s+html/i.test(cleaned) && /<\/html>/i.test(cleaned)) {
+    const endIdx = cleaned.lastIndexOf("</html>") + "</html>".length;
+    cleaned = cleaned.substring(0, endIdx);
+  }
+  return cleaned;
+}
+
 async function nodeBuildResponse(dict: SharedDict): Promise<NodeResult> {
-  const allOutputs = Object.values(dict.accumulatedOutputs);
-  let combinedDeliverable = allOutputs.join("\n\n");
+  const orderText = `${dict.workOrder.title} ${dict.workOrder.description}`.toLowerCase();
+  const expectsHtml = /\b(html|web\s*page|landing\s*page|homepage|website|web\s*app|dashboard\s*page|interactive\s*page)\b/i.test(orderText) ||
+    (/sandbox/i.test(orderText));
+
+  let combinedDeliverable: string;
+
+  if (expectsHtml) {
+    const bestHtml = selectBestHtmlOutput(dict.accumulatedOutputs);
+    if (bestHtml) {
+      combinedDeliverable = cleanDeliverable(bestHtml);
+    } else {
+      const contentOutputs = Object.entries(dict.accumulatedOutputs)
+        .filter(([_, v]) => !isIntermediateOutput(v))
+        .map(([_, v]) => v);
+      combinedDeliverable = contentOutputs.length > 0
+        ? cleanDeliverable(contentOutputs.join("\n\n"))
+        : Object.values(dict.accumulatedOutputs).join("\n\n");
+    }
+  } else {
+    const allOutputs = Object.values(dict.accumulatedOutputs);
+    combinedDeliverable = allOutputs.join("\n\n");
+  }
 
   if (!combinedDeliverable.trim() && dict.stepResults.length === 0) {
     combinedDeliverable = generateFallbackDeliverable(dict.workOrder);
