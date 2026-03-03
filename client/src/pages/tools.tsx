@@ -39,7 +39,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Terminal, Zap, Globe, Link2, Plus, Pencil, Trash2, Loader2, Wrench,
   Server, Code2, ShieldCheck, Key, FileCode, BookOpen, Settings2,
-  ChevronRight, Eye, Lock, Unlock, X, AlertTriangle
+  ChevronRight, Eye, Lock, Unlock, X, AlertTriangle, Download, CheckCircle2, FileDown
 } from "lucide-react";
 import type { Tool } from "@shared/schema";
 
@@ -717,9 +717,42 @@ export default function ToolsPage() {
   const [activeTab, setActiveTab] = useState("identity");
   const [credentialsState, setCredentialsState] = useState<any[]>([]);
   const [triggersState, setTriggersState] = useState<any[]>([]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importingSkill, setImportingSkill] = useState<string | null>(null);
 
   const { data: tools, isLoading } = useQuery<Tool[]>({
     queryKey: ["/api/tools"],
+  });
+
+  interface AvailableSkill {
+    name: string;
+    dirName: string;
+    slug: string;
+    description: string;
+    content: string;
+    alreadyImported: boolean;
+    hasReferences: boolean;
+    referenceFiles: string[];
+  }
+
+  const { data: availableSkills, isLoading: skillsLoading, refetch: refetchSkills } = useQuery<AvailableSkill[]>({
+    queryKey: ["/api/skills/available"],
+    enabled: importDialogOpen,
+  });
+
+  const importSkillMutation = useMutation({
+    mutationFn: (dirName: string) =>
+      apiRequest("POST", "/api/tools/import-skill", { dirName }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tools"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/skills/available"] });
+      toast({ title: "Skill imported to Tools Locker" });
+      setImportingSkill(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to import skill", description: err.message, variant: "destructive" });
+      setImportingSkill(null);
+    },
   });
 
   const form = useForm<ToolFormValues>({
@@ -890,10 +923,16 @@ export default function ToolsPage() {
             Deploy and govern agentic tools — Claude Skills, code blocks, slash commands, MCP servers, and API integrations
           </p>
         </div>
-        <Button onClick={openCreate} data-testid="button-deploy-tool">
-          <Plus className="w-4 h-4 mr-2" />
-          Deploy Tool
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)} data-testid="button-import-skills">
+            <FileDown className="w-4 h-4 mr-2" />
+            Import Skills
+          </Button>
+          <Button onClick={openCreate} data-testid="button-deploy-tool">
+            <Plus className="w-4 h-4 mr-2" />
+            Deploy Tool
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -1465,6 +1504,85 @@ export default function ToolsPage() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Claude Skills</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Scan approved skills from the project's skill directory and import them into the Tools Locker.
+            </p>
+          </DialogHeader>
+
+          {skillsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              <span className="text-sm text-muted-foreground">Scanning skills directory...</span>
+            </div>
+          ) : availableSkills && availableSkills.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {availableSkills.filter(s => !s.alreadyImported).length} of {availableSkills.length} skills available for import
+              </p>
+              {availableSkills.map((skill) => (
+                <div
+                  key={skill.dirName}
+                  className={`border rounded-lg p-4 flex items-start justify-between gap-4 ${skill.alreadyImported ? "opacity-60 bg-muted/30" : ""}`}
+                  data-testid={`skill-row-${skill.dirName}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <span className="font-medium text-sm truncate">{skill.name}</span>
+                      {skill.alreadyImported && (
+                        <Badge variant="secondary" className="text-[10px] flex-shrink-0">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Imported
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{skill.description || "No description"}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <Badge variant="outline" className="text-[10px]">{skill.dirName}</Badge>
+                      {skill.hasReferences && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {skill.referenceFiles.length} ref{skill.referenceFiles.length !== 1 ? "s" : ""}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={skill.alreadyImported ? "ghost" : "default"}
+                    disabled={skill.alreadyImported || importingSkill === skill.dirName}
+                    onClick={() => {
+                      setImportingSkill(skill.dirName);
+                      importSkillMutation.mutate(skill.dirName);
+                    }}
+                    data-testid={`button-import-${skill.dirName}`}
+                  >
+                    {importingSkill === skill.dirName ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : skill.alreadyImported ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-1" />
+                        Import
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BookOpen className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No skills found in the skills directory.</p>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

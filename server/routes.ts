@@ -29,6 +29,8 @@ import {
 import type { LlmSettings } from "@shared/schema";
 import { processWorkOrder, processWorkOrderSafe, isStaleProcessing, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig, extractWorkOrderFromChat } from "./llm-client";
+import * as fs from "fs";
+import * as path from "path";
 
 const startTime = Date.now();
 
@@ -1393,6 +1395,160 @@ export async function registerRoutes(
       res.json(tool);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch tool" });
+    }
+  });
+
+  app.get("/api/skills/available", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const skillsDir = path.resolve(".local/skills");
+      if (!fs.existsSync(skillsDir)) {
+        return res.json([]);
+      }
+      const dirs = fs.readdirSync(skillsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory());
+
+      const existingTools = await storage.getTools();
+      const existingSlugs = new Set(existingTools.map(t => t.slug));
+
+      const skills: Array<{
+        name: string;
+        dirName: string;
+        slug: string;
+        description: string;
+        content: string;
+        alreadyImported: boolean;
+        hasReferences: boolean;
+        referenceFiles: string[];
+      }> = [];
+
+      for (const dir of dirs) {
+        const skillMdPath = path.join(skillsDir, dir.name, "SKILL.md");
+        if (!fs.existsSync(skillMdPath)) continue;
+
+        const content = fs.readFileSync(skillMdPath, "utf-8");
+
+        let skillName = dir.name;
+        let description = "";
+        const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+        if (frontmatterMatch) {
+          const fm = frontmatterMatch[1];
+          const nameMatch = fm.match(/^name:\s*(.+)$/m);
+          const descMatch = fm.match(/^description:\s*(.+)$/m);
+          if (nameMatch) skillName = nameMatch[1].trim();
+          if (descMatch) description = descMatch[1].trim();
+        }
+
+        const slug = `skill-${dir.name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`;
+
+        const refsDir = path.join(skillsDir, dir.name, "references");
+        const hasReferences = fs.existsSync(refsDir);
+        let referenceFiles: string[] = [];
+        if (hasReferences) {
+          referenceFiles = fs.readdirSync(refsDir).filter(f => f.endsWith(".md"));
+        }
+        const additionalFiles = fs.readdirSync(path.join(skillsDir, dir.name))
+          .filter(f => f !== "SKILL.md" && f.endsWith(".md"));
+        referenceFiles = [...referenceFiles, ...additionalFiles];
+
+        skills.push({
+          name: skillName,
+          dirName: dir.name,
+          slug,
+          description,
+          content,
+          alreadyImported: existingSlugs.has(slug),
+          hasReferences,
+          referenceFiles,
+        });
+      }
+
+      res.json(skills);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to scan skills" });
+    }
+  });
+
+  app.post("/api/tools/import-skill", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { dirName, nameOverride, descriptionOverride } = req.body;
+      if (!dirName || typeof dirName !== "string") {
+        return res.status(400).json({ message: "dirName is required" });
+      }
+
+      if (/[\/\\]|\.\./.test(dirName)) {
+        return res.status(400).json({ message: "Invalid skill directory name" });
+      }
+
+      const skillsDir = path.resolve(".local/skills");
+      const skillDir = path.join(skillsDir, dirName);
+      const resolved = path.resolve(skillDir);
+      if (!resolved.startsWith(skillsDir + path.sep)) {
+        return res.status(400).json({ message: "Invalid skill directory name" });
+      }
+      const skillMdPath = path.join(skillDir, "SKILL.md");
+
+      if (!fs.existsSync(skillMdPath)) {
+        return res.status(404).json({ message: `Skill not found: ${dirName}` });
+      }
+
+      const content = fs.readFileSync(skillMdPath, "utf-8");
+
+      let skillName = dirName;
+      let description = "";
+      const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+      if (frontmatterMatch) {
+        const fm = frontmatterMatch[1];
+        const nameMatch = fm.match(/^name:\s*(.+)$/m);
+        const descMatch = fm.match(/^description:\s*(.+)$/m);
+        if (nameMatch) skillName = nameMatch[1].trim();
+        if (descMatch) description = descMatch[1].trim();
+      }
+
+      const refsDir = path.join(skillDir, "references");
+      let fullContent = content;
+      if (fs.existsSync(refsDir)) {
+        const refFiles = fs.readdirSync(refsDir).filter(f => f.endsWith(".md"));
+        for (const refFile of refFiles) {
+          const refContent = fs.readFileSync(path.join(refsDir, refFile), "utf-8");
+          fullContent += `\n\n---\n## Reference: ${refFile}\n${refContent}`;
+        }
+      }
+      const additionalFiles = fs.readdirSync(skillDir)
+        .filter(f => f !== "SKILL.md" && f.endsWith(".md"));
+      for (const addFile of additionalFiles) {
+        const addContent = fs.readFileSync(path.join(skillDir, addFile), "utf-8");
+        fullContent += `\n\n---\n## Reference: ${addFile}\n${addContent}`;
+      }
+
+      const slug = `skill-${dirName.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`;
+
+      const existingTools = await storage.getTools();
+      if (existingTools.some(t => t.slug === slug)) {
+        return res.status(409).json({ message: `Skill "${dirName}" is already imported as tool "${slug}"` });
+      }
+
+      const finalName = nameOverride || skillName.split(/[-_]/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      const finalDescription = descriptionOverride || description;
+
+      const tool = await storage.createTool({
+        name: finalName,
+        slug,
+        description: finalDescription,
+        type: "skill",
+        category: "general",
+        status: "active",
+        version: "1.0.0",
+        skillContent: fullContent,
+        executionMode: "prompt_injection",
+        accessTier: "any",
+        maxConcurrent: 0,
+        defaultLeaseSeconds: 300,
+        maxLeaseSeconds: 3600,
+      });
+
+      res.status(201).json(tool);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to import skill" });
     }
   });
 
