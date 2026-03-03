@@ -129,7 +129,7 @@ export default function Dashboard() {
             Dashboard
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Monitor Aiden (Tier 1) and sub-agent (Tier 2) orchestration
+            Monitor Aiden (Tier 1), PM (Tier 1.5), and sub-agent (Tier 2) orchestration
           </p>
         </div>
         {canSubmit && (
@@ -266,6 +266,20 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-medium">Tier 1 — Aiden</p>
                   <p className="text-xs text-muted-foreground">Policy, Routing, Decisions</p>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <div className="w-px h-6 bg-border" />
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-md bg-muted/40">
+                <div className="flex items-center justify-center w-8 h-8 rounded-md bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                  <GitBranch className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Tier 1.5 — PM Coordination</p>
+                  <p className="text-xs text-muted-foreground">Workflow orchestration, Step coordination</p>
                 </div>
               </div>
 
