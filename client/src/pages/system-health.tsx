@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +9,7 @@ import {
   XCircle,
   Activity,
   Database,
+  GitBranch,
   Layers,
   RefreshCw,
   Server,
@@ -25,6 +27,7 @@ interface HealthStatus {
   services: {
     database: string;
     tier1: string;
+    tier1_5: string;
     tier2: string;
     gccMemory: string;
   };
@@ -111,10 +114,24 @@ function formatUptime(seconds: number): string {
 
 export default function SystemHealth() {
   usePageTitle("System Health");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showRefreshed, setShowRefreshed] = useState(false);
   const { data: health, isLoading, isError, refetch } = useQuery<HealthStatus>({
     queryKey: ["/api/health"],
     refetchInterval: 30000,
   });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    setShowRefreshed(false);
+    try {
+      await refetch();
+      setShowRefreshed(true);
+      setTimeout(() => setShowRefreshed(false), 3000);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -127,14 +144,23 @@ export default function SystemHealth() {
             Monitor the status of all AIDEN_IWO services and components
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => refetch()}
-          data-testid="button-refresh-health"
-        >
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {showRefreshed && (
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 animate-in fade-in" data-testid="text-refresh-indicator">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Refreshed
+            </span>
+          )}
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            data-testid="button-refresh-health"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -150,7 +176,7 @@ export default function SystemHealth() {
             ))}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <HealthCardSkeleton key={i} />
             ))}
           </div>
@@ -234,6 +260,13 @@ export default function SystemHealth() {
                 status={health.services.tier1}
                 icon={Layers}
                 iconClass="bg-primary/10 text-primary dark:bg-primary/20"
+              />
+              <ServiceCard
+                title="Tier 1.5 - PM Coordination"
+                description="Workflow and PM sub-agent orchestration"
+                status={health.services.tier1_5}
+                icon={GitBranch}
+                iconClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
               />
               <ServiceCard
                 title="Tier 2 - Execution"

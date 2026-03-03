@@ -125,6 +125,7 @@ export async function registerRoutes(
         services: {
           database: dbHealthy ? "healthy" : "unhealthy",
           tier1: "active",
+          tier1_5: "active",
           tier2: "active",
           gccMemory: "active",
         },
