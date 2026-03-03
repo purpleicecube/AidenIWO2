@@ -52,6 +52,10 @@ import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun, SubAg
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ExpandablePanel } from "@/components/expandable-panel";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 function DetailSkeleton() {
   return (
@@ -364,7 +368,7 @@ export default function WorkOrderDetail() {
   const [reopenReason, setReopenReason] = useState("");
   const [deferDialogOpen, setDeferDialogOpen] = useState(false);
   const [deferReason, setDeferReason] = useState("");
-  const [deferUntil, setDeferUntil] = useState("");
+  const [deferUntil, setDeferUntil] = useState<Date | undefined>(undefined);
 
   const reopenMutation = useMutation({
     mutationFn: (reason: string) =>
@@ -455,13 +459,13 @@ export default function WorkOrderDetail() {
     mutationFn: () =>
       apiRequest("POST", `/api/work-orders/${params.id}/defer`, {
         reason: deferReason,
-        deferUntil: deferUntil,
+        deferUntil: deferUntil ? format(deferUntil, "yyyy-MM-dd") : "",
       }),
     onSuccess: () => {
       invalidateOrderQueries();
       setDeferDialogOpen(false);
       setDeferReason("");
-      setDeferUntil("");
+      setDeferUntil(undefined);
       toast({
         title: "Decision deferred",
         description: "Work order deferred until the selected date.",
@@ -679,7 +683,7 @@ export default function WorkOrderDetail() {
                       variant="outline"
                       onClick={() => {
                         setDeferReason("");
-                        setDeferUntil("");
+                        setDeferUntil(undefined);
                         setDeferDialogOpen(true);
                       }}
                       data-testid="button-defer"
@@ -708,7 +712,7 @@ export default function WorkOrderDetail() {
                     variant="outline"
                     onClick={() => {
                       setDeferReason("");
-                      setDeferUntil("");
+                      setDeferUntil(undefined);
                       setDeferDialogOpen(true);
                     }}
                     data-testid="button-defer-failed"
@@ -759,7 +763,7 @@ export default function WorkOrderDetail() {
                     variant="outline"
                     onClick={() => {
                       setDeferReason("");
-                      setDeferUntil("");
+                      setDeferUntil(undefined);
                       setDeferDialogOpen(true);
                     }}
                     data-testid="button-defer-awaiting"
@@ -932,15 +936,31 @@ export default function WorkOrderDetail() {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="defer-until">Review Date</Label>
-              <Input
-                id="defer-until"
-                type="date"
-                value={deferUntil}
-                min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
-                onChange={(e) => setDeferUntil(e.target.value)}
-                data-testid="input-defer-until"
-              />
+              <Label>Review Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !deferUntil && "text-muted-foreground"
+                    )}
+                    data-testid="input-defer-until"
+                  >
+                    <CalendarClock className="mr-2 h-4 w-4" />
+                    {deferUntil ? format(deferUntil, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[60]" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={deferUntil}
+                    onSelect={setDeferUntil}
+                    disabled={(date) => date <= new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <p className="text-xs text-muted-foreground">When should this work order be revisited?</p>
             </div>
 
