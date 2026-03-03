@@ -47,6 +47,7 @@ import {
   ArrowRightCircle,
   Archive,
   ArchiveRestore,
+  Skull,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun, SubAgent } from "@shared/schema";
 import { useState } from "react";
@@ -274,6 +275,8 @@ export default function WorkOrderDetail() {
   const [copied, setCopied] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [archiveReason, setArchiveReason] = useState("");
+  const [killDialogOpen, setKillDialogOpen] = useState(false);
+  const [killReason, setKillReason] = useState("");
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [acceptNotes, setAcceptNotes] = useState("");
 
@@ -498,6 +501,22 @@ export default function WorkOrderDetail() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to restore work order.", variant: "destructive" });
+    },
+  });
+
+  const killMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${params.id}/kill`, {
+        reason: killReason,
+      }),
+    onSuccess: () => {
+      invalidateOrderQueries();
+      setKillDialogOpen(false);
+      setKillReason("");
+      toast({ title: "Work Order Killed", description: "Work order has been killed and archived." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to kill work order.", variant: "destructive" });
     },
   });
 
@@ -771,6 +790,19 @@ export default function WorkOrderDetail() {
                   </Button>
                 </>
               )}
+              {isAdmin && !order.isArchived && order.status !== "completed" && (
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setKillReason("");
+                    setKillDialogOpen(true);
+                  }}
+                  data-testid="button-kill"
+                >
+                  <Skull className="w-4 h-4 mr-2" />
+                  Kill
+                </Button>
+              )}
               {isAdmin && !order.isArchived && (
                 <Button
                   variant="outline"
@@ -805,11 +837,22 @@ export default function WorkOrderDetail() {
       </div>
 
       {order.isArchived && (
-        <Card className="border-muted bg-muted/30" data-testid="archived-banner">
+        <Card className={`border-muted ${order.status === "killed" ? "bg-destructive/5 border-destructive/20" : "bg-muted/30"}`} data-testid="archived-banner">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <Archive className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">This work order is archived</span>
+              {order.status === "killed" ? (
+                <Skull className="w-4 h-4 text-destructive" />
+              ) : (
+                <Archive className="w-4 h-4 text-muted-foreground" />
+              )}
+              <span className={`text-sm font-medium ${order.status === "killed" ? "text-destructive" : "text-muted-foreground"}`}>
+                {order.status === "killed" ? "This work order was killed" : "This work order is archived"}
+              </span>
+              {order.tags?.includes("Killed") && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0" data-testid="badge-killed">
+                  Killed
+                </Badge>
+              )}
               {order.archivedBy && (
                 <span className="text-xs text-muted-foreground ml-auto">
                   by {order.archivedBy}
@@ -1075,6 +1118,48 @@ export default function WorkOrderDetail() {
                 <Archive className="w-4 h-4 mr-2" />
               )}
               {archiveMutation.isPending ? "Archiving..." : "Archive"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={killDialogOpen} onOpenChange={setKillDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Skull className="w-5 h-5" />
+              Kill Work Order
+            </DialogTitle>
+            <DialogDescription>
+              This will immediately stop the work order, set its status to "killed", and auto-archive it with a "Killed" tag. This action is intended for stalled or unnecessary work orders.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="kill-reason">Reason for killing</Label>
+            <Textarea
+              id="kill-reason"
+              placeholder="e.g. Process stalled for 30+ minutes, no longer needed..."
+              value={killReason}
+              onChange={(e) => setKillReason(e.target.value)}
+              data-testid="input-kill-reason"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKillDialogOpen(false)} data-testid="button-cancel-kill">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => killMutation.mutate()}
+              disabled={killMutation.isPending || killReason.trim().length === 0}
+              data-testid="button-confirm-kill"
+            >
+              {killMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Skull className="w-4 h-4 mr-2" />
+              )}
+              {killMutation.isPending ? "Killing..." : "Kill & Archive"}
             </Button>
           </DialogFooter>
         </DialogContent>

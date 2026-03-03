@@ -842,6 +842,61 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Kill Work Order ====================
+
+  app.post("/api/work-orders/:id/kill", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = z.object({
+        reason: z.string().min(1, "Reason is required").max(500),
+      }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten().fieldErrors });
+      }
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      if (order.status === "completed" && order.isArchived) {
+        return res.status(400).json({ message: "Work order is already completed and archived" });
+      }
+
+      const actor = getActor(req);
+      const previousStatus = order.status;
+      const gcc = (order.gccMemory || {}) as Record<string, any>;
+      const { gccMemory, commitId } = buildGccCommit(
+        gcc, order.correlationId, "killed",
+        `Killed by ${actor.actorName}`,
+        `Work order killed by ${actor.actorName}. Previous status: ${previousStatus}. Reason: ${parsed.data.reason}`,
+        { killedAt: new Date().toISOString(), killedBy: actor, previousStatus, killReason: parsed.data.reason },
+      );
+
+      const existingTags = (order.tags as string[] | null) || [];
+      const updatedTags = existingTags.includes("Killed") ? existingTags : [...existingTags, "Killed"];
+
+      await storage.updateWorkOrder(req.params.id, {
+        status: "killed",
+        isArchived: true,
+        archivedAt: new Date(),
+        archivedBy: actor.actorName,
+        archivedReason: `KILLED: ${parsed.data.reason}`,
+        tags: updatedTags,
+        gccMemory,
+      });
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Killed",
+        message: `Work order killed by ${actor.actorName}. Previous status: ${previousStatus}. Reason: ${parsed.data.reason}. Auto-archived with "Killed" tag.`,
+        metadata: { actor, reason: parsed.data.reason, previousStatus, commitId, tags: updatedTags },
+      });
+
+      const updated = await storage.getWorkOrder(req.params.id);
+      res.json(updated);
+    } catch (err) {
+      console.error("Kill work order error:", err);
+      res.status(500).json({ message: "Failed to kill work order" });
+    }
+  });
+
   // Sub-agent routes
   app.get("/api/sub-agents", isAuth, requireRole("viewer"), async (_req, res) => {
     try {

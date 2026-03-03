@@ -51,6 +51,7 @@ export const workOrders = pgTable("work_orders", {
   approvalStatus: text("approval_status"),
   deferredUntil: timestamp("deferred_until"),
   deferredReason: text("deferred_reason"),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
   isArchived: boolean("is_archived").default(false).notNull(),
   archivedAt: timestamp("archived_at"),
   archivedBy: text("archived_by"),
