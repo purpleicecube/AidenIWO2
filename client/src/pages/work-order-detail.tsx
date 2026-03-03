@@ -937,7 +937,7 @@ export default function WorkOrderDetail() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Review Date</Label>
-              <Popover>
+              <Popover modal={true}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -951,13 +951,12 @@ export default function WorkOrderDetail() {
                     {deferUntil ? format(deferUntil, "PPP") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[60]" align="start">
+                <PopoverContent className="w-auto p-0 pointer-events-auto" align="start" style={{ zIndex: 9999 }} onOpenAutoFocus={(e) => e.preventDefault()}>
                   <Calendar
                     mode="single"
                     selected={deferUntil}
                     onSelect={setDeferUntil}
                     disabled={(date) => date <= new Date()}
-                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
