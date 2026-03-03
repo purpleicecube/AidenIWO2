@@ -42,7 +42,11 @@ import {
   ArchiveRestore,
   Pencil,
   FolderInput,
+  CheckSquare,
+  X,
+  FolderOutput,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +71,9 @@ export default function ChatPage() {
   const [dragSessionId, setDragSessionId] = useState<string | null>(null);
   const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null);
   const [dropTargetUngrouped, setDropTargetUngrouped] = useState(false);
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+  const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -195,6 +202,46 @@ export default function ChatPage() {
     },
   });
 
+  const bulkMoveMutation = useMutation({
+    mutationFn: async ({ sessionIds, groupId }: { sessionIds: string[]; groupId: string | null }) => {
+      await apiRequest("POST", "/api/chat/sessions/bulk-update", { sessionIds, groupId });
+    },
+    onSuccess: () => {
+      invalidateSessions();
+      setSelectedSessionIds(new Set());
+      setBulkSelectMode(false);
+      setShowBulkMoveDialog(false);
+    },
+  });
+
+  const toggleSessionSelection = (sessionId: string) => {
+    setSelectedSessionIds(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  };
+
+  const selectAllVisible = (sessionList: ChatSession[]) => {
+    setSelectedSessionIds(prev => {
+      const next = new Set(prev);
+      const allSelected = sessionList.every(s => next.has(s.id));
+      if (allSelected) {
+        sessionList.forEach(s => next.delete(s.id));
+      } else {
+        sessionList.forEach(s => next.add(s.id));
+      }
+      return next;
+    });
+  };
+
+  const exitBulkMode = () => {
+    setBulkSelectMode(false);
+    setSelectedSessionIds(new Set());
+    setShowBulkMoveDialog(false);
+  };
+
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || chatMutation.isPending) return;
@@ -276,8 +323,9 @@ export default function ChatPage() {
     return (
       <div
         key={session.id}
-        draggable={!session.isArchived}
+        draggable={!session.isArchived && !bulkSelectMode}
         onDragStart={(e) => {
+          if (bulkSelectMode) return;
           setDragSessionId(session.id);
           e.dataTransfer.effectAllowed = "move";
           e.dataTransfer.setData("text/plain", session.id);
@@ -288,18 +336,36 @@ export default function ChatPage() {
           setDropTargetUngrouped(false);
         }}
         className={`group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm transition-colors ${
-          activeSessionId === session.id
+          bulkSelectMode && selectedSessionIds.has(session.id)
+            ? "bg-primary/10 ring-1 ring-primary/30"
+            : activeSessionId === session.id
             ? "bg-accent text-accent-foreground"
             : "hover:bg-muted/60"
         } ${dragSessionId === session.id ? "opacity-50" : ""}`}
-        onClick={() => setActiveSessionId(session.id)}
+        onClick={() => {
+          if (bulkSelectMode) {
+            toggleSessionSelection(session.id);
+          } else {
+            setActiveSessionId(session.id);
+          }
+        }}
         data-testid={`session-item-${session.id}`}
       >
-        <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+        {bulkSelectMode ? (
+          <Checkbox
+            checked={selectedSessionIds.has(session.id)}
+            onCheckedChange={() => toggleSessionSelection(session.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-shrink-0"
+            data-testid={`checkbox-session-${session.id}`}
+          />
+        ) : (
+          <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+        )}
         <span className="flex-1 truncate text-xs">
           {session.title || "New Conversation"}
         </span>
-        <DropdownMenu>
+        {!bulkSelectMode && (<DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
@@ -397,7 +463,7 @@ export default function ChatPage() {
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>)}
       </div>
     );
   };
@@ -556,50 +622,87 @@ export default function ChatPage() {
         <div className="p-3 border-b flex items-center justify-between gap-1">
           <span className="text-sm font-medium">History</span>
           <div className="flex items-center gap-0.5">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => {
-                setEditingGroup(null);
-                setGroupName("");
-                setGroupParentId(null);
-                setShowGroupDialog(true);
-              }}
-              title="New Group"
-              data-testid="button-new-group"
-            >
-              <FolderPlus className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              disabled={!activeSessionId}
-              onClick={() => {
-                if (!activeSessionId) return;
-                const session = sessions.find(s => s.id === activeSessionId);
-                if (!session) return;
-                const archiving = !session.isArchived;
-                updateSessionMutation.mutate({ id: activeSessionId, isArchived: archiving });
-                if (archiving) setActiveSessionId(null);
-                toast({ title: archiving ? "Chat archived" : "Chat unarchived" });
-              }}
-              title={activeSessionId ? (sessions.find(s => s.id === activeSessionId)?.isArchived ? "Unarchive current chat" : "Archive current chat") : "Select a chat to archive"}
-              data-testid="button-archive-current"
-            >
-              <Archive className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={handleNewChat}
-              title="New Chat"
-              data-testid="button-new-chat"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </Button>
+            {bulkSelectMode ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs px-2"
+                  onClick={() => selectAllVisible(activeSessions)}
+                  title="Select / Deselect All"
+                  data-testid="button-bulk-select-all"
+                >
+                  {activeSessions.every(s => selectedSessionIds.has(s.id)) && activeSessions.length > 0 ? "Deselect All" : "Select All"}
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={exitBulkMode}
+                  title="Exit Bulk Select"
+                  data-testid="button-bulk-cancel"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => setBulkSelectMode(true)}
+                  title="Bulk Select"
+                  data-testid="button-bulk-select"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    setEditingGroup(null);
+                    setGroupName("");
+                    setGroupParentId(null);
+                    setShowGroupDialog(true);
+                  }}
+                  title="New Group"
+                  data-testid="button-new-group"
+                >
+                  <FolderPlus className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  disabled={!activeSessionId}
+                  onClick={() => {
+                    if (!activeSessionId) return;
+                    const session = sessions.find(s => s.id === activeSessionId);
+                    if (!session) return;
+                    const archiving = !session.isArchived;
+                    updateSessionMutation.mutate({ id: activeSessionId, isArchived: archiving });
+                    if (archiving) setActiveSessionId(null);
+                    toast({ title: archiving ? "Chat archived" : "Chat unarchived" });
+                  }}
+                  title={activeSessionId ? (sessions.find(s => s.id === activeSessionId)?.isArchived ? "Unarchive current chat" : "Archive current chat") : "Select a chat to archive"}
+                  data-testid="button-archive-current"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={handleNewChat}
+                  title="New Chat"
+                  data-testid="button-new-chat"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
         <ScrollArea className="flex-1">
@@ -683,6 +786,39 @@ export default function ChatPage() {
             )}
           </div>
         </ScrollArea>
+        {bulkSelectMode && selectedSessionIds.size > 0 && (
+          <div className="border-t p-2 bg-muted/50 space-y-2" data-testid="bulk-action-bar">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {selectedSessionIds.size} chat{selectedSessionIds.size !== 1 ? "s" : ""} selected
+              </span>
+            </div>
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                variant="default"
+                className="flex-1 h-8 text-xs"
+                onClick={() => setShowBulkMoveDialog(true)}
+                data-testid="button-bulk-move"
+              >
+                <FolderOutput className="w-3.5 h-3.5 mr-1.5" />
+                Move to Folder
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => {
+                  bulkMoveMutation.mutate({ sessionIds: Array.from(selectedSessionIds), groupId: null });
+                  toast({ title: `${selectedSessionIds.size} chats ungrouped` });
+                }}
+                data-testid="button-bulk-ungroup"
+              >
+                Ungroup
+              </Button>
+            </div>
+          </div>
+        )}
         {gccMemory && activeSessionId && (
           <div className="border-t p-3 space-y-2" data-testid="container-gcc-memory">
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -921,6 +1057,46 @@ export default function ChatPage() {
               data-testid="button-save-group"
             >
               {editingGroup ? "Save" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBulkMoveDialog} onOpenChange={setShowBulkMoveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move {selectedSessionIds.size} Chat{selectedSessionIds.size !== 1 ? "s" : ""} to Folder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 py-2 max-h-[300px] overflow-y-auto">
+            {groups.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm hover:bg-muted/60 transition-colors text-left"
+                onClick={() => {
+                  bulkMoveMutation.mutate({ sessionIds: Array.from(selectedSessionIds), groupId: g.id });
+                  toast({ title: `${selectedSessionIds.size} chats moved to ${g.name}` });
+                }}
+                data-testid={`bulk-move-to-${g.id}`}
+              >
+                <Folder className="w-4 h-4 flex-shrink-0 text-muted-foreground" style={g.color ? { color: g.color } : undefined} />
+                <span className="flex-1 truncate">{g.name}</span>
+                {g.parentId && (
+                  <span className="text-[10px] text-muted-foreground/60">
+                    in {groups.find(p => p.id === g.parentId)?.name}
+                  </span>
+                )}
+              </button>
+            ))}
+            {groups.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No folders yet. Create a folder first.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkMoveDialog(false)} data-testid="button-cancel-bulk-move">
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
