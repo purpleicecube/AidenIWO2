@@ -53,9 +53,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ExpandablePanel } from "@/components/expandable-panel";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
 function DetailSkeleton() {
   return (
@@ -937,29 +935,29 @@ export default function WorkOrderDetail() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Review Date</Label>
-              <Popover modal={true}>
-                <PopoverTrigger asChild>
+              {deferUntil && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-sm" data-testid="text-selected-date">
+                  <CalendarClock className="h-4 w-4 text-sky-600" />
+                  <span className="font-medium">{format(deferUntil, "PPP")}</span>
                   <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !deferUntil && "text-muted-foreground"
-                    )}
-                    data-testid="input-defer-until"
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-6 w-6 p-0"
+                    onClick={() => setDeferUntil(undefined)}
+                    data-testid="button-clear-date"
                   >
-                    <CalendarClock className="mr-2 h-4 w-4" />
-                    {deferUntil ? format(deferUntil, "PPP") : "Pick a date"}
+                    <X className="h-3 w-3" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 pointer-events-auto" align="start" style={{ zIndex: 9999 }} onOpenAutoFocus={(e) => e.preventDefault()}>
-                  <Calendar
-                    mode="single"
-                    selected={deferUntil}
-                    onSelect={setDeferUntil}
-                    disabled={(date) => date <= new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
+                </div>
+              )}
+              <div className="border rounded-md flex justify-center" data-testid="input-defer-until">
+                <Calendar
+                  mode="single"
+                  selected={deferUntil}
+                  onSelect={setDeferUntil}
+                  disabled={(date) => date <= new Date()}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">When should this work order be revisited?</p>
             </div>
 
