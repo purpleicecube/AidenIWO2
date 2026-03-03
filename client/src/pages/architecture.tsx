@@ -124,11 +124,11 @@ export default function Architecture() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               {[
-                "Coordinates multi-step workflow executions",
-                "Dispatches steps to worker sub-agents",
-                "Reviews step outputs against workflow goals",
+                "Breaks workflows into a series of linked work orders",
+                "Dispatches each work order to the appropriate worker sub-agent",
+                "Reviews work order outputs against workflow goals",
                 "Requests revisions from workers if quality is low",
-                "Assembles final work product from step outputs",
+                "Assembles all work order outputs into a final deliverable",
                 "Escalates to Aiden (Tier 1) on unresolvable failures",
               ].map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
@@ -260,37 +260,37 @@ export default function Architecture() {
         <Card className="border-amber-200/50 dark:border-amber-800/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium">Workflow Lifecycle</CardTitle>
-            <p className="text-xs text-muted-foreground">Multi-step workflows — PM coordinates via Tier 1.5</p>
+            <p className="text-xs text-muted-foreground">A series of linked work orders orchestrated by the PM via Tier 1.5</p>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center py-4">
               <FlowStep
                 step={1}
                 title="API Ingestion"
-                description="Work order enters the system via API"
+                description="Workflow work order enters the system via API"
                 icon={Database}
                 iconClass="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
               />
               <FlowStep
                 step={2}
                 title="Aiden: Policy Gate & Routing"
-                description="Aiden evaluates policy and routes to PM sub-agent"
+                description="Aiden evaluates policy and routes work order to PM sub-agent"
                 icon={Brain}
                 iconClass="bg-primary/10 text-primary dark:bg-primary/20"
                 badge={{ label: "Tier 1", className: "border-primary/30 text-primary" }}
               />
               <FlowStep
                 step={3}
-                title="PM: Step Dispatch"
-                description="PM identifies next step and dispatches to worker agent"
+                title="PM: Work Order Dispatch"
+                description="PM breaks workflow into linked work orders and dispatches next to worker agent"
                 icon={ClipboardList}
                 iconClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                 badge={{ label: "Tier 1.5", className: "border-amber-500/30 text-amber-600 dark:text-amber-400" }}
               />
               <FlowStep
                 step={4}
-                title="Worker: Step Execution"
-                description="Worker agent executes step via PocketFlow with tools"
+                title="Worker: Work Order Execution"
+                description="Worker agent executes individual work order via PocketFlow with tools"
                 icon={Bot}
                 iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
                 badge={{ label: "Tier 2", className: "border-emerald-500/30 text-emerald-600 dark:text-emerald-400" }}
@@ -298,7 +298,7 @@ export default function Architecture() {
               <FlowStep
                 step={5}
                 title="PM: Review & Revise"
-                description="PM reviews output, requests revisions if needed"
+                description="PM reviews work order output, requests revisions if needed"
                 icon={RotateCcw}
                 iconClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                 badge={{ label: "Tier 1.5", className: "border-amber-500/30 text-amber-600 dark:text-amber-400" }}
@@ -306,7 +306,7 @@ export default function Architecture() {
               <FlowStep
                 step={6}
                 title="PM: Assemble Work Product"
-                description="PM synthesizes step outputs into final deliverable"
+                description="PM synthesizes all completed work order outputs into final deliverable"
                 icon={GitMerge}
                 iconClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                 badge={{ label: "Tier 1.5", className: "border-amber-500/30 text-amber-600 dark:text-amber-400" }}
@@ -314,7 +314,7 @@ export default function Architecture() {
               <FlowStep
                 step={7}
                 title="Aiden: Executive Review"
-                description="Aiden reviews PM's work product for final approval"
+                description="Aiden reviews PM's assembled work product for final approval"
                 icon={FileCheck}
                 iconClass="bg-primary/10 text-primary dark:bg-primary/20"
                 badge={{ label: "Tier 1", className: "border-primary/30 text-primary" }}
