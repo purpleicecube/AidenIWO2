@@ -229,6 +229,7 @@ export const workflowSteps = pgTable("workflow_steps", {
   name: text("name").notNull(),
   description: text("description"),
   order: integer("order").notNull().default(0),
+  stepType: text("step_type").notNull().default("internal"),
   agentType: text("agent_type"),
   assignedSubAgentId: varchar("assigned_sub_agent_id"),
   promptTemplate: text("prompt_template"),

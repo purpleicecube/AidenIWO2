@@ -15,6 +15,9 @@ import {
   GitMerge,
   RotateCcw,
   FileCheck,
+  Cog,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 
 function FlowStep({
@@ -138,11 +141,29 @@ export default function Architecture() {
               ))}
             </div>
             <div className="pt-2 border-t">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Activation</p>
-              <div className="p-2 rounded-md bg-muted/40">
-                <p className="text-xs text-muted-foreground">
-                  Active only for workflow-based work orders. Simple (single-step) work orders bypass Tier 1.5 and go directly from Tier 1 to Tier 2.
-                </p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Step Types</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/40">
+                  <Cog className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium">Internal</p>
+                    <p className="text-[11px] text-muted-foreground">PM handles directly or dispatches to a worker — no formal work order</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-md bg-blue-50 dark:bg-blue-900/20">
+                  <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium">Work Order</p>
+                    <p className="text-[11px] text-muted-foreground">Creates a linked child work order through the full Aiden pipeline</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-md bg-purple-50 dark:bg-purple-900/20">
+                  <ExternalLink className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium">External</p>
+                    <p className="text-[11px] text-muted-foreground">Placeholder for work outside AIDEN_IWO — pauses until marked complete</p>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>

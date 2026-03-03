@@ -47,6 +47,9 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  FileText,
+  ExternalLink,
+  Cog,
 } from "lucide-react";
 import type {
   WorkflowTemplate,
@@ -73,6 +76,7 @@ const stepFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   description: z.string().nullable().optional(),
   order: z.coerce.number().int().min(0),
+  stepType: z.string().default("internal"),
   agentType: z.string().nullable().optional(),
   assignedSubAgentId: z.string().nullable().optional(),
   promptTemplate: z.string().nullable().optional(),
@@ -134,6 +138,17 @@ function ExecutionStatusIcon({ status }: { status: string }) {
   }
 }
 
+function stepTypeBadge(stepType: string) {
+  switch (stepType) {
+    case "work_order":
+      return { label: "Work Order", icon: FileText, className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
+    case "external":
+      return { label: "External", icon: ExternalLink, className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" };
+    default:
+      return { label: "Internal", icon: Cog, className: "bg-muted text-muted-foreground" };
+  }
+}
+
 function StepCard({
   step,
   onDelete,
@@ -141,6 +156,9 @@ function StepCard({
   step: WorkflowStep;
   onDelete: (id: string) => void;
 }) {
+  const typeBadge = stepTypeBadge(step.stepType);
+  const TypeIcon = typeBadge.icon;
+
   return (
     <div
       className="flex items-start justify-between gap-3 p-3 rounded-md bg-muted/40"
@@ -160,15 +178,29 @@ function StepCard({
             >
               {step.stepKey}
             </Badge>
+            <Badge
+              variant="outline"
+              className={`border-transparent no-default-hover-elevate no-default-active-elevate text-[10px] px-1.5 py-0 h-4 ${typeBadge.className}`}
+              data-testid={`badge-step-type-${step.id}`}
+            >
+              <TypeIcon className="w-2.5 h-2.5 mr-1" />
+              {typeBadge.label}
+            </Badge>
           </div>
           {step.description && (
             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
               {step.description}
             </p>
           )}
-          {step.agentType && (
+          {step.agentType && step.stepType !== "external" && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1.5">
               <span className="font-medium">Agent:</span> {step.agentType}
+            </div>
+          )}
+          {step.stepType === "external" && (
+            <div className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 mt-1.5">
+              <ExternalLink className="w-3 h-3" />
+              <span>Awaits external completion by operator</span>
             </div>
           )}
         </div>
@@ -308,6 +340,7 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
       name: "",
       description: null,
       order: 0,
+      stepType: "internal",
       agentType: null,
       assignedSubAgentId: null,
       promptTemplate: null,
@@ -395,6 +428,7 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
               name: "",
               description: null,
               order: sortedSteps.length,
+              stepType: "internal",
               agentType: null,
               assignedSubAgentId: null,
               promptTemplate: null,
@@ -493,6 +527,42 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
 
               <FormField
                 control={stepForm.control}
+                name="stepType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Step Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "internal"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-step-type">
+                          <SelectValue placeholder="Select step type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="internal">
+                          <span className="flex items-center gap-2"><Cog className="w-3.5 h-3.5" /> Internal</span>
+                        </SelectItem>
+                        <SelectItem value="work_order">
+                          <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5" /> Work Order</span>
+                        </SelectItem>
+                        <SelectItem value="external">
+                          <span className="flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> External</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {field.value === "work_order"
+                        ? "Creates a linked child work order through the full Aiden pipeline"
+                        : field.value === "external"
+                        ? "Placeholder for work done outside AIDEN_IWO — pauses until marked complete"
+                        : "PM handles directly or dispatches to a worker agent internally"}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={stepForm.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
@@ -511,6 +581,7 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
                 )}
               />
 
+              {stepForm.watch("stepType") !== "external" && (
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={stepForm.control}
@@ -563,27 +634,30 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
                   )}
                 />
               </div>
+              )}
 
-              <FormField
-                control={stepForm.control}
-                name="promptTemplate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Prompt / Instructions</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        value={field.value || ""}
-                        placeholder="Specific instructions for this step's agent (optional)"
-                        className="resize-none text-xs"
-                        rows={3}
-                        data-testid="input-step-prompt"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {stepForm.watch("stepType") !== "external" && (
+                <FormField
+                  control={stepForm.control}
+                  name="promptTemplate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prompt / Instructions</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          value={field.value || ""}
+                          placeholder="Specific instructions for this step's agent (optional)"
+                          className="resize-none text-xs"
+                          rows={3}
+                          data-testid="input-step-prompt"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button
