@@ -25,10 +25,17 @@ async function getCredentials() {
     }
   ).then(res => res.json()).then(data => data.items?.[0]);
 
-  if (!connectionSettings || (!connectionSettings.settings.api_key || !connectionSettings.settings.from_email)) {
-    throw new Error('SendGrid not connected');
+  if (!connectionSettings || (!connectionSettings.settings?.api_key || !connectionSettings.settings?.from_email)) {
+    console.error('SendGrid connector response:', JSON.stringify(connectionSettings, null, 2));
+    throw new Error('SendGrid not connected — missing api_key or from_email');
   }
-  return { apiKey: connectionSettings.settings.api_key, email: connectionSettings.settings.from_email };
+
+  const apiKey = connectionSettings.settings.api_key;
+  if (!apiKey.startsWith('SG.')) {
+    console.error(`SendGrid API key format invalid (starts with "${apiKey.substring(0, 4)}...")`);
+  }
+
+  return { apiKey, email: connectionSettings.settings.from_email };
 }
 
 async function getUncachableSendGridClient() {
