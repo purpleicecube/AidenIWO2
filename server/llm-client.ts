@@ -765,8 +765,18 @@ When planning steps, if a step would benefit from using a tool (e.g., web search
 
   const revisionGuidance = revisionContext ? `\n${revisionContext}` : "";
 
+  const planOrderText = `${order.title} ${order.description}`;
+  const planWantsHtml = /\b(html\s*page|html\s*file|web\s*page|html5|single.file.*html|self.contained.*html|html\s*document|landing\s*page|homepage|website|web\s*app|ui\s*mockup|dashboard\s*page|interactive\s*page)\b/i.test(planOrderText);
+  const planWantsCode = /\b(source\s*code|script|program|function|class|module|implementation|algorithm|api\s*endpoint|backend|frontend\s*component)\b/i.test(planOrderText) && !planWantsHtml;
+  let planFormatNote = "";
+  if (planWantsHtml || isSandboxTargeted) {
+    planFormatNote = `\nCRITICAL: The final deliverable must be ACTUAL HTML source code (a complete, self-contained HTML document), NOT a JSON description or metadata about an HTML page. Plan your steps to produce real code/content, not structural outlines.`;
+  } else if (planWantsCode) {
+    planFormatNote = `\nCRITICAL: The final deliverable must be ACTUAL source code, not descriptions of code or pseudocode. Plan steps that produce real, runnable code.`;
+  }
+
   const prompt = `You are executing a work order as a Tier 2 sub-agent. Break the work order into concrete execution steps.
-${gapsContext}${sandboxGuidance}${toolsContext}${revisionGuidance}
+${gapsContext}${sandboxGuidance}${toolsContext}${revisionGuidance}${planFormatNote}
 Each step should be a discrete unit of work. Steps can declare dependencies on other steps by ID.
 Independent steps (no dependencies) will be executed in PARALLEL for efficiency.
 
@@ -834,6 +844,24 @@ The tool results will be provided back to you for synthesis. You can include bot
 
   const revisionGuidance = revisionContext ? `\n${revisionContext}` : "";
 
+  const combinedText = `${order.title} ${order.description} ${step.description}`;
+  const wantsHtml = /\b(html\s*page|html\s*file|web\s*page|html5|single.file.*html|self.contained.*html|html\s*document|landing\s*page|homepage|website|web\s*app|ui\s*mockup|dashboard\s*page|interactive\s*page)\b/i.test(combinedText);
+  const wantsCode = /\b(source\s*code|script|program|function|class|module|implementation|algorithm|api\s*endpoint|backend|frontend\s*component)\b/i.test(combinedText) && !wantsHtml;
+  const wantsDocument = /\b(report|document|paper|article|memo|brief|analysis|assessment|proposal|guide|manual|sop|procedure|write-?up|whitepaper|specification)\b/i.test(combinedText) && !wantsHtml && !wantsCode;
+
+  let formatGuidance = "";
+  if (wantsHtml || isSandboxTargeted) {
+    formatGuidance = `
+FORMAT REQUIREMENT: The work order requires an HTML page/file. Your "output" field MUST contain the COMPLETE, ACTUAL HTML source code (starting with <!DOCTYPE html> or <html>), with all CSS and JS embedded inline. Do NOT output JSON metadata, layout descriptions, or structural outlines about an HTML page — output the REAL HTML code itself. The entire HTML document must be inside the "output" string value.
+IMPORTANT: Since the output goes inside a JSON string field, make sure to properly escape all double quotes and newlines within the HTML so the JSON remains valid.`;
+  } else if (wantsCode) {
+    formatGuidance = `
+FORMAT REQUIREMENT: The work order requires code. Your "output" field MUST contain the ACTUAL source code — not a description of code or pseudocode. Write real, runnable code. Escape quotes and newlines properly since the output is inside a JSON string field.`;
+  } else if (wantsDocument) {
+    formatGuidance = `
+FORMAT REQUIREMENT: The work order requires a document/report. Your "output" field MUST contain the ACTUAL written content in full prose with proper markdown formatting — not an outline, not JSON metadata, not bullet-point placeholders. Write the complete document text.`;
+  }
+
   const prompt = `You are executing step "${step.name}" of a work order.
 
 Step description: ${step.description}
@@ -844,8 +872,8 @@ Work Order Context:
 - Description: ${order.description}
 - Type: ${order.type}
 - Priority: ${order.priority}
-
-IMPORTANT: Produce the ACTUAL deliverable content for this step. Write the real work product — not a summary or status.
+${formatGuidance}
+IMPORTANT: Produce the ACTUAL deliverable content for this step. Write the real work product — not a summary, not a status update, not JSON metadata about the work product. The "output" field must contain the FINISHED content itself.
 If this step cannot be executed (missing info, external dependency, etc.), set blocked=true.
 If the step description mentions using a tool, you SHOULD include tool_calls in your response.
 
@@ -853,7 +881,7 @@ Respond with ONLY a JSON object:
 {
   "blocked": false,
   "reason": null,
-  "output": "THE ACTUAL CONTENT/DELIVERABLE FOR THIS STEP in markdown",
+  "output": "THE ACTUAL CONTENT/DELIVERABLE FOR THIS STEP — real content, not metadata",
   "tool_calls": []
 }`;
 
@@ -876,8 +904,8 @@ Work Order Context:
 - Description: ${order.description}
 - Type: ${order.type}
 - Priority: ${order.priority}
-
-Produce the ACTUAL deliverable content for this step. Write the real work product in markdown format. Do NOT wrap your response in JSON — just output the content directly.`;
+${formatGuidance}
+Produce the ACTUAL deliverable content for this step. Write the real work product — not metadata, not JSON, not an outline. Do NOT wrap your response in JSON — just output the content directly.`;
 
     try {
       const fallbackRaw = await callLLMPlainText(settings, systemPrompt, fallbackPrompt, apiKeyOverride);
