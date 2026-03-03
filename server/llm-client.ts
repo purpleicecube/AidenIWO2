@@ -850,16 +850,27 @@ The tool results will be provided back to you for synthesis. You can include bot
   const wantsDocument = /\b(report|document|paper|article|memo|brief|analysis|assessment|proposal|guide|manual|sop|procedure|write-?up|whitepaper|specification)\b/i.test(combinedText) && !wantsHtml && !wantsCode;
 
   let formatGuidance = "";
+  const hasSearchTool = availableTools?.some(t => /search|browse|scrape|fetch|web/i.test(t.name + " " + t.slug + " " + t.description)) ?? false;
+  const mediaGuidance = wantsHtml
+    ? `\nIMAGES: Use high-quality placeholder images from https://picsum.photos (e.g., https://picsum.photos/800/400 for an 800x400 image, or https://picsum.photos/seed/topic/800/400 for consistent seeded images). Use descriptive alt text. Do NOT leave empty src attributes or broken image references.`
+    : "";
+  const dataSourceGuidance = !hasSearchTool
+    ? `\nDATA SOURCING: You do NOT have access to the internet or real-time data. If the work order references specific real-world content (news headlines, current events, real publications), create realistic, illustrative example content that matches the theme and tone requested. Make it convincing and professional — do NOT insert obvious placeholders like "[headline here]" or "Lorem ipsum". The content should read as if it were real even though it is generated.`
+    : "";
+
   if (wantsHtml || isSandboxTargeted) {
     formatGuidance = `
 FORMAT REQUIREMENT: The work order requires an HTML page/file. Your "output" field MUST contain the COMPLETE, ACTUAL HTML source code (starting with <!DOCTYPE html> or <html>), with all CSS and JS embedded inline. Do NOT output JSON metadata, layout descriptions, or structural outlines about an HTML page — output the REAL HTML code itself. The entire HTML document must be inside the "output" string value.
-IMPORTANT: Since the output goes inside a JSON string field, make sure to properly escape all double quotes and newlines within the HTML so the JSON remains valid.`;
+IMPORTANT: Since the output goes inside a JSON string field, make sure to properly escape all double quotes and newlines within the HTML so the JSON remains valid.
+HTML QUALITY: Include proper <meta> tags (charset, viewport, description), semantic HTML elements, ARIA labels for accessibility, and a polished visual design with consistent color scheme, typography, and spacing.${mediaGuidance}${dataSourceGuidance}`;
   } else if (wantsCode) {
     formatGuidance = `
-FORMAT REQUIREMENT: The work order requires code. Your "output" field MUST contain the ACTUAL source code — not a description of code or pseudocode. Write real, runnable code. Escape quotes and newlines properly since the output is inside a JSON string field.`;
+FORMAT REQUIREMENT: The work order requires code. Your "output" field MUST contain the ACTUAL source code — not a description of code or pseudocode. Write real, runnable code. Escape quotes and newlines properly since the output is inside a JSON string field.${dataSourceGuidance}`;
   } else if (wantsDocument) {
     formatGuidance = `
-FORMAT REQUIREMENT: The work order requires a document/report. Your "output" field MUST contain the ACTUAL written content in full prose with proper markdown formatting — not an outline, not JSON metadata, not bullet-point placeholders. Write the complete document text.`;
+FORMAT REQUIREMENT: The work order requires a document/report. Your "output" field MUST contain the ACTUAL written content in full prose with proper markdown formatting — not an outline, not JSON metadata, not bullet-point placeholders. Write the complete document text.${dataSourceGuidance}`;
+  } else if (!hasSearchTool) {
+    formatGuidance = dataSourceGuidance;
   }
 
   const prompt = `You are executing step "${step.name}" of a work order.
@@ -1096,11 +1107,20 @@ export async function runAidenQualityReview(
   convergenceScore: number,
   iterations: number,
   stepCount: number,
-  executorName: string
+  executorName: string,
+  hadSearchTools?: boolean
 ): Promise<AidenQualityReview> {
   const deliverablePreview = deliverable.length > 4000
     ? deliverable.substring(0, 4000) + "\n... [truncated for review]"
     : deliverable;
+
+  const capabilitiesNote = hadSearchTools
+    ? `\nCapabilities: The executor HAD access to web search/browsing tools. It is fair to expect real, sourced data if the work order asked for it.`
+    : `\nCapabilities: The executor did NOT have access to the internet, web search, or real-time data. It also CANNOT generate or embed real images. Therefore:
+- Do NOT penalize for using illustrative/example content instead of real news, headlines, or current events
+- Do NOT penalize for using placeholder images (e.g., picsum.photos, unsplash) instead of real photos
+- DO evaluate the quality, structure, and professionalism of the content that WAS produced
+- Focus your review on: formatting, completeness, code quality, design, accessibility, and how well the deliverable meets the structural requirements of the work order`;
 
   const prompt = `You are Aiden, the Tier 1 orchestration manager. A sub-agent has completed execution on a work order. You must perform a final quality review before approving completion.
 
@@ -1121,6 +1141,8 @@ Rules:
 - "block" only if the deliverable is fundamentally wrong or harmful
 - Be pragmatic — good-enough deliverables should be approved with noted improvements
 - Score reflects overall quality: 0.8+ is good, 0.6-0.8 needs improvement, below 0.6 is inadequate
+- Only flag issues that the executor COULD reasonably fix given its capabilities (see below)
+${capabilitiesNote}
 
 Work Order:
 - Title: ${order.title}

@@ -3,6 +3,7 @@ import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun } from "@shared
 import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, runAidenQualityReview, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
 import { pocketflowExecute } from "./pocketflow";
+import { getAvailableToolsForAgent } from "./tool-executor";
 import {
   selectProjectManager, resolvePmLlmConfig,
   pmReviewStepOutput, pmRequestStepRevision,
@@ -299,6 +300,12 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   const iterations = pfMeta?.iterations ?? 1;
   const stepCount = pfMeta?.stepResults?.length ?? 0;
 
+  let hadSearchTools = false;
+  try {
+    const agentTools = await getAvailableToolsForAgent(targetSubAgent?.id || undefined);
+    hadSearchTools = agentTools.some(t => /search|browse|scrape|fetch|web/i.test(t.name + " " + t.slug + " " + (t.description || "")));
+  } catch { /* tools check non-critical */ }
+
   let qualityReview;
   if (useLLM && settings) {
     await storage.createExecutionLog({
@@ -316,7 +323,8 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       convergenceScore,
       iterations,
       stepCount,
-      executorLabel
+      executorLabel,
+      hadSearchTools
     );
 
     await storage.createExecutionLog({
@@ -441,7 +449,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
 
         let revQualityReview;
         try {
-          revQualityReview = await runAidenQualityReview(settings!, revisedOrder, revDeliverable, revPfMeta?.convergenceScore ?? 0, revPfMeta?.iterations ?? 1, revPfMeta?.stepResults?.length ?? 0, executorLabel);
+          revQualityReview = await runAidenQualityReview(settings!, revisedOrder, revDeliverable, revPfMeta?.convergenceScore ?? 0, revPfMeta?.iterations ?? 1, revPfMeta?.stepResults?.length ?? 0, executorLabel, hadSearchTools);
           await storage.createExecutionLog({
             workOrderId: orderId, tier: 1,
             action: `Aiden: Revision ${revisionsDone} Quality ${revQualityReview.approved ? "Approved" : "Flagged"}`,
