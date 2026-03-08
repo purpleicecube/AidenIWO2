@@ -5,6 +5,7 @@ import { fileWorkOrderOutput } from "./workspace-filing";
 import { pocketflowExecute } from "./pocketflow";
 import { getAvailableToolsForAgent } from "./tool-executor";
 import { autoImportSkillsForDescription } from "./skill-auto-import";
+import { createMemoryAdvisor, type WorkOrderEvent } from "./memory-advisor";
 import {
   selectProjectManager, resolvePmLlmConfig,
   pmReviewStepOutput, pmRequestStepRevision,
@@ -148,6 +149,15 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   const settings = await storage.getLlmSettings();
   const useLLM = settings?.enabled === true;
   const activeSubAgents = await storage.getActiveSubAgents();
+
+  // P1.4: Memory Advisor — Hook 1 (pre-Tier-1 recall)
+  const opSettings = await storage.getOperationalSettings().catch(() => null);
+  const advisor = createMemoryAdvisor(opSettings?.memoryAdvisor ?? "none");
+  const advisoryMemories = await advisor.recall(`${order.title}: ${order.description}`).catch(() => []);
+  const advisoryContext = advisoryMemories.length > 0
+    ? `\n\n[Advisory Memory — ${advisoryMemories.length} relevant past outcome(s)]:\n` +
+      advisoryMemories.map(m => `- ${m.context} (relevance: ${(m.relevance * 100).toFixed(0)}%)`).join("\n")
+    : "";
 
   await storage.createExecutionLog({
     workOrderId: orderId,
@@ -591,6 +601,17 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     fileWorkOrderOutput(completedOrder).catch(err =>
       console.error("Auto-filing error:", err.message)
     );
+    // P1.4: Memory Advisor — Hook 2 (post-completion store)
+    advisor.store({
+      orderId: completedOrder.id,
+      title: completedOrder.title || order.title,
+      description: order.description || "",
+      status: "completed",
+      summary: qualityReview?.summary,
+      issues: qualityReview?.issues,
+      qualityScore: qualityReview?.score,
+      handler: tier1Result.handler || undefined,
+    } as WorkOrderEvent).catch(() => {});
   }
 
   return completedOrder;

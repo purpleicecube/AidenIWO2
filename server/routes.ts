@@ -3600,7 +3600,7 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
     }
   });
 
-  app.get("/api/images/:placeholderId", async (req: Request, res: Response) => {
+  app.get("/api/images/:placeholderId", isAuth, async (req: Request, res: Response) => {
     try {
       const image = await storage.getUploadedImage(req.params.placeholderId as string);
       if (!image) {
@@ -3616,7 +3616,7 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
     }
   });
 
-  app.get("/api/images/:placeholderId/meta", async (req: Request, res: Response) => {
+  app.get("/api/images/:placeholderId/meta", isAuth, async (req: Request, res: Response) => {
     try {
       const image = await storage.getUploadedImage(req.params.placeholderId as string);
       if (!image) {

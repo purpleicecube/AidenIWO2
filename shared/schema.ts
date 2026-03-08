@@ -72,6 +72,7 @@ export const operationalSettings = pgTable("operational_settings", {
   emergencyTriggers: jsonb("emergency_triggers").default(sql`'["security_breach", "legal_deadline_24h", "revenue_loss", "system_outage"]'::jsonb`),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   updatedBy: text("updated_by").default("system"),
+  memoryAdvisor: text("memory_advisor").notNull().default("none"),
 });
 
 export const insertOperationalSettingsSchema = createInsertSchema(operationalSettings).omit({
