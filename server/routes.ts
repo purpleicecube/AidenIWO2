@@ -113,6 +113,14 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Startup validation — warn early if 21st.dev key is missing
+  if (!process.env.TWENTY_FIRST_API_KEY) {
+    console.warn(
+      "[startup] TWENTY_FIRST_API_KEY is not set — 21st.dev Magic MCP tool will fail at runtime. " +
+      "Set it in .env to enable UI component generation for Mark/Tom sub-agents."
+    );
+  }
+
   app.get("/api/health", async (_req, res) => {
     try {
       const uptime = Math.floor((Date.now() - startTime) / 1000);
