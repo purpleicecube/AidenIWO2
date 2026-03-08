@@ -48,6 +48,10 @@ import {
   Archive,
   ArchiveRestore,
   Skull,
+  FileDown,
+  FolderOpen,
+  FileText,
+  Presentation,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun, SubAgent } from "@shared/schema";
 import { useState } from "react";
@@ -1410,6 +1414,8 @@ export default function WorkOrderDetail() {
             <WorkflowExecutionPanel executionId={order.workflowExecutionId} />
           )}
 
+          <DeliverableCard orderId={order.id} tier2Result={order.tier2Result as any} />
+
           {(order.tier1Result || order.tier2Result) && (
             <Card>
               <CardHeader className="pb-3">
@@ -1438,6 +1444,102 @@ export default function WorkOrderDetail() {
         </div>
       </div>
     </div>
+  );
+}
+
+function DeliverableCard({ orderId, tier2Result }: { orderId: string; tier2Result: any }) {
+  const { data: artifacts } = useQuery<any[]>({
+    queryKey: ["/api/artifacts", { sourceId: orderId }],
+    queryFn: () => fetch(`/api/artifacts?sourceId=${orderId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!orderId,
+  });
+
+  // Binary deliverables: pdf, pptx, docx, xlsx, zip, etc.
+  const binaryArtifacts = (artifacts || []).filter(a =>
+    a.type === "file" && a.mimeType && !a.mimeType.startsWith("text/")
+  );
+
+  // In-flight postProcessedFile (available before filing, e.g. awaiting_operator)
+  const inFlight = tier2Result?.output?.postProcessedFile;
+
+  if (!binaryArtifacts.length && !inFlight) return null;
+
+  function formatBytes(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function mimeIcon(mime: string) {
+    if (mime === "application/pdf") return <FileText className="w-4 h-4 text-red-500" />;
+    if (mime.includes("presentationml") || mime.includes("pptx")) return <Presentation className="w-4 h-4 text-orange-500" />;
+    return <FileDown className="w-4 h-4 text-muted-foreground" />;
+  }
+
+  function mimeLabel(mime: string) {
+    if (mime === "application/pdf") return "PDF";
+    if (mime.includes("presentationml")) return "PPTX";
+    if (mime.includes("wordprocessingml")) return "DOCX";
+    if (mime.includes("spreadsheetml")) return "XLSX";
+    return mime.split("/").pop()?.toUpperCase() ?? "FILE";
+  }
+
+  return (
+    <Card className="border-emerald-200 dark:border-emerald-900/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <FileDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          Deliverables
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {binaryArtifacts.map(artifact => (
+          <div
+            key={artifact.id}
+            className="flex items-center gap-3 p-3 rounded-md bg-muted/40 border border-border/50"
+          >
+            {mimeIcon(artifact.mimeType)}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{artifact.name}</p>
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">
+                  {mimeLabel(artifact.mimeType)}
+                </span>
+                <span>{formatBytes(artifact.size)}</span>
+                {artifact.folderId && (
+                  <span className="hidden sm:flex items-center gap-1 truncate max-w-[260px]">
+                    <FolderOpen className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate font-mono">{artifact.folderPath || "Artifacts"}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            <a href={`/api/artifacts/${artifact.id}/download`} download={artifact.name}>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 flex-shrink-0">
+                <FileDown className="w-3.5 h-3.5" />
+                Download
+              </Button>
+            </a>
+          </div>
+        ))}
+
+        {inFlight && binaryArtifacts.length === 0 && (
+          <div className="flex items-center gap-3 p-3 rounded-md bg-amber-50/60 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+            {mimeIcon(inFlight.mimeType || "")}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{inFlight.path?.split("/").pop() ?? "Deliverable"}</p>
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">
+                  {mimeLabel(inFlight.mimeType || "")}
+                </span>
+                <span>{formatBytes(inFlight.size || 0)}</span>
+                <span className="text-amber-600 dark:text-amber-400">Pending operator review — accept to file</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

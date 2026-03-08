@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑inspired visual theme style guide with design tokens and component examples.">
+  <title>Apple‑Inspired Visual Theme – Style Guide</title>
+  <style>
+    :root {
+      /* Colors */
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-text: #1d1d1f;
+      --color-muted: #8e8e93;
+
+      /* Typography */
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-size-base: 16px;
+      --font-weight-regular: 400;
+      --font-weight-bold: 600;
+
+      /* Spacing */
+      --space-0: 0px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+      --space-8: 48px;
+    }
+
+    body {
+      margin: var(--space-0);
+      font-family: var(--font-family);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background-color: var(--color-bg);
+      line-height: 1.5;
+    }
+
+    h1, h2, h3 {
+      margin-top: var(--space-6);
+      margin-bottom: var(--space-4);
+      font-weight: var(--font-weight-bold);
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: var(--space-4);
+    }
+
+    /* Navigation */
+    .nav {
+      display: flex;
+      align-items: center;
+      height: 56px;
+      background: var(--color-surface);
+      padding: 0 var(--space-4);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .nav .logo {
+      font-weight: var(--font-weight-bold);
+      font-size: 1.25rem;
+      color: var(--color-primary);
+    }
+    .nav ul {
+      list-style: none;
+      display: flex;
+      gap: var(--space-4);
+      margin-left: auto;
+    }
+    .nav a {
+      text-decoration: none;
+      color: var(--color-text);
+      font-weight: var(--font-weight-regular);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-weight: var(--font-weight-bold);
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    .btn-primary {
+      background: var(--color-primary);
+      color: #fff;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary {
+      background: var(--color-surface);
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+    }
+    .btn-secondary:hover { background: var(--color-primary); color: #fff; }
+
+    /* Input */
+    .input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--color-muted);
+      border-radius: 8px;
+      font-family: var(--font-family);
+      font-size: 1rem;
+    }
+    .input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(0,122,255,0.2);
+    }
+
+    /* Card */
+    .card {
+      background: var(--color-surface);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .card img {
+      width: 100%;
+      height: auto;
+    }
+    .card-content {
+      padding: var(--space-4);
+    }
+
+    /* Tokens table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-6);
+    }
+    th, td {
+      text-align: left;
+      padding: var(--space-2);
+      border-bottom: 1px solid #e0e0e0;
+    }
+    th { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <nav class="nav" aria-label="Main navigation">
+    <div class="logo">Iowa</div>
+    <ul>
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Features</a></li>
+      <li><a href="#">Pricing</a></li>
+      <li><a href="#">Contact</a></li>
+    </ul>
+  </nav>
+
+  <main class="container">
+    <h1>Apple‑Inspired Visual Theme – Style Guide</h1>
+
+    <section>
+      <h2>Design Tokens (JSON)</h2>
+      <pre id="tokens-json" style="background:#f8f8f8;padding:var(--space-4);border-radius:8px;overflow:auto;">
+{
+  "typography": {
+    "fontFamily": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+    "fontSizeBase": "16px",
+    "fontWeightRegular": "400",
+    "fontWeightBold": "600"
+  },
+  "colors": {
+    "background": "#f5f5f7",
+    "surface": "#ffffff",
+    "primary": "#007aff",
+    "text": "#1d1d1f",
+    "muted": "#8e8e93"
+  },
+  "spacing": {
+    "0": "0px",
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "5": "24px",
+    "6": "32px",
+    "8": "48px"
+  },
+  "components": {
+    "button": {
+      "borderRadius": "8px",
+      "padding": "12px 24px",
+      "fontWeight": "600"
+    },
+    "input": {
+      "borderRadius": "8px",
+      "padding": "12px",
+      "border": "1px solid var(--color-muted)"
+    },
+    "card": {
+      "borderRadius": "12px",
+      "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
+      "padding": "16px"
+    },
+    "nav": {
+      "height": "56px",
+      "background": "var(--color-surface)"
+    }
+  }
+}
+      </pre>
+    </section>
+
+    <section>
+      <h2>Component Examples</h2>
+
+      <h3>Buttons</h3>
+      <button class="btn btn-primary">Primary Button</button>
+      <button class="btn btn-secondary" style="margin-left: var(--space-2);">Secondary Button</button>
+
+      <h3 style="margin-top: var(--space-6);">Input Field</h3>
+      <input type="text" class="input" placeholder="Enter text…" aria-label="Sample input">
+
+      <h3 style="margin-top: var(--space-6);">Card</h3>
+      <div class="card" style="max-width: 320px;">
+        <img src="https://picsum.photos/seed/card/800/400" alt="Placeholder image for card">
+        <div class="card-content">
+          <h4 style="margin: 0 0 var(--space-2);">Card Title</h4>
+          <p style="margin: 0;">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Spacing Scale</h2>
+      <table>
+        <thead>
+          <tr><th>Token</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>--space-0</td><td>0px</td></tr>
+          <tr><td>--space-1</td><td>4px</td></tr>
+          <tr><td>--space-2</td><td>8px</td></tr>
+          <tr><td>--space-3</td><td>12px</td></tr>
+          <tr><td>--space-4</td><td>16px</td></tr>
+          <tr><td>--space-5</td><td>24px</td></tr>
+          <tr><td>--space-6</td><td>32px</td></tr>
+          <tr><td>--space-8</td><td>48px</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script type="application/json" id="design-tokens">
+    {
+      "typography": {
+        "fontFamily": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+        "fontSizeBase": "16px",
+        "fontWeightRegular": "400",
+        "fontWeightBold": "600"
+      },
+      "colors": {
+        "background": "#f5f5f7",
+        "surface": "#ffffff",
+        "primary": "#007aff",
+        "text": "#1d1d1f",
+        "muted": "#8e8e93"
+      },
+      "spacing": {
+        "0": "0px",
+        "1": "4px",
+        "2": "8px",
+        "3": "12px",
+        "4": "16px",
+        "5": "24px",
+        "6": "32px",
+        "8": "48px"
+      },
+      "components": {
+        "button": {
+          "borderRadius": "8px",
+          "padding": "12px 24px",
+          "fontWeight": "600"
+        },
+        "input": {
+          "borderRadius": "8px",
+          "padding": "12px",
+          "border": "1px solid var(--color-muted)"
+        },
+        "card": {
+          "borderRadius": "12px",
+          "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
+          "padding": "16px"
+        },
+        "nav": {
+          "height": "56px",
+          "background": "var(--color-surface)"
+        }
+      }
+    }
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta name=\"description\" content=\"Apple‑inspired five‑page website prototype for Iowa.\">\n  <title>Iowa – Apple‑Inspired Site</title>\n  <style>\n    :root {\n      /* Colors */\n      --color-bg: #f5f5f7;\n      --color-surface: #ffffff;\n      --color-primary: #007aff;\n      --color-text: #1d1d1f;\n      --color-muted: #8e8e93;\n\n      /* Typography */\n      --font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n      --font-size-base: 16px;\n      --font-weight-regular: 400;\n      --font-weight-bold: 600;\n\n      /* Spacing */\n      --space-0: 0px;\n      --space-1: 4px;\n      --space-2: 8px;\n      --space-3: 12px;\n      --space-4: 16px;\n      --space-5: 24px;\n      --space-6: 32px;\n      --space-8: 48px;\n    }\n\n    body {\n      margin: var(--space-0);\n      font-family: var(--font-family);\n      font-size: var(--font-size-base);\n      color: var(--color-text);\n      background-color: var(--color-bg);\n      line-height: 1.5;\n    }\n\n    h1, h2, h3, h4 {\n      margin-top: var(--space-6);\n      margin-bottom: var(--space-4);\n      font-weight: var(--font-weight-bold);\n    }\n\n    .container {\n      max-width: 960px;\n      margin: 0 auto;\n      padding: var(--space-4);\n    }\n\n    /* Navigation */\n    .nav {\n      display: flex;\n      align-items: center;\n      height: 56px;\n      background: var(--color-surface);\n      padding: 0 var(--space-4);\n      box-shadow: 0 1px 3px rgba(0,0,0,0.1);\n    }\n    .nav .logo {\n      font-weight: var(--font-weight-bold);\n      font-size: 1.25rem;\n      color: var(--color-primary);\n    }\n    .nav ul {\n      list-style: none;\n      display: flex;\n      gap: var(--space-4);\n      margin-left: auto;\n    }\n    .nav a {\n      text-decoration: none;\n      color: var(--color-text);\n      font-weight: var(--font-weight-regular);\n    }\n\n    /* Buttons */\n    .btn {\n      display: inline-block;\n      border: none;\n      border-radius: 8px;\n      padding: 12px 24px;\n      font-weight: var(--font-weight-bold);\n      cursor: pointer;\n      transition: background 0.2s, opacity 0.2s;\n    }\n    .btn-primary {\n      background: var(--color-primary);\n      color: #fff;\n    }\n    .btn-primary:hover { opacity: 0.9; }\n    .btn-secondary {\n      background: var(--color-surface);\n      color: var(--color-primary);\n      border: 1px solid var(--color-primary);\n    }\n    .btn-secondary:hover { background: var(--color-primary); color: #fff; }\n\n    /* Input */\n    .input {\n      width: 100%;\n      padding: 12px;\n      border: 1px solid var(--color-muted);\n      border-radius: 8px;\n      font-family: var(--font-family);\n      font-size: 1rem;\n    }\n    .input:focus {\n      outline: none;\n      border-color: var(--color-primary);\n      box-shadow: 0 0 0 2px rgba(0,122,255,0.2);\n    }\n\n    /* Card */\n    .card {\n      background: var(--color-surface);\n      border-radius: 12px;\n      box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n      overflow: hidden;\n      display: flex;\n      flex-direction: column;\n    }\n    .card img {\n      width: 100%;\n      height: auto;\n    }\n    .card-content {\n      padding: var(--space-4);\n    }\n\n    /* Hero */\n    .hero {\n      text-align: center;\n      padding: var(--space-8) var(--space-4);\n      background: var(--color-surface);\n      border-radius: 12px;\n      box-shadow: 0 2px 8px rgba(0,0,0,0.05);\n    }\n    .hero h1 {\n      margin-bottom: var(--space-4);\n      font-size: 2.5rem;\n    }\n    .hero p {\n      margin-bottom: var(--space-6);\n      color: var(--color-muted);\n    }\n\n    /* Pricing Table */\n    .pricing-table {\n      width: 100%;\n      border-collapse: collapse;\n      margin-top: var(--space-6);\n    }\n    .pricing-table th, .pricing-table td {\n      padding: var(--space-4);\n      border: 1px solid #e0e0e0;\n      text-align: left;\n    }\n    .pricing-table th {\n      background: #f0f0f0;\n    }\n\n    /* Footer */\n    .footer {\n      text-align: center;\n      padding: var(--space-6) var(--space-4);\n      font-size: 0.875rem;\n      color: var(--color-muted);\n    }\n  </style>\n</head>\n<body>\n  <nav class=\"nav\" aria-label=\"Main navigation\">\n    <div class=\"logo\">Iowa</div>\n    <ul>\n      <li><a href=\"#home\">Home</a></li>\n      <li><a href=\"#about\">About</a></li>\n      <li><a href=\"#features\">Features</a></li>\n      <li><a href=\"#pricing\">Pricing</a></li>\n      <li><a href=\"#contact\">Contact</a></li>\n    </ul>\n  </nav>\n\n  <main class=\"container\">\n    <!-- Home -->\n    <section id=\"home\" class=\"hero\">\n      <h1>Welcome to Iowa</h1>\n      <p>Experience sleek, Apple‑inspired design for your digital products.</p>\n      <a href=\"#features\" class=\"btn btn-primary\">Explore Features</a>\n    </section>\n\n    <!-- About -->\n    <section id=\"about\">\n      <h2>About Iowa</h2>\n      <p>Iowa is a conceptual showcase of clean, minimalist UI built with modern web standards. It demonstrates how Apple’s design language can be translated to the web.</p>\n      <img src=\"https://picsum.photos/seed/about/800/400\" alt=\"Placeholder image showing a sleek interface\" style=\"width:100%;border-radius:12px;margin-top:var(--space-4);\">\n    </section>\n\n    <!-- Features -->\n    <section id=\"features\">\n      <h2>Features</h2>\n      <div style=\"display:flex;gap:var(--space-4);flex-wrap:wrap;\">\n        <div class=\"card\" style=\"flex:1 1 calc(33% - var(--space-4));max-width:300px;\">\n          <img src=\"https://picsum.photos/seed/feature1/800/400\" alt=\"Feature 1 illustration\">\n          <div class=\"card-content\">\n            <h4 style=\"margin:0 0 var(--space-2);\">Elegant Typography</h4>\n            <p>Sharp, readable fonts that adapt to any screen.</p>\n          </div>\n        </div>\n        <div class=\"card\" style=\"flex:1 1 calc(33% - var(--space-4));max-width:300px;\">\n          <img src=\"https://picsum.photos/seed/feature2/800/400\" alt=\"Feature 2 illustration\">\n          <div class=\"card-content\">\n            <h4 style=\"margin:0 0 var(--space-2);\">Responsive Layouts</h4>\n            <p>Fluid grids that look great on any device.</p>\n          </div>\n        </div>\n        <div class=\"card\" style=\"flex:1 1 calc(33% - var(--space-4));max-width:300px;\">\n          <img src=\"https://picsum.photos/seed/feature3/800/400\" alt=\"Feature 3 illustration\">\n          <div class=\"card-content\">\n            <h4 style=\"margin:0 0 var(--space-2);\">Smooth Interactions</h4>\n            <p>Micro‑animations that feel native.</p>\n          </div>\n        </div>\n      </div>\n    </section>\n\n    <!-- Pricing -->\n    <section id=\"pricing\">\n      <h2>Pricing</h2>\n      <table class=\"pricing-table\">\n        <thead>\n          <tr><th>Plan</th><th>Price</th><th>Features</th></tr>\n        </thead>\n        <tbody>\n          <tr><td>Basic</td><td>$0</td><td>Core components, community support</td></tr>\n          <tr><td>Pro</td><td>$49/mo</td><td>All features, priority support</td></tr>\n          <tr><td>Enterprise</td><td>Contact us</td><td>Custom solutions, dedicated manager</td></tr>\n        </tbody>\n      </table>\n      <a href=\"#contact\" class=\"btn btn-primary\">Get Started</a>\n    </section>\n\n    <!-- Contact -->\n    <section id=\"contact\">\n      <h2>Contact Us</h2>\n      <p>Have questions? Reach out and we’ll get back to you shortly.</p>\n      <form aria-label=\"Contact form\" style=\"max-width:480px;\">\n        <label for=\"name\" style=\"display:block;margin-bottom:var(--space-2);\">Name</label>\n        <input type=\"text\" id=\"name\" class=\"input\" placeholder=\"Your name\" required>\n        <label for=\"email\" style=\"display:block;margin-top:var(--space-4);margin-bottom:var(--space-2);\">Email</label>\n        <input type=\"email\" id=\"email\" class=\"input\" placeholder=\"you@example.com\" required>\n        <label for=\"message\" style=\"display:block;margin-top:var(--space-4);margin-bottom:var(--space-2);\">Message</label>\n        <textarea id=\"message\" class=\"input\" rows=\"4\" placeholder=\"Your message...\" required></textarea>\n        <button type=\"submit\" class=\"btn btn-primary\" style=\"margin-top:var(--space-4);\">Send Message</button>\n      </form>\n    </section>\n  </main>\n\n  <footer class=\"footer\">\n    © 2024 Iowa. All rights reserved.\n  </footer>\n</body>\n</html>

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Apple‑inspired visual theme design tokens and style guide">
+  <title>Apple‑Inspired Visual Theme – Design Tokens & Style Guide</title>
+  <style>
+    /* -------------------------------------------------
+       Design Tokens (CSS Custom Properties)
+       ------------------------------------------------- */
+    :root {
+      /* Typography */
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 600;
+
+      /* Color Palette */
+      --color-bg: #ffffff;
+      --color-surface: #f9f9f9;
+      --color-primary: #0071e3;      /* Apple blue */
+      --color-primary-dark: #005bb5;
+      --color-text: #1d1d1f;         /* Dark gray */
+      --color-muted: #6e6e73;        /* Medium gray */
+      --color-border: #d2d2d7;       /* Light gray border */
+
+      /* Spacing Scale (4px base) */
+      --space-0: 0;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+      --space-7: 40px;
+      --space-8: 48px;
+      --space-9: 64px;
+      --space-10: 80px;
+
+      /* Border radius */
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    /* -------------------------------------------------
+       Global Styles
+       ------------------------------------------------- */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-weight: var(--font-weight-regular);
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--color-text);
+      background-color: var(--color-bg);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      margin: 0 0 var(--space-4) 0;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.2;
+      color: var(--color-text);
+    }
+
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 2rem; }
+    h3 { font-size: 1.75rem; }
+    h4 { font-size: 1.5rem; }
+    h5 { font-size: 1.25rem; }
+    h6 { font-size: 1rem; }
+
+    p {
+      margin: 0 0 var(--space-4) 0;
+    }
+
+    a {
+      color: var(--color-primary);
+      text-decoration: none;
+    }
+    a:hover, a:focus {
+      text-decoration: underline;
+    }
+
+    /* -------------------------------------------------
+       Layout Helpers
+       ------------------------------------------------- */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: var(--space-5) var(--space-4);
+    }
+
+    .section {
+      padding: var(--space-8) 0;
+    }
+
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-5);
+    }
+
+    .grid > * {
+      flex: 1 1 calc(50% - var(--space-5));
+      min-width: 260px;
+    }
+
+    /* -------------------------------------------------
+       Component Styles
+       ------------------------------------------------- */
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      padding: var(--space-2) var(--space-4);
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      color: #fff;
+      background-color: var(--color-primary);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background-color .2s ease;
+    }
+    .btn:hover,
+    .btn:focus {
+      background-color: var(--color-primary-dark);
+    }
+    .btn-outline {
+      background-color: transparent;
+      color: var(--color-primary);
+      border: 2px solid var(--color-primary);
+    }
+    .btn-outline:hover,
+    .btn-outline:focus {
+      background-color: rgba(0,113,227,.08);
+    }
+
+    /* Inputs */
+    .input {
+      width: 100%;
+      padding: var(--space-2);
+      font-size: 1rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background-color: var(--color-surface);
+      color: var(--color-text);
+    }
+    .input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0,113,227,.15);
+    }
+
+    /* Card */
+    .card {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .card img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .card-body {
+      padding: var(--space-4);
+      flex: 1;
+    }
+    .card-title {
+      margin-bottom: var(--space-2);
+      font-size: 1.25rem;
+      font-weight: var(--font-weight-medium);
+    }
+
+    /* Navigation */
+    .nav {
+      background-color: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-3) var(--space-5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav__logo {
+      font-weight: var(--font-weight-bold);
+      font-size: 1.25rem;
+      color: var(--color-text);
+    }
+    .nav__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      gap: var(--space-5);
+    }
+    .nav__link {
+      color: var(--color-muted);
+      font-weight: var(--font-weight-medium);
+    }
+    .nav__link:hover,
+    .nav__link:focus {
+      color: var(--color-text);
+    }
+
+    /* Color Swatch */
+    .swatch {
+      width: 100%;
+      height: 80px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+    }
+
+    /* Spacing visualizer */
+    .spacing-box {
+      background-color: var(--color-primary);
+      border-radius: var(--radius-sm);
+    }
+
+    /* Accessibility */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <header class="nav" aria-label="Main navigation">
+    <div class="nav__logo">Apple‑Inspired Theme</div>
+    <ul class="nav__list">
+      <li><a href="#typography" class="nav__link">Typography</a></li>
+      <li><a href="#colors" class="nav__link">Colors</a></li>
+      <li><a href="#spacing" class="nav__link">Spacing</a></li>
+      <li><a href="#components" class="nav__link">Components</a></li>
+    </ul>
+  </header>
+
+  <main class="container">
+    <!-- Typography Section -->
+    <section id="typography" class="section">
+      <h2>Typography</h2>
+      <p>The theme uses the system San‑Francisco stack for a clean, native feel.</p>
+      <pre style="background:#f4f4f4;padding:var(--space-4);border-radius:var(--radius-sm);overflow:auto;">
+font-family: var(--font-sans);
+font-weight: var(--font-weight-regular);
+      </pre>
+
+      <h3>Heading Scale</h3>
+      <div class="grid">
+        <div><h1>Heading 1 – 2.5rem</h1></div>
+        <div><h2>Heading 2 – 2rem</h2></div>
+        <div><h3>Heading 3 – 1.75rem</h3></div>
+        <div><h4>Heading 4 – 1.5rem</h4></div>
+        <div><h5>Heading 5 – 1.25rem</h5></div>
+        <div><h6>Heading 6 – 1rem</h6></div>
+      </div>
+    </section>
+
+    <!-- Colors Section -->
+    <section id="colors" class="section">
+      <h2>Color Palette</h2>
+      <p>Minimalist palette with a single accent color.</p>
+      <div class="grid">
+        <div>
+          <div class="swatch" style="background: var(--color-bg);"></div>
+          <p>--color-bg (Background)</p>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--color-surface);"></div>
+          <p>--color-surface (Surface)</p>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--color-primary);"></div>
+          <p>--color-primary (Accent)</p>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--color-text);"></div>
+          <p>--color-text (Primary Text)</p>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--color-muted);"></div>
+          <p>--color-muted (Secondary Text)</p>
+        </div>
+        <div>
+          <div class="swatch" style="background: var(--color-border);"></div>
+          <p>--color-border (Borders)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Spacing Section -->
+    <section id="spacing" class="section">
+      <h2>Spacing Scale</h2>
+      <p>Base unit is 4 px. Use multiples for consistent layout.</p>
+      <div class="grid">
+        <div>
+          <div class="spacing-box" style="height: var(--space-1);"></div>
+          <p>--space-1 (4 px)</p>
+        </div>
+        <div>
+          <div class="spacing-box" style="height: var(--space-2);"></div>
+          <p>--space-2 (8 px)</p>
+        </div>
+        <div>
+          <div class="spacing-box" style="height: var(--space-3);"></div>
+          <p>--space-3 (12 px)</p>
+        </div>
+        <div>
+          <div class="spacing-box" style="height: var(--space-4);"></div>
+          <p>--space-4 (16 px)</p>
+        </div>
+        <div>
+          <div class="spacing-box" style="height: var(--space-5);"></div>
+          <p>--space-5 (24 px)</p>
+        </div>
+        <div>
+          <div class="spacing-box" style="height: var(--space-6);"></div>
+          <p>--space-6 (32 px)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Components Section -->
+    <section id="components" class="section">
+      <h2>Component Library</h2>
+
+      <!-- Buttons -->
+      <h3>Buttons</h3>
+      <div class="grid">
+        <div>
+          <button class="btn">Primary Button</button>
+        </div>
+        <div>
+          <button class="btn btn-outline">Outline Button</button>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <h3 style="margin-top: var(--space-6);">Form Inputs</h3>
+      <label for="sample-input" class="visually-hidden">Sample Input</label>
+      <input id="sample-input" class="input" type="text" placeholder="Enter text…">
+
+      <!-- Card -->
+      <h3 style="margin-top: var(--space-6);">Card</h3>
+      <div class="card" style="max-width: 320px;">
+        <img src="https://picsum.photos/seed/card/800/400" alt="Placeholder image for card">
+        <div class="card-body">
+          <h4 class="card-title">Card Title</h4>
+          <p>Brief description that showcases how the card component looks with the Apple‑inspired theme.</p>
+          <button class="btn btn-outline">Learn More</button>
+        </div>
+      </div>
+
+      <!-- Navigation (example) -->
+      <h3 style="margin-top: var(--space-6);">Navigation Bar</h3>
+      <nav class="nav" aria-label="Example navigation">
+        <div class="nav__logo">Brand</div>
+        <ul class="nav__list">
+          <li><a href="#" class="nav__link">Home</a></li>
+          <li><a href="#" class="nav__link">Products</a></li>
+          <li><a href="#" class="nav__link">Support</a></li>
+          <li><a href="#" class="nav__link">Contact</a></li>
+        </ul>
+      </nav>
+    </section>
+  </main>
+
+  <footer class="section" style="text-align:center; font-size:0.875rem; color:var(--color-muted);">
+    <p>© 2026 Apple‑Inspired Theme – Crafted with meticulous attention to detail.</p>
+  </footer>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Apple‑inspired five‑page website prototype – Home, About, Features, Pricing, Contact">
+  <title>Apple‑Inspired Iowa Website</title>
+  <style>
+    /* -------------------------------------------------
+       Design Tokens (CSS Custom Properties)
+       ------------------------------------------------- */
+    :root {
+      /* Typography */
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 600;
+
+      /* Color Palette */
+      --color-bg: #ffffff;
+      --color-surface: #f9f9f9;
+      --color-primary: #0071e3;      /* Apple blue */
+      --color-primary-dark: #005bb5;
+      --color-text: #1d1d1f;         /* Dark gray */
+      --color-muted: #6e6e73;        /* Medium gray */
+      --color-border: #d2d2d7;       /* Light gray border */
+
+      /* Spacing Scale (4px base) */
+      --space-0: 0;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+      --space-7: 40px;
+      --space-8: 48px;
+      --space-9: 64px;
+      --space-10: 80px;
+
+      /* Border radius */
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    /* -------------------------------------------------
+       Global Styles
+       ------------------------------------------------- */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-weight: var(--font-weight-regular);
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--color-text);
+      background-color: var(--color-bg);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      margin: 0 0 var(--space-4) 0;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.2;
+      color: var(--color-text);
+    }
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 2rem; }
+    h3 { font-size: 1.75rem; }
+    h4 { font-size: 1.5rem; }
+    h5 { font-size: 1.25rem; }
+    h6 { font-size: 1rem; }
+
+    p { margin: 0 0 var(--space-4) 0; }
+
+    a {
+      color: var(--color-primary);
+      text-decoration: none;
+    }
+    a:hover, a:focus { text-decoration: underline; }
+
+    /* -------------------------------------------------
+       Layout Helpers
+       ------------------------------------------------- */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: var(--space-5) var(--space-4);
+    }
+
+    .section { padding: var(--space-8) 0; }
+
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-5);
+    }
+    .grid > * { flex: 1 1 calc(50% - var(--space-5)); min-width: 260px; }
+
+    /* -------------------------------------------------
+       Component Styles
+       ------------------------------------------------- */
+    .btn {
+      display: inline-block;
+      padding: var(--space-2) var(--space-4);
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      color: #fff;
+      background-color: var(--color-primary);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background-color .2s ease;
+    }
+    .btn:hover, .btn:focus { background-color: var(--color-primary-dark); }
+
+    .btn-outline {
+      background-color: transparent;
+      color: var(--color-primary);
+      border: 2px solid var(--color-primary);
+    }
+    .btn-outline:hover, .btn-outline:focus {
+      background-color: rgba(0,113,227,.08);
+    }
+
+    .input {
+      width: 100%;
+      padding: var(--space-2);
+      font-size: 1rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background-color: var(--color-surface);
+      color: var(--color-text);
+    }
+    .input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0,113,227,.15);
+    }
+
+    .card {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .card img { width: 100%; height: auto; display: block; }
+    .card-body { padding: var(--space-4); flex: 1; }
+    .card-title { margin-bottom: var(--space-2); font-size: 1.25rem; font-weight: var(--font-weight-medium); }
+
+    .nav {
+      background-color: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-3) var(--space-5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav__logo { font-weight: var(--font-weight-bold); font-size: 1.25rem; color: var(--color-text); }
+    .nav__list { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--space-5); }
+    .nav__link {
+      color: var(--color-muted);
+      font-weight: var(--font-weight-medium);
+    }
+    .nav__link:hover, .nav__link:focus { color: var(--color-text); }
+
+    .swatch {
+      width: 100%;
+      height: 80px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+    }
+
+    .spacing-box {
+      background-color: var(--color-primary);
+      border-radius: var(--radius-sm);
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.875rem;
+      color: var(--color-muted);
+      padding: var(--space-5) 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Global Navigation -->
+  <header class="nav" aria-label="Main navigation">
+    <div class="nav__logo">Iowa</div>
+    <ul class="nav__list">
+      <li><a href="#home" class="nav__link">Home</a></li>
+      <li><a href="#about" class="nav__link">About</a></li>
+      <li><a href="#features" class="nav__link">Features</a></li>
+      <li><a href="#pricing" class="nav__link">Pricing</a></li>
+      <li><a href="#contact" class="nav__link">Contact</a></li>
+    </ul>
+  </header>
+
+  <!-- Pages (hidden/shown via JS) -->
+  <main class="container">
+    <!-- Home -->
+    <section id="home" class="page section">
+      <h1>Welcome to Iowa</h1>
+      <p>Experience the sleek, intuitive design inspired by Apple’s timeless aesthetic.</p>
+      <button class="btn">Get Started</button>
+      <div class="grid" style="margin-top: var(--space-6);">
+        <div class="card" style="max-width: 320px;">
+          <img src="https://picsum.photos/seed/home/800/400" alt="Elegant product showcase">
+          <div class="card-body">
+            <h4 class="card-title">Elegant Design</h4>
+            <p>Clean lines, subtle shadows, and a focus on content.</p>
+            <a href="#features" class="btn btn-outline">Learn More</a>
+          </div>
+        </div>
+        <div class="card" style="max-width: 320px;">
+          <img src="https://picsum.photos/seed/home2/800/400" alt="Responsive layout illustration">
+          <div class="card-body">
+            <h4 class="card-title">Responsive Everywhere</h4>
+            <p>Looks perfect on any device, from phones to large monitors.</p>
+            <a href="#pricing" class="btn btn-outline">See Pricing</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="page section" style="display:none;">
+      <h2>About Iowa</h2>
+      <p>Iowa is a conceptual showcase of how modern web design can emulate the refined simplicity of Apple’s UI language.</p>
+      <h3>Our Vision</h3>
+      <p>To deliver a polished, accessible, and performant web experience that feels native.</p>
+      <h3>Design Philosophy</h3>
+      <ul>
+        <li>Minimalist visual hierarchy</li>
+        <li>Generous whitespace</li>
+        <li>High‑contrast, legible typography</li>
+        <li>Subtle motion and feedback</li>
+      </ul>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="page section" style="display:none;">
+      <h2>Features</h2>
+      <div class="grid">
+        <div>
+          <h3>Typography</h3>
+          <p>System‑native San‑Francisco stack with a clear hierarchy.</p>
+        </div>
+        <div>
+          <h3>Color System</h3>
+          <p>Primary Apple blue with balanced neutrals for depth.</p>
+        </div>
+        <div>
+          <h3>Components</h3>
+          <p>Buttons, cards, inputs, and navigation built with subtle interactions.</p>
+        </div>
+        <div>
+          <h3>Responsive Grid</h3>
+          <p>Flex‑based layout that adapts gracefully to any viewport.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="page section" style="display:none;">
+      <h2>Pricing</h2>
+      <p>Choose the plan that fits your needs. All plans include full access to the design system.</p>
+      <div class="grid">
+        <div class="card" style="max-width: 300px;">
+          <div class="card-body">
+            <h4 class="card-title">Starter</h4>
+            <p><strong>$0 / month</strong></p>
+            <p>Basic access – perfect for personal projects.</p>
+            <button class="btn btn-outline">Select</button>
+          </div>
+        </div>
+        <div class="card" style="max-width: 300px;">
+          <div class="card-body">
+            <h4 class="card-title">Pro</h4>
+            <p><strong>$49 / month</strong></p>
+            <p>Full component library, priority support, and updates.</p>
+            <button class="btn">Select</button>
+          </div>
+        </div>
+        <div class="card" style="max-width: 300px;">
+          <div class="card-body">
+            <h4 class="card-title">Enterprise</h4>
+            <p><strong>Contact us</strong></p>
+            <p>Custom integrations, dedicated account manager, SLA.</p>
+            <button class="btn btn-outline">Contact Sales</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" class="page section" style="display:none;">
+      <h2>Contact Us</h2>
+      <p>Have questions? We'd love to hear from you.</p>
+      <form id="contact-form" novalidate>
+        <div class="grid" style="gap: var(--space-4);">
+          <div>
+            <label for="name" class="visually-hidden">Name</label>
+            <input id="name" class="input" type="text" placeholder="Your name" required>
+          </div>
+          <div>
+            <label for="email" class="visually-hidden">Email</label>
+            <input id="email" class="input" type="email" placeholder="you@example.com" required>
+          </div>
+        </div>
+        <div style="margin-top: var(--space-4);">
+          <label for="message" class="visually-hidden">Message</label>
+          <textarea id="message" class="input" rows="4" placeholder="Your message…" required></textarea>
+        </div>
+        <button type="submit" class="btn" style="margin-top: var(--space-4);">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="section">
+    <p>© 2026 Iowa – Crafted with meticulous attention to detail.</p>
+  </footer>
+
+  <script>
+    // Simple hash‑based router
+    function showPage() {
+      const hash = location.hash || '#home';
+      document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+      const target = document.querySelector(hash);
+      if (target) target.style.display = 'block';
+      // Update active link styling (optional)
+      document.querySelectorAll('.nav__link').forEach(link => {
+        link.style.fontWeight = (link.getAttribute('href') === hash) ? '600' : '500';
+        link.style.color = (link.getAttribute('href') === hash) ? 'var(--color-text)' : 'var(--color-muted)';
+      });
+    }
+
+    window.addEventListener('hashchange', showPage);
+    window.addEventListener('DOMContentLoaded', showPage);
+
+    // Minimal form handling (no backend)
+    document.getElementById('contact-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      alert('Thank you! Your message has been “sent”. (This is a placeholder.)');
+      this.reset();
+    });
+  </script>
+</body>
+</html>

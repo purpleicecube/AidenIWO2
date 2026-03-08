@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Apple‑inspired five‑page website for the Iowa project – clean layout, ample white space, subtle gradients, high‑resolution imagery, modern sans‑serif typography.">
+  <title>Iowa – Welcome</title>
+  <style>
+    :root {
+      --color-primary: #333;
+      --color-bg: #fafafa;
+      --color-header: #f2f2f2;
+      --color-accent: #007aff; /* Apple blue */
+      --radius: 8px;
+      --spacing: 1.5rem;
+      --max-width: 960px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-primary);
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(135deg, #eaeaea, #ffffff);
+      padding: var(--spacing) var(--spacing);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .logo {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+    nav {
+      margin-top: 0.5rem;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--color-primary);
+      margin-right: 1.5rem;
+      font-weight: 500;
+      position: relative;
+    }
+    nav a:hover,
+    nav a.active {
+      color: var(--color-accent);
+    }
+    nav a.active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -4px;
+      height: 2px;
+      background: var(--color-accent);
+      border-radius: 2px;
+    }
+    main {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--spacing);
+    }
+    section {
+      padding: calc(var(--spacing) * 2) 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    h1, h2 {
+      margin-bottom: var(--spacing);
+      font-weight: 600;
+    }
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 2rem; }
+    p { margin-bottom: var(--spacing); }
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .hero img {
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      border-radius: var(--radius);
+      margin-top: var(--spacing);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: var(--spacing);
+    }
+    .feature-card {
+      background: #fff;
+      padding: var(--spacing);
+      border-radius: var(--radius);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+    }
+    .team {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing);
+    }
+    .team-member {
+      text-align: center;
+    }
+    .team-member img {
+      width: 100%;
+      max-width: 200px;
+      border-radius: 50%;
+      margin-bottom: 0.5rem;
+    }
+    form {
+      background: #fff;
+      padding: var(--spacing);
+      border-radius: var(--radius);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.6rem;
+      margin-bottom: var(--spacing);
+      border: 1px solid #ccc;
+      border-radius: var(--radius);
+      font-family: var(--font-sans);
+    }
+    button {
+      background: var(--color-accent);
+      color: #fff;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    button:hover {
+      background: #005bb5;
+    }
+    footer {
+      background: var(--color-header);
+      text-align: center;
+      padding: var(--spacing);
+      font-size: 0.9rem;
+      color: #666;
+    }
+    @media (max-width: 600px) {
+      nav a { margin-right: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <div class="logo">Iowa</div>
+    <nav aria-label="Primary">
+      <a href="#home" class="active">Home</a>
+      <a href="#about">About</a>
+      <a href="#features">Features</a>
+      <a href="#team">Team</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" aria-labelledby="home-title">
+      <div class="hero">
+        <h1 id="home-title">Welcome to Iowa</h1>
+        <p>Experience the elegance of Apple‑inspired design, crafted for simplicity and performance.</p>
+        <img src="https://picsum.photos/seed/home/800/400" alt="Scenic view representing Iowa project">
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">About Iowa</h2>
+      <p>Iowa is a modern web experience built for the Aiden IWO initiative. It blends clean aesthetics with intuitive navigation, ensuring every visitor feels welcomed and informed.</p>
+      <p>Our mission is to deliver a polished, high‑performance site that reflects the quality and craftsmanship of Apple’s visual language.</p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <div class="features">
+        <div class="feature-card">
+          <h3>Responsive Layout</h3>
+          <p>Seamlessly adapts to any screen size, from mobile to desktop.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Fast Performance</h3>
+          <p>Optimized assets and minimal JavaScript for lightning‑quick load times.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Accessible Design</h3>
+          <p>ARIA labels, proper contrast, and keyboard‑friendly navigation.</p>
+        </div>
+        <div class="feature-card">
+          <h3>High‑Resolution Imagery</h3>
+          <p>Beautiful placeholder images from Picsum, ready for real content.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section id="team" aria-labelledby="team-title">
+      <h2 id="team-title">Our Team</h2>
+      <div class="team">
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team1/200/200" alt="Portrait of Alex, Lead Designer">
+          <h4>Alex – Lead Designer</h4>
+          <p>Crafts the visual language with meticulous attention to detail.</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team2/200/200" alt="Portrait of Jamie, Front‑end Engineer">
+          <h4>Jamie – Front‑end Engineer</h4>
+          <p>Builds the clean, performant code that powers the site.</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team3/200/200" alt="Portrait of Morgan, Project Manager">
+          <h4>Morgan – Project Manager</h4>
+          <p>Ensures every milestone is met with precision and care.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Get in Touch</h2>
+      <form aria-label="Contact form">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required aria-required="true">
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required aria-required="true">
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" placeholder="Your message" required aria-required="true"></textarea>
+
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa Project – All rights reserved.
+  </footer>
+
+  <script>
+    // Highlight active navigation link based on scroll position
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('nav a');
+
+    function activateLink() {
+      let index = sections.length;
+
+      while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+      navLinks.forEach((link) => link.classList.remove('active'));
+      navLinks[index].classList.add('active');
+    }
+
+    activateLink();
+    window.addEventListener('scroll', activateLink);
+  </script>
+</body>
+</html>
+
+```html
+<style>
+  /* -------------------------------------------------
+     Apple‑style visual language + Anthropic brand palette
+     ------------------------------------------------- */
+
+  :root {
+    /* Anthropic brand colors */
+    --anthropic-dark:        #141413;   /* primary text */
+    --anthropic-light:       #faf9f5;   /* page background */
+    --anthropic-mid-gray:    #b0aea5;   /* secondary UI elements */
+    --anthropic-light-gray:  #e8e6dc;   /* subtle surfaces */
+    --anthropic-accent-orange:#d97757;  /* call‑to‑action */
+    --anthropic-accent-blue: #6a9bcc;   /* interactive accents */
+    --anthropic-accent-green:#788c5d;   /* optional highlights */
+
+    /* Layout & spacing */
+    --radius:   8px;
+    --spacing:  1.5rem;
+    --max-width:960px;
+
+    /* Typography – brand guidelines */
+    --font-heading: "Poppins", Arial, sans-serif;   /* headings */
+    --font-body:    "Lora", Georgia, serif;         /* body text */
+    --font-sans:    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  html { scroll-behavior:smooth; }
+
+  body {
+    font-family: var(--font-body), var(--font-sans);
+    background: var(--anthropic-light);
+    color: var(--anthropic-dark);
+    line-height:1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* -------------------------------------------------
+     Header & Navigation – clean, sticky, subtle gradient
+     ------------------------------------------------- */
+  header {
+    background: linear-gradient(135deg, var(--anthropic-light-gray), #ffffff);
+    padding: var(--spacing) var(--spacing);
+    position: sticky;
+    top:0;
+    z-index:10;
+    box-shadow:0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  .logo {
+    font-family: var(--font-heading);
+    font-size:1.8rem;
+    font-weight:600;
+    color: var(--anthropic-dark);
+  }
+
+  nav {
+    margin-top:0.5rem;
+  }
+
+  nav a {
+    text-decoration:none;
+    color: var(--anthropic-mid-gray);
+    margin-right:1.5rem;
+    font-weight:500;
+    position:relative;
+    transition:color .2s;
+  }
+
+  nav a:hover,
+  nav a:focus,
+  nav a.active {
+    color: var(--anthropic-accent-blue);
+  }
+
+  nav a.active::after {
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:-4px;
+    height:2px;
+    background:var(--anthropic-accent-blue);
+    border-radius:2px;
+  }
+
+  /* -------------------------------------------------
+     Main content container
+     ------------------------------------------------- */
+  main {
+    max-width:var(--max-width);
+    margin:0 auto;
+    padding:var(--spacing);
+  }
+
+  section {
+    padding:calc(var(--spacing) * 2) 0;
+    border-bottom:1px solid var(--anthropic-light-gray);
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    margin-bottom:var(--spacing);
+    font-weight:600;
+    color: var(--anthropic-dark);
+  }
+
+  h1 { font-size:2.5rem; }
+  h2 { font-size:2rem; }
+  h3 { font-size:1.5rem; }
+  h4 { font-size:1.25rem; }
+
+  p { margin-bottom:var(--spacing); }
+
+  /* -------------------------------------------------
+     Hero component – centered, image with subtle depth
+     ------------------------------------------------- */
+  .hero {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+  }
+
+  .hero img {
+    width:100%;
+    max-width:800px;
+    height:auto;
+    border-radius:var(--radius);
+    margin-top:var(--spacing);
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  /* -------------------------------------------------
+     Feature grid – responsive, card hover lift
+     ------------------------------------------------- */
+  .features {
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+    gap:var(--spacing);
+  }
+
+  .feature-card {
+    background:#fff;
+    padding:var(--spacing);
+    border-radius:var(--radius);
+    box-shadow:0 2px 6px rgba(0,0,0,0.06);
+    transition:transform .2s, box-shadow .2s;
+  }
+
+  .feature-card:hover,
+  .feature-card:focus-within {
+    transform:translateY(-4px);
+    box-shadow:0 6px 12px rgba(0,0,0,0.12);
+  }
+
+  /* -------------------------------------------------
+     Team grid – circular avatars, centered text
+     ------------------------------------------------- */
+  .team {
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+    gap:var(--spacing);
+  }
+
+  .team-member {
+    text-align:center;
+  }
+
+  .team-member img {
+    width:100%;
+    max-width:200px;
+    border-radius:50%;
+    margin-bottom:0.5rem;
+    box-shadow:0 2px 4px rgba(0,0,0,0.07);
+  }
+
+  /* -------------------------------------------------
+     Form – white card, clear focus states
+     ------------------------------------------------- */
+  form {
+    background:#fff;
+    padding:var(--spacing);
+    border-radius:var(--radius);
+    box-shadow:0 2px 6px rgba(0,0,0,0.06);
+    max-width:500px;
+    margin:0 auto;
+  }
+
+  label {
+    display:block;
+    margin-bottom:0.3rem;
+    font-weight:500;
+    color: var(--anthropic-dark);
+  }
+
+  input,
+  textarea {
+    width:100%;
+    padding:0.6rem;
+    margin-bottom:var(--spacing);
+    border:1px solid var(--anthropic-mid-gray);
+    border-radius:var(--radius);
+    font-family:var(--font-body), var(--font-sans);
+    transition:border-color .2s, box-shadow .2s;
+  }
+
+  input:focus,
+  textarea:focus {
+    outline:none;
+    border-color:var(--anthropic-accent-blue);
+    box-shadow:0 0 0 3px rgba(106,155,204,0.2);
+  }
+
+  button {
+    background:var(--anthropic-accent-orange);
+    color:#fff;
+    border:none;
+    padding:0.8rem 1.5rem;
+    border-radius:var(--radius);
+    font-size:1rem;
+    cursor:pointer;
+    font-family:var(--font-heading);
+    transition:background .2s, transform .1s;
+  }
+
+  button:hover,
+  button:focus {
+    background:#c45a44; /* darker orange */
+    transform:translateY(-1px);
+  }
+
+  button:active {
+    transform:translateY(0);
+  }
+
+  /* -------------------------------------------------
+     Footer – muted, centered
+     ------------------------------------------------- */
+  footer {
+    background:var(--anthropic-light-gray);
+    text-align:center;
+    padding:var(--spacing);
+    font-size:0.9rem;
+    color:#666;
+  }
+
+  /* -------------------------------------------------
+     Responsive tweaks
+     ------------------------------------------------- */
+  @media (max-width:600px) {
+    nav a { margin-right:0.8rem; }
+    .hero { padding:0 var(--spacing); }
+  }
+</style>
+```
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Apple‑inspired five‑page website for the Iowa project – clean layout, ample white space, subtle gradients, high‑resolution imagery, modern sans‑serif typography.">
+  <title>Iowa – Welcome</title>
+  <style>
+    /* -------------------------------------------------
+       Apple‑style visual language + Anthropic brand palette
+       ------------------------------------------------- */
+
+    :root {
+      /* Anthropic brand colors */
+      --anthropic-dark:        #141413;   /* primary text */
+      --anthropic-light:       #faf9f5;   /* page background */
+      --anthropic-mid-gray:    #b0aea5;   /* secondary UI elements */
+      --anthropic-light-gray:  #e8e6dc;   /* subtle surfaces */
+      --anthropic-accent-orange:#d97757;  /* call‑to‑action */
+      --anthropic-accent-blue: #6a9bcc;   /* interactive accents */
+      --anthropic-accent-green:#788c5d;   /* optional highlights */
+
+      /* Layout & spacing */
+      --radius:   8px;
+      --spacing:  1.5rem;
+      --max-width:960px;
+
+      /* Typography – brand guidelines */
+      --font-heading: "Poppins", Arial, sans-serif;   /* headings */
+      --font-body:    "Lora", Georgia, serif;         /* body text */
+      --font-sans:    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    html { scroll-behavior:smooth; }
+
+    body {
+      font-family: var(--font-body), var(--font-sans);
+      background: var(--anthropic-light);
+      color: var(--anthropic-dark);
+      line-height:1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* -------------------------------------------------
+       Header & Navigation – clean, sticky, subtle gradient
+       ------------------------------------------------- */
+    header {
+      background: linear-gradient(135deg, var(--anthropic-light-gray), #ffffff);
+      padding: var(--spacing) var(--spacing);
+      position: sticky;
+      top:0;
+      z-index:10;
+      box-shadow:0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .logo {
+      font-family: var(--font-heading);
+      font-size:1.8rem;
+      font-weight:600;
+      color: var(--anthropic-dark);
+    }
+
+    nav {
+      margin-top:0.5rem;
+    }
+
+    nav a {
+      text-decoration:none;
+      color: var(--anthropic-mid-gray);
+      margin-right:1.5rem;
+      font-weight:500;
+      position:relative;
+      transition:color .2s;
+    }
+
+    nav a:hover,
+    nav a:focus,
+    nav a.active {
+      color: var(--anthropic-accent-blue);
+    }
+
+    nav a.active::after {
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:-4px;
+      height:2px;
+      background:var(--anthropic-accent-blue);
+      border-radius:2px;
+    }
+
+    /* -------------------------------------------------
+       Main content container
+       ------------------------------------------------- */
+    main {
+      max-width:var(--max-width);
+      margin:0 auto;
+      padding:var(--spacing);
+    }
+
+    section {
+      padding:calc(var(--spacing) * 2) 0;
+      border-bottom:1px solid var(--anthropic-light-gray);
+    }
+
+    h1, h2, h3, h4 {
+      font-family: var(--font-heading);
+      margin-bottom:var(--spacing);
+      font-weight:600;
+      color: var(--anthropic-dark);
+    }
+
+    h1 { font-size:2.5rem; }
+    h2 { font-size:2rem; }
+    h3 { font-size:1.5rem; }
+    h4 { font-size:1.25rem; }
+
+    p { margin-bottom:var(--spacing); }
+
+    /* -------------------------------------------------
+       Hero component – centered, image with subtle depth
+       ------------------------------------------------- */
+    .hero {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      text-align:center;
+    }
+
+    .hero img {
+      width:100%;
+      max-width:800px;
+      height:auto;
+      border-radius:var(--radius);
+      margin-top:var(--spacing);
+      box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    /* -------------------------------------------------
+       Feature grid – responsive, card hover lift
+       ------------------------------------------------- */
+    .features {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:var(--spacing);
+    }
+
+    .feature-card {
+      background:#fff;
+      padding:var(--spacing);
+      border-radius:var(--radius);
+      box-shadow:0 2px 6px rgba(0,0,0,0.06);
+      transition:transform .2s, box-shadow .2s;
+    }
+
+    .feature-card:hover,
+    .feature-card:focus-within {
+      transform:translateY(-4px);
+      box-shadow:0 6px 12px rgba(0,0,0,0.12);
+    }
+
+    /* -------------------------------------------------
+       Team grid – circular avatars, centered text
+       ------------------------------------------------- */
+    .team {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+      gap:var(--spacing);
+    }
+
+    .team-member {
+      text-align:center;
+    }
+
+    .team-member img {
+      width:100%;
+      max-width:200px;
+      border-radius:50%;
+      margin-bottom:0.5rem;
+      box-shadow:0 2px 4px rgba(0,0,0,0.07);
+    }
+
+    /* -------------------------------------------------
+       Form – white card, clear focus states
+       ------------------------------------------------- */
+    form {
+      background:#fff;
+      padding:var(--spacing);
+      border-radius:var(--radius);
+      box-shadow:0 2px 6px rgba(0,0,0,0.06);
+      max-width:500px;
+      margin:0 auto;
+    }
+
+    label {
+      display:block;
+      margin-bottom:0.3rem;
+      font-weight:500;
+      color: var(--anthropic-dark);
+    }
+
+    input,
+    textarea {
+      width:100%;
+      padding:0.6rem;
+      margin-bottom:var(--spacing);
+      border:1px solid var(--anthropic-mid-gray);
+      border-radius:var(--radius);
+      font-family:var(--font-body), var(--font-sans);
+      transition:border-color .2s, box-shadow .2s;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline:none;
+      border-color:var(--anthropic-accent-blue);
+      box-shadow:0 0 0 3px rgba(106,155,204,0.2);
+    }
+
+    button {
+      background:var(--anthropic-accent-orange);
+      color:#fff;
+      border:none;
+      padding:0.8rem 1.5rem;
+      border-radius:var(--radius);
+      font-size:1rem;
+      cursor:pointer;
+      font-family:var(--font-heading);
+      transition:background .2s, transform .1s;
+    }
+
+    button:hover,
+    button:focus {
+      background:#c45a44; /* darker orange */
+      transform:translateY(-1px);
+    }
+
+    button:active {
+      transform:translateY(0);
+    }
+
+    /* -------------------------------------------------
+       Footer – muted, centered
+       ------------------------------------------------- */
+    footer {
+      background:var(--anthropic-light-gray);
+      text-align:center;
+      padding:var(--spacing);
+      font-size:0.9rem;
+      color:#666;
+    }
+
+    /* -------------------------------------------------
+       Responsive tweaks
+       ------------------------------------------------- */
+    @media (max-width:600px) {
+      nav a { margin-right:0.8rem; }
+      .hero { padding:0 var(--spacing); }
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <div class="logo">Iowa</div>
+    <nav aria-label="Primary">
+      <a href="#home" class="active">Home</a>
+      <a href="#about">About</a>
+      <a href="#features">Features</a>
+      <a href="#team">Team</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" aria-labelledby="home-title">
+      <div class="hero">
+        <h1 id="home-title">Welcome to Iowa</h1>
+        <p>Experience the elegance of Apple‑inspired design, crafted for simplicity and performance.</p>
+        <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='800'%20height='400'%3E%3Crect%20width='800'%20height='400'%20fill='%23e0e0e0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23888'%20font-family='Arial'%20font-size='24'%3EHero%20Image%3C/text%3E%3C/svg%3E"
+             alt="Placeholder hero image">
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">About Iowa</h2>
+      <p>Iowa is a modern web experience built for the Aiden IWO initiative. It blends clean aesthetics with intuitive navigation, ensuring every visitor feels welcomed and informed.</p>
+      <p>Our mission is to deliver a polished, high‑performance site that reflects the quality and craftsmanship of Apple’s visual language.</p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <div class="features">
+        <div class="feature-card">
+          <h3>Responsive Layout</h3>
+          <p>Seamlessly adapts to any screen size, from mobile to desktop.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Fast Performance</h3>
+          <p>Optimized assets and minimal JavaScript for lightning‑quick load times.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Accessible Design</h3>
+          <p>ARIA labels, proper contrast, and keyboard‑friendly navigation.</p>
+        </div>
+        <div class="feature-card">
+          <h3>High‑Resolution Imagery</h3>
+          <p>Beautiful placeholder images, ready for real content.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section id="team" aria-labelledby="team-title">
+      <h2 id="team-title">Our Team</h2>
+      <div class="team">
+        <div class="team-member">
+          <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='200'%20height='200'%3E%3Crect%20width='200'%20height='200'%20fill='%23e0e0e0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23888'%20font-family='Arial'%20font-size='14'%3EAlex%3C/text%3E%3C/svg%3E"
+               alt="Placeholder portrait of Alex">
+          <h4>Alex – Lead Designer</h4>
+          <p>Crafts the visual language with meticulous attention to detail.</p>
+        </div>
+        <div class="team-member">
+          <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='200'%20height='200'%3E%3Crect%20width='200'%20height='200'%20fill='%23e0e0e0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23888'%20font-family='Arial'%20font-size='14'%3EJamie%3C/text%3E%3C/svg%3E"
+               alt="Placeholder portrait of Jamie">
+          <h4>Jamie – Front‑end Engineer</h4>
+          <p>Builds the clean, performant code that powers the site.</p>
+        </div>
+        <div class="team-member">
+          <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='200'%20height='200'%3E%3Crect%20width='200'%20height='200'%20fill='%23e0e0e0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23888'%20font-family='Arial'%20font-size='14'%3EMorgan%3C/text%3E%3C/svg%3E"
+               alt="Placeholder portrait of Morgan">
+          <h4>Morgan – Project Manager</h4>
+          <p>Ensures every milestone is met with precision and care.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Get in Touch</h2>
+      <form aria-label="Contact form">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required aria-required="true">
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required aria-required="true">
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" placeholder="Your message" required aria-required="true"></textarea>
+
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa Project – All rights reserved.
+  </footer>
+
+  <script>
+    // Highlight active navigation link based on scroll position
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('nav a');
+
+    function activateLink() {
+      let index = sections.length;
+      while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+      navLinks.forEach(link => link.classList.remove('active'));
+      navLinks[index].classList.add('active');
+    }
+
+    activateLink();
+    window.addEventListener('scroll', activateLink);
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Apple‑inspired five‑page website for the Iowa project – clean layout, ample white space, subtle gradients, high‑resolution imagery, modern sans‑serif typography.">
+  <title>Iowa – Welcome</title>
+  <style>
+    /* -------------------------------------------------
+       Apple‑style visual language + Anthropic brand palette
+       ------------------------------------------------- */
+
+    :root {
+      /* Anthropic brand colors */
+      --anthropic-dark:        #141413;   /* primary text */
+      --anthropic-light:       #faf9f5;   /* page background */
+      --anthropic-mid-gray:    #b0aea5;   /* secondary UI elements */
+      --anthropic-light-gray:  #e8e6dc;   /* subtle surfaces */
+      --anthropic-accent-orange:#d97757;  /* call‑to‑action */
+      --anthropic-accent-blue: #6a9bcc;   /* interactive accents */
+      --anthropic-accent-green:#788c5d;   /* optional highlights */
+
+      /* Layout & spacing */
+      --radius:   8px;
+      --spacing:  1.5rem;
+      --max-width:960px;
+
+      /* Typography – brand guidelines */
+      --font-heading: "Poppins", Arial, sans-serif;   /* headings */
+      --font-body:    "Lora", Georgia, serif;         /* body text */
+      --font-sans:    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    html { scroll-behavior:smooth; }
+
+    body {
+      font-family: var(--font-body), var(--font-sans);
+      background: var(--anthropic-light);
+      color: var(--anthropic-dark);
+      line-height:1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* -------------------------------------------------
+       Header & Navigation – clean, sticky, subtle gradient
+       ------------------------------------------------- */
+    header {
+      background: linear-gradient(135deg, var(--anthropic-light-gray), #ffffff);
+      padding: var(--spacing) var(--spacing);
+      position: sticky;
+      top:0;
+      z-index:10;
+      box-shadow:0 2px 4px rgba(0,0,0,0.05);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .logo {
+      font-family: var(--font-heading);
+      font-size:1.8rem;
+      font-weight:600;
+      color: var(--anthropic-dark);
+    }
+
+    nav {
+      margin-top:0.5rem;
+      display:flex;
+      gap:1.5rem;
+    }
+
+    nav a {
+      text-decoration:none;
+      color: var(--anthropic-mid-gray);
+      font-weight:500;
+      position:relative;
+      transition:color .2s;
+    }
+
+    nav a:hover,
+    nav a:focus,
+    nav a.active {
+      color: var(--anthropic-accent-blue);
+    }
+
+    nav a.active::after {
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:-4px;
+      height:2px;
+      background:var(--anthropic-accent-blue);
+      border-radius:2px;
+    }
+
+    /* Hamburger button – hidden on desktop */
+    .hamburger {
+      display:none;
+      flex-direction:column;
+      justify-content:space-between;
+      width:24px;
+      height:18px;
+      cursor:pointer;
+    }
+
+    .hamburger span {
+      display:block;
+      height:3px;
+      background:var(--anthropic-dark);
+      border-radius:2px;
+    }
+
+    /* Mobile menu state */
+    nav.mobile {
+      display:none;
+      flex-direction:column;
+      width:100%;
+      background:var(--anthropic-light);
+      position:absolute;
+      top:100%;
+      left:0;
+      padding:var(--spacing);
+    }
+
+    nav.mobile.open {
+      display:flex;
+    }
+
+    /* -------------------------------------------------
+       Main content container
+       ------------------------------------------------- */
+    main {
+      max-width:var(--max-width);
+      margin:0 auto;
+      padding:var(--spacing);
+    }
+
+    section {
+      padding:calc(var(--spacing) * 2) 0;
+      border-bottom:1px solid var(--anthropic-light-gray);
+    }
+
+    h1, h2, h3, h4 {
+      font-family: var(--font-heading);
+      margin-bottom:var(--spacing);
+      font-weight:600;
+      color: var(--anthropic-dark);
+    }
+
+    h1 { font-size:2.5rem; }
+    h2 { font-size:2rem; }
+    h3 { font-size:1.5rem; }
+    h4 { font-size:1.25rem; }
+
+    p { margin-bottom:var(--spacing); }
+
+    /* -------------------------------------------------
+       Hero component – centered, image with subtle depth
+       ------------------------------------------------- */
+    .hero {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      text-align:center;
+    }
+
+    .hero img {
+      width:100%;
+      max-width:800px;
+      height:auto;
+      border-radius:var(--radius);
+      margin-top:var(--spacing);
+      box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    /* -------------------------------------------------
+       Feature grid – responsive, card hover lift
+       ------------------------------------------------- */
+    .features {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:var(--spacing);
+    }
+
+    .feature-card {
+      background:#fff;
+      padding:var(--spacing);
+      border-radius:var(--radius);
+      box-shadow:0 2px 6px rgba(0,0,0,0.06);
+      transition:transform .2s, box-shadow .2s;
+    }
+
+    .feature-card:hover,
+    .feature-card:focus-within {
+      transform:translateY(-4px);
+      box-shadow:0 6px 12px rgba(0,0,0,0.12);
+    }
+
+    /* -------------------------------------------------
+       Team grid – circular avatars, centered text
+       ------------------------------------------------- */
+    .team {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+      gap:var(--spacing);
+    }
+
+    .team-member {
+      text-align:center;
+    }
+
+    .team-member img {
+      width:100%;
+      max-width:200px;
+      border-radius:50%;
+      margin-bottom:0.5rem;
+      box-shadow:0 2px 4px rgba(0,0,0,0.07);
+    }
+
+    /* -------------------------------------------------
+       Form – white card, clear focus states
+       ------------------------------------------------- */
+    form {
+      background:#fff;
+      padding:var(--spacing);
+      border-radius:var(--radius);
+      box-shadow:0 2px 6px rgba(0,0,0,0.06);
+      max-width:500px;
+      margin:0 auto;
+    }
+
+    label {
+      display:block;
+      margin-bottom:0.3rem;
+      font-weight:500;
+      color: var(--anthropic-dark);
+    }
+
+    input,
+    textarea {
+      width:100%;
+      padding:0.6rem;
+      margin-bottom:var(--spacing);
+      border:1px solid var(--anthropic-mid-gray);
+      border-radius:var(--radius);
+      font-family:var(--font-body), var(--font-sans);
+      transition:border-color .2s, box-shadow .2s;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline:none;
+      border-color:var(--anthropic-accent-blue);
+      box-shadow:0 0 0 3px rgba(106,155,204,0.2);
+    }
+
+    button {
+      background:var(--anthropic-accent-orange);
+      color:#fff;
+      border:none;
+      padding:0.8rem 1.5rem;
+      border-radius:var(--radius);
+      font-size:1rem;
+      cursor:pointer;
+      font-family:var(--font-heading);
+      transition:background .2s, transform .1s;
+    }
+
+    button:hover,
+    button:focus {
+      background:#c45a44; /* darker orange */
+      transform:translateY(-1px);
+    }
+
+    button:active {
+      transform:translateY(0);
+    }
+
+    /* -------------------------------------------------
+       Footer – muted, centered
+       ------------------------------------------------- */
+    footer {
+      background:var(--anthropic-light-gray);
+      text-align:center;
+      padding:var(--spacing);
+      font-size:0.9rem;
+      color:#666;
+    }
+
+    /* -------------------------------------------------
+       Responsive tweaks
+       ------------------------------------------------- */
+    @media (max-width:600px) {
+      nav { display:none; }
+      .hamburger { display:flex; }
+      nav.mobile { position:static; }
+      .hero { padding:0 var(--spacing); }
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <div class="logo">Iowa</div>
+
+    <!-- Hamburger for mobile -->
+    <div class="hamburger" aria-label="Toggle navigation menu" aria-controls="mobile-nav" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <!-- Desktop navigation -->
+    <nav aria-label="Primary">
+      <a href="#home" class="active">Home</a>
+      <a href="#about">About</a>
+      <a href="#features">Features</a>
+      <a href="#team">Team</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <!-- Mobile navigation (cloned via JS) -->
+    <nav id="mobile-nav" class="mobile" aria-label="Mobile navigation"></nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" aria-labelledby="home-title">
+      <div class="hero">
+        <h1 id="home-title">Welcome to Iowa</h1>
+        <p>Experience the elegance of Apple‑inspired design, crafted for simplicity and performance.</p>
+        <img src="https://picsum.photos/seed/home/800/400" alt="Scenic view representing Iowa project">
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">About Iowa</h2>
+      <p>Iowa is a modern web experience built for the Aiden IWO initiative. It blends clean aesthetics with intuitive navigation, ensuring every visitor feels welcomed and informed.</p>
+      <p>Our mission is to deliver a polished, high‑performance site that reflects the quality and craftsmanship of Apple’s visual language.</p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <div class="features">
+        <div class="feature-card">
+          <h3>Responsive Layout</h3>
+          <p>Seamlessly adapts to any screen size, from mobile to desktop.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Fast Performance</h3>
+          <p>Optimized assets and minimal JavaScript for lightning‑quick load times.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Accessible Design</h3>
+          <p>ARIA labels, proper contrast, and keyboard‑friendly navigation.</p>
+        </div>
+        <div class="feature-card">
+          <h3>High‑Resolution Imagery</h3>
+          <p>Beautiful placeholder images, ready for real content.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section id="team" aria-labelledby="team-title">
+      <h2 id="team-title">Our Team</h2>
+      <div class="team">
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team1/200/200" alt="Portrait of Alex, Lead Designer">
+          <h4>Alex – Lead Designer</h4>
+          <p>Crafts the visual language with meticulous attention to detail.</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team2/200/200" alt="Portrait of Jamie, Front‑end Engineer">
+          <h4>Jamie – Front‑end Engineer</h4>
+          <p>Builds the clean, performant code that powers the site.</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team3/200/200" alt="Portrait of Morgan, Project Manager">
+          <h4>Morgan – Project Manager</h4>
+          <p>Ensures every milestone is met with precision and care.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Get in Touch</h2>
+      <form aria-label="Contact form" novalidate>
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required aria-required="true">
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required aria-required="true">
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" placeholder="Your message" required aria-required="true"></textarea>
+
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa Project – All rights reserved.
+  </footer>
+
+  <script>
+    // -------------------------------------------------
+    // Navigation: active link highlighting
+    // -------------------------------------------------
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('nav[aria-label="Primary"] a');
+
+    function activateLink() {
+      let index = sections.length;
+      while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+      navLinks.forEach(link => link.classList.remove('active'));
+      navLinks[index].classList.add('active');
+    }
+
+    activateLink();
+    window.addEventListener('scroll', activateLink);
+
+    // -------------------------------------------------
+    // Mobile hamburger menu toggle
+    // -------------------------------------------------
+    const hamburger = document.querySelector('.hamburger');
+    const mobileNav = document.getElementById('mobile-nav');
+
+    // Clone desktop links into mobile nav (once)
+    const desktopLinks = document.querySelectorAll('nav[aria-label="Primary"] a');
+    desktopLinks.forEach(link => {
+      const clone = link.cloneNode(true);
+      mobileNav.appendChild(clone);
+    });
+
+    hamburger.addEventListener('click', () => {
+      const expanded = hamburger.getAttribute('aria-expanded') === 'true';
+      hamburger.setAttribute('aria-expanded', String(!expanded));
+      mobileNav.classList.toggle('open');
+    });
+
+    // Close mobile menu when a link is clicked
+    mobileNav.addEventListener('click', e => {
+      if (e.target.tagName.toLowerCase() === 'a') {
+        mobileNav.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // -------------------------------------------------
+    // Contact form basic validation
+    // -------------------------------------------------
+    const form = document.querySelector('form[aria-label="Contact form"]');
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault(); // Prevent actual submission
+
+      const name = form.elements.name;
+      const email = form.elements.email;
+      const message = form.elements.message;
+
+      // Simple validation helpers
+      const isEmpty = el => !el.value.trim();
+      const isValidEmail = el => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim());
+
+      // Reset previous error styles
+      [name, email, message].forEach(el => el.style.borderColor = '');
+
+      let valid = true;
+      if (isEmpty(name)) {
+        name.style.borderColor = 'red';
+        valid = false;
+      }
+      if (isEmpty(email) || !isValidEmail(email)) {
+        email.style.borderColor = 'red';
+        valid = false;
+      }
+      if (isEmpty(message)) {
+        message.style.borderColor = 'red';
+        valid = false;
+      }
+
+      if (!valid) {
+        alert('Please fill out all fields correctly before submitting.');
+        return;
+      }
+
+      // Simulate successful submission
+      alert('Thank you! Your message has been sent.');
+      form.reset();
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Apple‑inspired five‑page website for the Iowa project – clean layout, ample white space, subtle gradients, high‑resolution imagery, modern sans‑serif typography.">
+  <title>Iowa – Welcome</title>
+  <style>
+    /* -------------------------------------------------
+       Apple‑style visual language + Anthropic brand palette
+       ------------------------------------------------- */
+
+    :root {
+      /* Anthropic brand colors */
+      --anthropic-dark:        #141413;   /* primary text */
+      --anthropic-light:       #faf9f5;   /* page background */
+      --anthropic-mid-gray:    #b0aea5;   /* secondary UI elements */
+      --anthropic-light-gray:  #e8e6dc;   /* subtle surfaces */
+      --anthropic-accent-orange:#d97757;  /* call‑to‑action */
+      --anthropic-accent-blue: #6a9bcc;   /* interactive accents */
+      --anthropic-accent-green:#788c5d;   /* optional highlights */
+
+      /* Layout & spacing */
+      --radius:   8px;
+      --spacing:  1.5rem;
+      --max-width:960px;
+
+      /* Typography – brand guidelines */
+      --font-heading: "Poppins", Arial, sans-serif;   /* headings */
+      --font-body:    "Lora", Georgia, serif;         /* body text */
+      --font-sans:    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    html { scroll-behavior:smooth; }
+
+    body {
+      font-family: var(--font-body), var(--font-sans);
+      background: var(--anthropic-light);
+      color: var(--anthropic-dark);
+      line-height:1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* -------------------------------------------------
+       Header & Navigation – clean, sticky, subtle gradient
+       ------------------------------------------------- */
+    header {
+      background: linear-gradient(135deg, var(--anthropic-light-gray), #ffffff);
+      padding: var(--spacing) var(--spacing);
+      position: sticky;
+      top:0;
+      z-index:10;
+      box-shadow:0 2px 4px rgba(0,0,0,0.05);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .logo {
+      font-family: var(--font-heading);
+      font-size:1.8rem;
+      font-weight:600;
+      color: var(--anthropic-dark);
+    }
+
+    nav {
+      margin-top:0.5rem;
+      display:flex;
+      gap:1.5rem;
+    }
+
+    nav a {
+      text-decoration:none;
+      color: var(--anthropic-mid-gray);
+      font-weight:500;
+      position:relative;
+      transition:color .2s;
+    }
+
+    nav a:hover,
+    nav a:focus,
+    nav a.active {
+      color: var(--anthropic-accent-blue);
+    }
+
+    nav a.active::after {
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:-4px;
+      height:2px;
+      background:var(--anthropic-accent-blue);
+      border-radius:2px;
+    }
+
+    /* Hamburger button – hidden on desktop */
+    .hamburger {
+      display:none;
+      flex-direction:column;
+      justify-content:space-between;
+      width:24px;
+      height:18px;
+      cursor:pointer;
+    }
+
+    .hamburger span {
+      display:block;
+      height:3px;
+      background:var(--anthropic-dark);
+      border-radius:2px;
+    }
+
+    /* Mobile menu state */
+    nav.mobile {
+      display:none;
+      flex-direction:column;
+      width:100%;
+      background:var(--anthropic-light);
+      position:absolute;
+      top:100%;
+      left:0;
+      padding:var(--spacing);
+    }
+
+    nav.mobile.open {
+      display:flex;
+    }
+
+    /* -------------------------------------------------
+       Main content container
+       ------------------------------------------------- */
+    main {
+      max-width:var(--max-width);
+      margin:0 auto;
+      padding:var(--spacing);
+    }
+
+    section {
+      padding:calc(var(--spacing) * 2) 0;
+      border-bottom:1px solid var(--anthropic-light-gray);
+    }
+
+    h1, h2, h3, h4 {
+      font-family: var(--font-heading);
+      margin-bottom:var(--spacing);
+      font-weight:600;
+      color: var(--anthropic-dark);
+    }
+
+    h1 { font-size:2.5rem; }
+    h2 { font-size:2rem; }
+    h3 { font-size:1.5rem; }
+    h4 { font-size:1.25rem; }
+
+    p { margin-bottom:var(--spacing); }
+
+    /* -------------------------------------------------
+       Hero component – centered, image with subtle depth
+       ------------------------------------------------- */
+    .hero {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      text-align:center;
+    }
+
+    .hero img {
+      width:100%;
+      max-width:800px;
+      height:auto;
+      border-radius:var(--radius);
+      margin-top:var(--spacing);
+      box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    /* -------------------------------------------------
+       Feature grid – responsive, card hover lift
+       ------------------------------------------------- */
+    .features {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1rem));
+      gap:var(--spacing);
+    }
+
+    .feature-card {
+      background:#fff;
+      padding:var(--spacing);
+      border-radius:var(--radius);
+      box-shadow:0 2px 6px rgba(0,0,0,0.06);
+      transition:transform .2s, box-shadow .2s;
+    }
+
+    .feature-card:hover,
+    .feature-card:focus-within {
+      transform:translateY(-4px);
+      box-shadow:0 6px 12px rgba(0,0,0,0.12);
+    }
+
+    /* -------------------------------------------------
+       Team grid – circular avatars, centered text
+       ------------------------------------------------- */
+    .team {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+      gap:var(--spacing);
+    }
+
+    .team-member {
+      text-align:center;
+    }
+
+    .team-member img {
+      width:100%;
+      max-width:200px;
+      border-radius:50%;
+      margin-bottom:0.5rem;
+      box-shadow:0 2px 4px rgba(0,0,0,0.07);
+    }
+
+    /* -------------------------------------------------
+       Form – white card, clear focus states
+       ------------------------------------------------- */
+    form {
+      background:#fff;
+      padding:var(--spacing);
+      border-radius:var(--radius);
+      box-shadow:0 2px 6px rgba(0,0,0,0.06);
+      max-width:500px;
+      margin:0 auto;
+    }
+
+    label {
+      display:block;
+      margin-bottom:0.3rem;
+      font-weight:500;
+      color: var(--anthropic-dark);
+    }
+
+    input,
+    textarea {
+      width:100%;
+      padding:0.6rem;
+      margin-bottom:var(--spacing);
+      border:1px solid var(--anthropic-mid-gray);
+      border-radius:var(--radius);
+      font-family:var(--font-body), var(--font-sans);
+      transition:border-color .2s, box-shadow .2s;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline:none;
+      border-color:var(--anthropic-accent-blue);
+      box-shadow:0 0 0 3px rgba(106,155,204,0.2);
+    }
+
+    button {
+      background:var(--anthropic-accent-orange);
+      color:#fff;
+      border:none;
+      padding:0.8rem 1.5rem;
+      border-radius:var(--radius);
+      font-size:1rem;
+      cursor:pointer;
+      font-family:var(--font-heading);
+      transition:background .2s, transform .1s;
+    }
+
+    button:hover,
+    button:focus {
+      background:#c45a44; /* darker orange */
+      transform:translateY(-1px);
+    }
+
+    button:active {
+      transform:translateY(0);
+    }
+
+    /* -------------------------------------------------
+       Footer – muted, centered
+       ------------------------------------------------- */
+    footer {
+      background:var(--anthropic-light-gray);
+      text-align:center;
+      padding:var(--spacing);
+      font-size:0.9rem;
+      color:#666;
+    }
+
+    /* -------------------------------------------------
+       Responsive tweaks
+       ------------------------------------------------- */
+    @media (max-width:600px) {
+      nav { display:none; }
+      .hamburger { display:flex; }
+      nav.mobile { position:static; }
+      .hero { padding:0 var(--spacing); }
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <div class="logo">Iowa</div>
+
+    <!-- Hamburger for mobile -->
+    <div class="hamburger" aria-label="Toggle navigation menu" aria-controls="mobile-nav" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <!-- Desktop navigation -->
+    <nav aria-label="Primary">
+      <a href="#home" class="active">Home</a>
+      <a href="#about">About</a>
+      <a href="#features">Features</a>
+      <a href="#team">Team</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <!-- Mobile navigation (cloned via JS) -->
+    <nav id="mobile-nav" class="mobile" aria-label="Mobile navigation"></nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" aria-labelledby="home-title">
+      <div class="hero">
+        <h1 id="home-title">Welcome to Iowa</h1>
+        <p>Experience the elegance of Apple‑inspired design, crafted for simplicity and performance.</p>
+        <img src="https://picsum.photos/seed/home/800/400" alt="Scenic view representing Iowa project">
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">About Iowa</h2>
+      <p>Iowa is a modern web experience built for the Aiden IWO initiative. It blends clean aesthetics with intuitive navigation, ensuring every visitor feels welcomed and informed.</p>
+      <p>Our mission is to deliver a polished, high‑performance site that reflects the quality and craftsmanship of Apple’s visual language.</p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <div class="features">
+        <div class="feature-card">
+          <h3>Responsive Layout</h3>
+          <p>Seamlessly adapts to any screen size, from mobile to desktop.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Fast Performance</h3>
+          <p>Optimized assets and minimal JavaScript for lightning‑quick load times.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Accessible Design</h3>
+          <p>ARIA labels, proper contrast, and keyboard‑friendly navigation.</p>
+        </div>
+        <div class="feature-card">
+          <h3>High‑Resolution Imagery</h3>
+          <p>Beautiful placeholder images, ready for real content.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section id="team" aria-labelledby="team-title">
+      <h2 id="team-title">Our Team</h2>
+      <div class="team">
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team1/200/200" alt="Portrait of Alex, Lead Designer">
+          <h4>Alex – Lead Designer</h4>
+          <p>Crafts the visual language with meticulous attention to detail.</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team2/200/200" alt="Portrait of Jamie, Front‑end Engineer">
+          <h4>Jamie – Front‑end Engineer</h4>
+          <p>Builds the clean, performant code that powers the site.</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team3/200/200" alt="Portrait of Morgan, Project Manager">
+          <h4>Morgan – Project Manager</h4>
+          <p>Ensures every milestone is met with precision and care.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Get in Touch</h2>
+      <form aria-label="Contact form" novalidate>
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required aria-required="true">
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required aria-required="true">
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" placeholder="Your message" required aria-required="true"></textarea>
+
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa Project – All rights reserved.
+  </footer>
+
+  <script>
+    // -------------------------------------------------
+    // Navigation: active link highlighting
+    // -------------------------------------------------
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('nav[aria-label="Primary"] a');
+
+    function activateLink() {
+      let index = sections.length;
+      while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+      navLinks.forEach(link => link.classList.remove('active'));
+      navLinks[index].classList.add('active');
+    }
+
+    activateLink();
+    window.addEventListener('scroll', activateLink);
+
+    // -------------------------------------------------
+    // Mobile hamburger menu toggle
+    // -------------------------------------------------
+    const hamburger = document.querySelector('.hamburger');
+    const mobileNav = document.getElementById('mobile-nav');
+
+    // Clone desktop links into mobile nav (once)
+    const desktopLinks = document.querySelectorAll('nav[aria-label="Primary"] a');
+    desktopLinks.forEach(link => {
+      const clone = link.cloneNode(true);
+      mobileNav.appendChild(clone);
+    });
+
+    hamburger.addEventListener('click', () => {
+      const expanded = hamburger.getAttribute('aria-expanded') === 'true';
+      hamburger.setAttribute('aria-expanded', String(!expanded));
+      mobileNav.classList.toggle('open');
+    });
+
+    // Close mobile menu when a link is clicked
+    mobileNav.addEventListener('click', e => {
+      if (e.target.tagName.toLowerCase() === 'a') {
+        mobileNav.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // -------------------------------------------------
+    // Contact form basic validation
+    // -------------------------------------------------
+    const form = document.querySelector('form[aria-label="Contact form"]');
+
+    form.add

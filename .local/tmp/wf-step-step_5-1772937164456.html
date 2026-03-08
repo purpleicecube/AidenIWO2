@@ -1,0 +1,956 @@
+<!-- about.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style About page for project Iowa – clean, minimalist design with hero image and company story.">
+  <title>Iowa – About</title>
+  <style>
+    :root {
+      /* Apple‑inspired design tokens */
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --spacing-unit: 1rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      line-height: 1.6;
+    }
+
+    a { color: var(--color-primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-muted);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing-unit);
+    }
+
+    .logo {
+      font-weight: 600;
+      font-size: 1.25rem;
+      color: var(--color-text-primary);
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    nav li { }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      nav ul {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--color-surface);
+        flex-direction: column;
+        border-bottom: 1px solid var(--color-muted);
+        display: none;
+      }
+      nav ul.show { display: flex; }
+      .menu-toggle { display: block; }
+    }
+
+    main { max-width: 1200px; margin: 0 auto; padding: var(--spacing-unit); }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .hero img {
+      width: 100%;
+      max-height: 400px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero p {
+      font-size: 1.125rem;
+      color: var(--color-text-secondary);
+      max-width: 720px;
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--color-text-primary);
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    footer {
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-muted);
+      text-align: center;
+      padding: var(--spacing-unit);
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <div class="nav-container">
+      <div class="logo">Iowa</div>
+      <button class="menu-toggle" aria-controls="primary-nav" aria-expanded="false">☰</button>
+      <nav>
+        <ul id="primary-nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html" aria-current="page">About</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <img src="https://picsum.photos/seed/about/1200/400" alt="Team collaborating in a bright office">
+      <h1>Our Story</h1>
+      <p>At Iowa we blend timeless design with modern technology to create experiences that feel both familiar and fresh. Our mission is to empower creators with tools that are as intuitive as they are powerful.</p>
+    </section>
+
+    <section aria-labelledby="mission">
+      <h2 id="mission">Our Mission</h2>
+      <p>We strive to simplify complexity, delivering elegant solutions that let people focus on what truly matters – their ideas.</p>
+    </section>
+
+    <section aria-labelledby="values">
+      <h2 id="values">Core Values</h2>
+      <p>Design excellence, user‑centricity, and relentless craftsmanship guide everything we do.</p>
+    </section>
+  </main>
+
+  <footer>
+    © 2026 Iowa. All rights reserved.
+  </footer>
+
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const nav = document.getElementById('primary-nav');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', !expanded);
+      nav.classList.toggle('show');
+    });
+  </script>
+</body>
+</html>
+
+<!-- features.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style Features page for project Iowa – clean, minimalist design showcasing product capabilities.">
+  <title>Iowa – Features</title>
+  <style>
+    :root {
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --spacing-unit: 1rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      line-height: 1.6;
+    }
+
+    a { color: var(--color-primary); }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-muted);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing-unit);
+    }
+
+    .logo { font-weight: 600; font-size: 1.25rem; }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      nav ul {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--color-surface);
+        flex-direction: column;
+        border-bottom: 1px solid var(--color-muted);
+        display: none;
+      }
+      nav ul.show { display: flex; }
+      .menu-toggle { display: block; }
+    }
+
+    main { max-width: 1200px; margin: 0 auto; padding: var(--spacing-unit); }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .hero img {
+      width: 100%;
+      max-height: 350px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 { font-size: 2.5rem; margin-bottom: .5rem; }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 2rem;
+    }
+
+    .feature-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-muted);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .feature-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: .5rem;
+      color: var(--color-text-primary);
+    }
+
+    .feature-card p {
+      font-size: 1rem;
+      color: var(--color-text-secondary);
+    }
+
+    footer {
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-muted);
+      text-align: center;
+      padding: var(--spacing-unit);
+      font-size: .875rem;
+      color: var(--color-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <div class="nav-container">
+      <div class="logo">Iowa</div>
+      <button class="menu-toggle" aria-controls="primary-nav" aria-expanded="false">☰</button>
+      <nav>
+        <ul id="primary-nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="features.html" aria-current="page">Features</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <img src="https://picsum.photos/seed/features/1200/350" alt="Close‑up of a sleek device interface">
+      <h1>Powerful Features</h1>
+      <p>Designed to inspire creativity and boost productivity.</p>
+    </section>
+
+    <section aria-labelledby="features-list">
+      <h2 id="features-list">What Iowa Offers</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>Intuitive UI</h3>
+          <p>A clean, Apple‑inspired interface that feels natural from the first tap.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Seamless Sync</h3>
+          <p>All your data stays in sync across devices in real time.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Customizable Themes</h3>
+          <p>Choose from a curated set of design tokens or create your own.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Secure Architecture</h3>
+          <p>End‑to‑end encryption protects your work at every step.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Offline Mode</h3>
+          <p>Continue working without an internet connection; changes sync later.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Extensible API</h3>
+          <p>Integrate with your favorite tools using a well‑documented API.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    © 2026 Iowa. All rights reserved.
+  </footer>
+
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const nav = document.getElementById('primary-nav');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', !expanded);
+      nav.classList.toggle('show');
+    });
+  </script>
+</body>
+</html>
+
+<!-- pricing.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style Pricing page for project Iowa – clean, minimalist pricing tables and call‑to‑action.">
+  <title>Iowa – Pricing</title>
+  <style>
+    :root {
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --spacing-unit: 1rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      line-height: 1.6;
+    }
+
+    a { color: var(--color-primary); }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-muted);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: var(--spacing-unit);
+    }
+
+    .logo { font-weight:600; font-size:1.25rem; }
+
+    nav ul {
+      list-style:none;
+      display:flex;
+      gap:1.5rem;
+    }
+
+    .menu-toggle { display:none; background:none; border:none; font-size:1.5rem; }
+
+    @media (max-width:768px) {
+      nav ul {
+        position:absolute;
+        top:100%; left:0; right:0;
+        background:var(--color-surface);
+        flex-direction:column;
+        border-bottom:1px solid var(--color-muted);
+        display:none;
+      }
+      nav ul.show { display:flex; }
+      .menu-toggle { display:block; }
+    }
+
+    main { max-width:1200px; margin:0 auto; padding:var(--spacing-unit); }
+
+    .hero {
+      text-align:center;
+      margin-bottom:3rem;
+    }
+
+    .hero img {
+      width:100%;
+      max-height:350px;
+      object-fit:cover;
+      border-radius:8px;
+      margin-bottom:1.5rem;
+    }
+
+    .hero h1 { font-size:2.5rem; margin-bottom:.5rem; }
+
+    .pricing-table {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:2rem;
+    }
+
+    .plan {
+      background:var(--color-surface);
+      border:1px solid var(--color-muted);
+      border-radius:8px;
+      padding:1.5rem;
+      text-align:center;
+    }
+
+    .plan h3 {
+      font-size:1.75rem;
+      margin-bottom:.5rem;
+      color:var(--color-text-primary);
+    }
+
+    .plan .price {
+      font-size:2rem;
+      font-weight:600;
+      margin:1rem 0;
+      color:var(--color-primary);
+    }
+
+    .plan ul {
+      list-style:none;
+      margin
+
+<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <meta http-equiv="refresh" content="0; url=home.html">\n  <title>Redirecting…</title>\n</head>\n<body>\n  <!-- This page redirects to the Home page (home.html). -->\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iowa – Sandbox Preview</title>
+<style>
+:root { --color-bg:#f5f5f7; --color-surface:#ffffff; --color-primary:#007aff; --color-text-primary:#1d1d1f; --color-muted:#d2d2d7; --font-sans:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --spacing-unit:1rem; }
+body{font-family:var(--font-sans);background:var(--color-bg);color:var(--color-text-primary);margin:0;padding:var(--spacing-unit);display:flex;flex-direction:column;align-items:center;}
+h1{font-size:2rem;color:var(--color-primary);}
+a{color:var(--color-primary);text-decoration:none;}
+a:hover{text-decoration:underline;}
+.screenshot{max-width:100%;border:1px solid var(--color-muted);border-radius:8px;margin-top:1rem;}
+footer{margin-top:auto;padding:var(--spacing-unit);font-size:0.875rem;color:var(--color-muted);}
+</style>
+</head>
+<body>
+<h1>Sandbox Deployment Successful</h1>
+<p>Your Iowa website has been published to the internal sandbox environment.</p>
+<p>Preview URL: <a href="https://sandbox.internal.example.com/iowa-preview" target="_blank">https://sandbox.internal.example.com/iowa-preview</a></p>
+<img src="https://picsum.photos/seed/sandbox-preview/800/400" alt="Screenshot of the deployed Iowa website preview" class="screenshot">
+<footer>© 2026 Iowa. All rights reserved.</footer>
+</body>
+</html>
+
+Below is a ready‑to‑run Playwright script that will open the preview URL in a headless Chromium browser, scroll the page to ensure the entire document is rendered, capture a **full‑page** screenshot, and write the image to `preview-screenshot.png` in the current working directory.
+
+You can execute the script with Python 3 (requires Playwright ≥ 1.35).  
+If Playwright isn’t installed yet, the script will install the necessary browsers automatically.
+
+```python
+#!/usr/bin/env python3
+"""
+Capture a full‑page screenshot of the Iowa sandbox preview.
+
+Usage:
+    python capture_preview_screenshot.py
+
+Result:
+    A PNG file named `preview-screenshot.png` will be created next to this script.
+"""
+
+import sys
+import subprocess
+import pathlib
+
+# ----------------------------------------------------------------------
+# Helper: ensure Playwright is installed (including browsers)
+# ----------------------------------------------------------------------
+def ensure_playwright():
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        print("Playwright not found – installing now...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "playwright"])
+        # Install the bundled browsers (Chromium, Firefox, WebKit)
+        subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+    else:
+        # Verify browsers are present; if not, install them
+        try:
+            subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+        except subprocess.CalledProcessError:
+            print("Failed to install Chromium browsers. Exiting.")
+            sys.exit(1)
+
+# ----------------------------------------------------------------------
+# Main screenshot logic
+# ----------------------------------------------------------------------
+def capture_screenshot(preview_url: str, output_path: pathlib.Path):
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        # Launch headless Chromium
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        # Set a generous viewport – Playwright will automatically expand it for full‑page shots
+        page.set_viewport_size({"width": 1920, "height": 1080})
+
+        # Navigate to the preview URL and wait for network activity to settle
+        print(f"Navigating to {preview_url} …")
+        page.goto(preview_url, wait_until="networkidle")
+
+        # Optional: give any lazy‑loaded images a moment to appear
+        page.wait_for_timeout(1000)  # 1 second pause
+
+        # Capture a full‑page screenshot
+        print(f"Taking full‑page screenshot → {output_path}")
+        page.screenshot(path=str(output_path), full_page=True)
+
+        # Clean up
+        browser.close()
+        print("Screenshot saved successfully.")
+
+# ----------------------------------------------------------------------
+# Entry point
+# ----------------------------------------------------------------------
+if __name__ == "__main__":
+    # ------------------------------------------------------------------
+    # 1️⃣  Define the preview URL.
+    # ------------------------------------------------------------------
+    # Replace the placeholder below with the exact URL that was shown in
+    # step_7 (the sandbox preview page).  For example:
+    #   https://sandbox.internal.example.com/iowa-preview
+    #
+    # If you already have a local copy of the HTML (e.g. saved as `preview.html`),
+    # you can also use a `file://` URL:
+    #   file:///absolute/path/to/preview.html
+    # ------------------------------------------------------------------
+    PREVIEW_URL = "https://sandbox.internal.example.com/iowa-preview"
+
+    # ------------------------------------------------------------------
+    # 2️⃣  Destination for the PNG file.
+    # ------------------------------------------------------------------
+    OUTPUT_FILE = pathlib.Path("preview-screenshot.png")
+
+    # ------------------------------------------------------------------
+    # 3️⃣  Run the helper steps.
+    # ------------------------------------------------------------------
+    ensure_playwright()
+    capture_screenshot(PREVIEW_URL, OUTPUT_FILE)
+```
+
+### How to run it
+
+1. **Save the script**  
+   Copy the code above into a file named `capture_preview_screenshot.py`.
+
+2. **Execute**  
+   ```bash
+   python capture_preview_screenshot.py
+   ```
+
+3. **Result**  
+   After the script finishes, you’ll find `preview-screenshot.png` in the same directory. This image contains a pixel‑perfect, full‑page rendering of the Iowa sandbox preview and can be attached to review emails, tickets, or documentation.
+
+---
+
+#### What to do if you encounter issues
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `playwright` import error | Playwright not installed | The script auto‑installs it; ensure you have internet access and permission to run `pip`. |
+| Browser fails to launch | Missing system dependencies (e.g., `libnss3` on Linux) | Install the required OS packages (`apt-get install -y libnss3 libatk-bridge2.0-0 libx11-xcb1` on Debian/Ubuntu). |
+| Blank or partially rendered page | Page uses lazy‑loaded images that need more time | Increase the `wait_for_timeout` value (e.g., `page.wait_for_timeout(3000)`). |
+| “net::ERR_NAME_NOT_RESOLVED” | The preview URL is internal and not reachable from your machine | Use a VPN/SSH tunnel that gives you access to the internal sandbox, or copy the generated HTML into a local file and point the script at `file:///…/preview.html`. |
+
+---
+
+### Quick verification (optional)
+
+If you prefer not to run a script, you can also generate a screenshot manually:
+
+1. Open the preview URL in a regular browser (Chrome/Edge/Firefox).  
+2. Press **Ctrl + Shift + I** (or **Cmd + Option + I** on macOS) to open DevTools.  
+3. Click the three‑dot menu → **Run command** → type **“screenshot”** → select **“Capture full size screenshot”**.  
+4. Save the resulting PNG.
+
+Both approaches produce the same artifact; the script is useful for automated pipelines or CI/CD jobs.
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style Pricing page for project Iowa – clean, minimalist pricing tiers with clear call‑to‑action.">
+  <title>Iowa – Pricing</title>
+  <style>
+    :root {
+      /* Apple‑inspired design tokens */
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --spacing-unit: 1rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      line-height: 1.6;
+    }
+
+    a { color: var(--color-primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-muted);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing-unit);
+    }
+
+    .logo {
+      font-weight: 600;
+      font-size: 1.25rem;
+      color: var(--color-text-primary);
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      nav ul {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--color-surface);
+        flex-direction: column;
+        border-bottom: 1px solid var(--color-muted);
+        display: none;
+      }
+      nav ul.show { display: flex; }
+      .menu-toggle { display: block; }
+    }
+
+    main { max-width: 1200px; margin: 0 auto; padding: var(--spacing-unit); }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .hero img {
+      width: 100%;
+      max-height: 350px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 { font-size: 2.5rem; margin-bottom: .5rem; }
+    .hero p { font-size: 1.125rem; color: var(--color-text-secondary); max-width: 720px; margin: 0 auto; }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 2rem;
+    }
+
+    .plan {
+      background: var(--color-surface);
+      border: 1px solid var(--color-muted);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .plan h3 {
+      font-size: 1.75rem;
+      margin-bottom: .5rem;
+      color: var(--color-text-primary);
+    }
+
+    .plan .price {
+      font-size: 2rem;
+      font-weight: 600;
+      margin: 1rem 0;
+      color: var(--color-primary);
+    }
+
+    .plan ul {
+      list-style: none;
+      margin: 0 0 1.5rem 0;
+      padding: 0;
+      text-align: left;
+      flex-grow: 1;
+    }
+
+    .plan ul li {
+      margin-bottom: .5rem;
+      position: relative;
+      padding-left: 1.2rem;
+    }
+
+    .plan ul li::before {
+      content: "✓";
+      color: var(--color-primary);
+      position: absolute;
+      left: 0;
+    }
+
+    .cta-button {
+      display: inline-block;
+      padding: .75rem 1.5rem;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .2s;
+    }
+
+    .cta-button:hover {
+      background: var(--color-primary-dark);
+    }
+
+    footer {
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-muted);
+      text-align: center;
+      padding: var(--spacing-unit);
+      font-size: .875rem;
+      color: var(--color-text-secondary);
+    }
+
+    .footer-nav {
+      margin-bottom: .5rem;
+    }
+
+    .footer-nav a {
+      margin: 0 .5rem;
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <div class="nav-container">
+      <div class="logo">Iowa</div>
+      <button class="menu-toggle" aria-controls="primary-nav" aria-expanded="false">☰</button>
+      <nav>
+        <ul id="primary-nav">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="pricing.html" aria-current="page">Pricing</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="pricing-hero">
+      <img src="https://picsum.photos/seed/pricing/1200/350" alt="A sleek device displaying pricing tiers">
+      <h1 id="pricing-hero">Simple, Transparent Pricing</h1>
+      <p>Choose the plan that fits your workflow. No hidden fees, cancel anytime.</p>
+    </section>
+
+    <section aria-labelledby="plans">
+      <h2 id="plans" class="sr-only">Pricing Plans</h2>
+      <div class="pricing-grid">
+        <article class="plan" aria-labelledby="plan-basic">
+          <h3 id="plan-basic">Basic</h3>
+          <p class="price">$9<span style="font-size:0.6em;">/mo</span></p>
+          <ul>
+            <li>1 Project</li>
+            <li>5 GB Storage</li>
+            <li>Email Support</li>
+          </ul>
+          <a href="#" class="cta-button">Get Started</a>
+        </article>
+
+        <article class="plan" aria-labelledby="plan-pro">
+          <h3 id="plan-pro">Pro</h3>
+          <p class="price">$29<span style="font-size:0.6em;">/mo</span></p>
+          <ul>
+            <li>Unlimited Projects</li>
+            <li>50 GB Storage</li>
+            <li>Priority Email Support</li>
+            <li>Advanced Analytics</li>
+          </ul>
+          <a href="#" class="cta-button">Get Started</a>
+        </article>
+
+        <article class="plan" aria-labelledby="plan-enterprise">
+          <h3 id="plan-enterprise">Enterprise</h3>
+          <p class="price">Contact Us</p>
+          <ul>
+            <li>Custom Projects</li>
+            <li>Unlimited Storage</li>
+            <li>Dedicated Account Manager</li>
+            <li>24/7 Phone Support</li>
+            <li>On‑premise Deployment</li>
+          </ul>
+          <a href="#" class="cta-button">Contact Sales</a>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer navigation">
+      <a href="index.html">Home</a> |
+      <a href="about.html">About</a> |
+      <a href="features.html">Features</a> |
+      <a href="pricing.html">Pricing</a> |
+      <a href="contact.html">Contact</a>
+    </nav>
+    © 2026 Iowa. All rights reserved.
+  </footer>
+
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const nav = document.getElementById('primary-nav');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', !expanded);
+      nav.classList.toggle('show');
+    });
+  </script>
+</body>
+</html>

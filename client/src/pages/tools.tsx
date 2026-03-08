@@ -719,6 +719,9 @@ export default function ToolsPage() {
   const [triggersState, setTriggersState] = useState<any[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importingSkill, setImportingSkill] = useState<string | null>(null);
+  const [skillSearch, setSkillSearch] = useState("");
+  const [skillCategoryFilter, setSkillCategoryFilter] = useState<string>("all");
+  const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
 
   const { data: tools, isLoading } = useQuery<Tool[]>({
     queryKey: ["/api/tools"],
@@ -733,12 +736,46 @@ export default function ToolsPage() {
     alreadyImported: boolean;
     hasReferences: boolean;
     referenceFiles: string[];
+    category: string;
+    source: string;
+    fileCount: number;
+    hasScripts: boolean;
   }
 
   const { data: availableSkills, isLoading: skillsLoading, refetch: refetchSkills } = useQuery<AvailableSkill[]>({
     queryKey: ["/api/skills/available"],
     enabled: importDialogOpen,
   });
+
+  const filteredSkills = (availableSkills || []).filter((skill) => {
+    const matchesSearch = !skillSearch ||
+      skill.name.toLowerCase().includes(skillSearch.toLowerCase()) ||
+      skill.description.toLowerCase().includes(skillSearch.toLowerCase()) ||
+      skill.dirName.toLowerCase().includes(skillSearch.toLowerCase());
+    const matchesCategory = skillCategoryFilter === "all" || skill.category === skillCategoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  const skillCategories = availableSkills
+    ? Array.from(new Set(availableSkills.map(s => s.category))).sort()
+    : [];
+
+  const categoryLabels: Record<string, string> = {
+    all: "All",
+    document: "Documents",
+    creative: "Creative & Design",
+    development: "Development",
+    productivity: "Productivity",
+    general: "General",
+  };
+
+  const categoryIcons: Record<string, string> = {
+    document: "file-text",
+    creative: "palette",
+    development: "code",
+    productivity: "message-square",
+    general: "box",
+  };
 
   const importSkillMutation = useMutation({
     mutationFn: (dirName: string) =>
@@ -1507,80 +1544,227 @@ export default function ToolsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <Dialog open={importDialogOpen} onOpenChange={(open) => {
+        setImportDialogOpen(open);
+        if (!open) { setSkillSearch(""); setSkillCategoryFilter("all"); setExpandedSkill(null); }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Import Claude Skills</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Import Claude Skills
+              {availableSkills && availableSkills.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] font-normal">
+                  {availableSkills.length} available
+                </Badge>
+              )}
+            </DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Scan approved skills from the project's skill directory and import them into the Tools Locker.
+              Browse the Anthropic official skill registry. Search, review details, then import into the Tools Locker.
             </p>
           </DialogHeader>
 
           {skillsLoading ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-12">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
               <span className="text-sm text-muted-foreground">Scanning skills directory...</span>
             </div>
           ) : availableSkills && availableSkills.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                {availableSkills.filter(s => !s.alreadyImported).length} of {availableSkills.length} skills available for import
-              </p>
-              {availableSkills.map((skill) => (
-                <div
-                  key={skill.dirName}
-                  className={`border rounded-lg p-4 flex items-start justify-between gap-4 ${skill.alreadyImported ? "opacity-60 bg-muted/30" : ""}`}
-                  data-testid={`skill-row-${skill.dirName}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                      <span className="font-medium text-sm truncate">{skill.name}</span>
-                      {skill.alreadyImported && (
-                        <Badge variant="secondary" className="text-[10px] flex-shrink-0">
-                          <CheckCircle2 className="w-3 h-3 mr-1" />
-                          Imported
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{skill.description || "No description"}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <Badge variant="outline" className="text-[10px]">{skill.dirName}</Badge>
-                      {skill.hasReferences && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {skill.referenceFiles.length} ref{skill.referenceFiles.length !== 1 ? "s" : ""}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={skill.alreadyImported ? "ghost" : "default"}
-                    disabled={skill.alreadyImported || importingSkill === skill.dirName}
-                    onClick={() => {
-                      setImportingSkill(skill.dirName);
-                      importSkillMutation.mutate(skill.dirName);
-                    }}
-                    data-testid={`button-import-${skill.dirName}`}
-                  >
-                    {importingSkill === skill.dirName ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : skill.alreadyImported ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4 mr-1" />
-                        Import
-                      </>
-                    )}
-                  </Button>
+            <div className="flex flex-col gap-3 min-h-0">
+              {/* Search + Filter bar */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Eye className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search skills by name, description, or keyword..."
+                    value={skillSearch}
+                    onChange={(e) => setSkillSearch(e.target.value)}
+                    className="pl-9 h-9"
+                    data-testid="input-skill-search"
+                  />
+                  {skillSearch && (
+                    <button onClick={() => setSkillSearch("")} className="absolute right-2.5 top-2.5">
+                      <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
                 </div>
-              ))}
+              </div>
+
+              {/* Category filter pills */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  onClick={() => setSkillCategoryFilter("all")}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    skillCategoryFilter === "all"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  All ({availableSkills.length})
+                </button>
+                {skillCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSkillCategoryFilter(cat)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                      skillCategoryFilter === cat
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {categoryLabels[cat] || cat} ({availableSkills.filter(s => s.category === cat).length})
+                  </button>
+                ))}
+              </div>
+
+              {/* Stats bar */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground border-b pb-2">
+                <span>
+                  {filteredSkills.length === availableSkills.length
+                    ? `${availableSkills.filter(s => !s.alreadyImported).length} of ${availableSkills.length} ready to import`
+                    : `Showing ${filteredSkills.length} of ${availableSkills.length} skills`}
+                </span>
+                <span className="flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  Anthropic Official Registry
+                </span>
+              </div>
+
+              {/* Skills list */}
+              <div className="overflow-y-auto flex-1 space-y-2 pr-1" style={{ maxHeight: "calc(85vh - 280px)" }}>
+                {filteredSkills.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">No skills match your search.</p>
+                  </div>
+                ) : (
+                  filteredSkills.map((skill) => (
+                    <div
+                      key={skill.dirName}
+                      className={`border rounded-lg transition-all ${
+                        skill.alreadyImported ? "opacity-60 bg-muted/30" : "hover:border-primary/30"
+                      } ${expandedSkill === skill.dirName ? "ring-1 ring-primary/20" : ""}`}
+                      data-testid={`skill-row-${skill.dirName}`}
+                    >
+                      {/* Compact row */}
+                      <div className="p-3 flex items-start justify-between gap-3">
+                        <div
+                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => setExpandedSkill(expandedSkill === skill.dirName ? null : skill.dirName)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <span className="font-medium text-sm">{skill.name}</span>
+                            {skill.alreadyImported && (
+                              <Badge variant="secondary" className="text-[10px] flex-shrink-0">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Imported
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 ml-6">
+                            {skill.description || "No description"}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-2 ml-6 flex-wrap">
+                            <Badge variant="outline" className="text-[10px]">
+                              {categoryLabels[skill.category] || skill.category}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px]">{skill.dirName}</Badge>
+                            {skill.hasScripts && (
+                              <Badge variant="outline" className="text-[10px]">
+                                <Code2 className="w-2.5 h-2.5 mr-0.5" />
+                                scripts
+                              </Badge>
+                            )}
+                            {skill.hasReferences && (
+                              <Badge variant="outline" className="text-[10px]">
+                                {skill.referenceFiles.length} ref{skill.referenceFiles.length !== 1 ? "s" : ""}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-[10px]">
+                              {skill.fileCount} file{skill.fileCount !== 1 ? "s" : ""}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setExpandedSkill(expandedSkill === skill.dirName ? null : skill.dirName)}
+                          >
+                            <ChevronRight className={`w-4 h-4 transition-transform ${expandedSkill === skill.dirName ? "rotate-90" : ""}`} />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={skill.alreadyImported ? "ghost" : "default"}
+                            disabled={skill.alreadyImported || importingSkill === skill.dirName}
+                            onClick={() => {
+                              setImportingSkill(skill.dirName);
+                              importSkillMutation.mutate(skill.dirName);
+                            }}
+                            data-testid={`button-import-${skill.dirName}`}
+                          >
+                            {importingSkill === skill.dirName ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : skill.alreadyImported ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <>
+                                <Download className="w-4 h-4 mr-1" />
+                                Import
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Expanded detail panel */}
+                      {expandedSkill === skill.dirName && (
+                        <div className="border-t px-3 pb-3 pt-2 bg-muted/20">
+                          <div className="text-xs space-y-2">
+                            <div>
+                              <span className="font-medium text-foreground">Full Description</span>
+                              <p className="text-muted-foreground mt-0.5 whitespace-pre-wrap">{skill.description}</p>
+                            </div>
+                            {skill.referenceFiles.length > 0 && (
+                              <div>
+                                <span className="font-medium text-foreground">Bundled References</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {skill.referenceFiles.map((f) => (
+                                    <Badge key={f} variant="outline" className="text-[10px] font-mono">{f}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-medium text-foreground">Import Details</span>
+                              <p className="text-muted-foreground mt-0.5">
+                                Will be imported as <code className="text-[10px] bg-muted px-1 py-0.5 rounded">skill</code> type tool with{" "}
+                                <code className="text-[10px] bg-muted px-1 py-0.5 rounded">prompt_injection</code> execution mode.
+                                {skill.hasScripts && " Includes helper scripts bundled with the skill."}
+                                {skill.referenceFiles.length > 0 && ` ${skill.referenceFiles.length} reference file(s) will be concatenated into the skill content.`}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="font-medium text-foreground">SKILL.md Preview</span>
+                              <pre className="mt-1 p-2 bg-muted rounded text-[11px] max-h-48 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
+                                {skill.content.slice(0, 1500)}{skill.content.length > 1500 ? "\n\n... (truncated)" : ""}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           ) : (
-            <div className="text-center py-8">
+            <div className="text-center py-12">
               <BookOpen className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">No skills found in the skills directory.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Place skill folders with SKILL.md files in <code className="bg-muted px-1 py-0.5 rounded">.local/skills/</code>
+              </p>
             </div>
           )}
         </DialogContent>

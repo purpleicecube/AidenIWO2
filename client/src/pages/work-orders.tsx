@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Link } from "wouter";
 import { useState } from "react";
-import { Search, Plus, ClipboardList, AlertTriangle, RefreshCw, XCircle, Eye, Loader2, UserCheck, CalendarClock, Archive } from "lucide-react";
+import { Search, Plus, ClipboardList, AlertTriangle, RefreshCw, XCircle, Eye, Loader2, UserCheck, CalendarClock, Archive, FileDown } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useToast } from "@/hooks/use-toast";
@@ -411,6 +411,21 @@ export default function WorkOrders() {
                       <p className={`text-sm font-medium truncate ${order.isArchived ? "text-muted-foreground" : ""}`}>
                         {order.isArchived && <Archive className="w-3 h-3 inline mr-1.5 opacity-50" />}
                         {order.title}
+                        {(() => {
+                          const ppf = (order.tier2Result as any)?.output?.postProcessedFile;
+                          return ppf ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center ml-1.5">
+                                  <FileDown className="w-3 h-3 text-emerald-500" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Has binary deliverable — open to download</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : null;
+                        })()}
                       </p>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {order.correlationId.slice(0, 8)}...

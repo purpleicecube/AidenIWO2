@@ -87,7 +87,7 @@ export function AppSidebar() {
               <Layers className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-tight">AIDEN_IWO</span>
+              <span className="text-sm font-semibold tracking-tight">AIDEN_IWO2</span>
               <span className="text-xs text-muted-foreground">Orchestration Engine</span>
             </div>
           </div>
@@ -163,7 +163,7 @@ export function AppSidebar() {
           </div>
         )}
         <div className="text-xs text-muted-foreground">
-          AIDEN_IWO v0.7.2
+          AIDEN_IWO2 v0.8.0
         </div>
       </SidebarFooter>
     </Sidebar>

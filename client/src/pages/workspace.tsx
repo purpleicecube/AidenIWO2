@@ -50,6 +50,11 @@ import {
   File,
   Save,
   GripVertical,
+  FileSpreadsheet,
+  FileImage,
+  FileArchive,
+  Presentation,
+  Globe,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
 import { ExpandablePanel } from "@/components/expandable-panel";
@@ -60,14 +65,52 @@ const FILE_ICONS: Record<string, typeof FileText> = {
   "application/json": FileJson,
   "text/javascript": FileCode,
   "text/typescript": FileCode,
-  "text/html": FileCode,
+  "text/html": Globe,
   "text/css": FileCode,
+  "application/pdf": FileText,
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": Presentation,
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": FileText,
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": FileSpreadsheet,
+  "application/msword": FileText,
+  "application/vnd.ms-excel": FileSpreadsheet,
+  "application/vnd.ms-powerpoint": Presentation,
+  "application/zip": FileArchive,
+  "application/gzip": FileArchive,
+  "application/x-tar": FileArchive,
+  "image/png": FileImage,
+  "image/jpeg": FileImage,
+  "image/gif": FileImage,
+  "image/svg+xml": FileImage,
+  "image/webp": FileImage,
 };
 
 function getFileIcon(mimeType?: string | null) {
   if (!mimeType) return File;
   return FILE_ICONS[mimeType] || File;
 }
+
+/** Classify how to render/preview an artifact */
+function getFileCategory(name: string, mimeType: string): "binary-download" | "html-preview" | "image-preview" | "text-preview" {
+  const ext = name?.split(".").pop()?.toLowerCase() || "";
+  // Binary download types
+  if (["pptx", "ppt", "docx", "doc", "xlsx", "xls", "pdf", "zip", "gz", "tar", "7z", "rar"].includes(ext)) return "binary-download";
+  if (mimeType.includes("vnd.openxmlformats") || mimeType.includes("octet-stream") || mimeType.includes("zip") || mimeType.includes("pdf") || mimeType.includes("msword") || mimeType.includes("ms-excel") || mimeType.includes("ms-powerpoint")) return "binary-download";
+  // Images
+  if (mimeType.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return "image-preview";
+  // HTML/CSS self-contained preview
+  if (ext === "html" || ext === "htm" || mimeType === "text/html") return "html-preview";
+  // Everything else: text/markdown/code/mermaid
+  return "text-preview";
+}
+
+const FILE_TYPE_LABELS: Record<string, string> = {
+  pptx: "PowerPoint", ppt: "PowerPoint", docx: "Word Document", doc: "Word Document",
+  xlsx: "Excel Spreadsheet", xls: "Excel Spreadsheet", pdf: "PDF Document",
+  zip: "ZIP Archive", gz: "GZip Archive", tar: "TAR Archive", "7z": "7-Zip Archive", rar: "RAR Archive",
+  md: "Markdown", html: "HTML", htm: "HTML", css: "Stylesheet", js: "JavaScript", ts: "TypeScript",
+  json: "JSON", mmd: "Mermaid Diagram", mermaid: "Mermaid Diagram", svg: "SVG Image",
+  png: "PNG Image", jpg: "JPEG Image", jpeg: "JPEG Image", gif: "GIF Image", webp: "WebP Image",
+};
 
 function formatDate(dateStr: string | Date) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -613,9 +656,30 @@ export default function WorkspacePage() {
                 title={selectedArtifact.name}
               >
                 <div className="p-6">
-                  <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-file-content-expanded">
-                    {selectedArtifact.content || "No content"}
-                  </pre>
+                  {getFileCategory(selectedArtifact.name || "", selectedArtifact.mimeType || "") === "binary-download" ? (
+                    <div className="flex flex-col items-center gap-4 py-8">
+                      <p className="text-sm text-muted-foreground">Binary file — use download button below</p>
+                      <a
+                        href={`/api/artifacts/${selectedArtifact.id}/download`}
+                        download={selectedArtifact.name}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download {selectedArtifact.name?.split(".").pop()?.toUpperCase()}
+                      </a>
+                    </div>
+                  ) : getFileCategory(selectedArtifact.name || "", selectedArtifact.mimeType || "") === "html-preview" ? (
+                    <iframe
+                      srcDoc={selectedArtifact.content || ""}
+                      sandbox="allow-scripts allow-same-origin"
+                      className="w-full h-[80vh] rounded-lg border bg-white"
+                      title={selectedArtifact.name}
+                    />
+                  ) : (
+                    <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-file-content-expanded">
+                      {selectedArtifact.content || "No content"}
+                    </pre>
+                  )}
                 </div>
               </ExpandablePanel>
               <Button
@@ -666,15 +730,118 @@ export default function WorkspacePage() {
             )}
           </div>
           <div className="flex-1 overflow-auto p-3">
-            {selectedArtifact.content ? (
-              <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-file-content">
-                {selectedArtifact.content}
-              </pre>
-            ) : (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                No content
-              </div>
-            )}
+            {(() => {
+              const mime = selectedArtifact.mimeType || "";
+              const name = selectedArtifact.name || "";
+              const ext = name.split(".").pop()?.toLowerCase() || "";
+              const category = getFileCategory(name, mime);
+              const sizeKB = selectedArtifact.size ? (selectedArtifact.size / 1024).toFixed(0) : "?";
+              const typeLabel = FILE_TYPE_LABELS[ext] || ext.toUpperCase() || "File";
+              const IconComp = getFileIcon(mime);
+
+              // Binary download: .pptx, .docx, .xlsx, .pdf, .zip, etc.
+              if (category === "binary-download") {
+                return (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4" data-testid="binary-file-preview">
+                    <div className="w-20 h-20 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <IconComp className="w-10 h-10 text-primary" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium">{name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{typeLabel} — {sizeKB} KB</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={`/api/artifacts/${selectedArtifact.id}/download`}
+                        download={name}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                        data-testid="button-download-artifact"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download {typeLabel}
+                      </a>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Image preview: inline display + download
+              if (category === "image-preview" && selectedArtifact.content) {
+                const isSvg = ext === "svg" || mime === "image/svg+xml";
+                const imgSrc = isSvg
+                  ? `data:image/svg+xml;base64,${btoa(selectedArtifact.content)}`
+                  : `data:${mime};base64,${selectedArtifact.content}`;
+                return (
+                  <div className="flex flex-col items-center gap-4" data-testid="image-file-preview">
+                    <img src={imgSrc} alt={name} className="max-w-full max-h-[50vh] rounded-lg border" />
+                    <a
+                      href={`/api/artifacts/${selectedArtifact.id}/download`}
+                      download={name}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium hover:bg-accent transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      Download {typeLabel}
+                    </a>
+                  </div>
+                );
+              }
+
+              // HTML preview: render in sandboxed iframe + download
+              if (category === "html-preview" && selectedArtifact.content) {
+                return (
+                  <div className="flex flex-col gap-2 h-full" data-testid="html-file-preview">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Globe className="w-3 h-3" /> HTML Preview
+                      </span>
+                      <a
+                        href={`/api/artifacts/${selectedArtifact.id}/download`}
+                        download={name}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-medium hover:bg-accent transition-colors"
+                      >
+                        <Download className="w-3 h-3" />
+                        Download
+                      </a>
+                    </div>
+                    <iframe
+                      srcDoc={selectedArtifact.content}
+                      sandbox="allow-scripts allow-same-origin"
+                      className="flex-1 w-full rounded-lg border bg-white"
+                      title={name}
+                      data-testid="html-preview-iframe"
+                    />
+                  </div>
+                );
+              }
+
+              // Text preview: markdown, code, mermaid, JSON, plain text — with download
+              if (selectedArtifact.content) {
+                return (
+                  <div className="flex flex-col gap-2 h-full" data-testid="text-file-preview">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{typeLabel}</span>
+                      <a
+                        href={`/api/artifacts/${selectedArtifact.id}/download`}
+                        download={name}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-medium hover:bg-accent transition-colors"
+                      >
+                        <Download className="w-3 h-3" />
+                        Download
+                      </a>
+                    </div>
+                    <pre className="flex-1 text-xs whitespace-pre-wrap font-mono leading-relaxed overflow-auto" data-testid="text-file-content">
+                      {selectedArtifact.content}
+                    </pre>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="text-sm text-muted-foreground text-center py-8">
+                  No content
+                </div>
+              );
+            })()}
           </div>
         </div>
   ) : null;

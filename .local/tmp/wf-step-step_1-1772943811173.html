@@ -1,0 +1,2852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa Website — Six-Page Site Structure & Content Outline following Apple informational design principles">
+  <title>Iowa — Site Structure & Content Outline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font-system: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+      --color-bg: #ffffff;
+      --color-surface: #f5f5f7;
+      --color-surface-2: #fbfbfd;
+      --color-border: #d2d2d7;
+      --color-border-light: #e8e8ed;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-text-tertiary: #aeaeb2;
+      --color-accent: #0071e3;
+      --color-accent-light: #e8f0fb;
+      --color-accent-hover: #0077ed;
+      --color-tag-bg: #e8e8ed;
+      --color-tag-text: #6e6e73;
+      --color-h1-marker: #0071e3;
+      --color-h2-marker: #34c759;
+      --color-h3-marker: #ff9500;
+      --color-section-bg: #f9f9fb;
+      --color-image-bg: #e8e8ed;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-system);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── TOP NAV ── */
+    .doc-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--color-border-light);
+      padding: 0 40px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .doc-nav-brand {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--color-text-primary);
+      text-decoration: none;
+    }
+    .doc-nav-brand span { color: var(--color-accent); }
+    .doc-nav-links {
+      display: flex;
+      gap: 6px;
+      list-style: none;
+      flex-wrap: wrap;
+    }
+    .doc-nav-links a {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 20px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .doc-nav-links a:hover {
+      background: var(--color-surface);
+      color: var(--color-text-primary);
+    }
+    .doc-nav-links a.active {
+      background: var(--color-accent);
+      color: #fff;
+    }
+
+    /* ── DOCUMENT HEADER ── */
+    .doc-header {
+      background: linear-gradient(160deg, #fbfbfd 0%, #f0f4ff 100%);
+      border-bottom: 1px solid var(--color-border-light);
+      padding: 80px 40px 64px;
+      text-align: center;
+    }
+    .doc-header-eyebrow {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: 16px;
+    }
+    .doc-header h1 {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      color: var(--color-text-primary);
+      margin-bottom: 20px;
+    }
+    .doc-header-sub {
+      font-size: 19px;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+      max-width: 560px;
+      margin: 0 auto 32px;
+      line-height: 1.5;
+    }
+    .doc-meta {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .doc-meta-item {
+      font-size: 13px;
+      color: var(--color-text-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .doc-meta-item strong { color: var(--color-text-secondary); font-weight: 500; }
+
+    /* ── LEGEND ── */
+    .legend {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      max-width: 900px;
+      margin: 40px auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+    }
+    .legend-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      width: 100%;
+      margin-bottom: 4px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--color-text-secondary);
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-dot.h1 { background: var(--color-h1-marker); }
+    .legend-dot.h2 { background: var(--color-h2-marker); }
+    .legend-dot.h3 { background: var(--color-h3-marker); }
+    .legend-dot.img { background: #af52de; }
+    .legend-dot.copy { background: var(--color-text-tertiary); }
+    .legend-dot.cta { background: var(--color-accent); }
+
+    /* ── MAIN LAYOUT ── */
+    .doc-body {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 40px 80px;
+    }
+
+    /* ── PAGE SECTION ── */
+    .page-section {
+      margin-top: 72px;
+      scroll-margin-top: 72px;
+    }
+    .page-section-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+    .page-number {
+      flex-shrink: 0;
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: var(--color-accent);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: -0.02em;
+      margin-top: 2px;
+    }
+    .page-section-header-text h2 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--color-text-primary);
+      margin-bottom: 6px;
+    }
+    .page-section-header-text p {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+    }
+    .page-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: var(--color-tag-bg);
+      color: var(--color-tag-text);
+      padding: 3px 9px;
+      border-radius: 20px;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+
+    /* ── CONTENT BLOCKS ── */
+    .content-block {
+      background: var(--color-section-bg);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px;
+      margin-bottom: 16px;
+      transition: box-shadow 0.2s;
+    }
+    .content-block:hover { box-shadow: var(--shadow-md); }
+
+    .content-block-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .heading-badge {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .heading-badge.h1 { background: rgba(0,113,227,0.1); color: var(--color-h1-marker); }
+    .heading-badge.h2 { background: rgba(52,199,89,0.1); color: #248a3d; }
+    .heading-badge.h3 { background: rgba(255,149,0,0.1); color: #c93400; }
+
+    .heading-text {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--color-text-primary);
+    }
+    .heading-text.h1-text { font-size: 22px; font-weight: 700; }
+    .heading-text.h2-text { font-size: 18px; }
+    .heading-text.h3-text { font-size: 16px; font-weight: 500; }
+
+    .block-description {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+
+    .placeholder-copy {
+      background: #fff;
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--color-text-tertiary);
+      font-style: italic;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .placeholder-copy strong {
+      font-style: normal;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+    }
+
+    /* ── IMAGE CALLOUT ── */
+    .image-callout {
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .image-callout img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+    .image-callout-label {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.6));
+      padding: 24px 16px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .image-callout-spec {
+      font-size: 12px;
+      color: var(--color-text-tertiary);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .image-callout-spec::before {
+      content: '';
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #af52de;
+      flex-shrink: 0;
+    }
+
+    /* ── CTA BLOCK ── */
+    .cta-block {
+      background: var(--color-accent-light);
+      border: 1px solid rgba(0,113,227,0.15);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .cta-block-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--color-accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .cta-block-text {
+      font-size: 13px;
+      color: var(--color-accent);
+      font-weight: 500;
+    }
+    .cta-block-text span {
+      display: block;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    /* ── GRID LAYOUTS ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .four-col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    /* ── NAV STRUCTURE ── */
+    .nav-structure {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .nav-structure-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      margin-bottom: 12px;
+    }
+    .nav-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .nav-item {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: var(--color-surface);
+      color: var(--color-text-secondary);
+      border: 1px solid var(--color-border-light);
+    }
+    .nav-item.current {
+      background: var(--color-accent);
+      color: #fff;
+      border-color: var(--color-accent);
+    }
+    .nav-item.cta-nav {
+      background: var(--color-text-primary);
+      color: #fff;
+      border-color: var(--color-text-primary);
+    }
+
+    /* ── SECTION DIVIDER ── */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 28px 0 20px;
+    }
+    .section-divider-line { flex: 1; height: 1px; background: var(--color-border-light); }
+    .section-divider-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      white-space: nowrap;
+    }
+
+    /* ── FEATURE CHIP ── */
+    .feature-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .feature-chip {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: #fff;
+      border: 1px solid var(--color-border);
+      color: var(--color-text-secondary);
+    }
+
+    /* ── CARD MINI ── */
+    .card-mini {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .card-mini img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+    }
+    .card-mini-body {
+      padding: 12px 14px;
+    }
+    .card-mini-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 4px;
+    }
+    .card-mini-desc {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ── SCROLL TO TOP ── */
+    .scroll-top {
+      position: fixed;
+      bottom: 32px;
+      right: 32px;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: var(--color-text-primary);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: var(--shadow-lg);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 200;
+    }
+    .scroll-top.visible { opacity: 1; transform: translateY(0); }
+    .scroll-top:hover { background: var(--color-accent); }
+
+    /* ── PROGRESS BAR ── */
+    .progress-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 3px;
+      background: var(--color-accent);
+      z-index: 300;
+      transition: width 0.1s;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .doc-nav { padding: 0 20px; }
+      .doc-nav-links { display: none; }
+      .doc-header { padding: 48px 20px 40px; }
+      .doc-body { padding: 0 20px 60px; }
+      .two-col, .three-col, .four-col { grid-template-columns: 1fr; }
+      .content-block { padding: 20px; }
+      .page-section-header { flex-direction: column; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar" id="progressBar" style="width:0%"></div>
+
+  <!-- Top Navigation -->
+  <nav class="doc-nav" role="navigation" aria-label="Document navigation">
+    <a href="#" class="doc-nav-brand">Iowa<span>.</span></a>
+    <ul class="doc-nav-links" role="list">
+      <li><a href="#page-1" class="active">Home</a></li>
+      <li><a href="#page-2">About</a></li>
+      <li><a href="#page-3">Destinations</a></li>
+      <li><a href="#page-4">Experience</a></li>
+      <li><a href="#page-5">Stories</a></li>
+      <li><a href="#page-6">Plan Visit</a></li>
+    </ul>
+  </nav>
+
+  <!-- Document Header -->
+  <header class="doc-header" role="banner">
+    <p class="doc-header-eyebrow">Site Structure &amp; Content Outline</p>
+    <h1>Iowa Website</h1>
+    <p class="doc-header-sub">A six-page informational website following Apple design principles — generous whitespace, clear hierarchy, and purposeful content.</p>
+    <div class="doc-meta">
+      <div class="doc-meta-item"><strong>Pages:</strong> 6</div>
+      <div class="doc-meta-item"><strong>Design System:</strong> Apple-Inspired</div>
+      <div class="doc-meta-item"><strong>Stack:</strong> HTML / CSS / JS</div>
+      <div class="doc-meta-item"><strong>Version:</strong> 1.0 Draft</div>
+    </div>
+  </header>
+
+  <!-- Legend -->
+  <div class="doc-body">
+    <div class="legend" role="note" aria-label="Legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-item"><span class="legend-dot h1"></span> H1 — Page Title</div>
+      <div class="legend-item"><span class="legend-dot h2"></span> H2 — Section Heading</div>
+      <div class="legend-item"><span class="legend-dot h3"></span> H3 — Sub-section</div>
+      <div class="legend-item"><span class="legend-dot img"></span> Image Area</div>
+      <div class="legend-item"><span class="legend-dot copy"></span> Placeholder Copy</div>
+      <div class="legend-item"><span class="legend-dot cta"></span> CTA Element</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         PAGE 1 — HOME / HERO
+    ═══════════════════════════════════════════════ -->
+    <section class="page-section" id="page-1" aria-labelledby="page1-title">
+      <div class="page-section-header">
+        <div class="page-number" aria-hidden="true">1</div>
+        <div class="page-section-header-text">
+          <h2 id="page1-title">Home / Hero Page <span class="page-tag">index.html</span></h2>
+          <p>The entry point. Bold visual impact, clear value proposition, and immediate orientation for the visitor.</p>
+        </div>
+      </div>
+
+      <!-- Nav Structure -->
+      <div class="nav-structure" aria-label="Navigation structure for Home page">
+        <div class="nav-structure-title">Global Navigation Bar</div>
+        <div class="nav-items">
+          <div class="nav-item current">Iowa</div>
+          <div class="nav-item">About</div>
+          <div class="nav-item">Destinations</div>
+          <div class="nav-item">Experience</div>
+          <div class="nav-item">Stories</div>
+          <div class="nav-item cta-nav">Plan Your Visit</div>
+        </div>
+      </div>
+
+      <!-- Hero Section -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Iowa. More Than You Imagined.</span>
+        </div>
+        <p class="block-description">Full-bleed hero section. Large cinematic image or video background with centered headline and tagline. Occupies 90–100vh on desktop.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-hero/1100/300" alt="Iowa landscape hero image — rolling fields at golden hour" loading="lazy">
+          <div class="image-callout-label">Hero Image / Video Background</div>
+        </div>
+        <div class="image-callout-spec">Spec: Full-bleed, 100vw × 90–100vh. Suggested: aerial drone shot of Iowa farmland at golden hour or a vibrant downtown Des Moines skyline. Overlay: dark gradient from bottom.</div>
+        <div class="placeholder-copy">
+          <strong>Tagline:</strong> "Where the heartland meets the horizon. Discover Iowa's open skies, vibrant cities, and stories waiting to be told."
+        </div>
+        <div class="cta-block">
+          <div class="cta-block-icon">→</div>
+          <div class="cta-block-text">Primary CTA: "Explore Iowa" <span>Scrolls to feature highlights or links to Destinations page</span></div>
+        </div>
+        <div class="cta-block">
+          <div class="cta-block-icon" style="background:#34c759">↓</div>
+          <div class="cta-block-text">Secondary CTA: "Plan Your Visit" <span>Links directly to Plan Your Visit page</span></div>
+        </div>
+      </div>
+
+      <!-- Feature Highlights -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Feature Highlights Strip</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">What Makes Iowa Extraordinary</span>
+        </div>
+        <p class="block-description">Four-column icon + headline + one-liner strip. Inspired by Apple's feature grid. Minimal, scannable, no images — just icons and short copy.</p>
+        <div class="four-col">
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e8f4e8,#c8e6c9);display:flex;align-items:center;justify-content:center;font-size:24px;">🌾</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Rich Farmland</div>
+              <div class="card-mini-desc">The most productive soil on Earth, feeding the nation.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e8f0fb,#c5d8f5);display:flex;align-items:center;justify-content:center;font-size:24px;">🏙️</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Vibrant Cities</div>
+              <div class="card-mini-desc">Des Moines, Iowa City, Cedar Rapids — culture and cuisine.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#fff3e0,#ffe0b2);display:flex;align-items:center;justify-content:center;font-size:24px;">🎭</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Arts &amp; Culture</div>
+              <div class="card-mini-desc">World-class museums, festivals, and live music scenes.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#f3e5f5,#e1bee7);display:flex;align-items:center;justify-content:center;font-size:24px;">🌊</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Natural Beauty</div>
+              <div class="card-mini-desc">Rivers, lakes, trails, and breathtaking seasonal landscapes.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Destination Teaser -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Destination Teaser</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Start Exploring</span>
+        </div>
+        <p class="block-description">Horizontal scroll or 3-column card row teasing top destinations. Each card: image, city name, one-line hook, arrow link.</p>
+        <div class="three-col">
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/desmoines/400/160" alt="Des Moines skyline at dusk" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Des Moines</div>
+              <div class="card-mini-desc">Iowa's capital — food, art, and energy in the heartland.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/iowacity/400/160" alt="Iowa City riverfront" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Iowa City</div>
+              <div class="card-mini-desc">A UNESCO City of Literature with a spirited university culture.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/cedarrapids/400/160" alt="Cedar Rapids Czech Village" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Cedar Rapids</div>
+              <div class="card-mini-desc">Czech heritage, craft beer, and the National Czech &amp; Slovak Museum.</div>
+            </div>
+          </div>
+        </div>
+        <div class="cta-block" style="margin-top:16px">
+          <div class="cta-block-icon">→</div>
+          <div class="cta-block-text">CTA: "See All Destinations" <span>Links to Destinations page</span></div>
+        </div>
+      </div>
+
+      <!-- Editorial Teaser -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Latest Stories</span>
+        </div>
+        <p class="block-description">Two-column editorial teaser. Featured article left (large image), secondary article right (smaller). Links to Stories page.</p>
+        <div class="placeholder-copy">"The Field of Dreams: How a Movie Became Iowa's Most Beloved Landmark" — Featured story with pull quote and author byline.</div>
+        <div class="cta-block">
+          <div class="cta-block-icon">📖</div>
+          <div class="cta-block-text">CTA: "Read All Stories" <span>Links to Stories page</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════
+         PAGE 2 — ABOUT IOWA
+    ═══════════════════════════════════════════════ -->
+    <section class="page-section" id="page-2" aria-labelledby="page2-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#34c759">2</div>
+        <div class="page-section-header-text">
+          <h2 id="page2-title">About Iowa <span class="page-tag">about.html</span></h2>
+          <p>History, geography, and culture — the soul of the state told with depth and editorial grace.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item current">About</div>
+          <div class="nav-item">Destinations</div>
+          <div class="nav-item">Experience</div>
+          <div class="nav-item">Stories</div>
+          <div class="nav-item cta-nav">Plan Your Visit</div>
+        </div>
+      </div>
+
+      <!-- Page Hero -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">The Heart of America</span>
+        </div>
+        <p class="block-description">Subdued hero — not full-bleed. Half-height image with page title overlaid. Warm, editorial tone.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-about/1100/220" alt="Iowa countryside panorama — patchwork fields and blue sky" loading="lazy">
+          <div class="image-callout-label">About Page Hero — Half-height, 50vh</div>
+        </div>
+        <div class="placeholder-copy">"Iowa sits at the center of the American story — a place where the land shapes the people, and the people shape the nation. From the first Indigenous nations to waves of European settlers, from the Underground Railroad to the Iowa Caucuses, this is a state that has always mattered."</div>
+      </div>
+
+      <!-- History Section -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">History Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">A History Written in the Land</span>
+        </div>
+        <p class="block-description">Timeline-style layout or alternating text/image rows. Three sub-sections covering Indigenous heritage, settlement era, and modern Iowa.</p>
+        <div class="two-col">
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Indigenous Nations</span>
+            </div>
+            <div class="placeholder-copy">"Long before European contact, the Meskwaki, Sioux, and Potawatomi peoples called this land home. Their traditions, place names, and stewardship of the land remain woven into Iowa's identity."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Settlement &amp; Statehood</span>
+            </div>
+            <div class="placeholder-copy">"Iowa became the 29th state in 1846. Waves of German, Czech, and Scandinavian immigrants transformed the prairie into one of the world's most productive agricultural regions."</div>
+          </div>
+        </div>
+        <div class="content-block-header" style="margin-bottom:8px;margin-top:16px">
+          <span class="heading-badge h3">H3</span>
+          <span class="heading-text h3-text">Modern Iowa</span>
+        </div>
+        <div class="placeholder-copy">"Today Iowa leads in renewable energy, education, and innovation. The Iowa Caucuses have launched presidential campaigns. Iowa City is a UNESCO City of Literature. The state's story is still being written."</div>
+        <div class="image-callout" style="margin-top:12px">
+          <img src="https://picsum.photos/seed/iowa-history/1100/180" alt="Historic Iowa State Capitol building in Des Moines" loading="lazy">
+          <div class="image-callout-label">Image: Iowa State Capitol or historical archive photo</div>
+        </div>
+      </div>
+
+      <!-- Geography Section -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Geography Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">A Land of Surprising Variety</span>
+        </div>
+        <p class="block-description">Three-column layout with illustrated or photographic callouts for each geographic region.</p>
+        <div class="three-col">
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Loess Hills</span>
+            </div>
+            <div class="placeholder-copy">"Rare wind-deposited bluffs along the Missouri River — found only here and in China. A hiker's paradise of dramatic ridgelines and native prairie."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Mississippi Bluffs</span>
+            </div>
+            <div class="placeholder-copy">"The eastern border traces the mighty Mississippi. Limestone bluffs, river towns, and the Great River Road offer some of the Midwest's most scenic drives."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Prairie Heartland</span>
+            </div>
+            <div class="placeholder-copy">"Iowa's rolling central plains are the engine of American agriculture. Tallgrass prairie remnants, wetlands, and wildlife refuges preserve the original landscape."</div>
+          </div>
+        </div>
+        <div class="image-callout" style="margin-top:12px">
+          <img src="https://picsum.photos/seed/iowa-geo/1100/180" alt="Aerial view of Iowa's patchwork farmland and river valleys" loading="lazy">
+          <div class="image-callout-label">Image: Aerial map-style or drone landscape — full width</div>
+        </div>
+      </div>
+
+      <!-- Culture Section -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Culture Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Culture, Community &amp; Character</span>
+        </div>
+        <p class="block-description">Editorial text section with pull quote and supporting image. Covers Iowa's literary tradition, food culture, and community values.</p>
+        <div class="placeholder-copy">"Iowa has produced more writers per capita than almost any other state. From Grant Wood's American Gothic to the Iowa Writers' Workshop — the most celebrated creative writing program in the world — Iowa has always nurtured the arts."</div>
+        <div class="feature-chips">
+          <span class="feature-chip">Iowa Writers' Workshop</span>
+          <span class="feature-chip">Grant Wood</span>
+          <span class="feature-chip">State Fair</span>
+          <span class="feature-chip">Czech Heritage</span>
+          <span class="feature-chip">Farm-to-Table</span>
+          <span class="feature-chip">Ragbrai</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════
+         PAGE 3 — DESTINATIONS
+    ═══════════════════════════════════════════════ -->
+    <section class="page-section" id="page-3" aria-labelledby="page3-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#ff9500">3</div>
+        <div class="page-section-header-text">
+          <h2 id="page3-title">Destinations <span class="page-tag">destinations.html</span></h2>
+          <p>A curated grid of Iowa's most compelling places — cities, natural landmarks, and hidden gems.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About</div>
+          <div class="nav-item current">Destinations</div>
+          <div class="nav-item">Experience</div>
+          <div class="nav-item">Stories</div>
+          <div class="nav-item cta-nav">Plan Your Visit</div>
+        </div>
+      </div>
+
+      <!-- Page Intro -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Discover Iowa's Best Places</span>
+        </div>
+        <div class="placeholder-copy">"From the energy of Des Moines to the quiet beauty of the Loess Hills, Iowa rewards the curious traveler. Here are the destinations that define the state."</div>
+        <div class="feature-chips">
+          <span class="feature-chip" style="background:var(--color-accent);color:#fff;border-color:var(--color-accent)">All</span>
+          <span class="feature-chip">Cities</span>
+          <span class="feature-chip">Nature</span>
+          <span class="feature-chip">History</span>
+          <span class="feature-chip">Arts</span>
+          <span class="feature-chip">Food &amp; Drink</span>
+        </div>
+        <div class="image-callout-spec" style="margin-top:12px">Filter chips — JavaScript-powered category filter on destination cards</div>
+      </div>
+
+      <!-- Destinations Grid -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Featured Destinations Grid</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Featured Destinations</span>
+        </div>
+        <p class="block-description">Masonry or uniform 3-column grid. Each card: full-bleed image, destination name (H3), category tag, 2-sentence description, "Explore" link.</p>
+        <div class="three-col">
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/desmoines2/400/200" alt="Des Moines East Village neighborhood" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Des Moines <span class="page-tag">City</span></div>
+              <div class="card-mini-desc">Iowa's capital is a rising culinary and arts destination. The East Village, Pappajohn Sculpture Park, and a thriving restaurant scene await.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/iowacity2/400/200" alt="Iowa City pedestrian mall" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Iowa City <span class="page-tag">City</span></div>
+              <div class="card-mini-desc">Home to the University of Iowa and the legendary Writers' Workshop. Bookshops, live music, and a UNESCO literary heritage.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/loesshills/400/200" alt="Loess Hills dramatic ridgeline at sunset" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Loess Hills <span class="page-tag">Nature</span></div>
+              <div class="card-mini-desc">One of only two such landforms in the world. Hike the ridgelines, spot rare prairie plants, and watch the sunset paint the bluffs gold.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/fieldofdreams/400/200" alt="Field of Dreams movie site baseball diamond" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Field of Dreams <span class="page-tag">History</span></div>
+              <div class="card-mini-desc">The iconic Dyersville farm where the 1989 film was shot. Still a working farm, still a place of pilgrimage for baseball fans worldwide.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/amana/400/200" alt="Amana Colonies historic village" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Amana Colonies <span class="page-tag">History</span></div>
+              <div class="card-mini-desc">Seven villages founded by German religious communalists in the 1850s. Handcrafted furniture, woolen mills, and hearty German cuisine.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/effigy/400/200" alt="Effigy Mounds National Monument aerial view" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Effigy Mounds <span class="page-tag">Nature</span></div>
+              <div class="card-mini-desc">Ancient burial mounds shaped like bears and birds overlook the Mississippi River. A sacred and stunning National Monument.</div>
+            </div>
+          </div>
+        </div>
+        <div class="cta-block" style="margin-top:16px">
+          <div class="cta-block-icon">+</div>
+          <div class="cta-block-text">Load More Destinations <span>Pagination or "Load More" button — 6 additional destinations</span></div>
+        </div>
+      </div>
+
+      <!-- Map Section -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Iowa at a Glance</span>
+        </div>
+        <p class="block-description">Interactive or illustrated map of Iowa showing destination pins. Clicking a pin highlights the corresponding card.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-map/1100/220" alt="Illustrated map of Iowa showing major destinations" loading="lazy">
+          <div class="image-callout-label">Interactive Map — Iowa destinations with clickable pins</div>
+        </div>
+        <div class="image-callout-spec">Spec: SVG-based illustrated map or embedded Mapbox/Google Maps iframe. Pins correspond to destination cards above.</div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════
+         PAGE 4 — EXPERIENCE
+    ═══════════════════════════════════════════════ -->
+    <section class="page-section" id="page-4" aria-labelledby="page4-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#af52de">4</div>
+        <div class="page-section-header-text">
+          <h2 id="page4-title">Experience Iowa <span class="page-tag">experience.html</span></h2>
+          <p>Activities, seasons, and lifestyle content — what it feels like to be in Iowa across the year.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About</div>
+          <div class="nav-item">Destinations</div>
+          <div class="nav-item current">Experience</div>
+          <div class="nav-item">Stories</div>
+          <div class="nav-item cta-nav">Plan Your Visit</div>
+        </div>
+      </div>
+
+      <!-- Page Hero -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Live the Iowa Life</span>
+        </div>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-exp/1100/220" alt="Cyclists on RAGBRAI crossing Iowa countryside" loading="lazy">
+          <div class="image-callout-label">Experience Hero — Action/lifestyle photography, 50vh</div>
+        </div>
+        <div class="placeholder-copy">"Iowa isn't just a place to visit — it's a place to live fully. Whether you're cycling across the state, kayaking the Upper Iowa River, or savoring a farm-to-table dinner in Des Moines, Iowa offers experiences that stay with you."</div>
+      </div>
+
+      <!-- Activities -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Activities Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Things to Do</span>
+        </div>
+        <p class="block-description">Icon-forward activity categories in a 4-column grid. Each links to a filtered Destinations view or dedicated sub-page.</p>
+        <div class="four-col">
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e8f5e9,#a5d6a7);display:flex;align-items:center;justify-content:center;font-size:28px;">🚴</div>
+            <div class="card-mini-body"><div class="card-mini-title">Cycling</div><div class="card-mini-desc">RAGBRAI, trail networks, and scenic county roads.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e3f2fd,#90caf9);display:flex;align-items:center;justify-content:center;font-size:28px;">🎣</div>
+            <div class="card-mini-body"><div class="card-mini-title">Fishing</div><div class="card-mini-desc">World-class trout streams and Mississippi River fishing.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#fff8e1,#ffe082);display:flex;align-items:center;justify-content:center;font-size:28px;">🍽️</div>
+            <div class="card-mini-body"><div class="card-mini-title">Food &amp; Drink</div><div class="card-mini-desc">Farm-to-table dining, craft breweries, and the Iowa State Fair.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#fce4ec,#f48fb1);display:flex;align-items:center;justify-content:center;font-size:28px;">🎨</div>
+            <div class="card-mini-body"><div class="card-mini-title">Arts</div><div class="card-mini-desc">Galleries, live music, theater, and the Iowa State Fair fine arts.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seasons -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Seasons Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Iowa Through the Seasons</span>
+        </div>
+        <p class="block-description">Tabbed or accordion layout — one tab per season. Each tab: hero image, 3 activity highlights, best-time-to-visit note.</p>
+        <div class="two-col">
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Spring — April to June</span>
+            </div>
+            <div class="placeholder-copy">"Wildflowers carpet the Loess Hills. Morel mushroom season draws foragers. The Des Moines Arts Festival kicks off the cultural calendar."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Summer — July to August</span>
+            </div>
+            <div class="placeholder-copy">"RAGBRAI crosses the state. The Iowa State Fair draws a million visitors. Corn reaches head-high and the evenings glow golden."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Fall — September to November</span>
+            </div>
+            <div class="placeholder-copy">"Harvest season transforms the landscape into a tapestry of amber and gold. Apple orchards, pumpkin patches, and fall foliage drives."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Winter — December to March</span>
+            </div>
+            <div class="placeholder-copy">"Cross-country skiing in Backbone State Park. Ice fishing on Iowa's lakes. Cozy small-town holiday markets and warm restaurant culture."</div>
+          </div>
+        </div>
+        <div class="image-callout" style="margin-top:12px">
+          <img src="https://picsum.photos/seed/iowa-seasons/1100/180" alt="Iowa four seasons collage — spring flowers, summer corn, fall foliage, winter snow" loading="lazy">
+          <div class="image-callout-label">Image: Four-panel seasonal collage or tabbed photography</div>
+        </div>
+      </div>
+
+      <!-- Lifestyle -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">The Iowa Way of Life</span>
+        </div>
+        <p class="block-description">Long-form editorial section. Pull quote, portrait photography, and narrative copy about Iowa's community values, pace of life, and quality of living.</p>
+        <div class="placeholder-copy">"Iowans are known for their directness, their generosity, and their deep connection to the land. It's a place where neighbors still know each other's names, where the pace of life allows for real conversation, and where the sky is always the most dramatic thing in the room."</div>
+        <div class="feature-chips">
+          <span class="feature-chip">Low Cost of Living</span>
+          <span class="feature-chip">Top-Ranked Schools</span>
+          <span class="feature-chip">Safe Communities</span>
+          <span class="feature-chip">Outdoor Access</span>
+          <span class="feature-chip">Strong Economy</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════
+         PAGE 5 — STORIES
+    ═══════════════════════════════════════════════ -->
+    <section class="page-section" id="page-5" aria-labelledby="page5-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#ff3b30">5</div>
+        <div class="page-section-header-text">
+          <h2 id="page5-title">Stories <span class="page-tag">stories.html</span></h2>
+          <p>Editorial and blog-style articles — long-form storytelling about Iowa's people, places, and moments.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About</div>
+          <div class="nav-item">Destinations</div>
+          <div class="nav-item">Experience</div>
+          <div class="nav-item current">Stories</div>
+          <div class="nav-item cta-nav">Plan Your Visit</div>
+        </div>
+      </div>
+
+      <!-- Page Intro -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Stories from the Heartland</span>
+        </div>
+        <div class="placeholder-copy">"Iowa has always been a place of stories. Here we collect the ones worth telling — from the writers and farmers, the chefs and cyclists, the dreamers and doers who make this state extraordinary."</div>
+        <div class="feature-chips">
+          <span class="feature-chip" style="background:var(--color-accent);color:#fff;border-color:var(--color-accent)">All Stories</span>
+          <span class="feature-chip">People</span>
+          <span class="feature-chip">Places</span>
+          <span class="feature-chip">Food</span>
+          <span class="feature-chip">Adventure</span>
+          <span class="feature-chip">Culture</span>
+        </div>
+      </div>
+
+      <!-- Featured Article -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Featured Article</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Featured Story</span>
+        </div>
+        <p class="block-description">Full-width featured article card. Large image, category tag, headline (H2), deck/subhead, author + date, estimated read time, and "Read Story" CTA.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-story1/1100/260" alt="Baseball diamond at Field of Dreams site in Dyersville Iowa" loading="lazy">
+          <div class="image-callout-label">Featured Article Hero Image — 16:5 ratio, full width</div>
+        </div>
+        <div class="placeholder-copy">
+          <strong>Category:</strong> Places &nbsp;|&nbsp; <strong>Read time:</strong> 8 min<br><br>
+          <strong>Headline:</strong> "If You Build It, They Will Still Come: The Enduring Magic of the Field of Dreams"<br><br>
+          <strong>Deck:</strong> "Thirty-five years after the film wrapped, a quiet farm outside Dyersville, Iowa still draws pilgrims from around the world. We went to find out why."
+        </div>
+        <div class="cta-block">
+          <div class="cta-block-icon">📖</div>
+          <div class="cta-block-text">CTA: "Read the Full Story" <span>Links to individual article page (article-template.html)</span></div>
+        </div>
+      </div>
+
+      <!-- Article Grid -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Article Grid</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">More Stories</span>
+        </div>
+        <p class="block-description">3-column article grid. Each card: image (16:9), category tag, headline (H3), 1-sentence teaser, author avatar + name, date.</p>
+        <div class="three-col">
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/story-ragbrai/400/200" alt="RAGBRAI cyclists crossing Iowa at sunrise" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Adventure · 6 min read</div>
+              <div class="card-mini-desc">"RAGBRAI at 50: Why the World's Largest Bike Ride Keeps Getting Better" — The annual Register's Annual Great Bicycle Ride Across Iowa turns 50.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/story-food/400/200" alt="Farm-to-table dinner in an Iowa barn" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Food · 5 min read</div>
+              <div class="card-mini-desc">"The New Iowa Table: How Farm-to-Fork Dining is Redefining Midwestern Cuisine" — Chefs across the state are changing the conversation.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/story-writers/400/200" alt="Iowa Writers Workshop building on University of Iowa campus" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Culture · 7 min read</div>
+              <div class="card-mini-desc">"The Workshop Effect: How Iowa City Became the Literary Capital of America" — The Writers' Workshop has shaped American literature for 80 years.</div>
+            </div>
+          </div>
+        </div>
+        <div class="cta-block" style="margin-top:16px">
+          <div class="cta-block-icon">+</div>
+          <div class="cta-block-text">Load More Stories <span>Pagination — 6 more articles per page</span></div>
+        </div>
+      </div>
+
+      <!-- Newsletter -->
+      <div class="content-block" style="background:linear-gradient(135deg,#f0f4ff,#e8f0fb)">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Never Miss a Story</span>
+        </div>
+        <div class="placeholder-copy">"Get the best of Iowa delivered to your inbox. New stories, seasonal guides, and hidden gems — every two weeks."</div>
+        <div class="cta-block">
+          <div class="cta-block-icon">✉</div>
+          <div class="cta-block-text">Email signup form: input field + "Subscribe" button <span>Inline form — name, email, submit. Privacy note below.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════
+         PAGE 6 — PLAN YOUR VISIT
+    ═══════════════════════════════════════════════ -->
+    <section class="page-section" id="page-6" aria-labelledby="page6-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#1d1d1f">6</div>
+        <div class="page-section-header-text">
+          <h2 id="page6-title">Plan Your Visit <span class="page-tag">plan.html</span></h2>
+          <p>Practical information, resources, and contact — everything a visitor needs to make their Iowa trip a reality.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About</div>
+          <div class="nav-item">Destinations</div>
+          <div class="nav-item">Experience</div>
+          <div class="nav-item">Stories</div>
+          <div class="nav-item current cta-nav">Plan Your Visit</div>
+        </div>
+      </div>
+
+      <!-- Page Hero -->
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Your Iowa Adventure Starts Here</span>
+        </div>
+        <div class="placeholder-copy">"Whether you're planning a weekend getaway or a week-long road trip, Iowa is easier to explore than you think. Here's everything you need to know before you go."</div>
+      </div>
+
+      <!-- Getting Here -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Getting Here</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Getting to Iowa</span>
+        </div>
+        <p class="block-description">Three-column layout covering air, road, and rail options. Each with icon, heading (H3), and practical details.</p>
+        <div class="three-col">
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">✈ By Air</span>
+            </div>
+            <div class="placeholder-copy">"Des Moines International Airport (DSM) offers direct flights from major hubs including Chicago, Dallas, Denver, and Atlanta. Cedar Rapids Airport (CID) serves the eastern corridor."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">🚗 By Road</span>
+            </div>
+            <div class="placeholder-copy">"Iowa is intersected by I-80 (east-west) and I-35 (north-south). Chicago is 5 hours east; Kansas City is 3 hours south; Minneapolis is 4 hours north."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">🚂 By Rail</span>
+            </div>
+            <div class="placeholder-copy">"Amtrak's California Zephyr stops in Osceola, Creston, Ottumwa, and Burlington. The Iowa Pacific connects to Chicago's Union Station."</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Practical Info -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Practical Information</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Good to Know</span>
+        </div>
+        <p class="block-description">Accordion or two-column FAQ layout covering accommodation, weather, currency, accessibility, and local tips.</p>
+        <div class="two-col">
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Where to Stay</span>
+            </div>
+            <div class="placeholder-copy">"Iowa offers everything from boutique hotels in Des Moines' East Village to historic B&Bs in the Amana Colonies, lakeside cabins, and campgrounds in state parks."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Best Time to Visit</span>
+            </div>
+            <div class="placeholder-copy">"Late spring (May–June) and early fall (September–October) offer the most comfortable weather and the most vibrant landscapes. Summer brings festivals; winter offers solitude."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Getting Around</span>
+            </div>
+            <div class="placeholder-copy">"A car is recommended for exploring rural Iowa. Des Moines has a growing bike-share network and ride-share services. Iowa City is highly walkable."</div>
+          </div>
+          <div>
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Accessibility</span>
+            </div>
+            <div class="placeholder-copy">"Iowa's state parks and major attractions are ADA accessible. Des Moines and Iowa City have accessible public transit. Contact individual venues for specific needs."</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resources -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Resources</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Helpful Resources</span>
+        </div>
+        <p class="block-description">Card grid of downloadable or linkable resources: travel guide PDF, events calendar, state parks map, visitor centers directory.</p>
+        <div class="four-col">
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e8f0fb,#c5d8f5);display:flex;align-items:center;justify-content:center;font-size:24px;">📄</div>
+            <div class="card-mini-body"><div class="card-mini-title">Travel Guide</div><div class="card-mini-desc">Download the official Iowa Travel Guide PDF.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e8f5e9,#a5d6a7);display:flex;align-items:center;justify-content:center;font-size:24px;">📅</div>
+            <div class="card-mini-body"><div class="card-mini-title">Events Calendar</div><div class="card-mini-desc">Find festivals, fairs, and events near you.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#fff3e0,#ffe082);display:flex;align-items:center;justify-content:center;font-size:24px;">🗺️</div>
+            <div class="card-mini-body"><div class="card-mini-title">State Parks Map</div><div class="card-mini-desc">Explore Iowa's 80+ state parks and recreation areas.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#fce4ec,#f48fb1);display:flex;align-items:center;justify-content:center;font-size:24px;">ℹ️</div>
+            <div class="card-mini-body"><div class="card-mini-title">Visitor Centers</div><div class="card-mini-desc">Find welcome centers across the state.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div class="content-block" style="background:linear-gradient(135deg,#1d1d1f,#2c2c2e);color:#fff">
+        <div class="content-block-header">
+          <span class="heading-badge h2" style="background:rgba(255,255,255,0.1);color:#fff">H2</span>
+          <span class="heading-text h2-text" style="color:#fff">Contact &amp; Connect</span>
+        </div>
+        <p class="block-description" style="color:rgba(255,255,255,0.6)">Contact form and social media links. Clean, minimal layout — name, email, message, submit. Social icons row below.</p>
+        <div class="placeholder-copy" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5)">
+          Form fields: Name (text), Email (email), Subject (select: General Inquiry / Media / Partnerships / Feedback), Message (textarea), Submit button.
+        </div>
+        <div class="feature-chips" style="margin-top:16px">
+          <span class="feature-chip" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)">Twitter / X</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)">Instagram</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)">Facebook</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)">YouTube</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)">Pinterest</span>
+        </div>
+      </div>
+
+      <!-- Footer Preview -->
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Global Footer</div><div class="section-divider-line"></div></div>
+      <div class="content-block" style="background:#f5f5f7">
+        <div class="content-block-header">
+          <span class="heading-badge h3">Footer</span>
+          <span class="heading-text h3-text">Global Footer — Appears on All Pages</span>
+        </div>
+        <p class="block-description">Four-column footer: Logo + tagline | Quick Links | Explore | Legal. Bottom bar: copyright, privacy policy, terms.</p>
+        <div class="four-col">
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px">Iowa.</div>
+            <div class="card-mini-desc">The Hawkeye State. Discover what's waiting for you in the heart of America.</div>
+          </div>
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px">Quick Links</div>
+            <div class="card-mini-desc">Home · About · Destinations · Experience · Stories · Plan Your Visit</div>
+          </div>
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px">Explore</div>
+            <div class="card-mini-desc">Des Moines · Iowa City · Cedar Rapids · Loess Hills · Field of Dreams · Amana Colonies</div>
+          </div>
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px">Legal</div>
+            <div class="card-mini-desc">Privacy Policy · Terms of Use · Accessibility · Cookie Preferences · Sitemap</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- end .doc-body -->
+
+  <!-- Scroll to Top -->
+  <button class="scroll-top" id="scrollTop" aria-label="Scroll to top" title="Back to top">↑</button>
+
+  <script>
+    // Progress bar
+    const progressBar = document.getElementById('progressBar');
+    const scrollTop = document.getElementById('scrollTop');
+    const navLinks = document.querySelectorAll('.doc-nav-links a');
+    const sections = document.querySelectorAll('.page-section');
+
+    function updateProgress() {
+      const scrolled = window.scrollY;
+      const total = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = total > 0 ? (scrolled / total) * 100 : 0;
+      progressBar.style.width = pct + '%';
+      scrollTop.classList.toggle('visible', scrolled > 400);
+    }
+
+    function updateActiveNav() {
+      let current = '';
+      sections.forEach(section => {
+        const top = section.getBoundingClientRect().top;
+        if (top <= 80) current = section.id;
+      });
+      navLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+      });
+    }
+
+    window.addEventListener('scroll', () => {
+      updateProgress();
+      updateActiveNav();
+    }, { passive: true });
+
+    scrollTop.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // Smooth scroll for nav links
+    navLinks.forEach(link => {
+      link.addEventListener('click', e => {
+        const href = link.getAttribute('href');
+        if (href && href.startsWith('#') && href.length > 1) {
+          e.preventDefault();
+          const target = document.querySelector(href);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // Initial call
+    updateProgress();
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa Website — Six-Page Site Structure & Content Outline following Apple informational design principles">
+  <title>Iowa — Site Structure & Content Outline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font-system: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+      --color-bg: #ffffff;
+      --color-surface: #f5f5f7;
+      --color-surface-2: #fbfbfd;
+      --color-border: #d2d2d7;
+      --color-border-light: #e8e8ed;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-text-tertiary: #aeaeb2;
+      --color-accent: #0071e3;
+      --color-accent-light: #e8f0fb;
+      --color-tag-bg: #e8e8ed;
+      --color-tag-text: #6e6e73;
+      --color-section-bg: #f9f9fb;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-system);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* NAV */
+    .doc-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--color-border-light);
+      padding: 0 40px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .doc-nav-brand {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--color-text-primary);
+      text-decoration: none;
+    }
+    .doc-nav-brand span { color: var(--color-accent); }
+    .doc-nav-links {
+      display: flex;
+      gap: 4px;
+      list-style: none;
+    }
+    .doc-nav-links a {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      padding: 5px 11px;
+      border-radius: 20px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .doc-nav-links a:hover { background: var(--color-surface); color: var(--color-text-primary); }
+    .doc-nav-links a.active { background: var(--color-accent); color: #fff; }
+
+    /* PROGRESS */
+    .progress-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 3px;
+      background: var(--color-accent);
+      z-index: 300;
+      transition: width 0.1s;
+    }
+
+    /* DOCUMENT HEADER */
+    .doc-header {
+      background: linear-gradient(160deg, #fbfbfd 0%, #eef4ff 100%);
+      border-bottom: 1px solid var(--color-border-light);
+      padding: 80px 40px 64px;
+      text-align: center;
+    }
+    .doc-header-eyebrow {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: 16px;
+    }
+    .doc-header h1 {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      color: var(--color-text-primary);
+      margin-bottom: 20px;
+    }
+    .doc-header-sub {
+      font-size: 19px;
+      color: var(--color-text-secondary);
+      max-width: 560px;
+      margin: 0 auto 32px;
+      line-height: 1.5;
+    }
+    .doc-meta {
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .doc-meta-item {
+      font-size: 13px;
+      color: var(--color-text-tertiary);
+    }
+    .doc-meta-item strong { color: var(--color-text-secondary); font-weight: 500; }
+
+    /* LEGEND */
+    .legend {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 20px 28px;
+      max-width: 900px;
+      margin: 40px auto 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    .legend-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      width: 100%;
+      margin-bottom: 2px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--color-text-secondary); }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .legend-dot.h1 { background: #0071e3; }
+    .legend-dot.h2 { background: #34c759; }
+    .legend-dot.h3 { background: #ff9500; }
+    .legend-dot.img { background: #af52de; }
+    .legend-dot.cta { background: #0071e3; }
+
+    /* MAIN LAYOUT */
+    .doc-body {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 40px 100px;
+    }
+
+    /* PAGE SECTION */
+    .page-section {
+      margin-top: 72px;
+      scroll-margin-top: 68px;
+    }
+    .page-section-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+    .page-number {
+      flex-shrink: 0;
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: var(--color-accent);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 3px;
+    }
+    .page-section-header-text h2 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--color-text-primary);
+      margin-bottom: 6px;
+    }
+    .page-section-header-text p { font-size: 15px; color: var(--color-text-secondary); }
+    .page-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--color-tag-bg);
+      color: var(--color-tag-text);
+      padding: 3px 8px;
+      border-radius: 20px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    /* CONTENT BLOCKS */
+    .content-block {
+      background: var(--color-section-bg);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px;
+      margin-bottom: 16px;
+      transition: box-shadow 0.2s;
+    }
+    .content-block:hover { box-shadow: var(--shadow-md); }
+    .content-block-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .heading-badge {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .heading-badge.h1 { background: rgba(0,113,227,0.1); color: #0071e3; }
+    .heading-badge.h2 { background: rgba(52,199,89,0.1); color: #248a3d; }
+    .heading-badge.h3 { background: rgba(255,149,0,0.1); color: #c93400; }
+    .heading-badge.footer { background: rgba(110,110,115,0.1); color: #6e6e73; }
+    .heading-text { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: var(--color-text-primary); }
+    .heading-text.h1-text { font-size: 22px; font-weight: 700; }
+    .heading-text.h2-text { font-size: 18px; }
+    .heading-text.h3-text { font-size: 15px; font-weight: 500; }
+
+    .block-description { font-size: 14px; color: var(--color-text-secondary); line-height: 1.6; margin-bottom: 14px; }
+
+    .placeholder-copy {
+      background: #fff;
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--color-text-tertiary);
+      font-style: italic;
+      line-height: 1.65;
+      margin-bottom: 12px;
+    }
+    .placeholder-copy strong { font-style: normal; font-weight: 600; color: var(--color-text-secondary); }
+
+    /* IMAGE CALLOUT */
+    .image-callout {
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .image-callout img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+    .image-callout-label {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.6));
+      padding: 24px 16px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .image-spec {
+      font-size: 12px;
+      color: var(--color-text-tertiary);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .image-spec::before {
+      content: '';
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #af52de;
+      flex-shrink: 0;
+    }
+
+    /* CTA BLOCK */
+    .cta-block {
+      background: var(--color-accent-light);
+      border: 1px solid rgba(0,113,227,0.15);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .cta-icon {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      background: var(--color-accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .cta-text { font-size: 13px; color: var(--color-accent); font-weight: 500; }
+    .cta-text span { display: block; font-size: 12px; color: var(--color-text-secondary); font-weight: 400; margin-top: 2px; }
+
+    /* GRIDS */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .four-col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+    /* NAV STRUCTURE */
+    .nav-structure {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 18px 22px;
+      margin-bottom: 20px;
+    }
+    .nav-structure-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      margin-bottom: 10px;
+    }
+    .nav-items { display: flex; flex-wrap: wrap; gap: 7px; }
+    .nav-item {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 5px 13px;
+      border-radius: 20px;
+      background: var(--color-surface);
+      color: var(--color-text-secondary);
+      border: 1px solid var(--color-border-light);
+    }
+    .nav-item.current { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+    .nav-item.cta-nav { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .nav-item.current.cta-nav { background: var(--color-accent); border-color: var(--color-accent); }
+
+    /* SECTION DIVIDER */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 24px 0 18px;
+    }
+    .section-divider-line { flex: 1; height: 1px; background: var(--color-border-light); }
+    .section-divider-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      white-space: nowrap;
+    }
+
+    /* FEATURE CHIPS */
+    .feature-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .feature-chip {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 11px;
+      border-radius: 20px;
+      background: #fff;
+      border: 1px solid var(--color-border);
+      color: var(--color-text-secondary);
+    }
+
+    /* CARD MINI */
+    .card-mini {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .card-mini img { width: 100%; height: 120px; object-fit: cover; display: block; }
+    .card-mini-body { padding: 12px 14px; }
+    .card-mini-title { font-size: 13px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 4px; }
+    .card-mini-desc { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
+
+    /* SUBSECTION BLOCK */
+    .sub-block {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+    }
+
+    /* SCROLL TOP */
+    .scroll-top {
+      position: fixed;
+      bottom: 32px; right: 32px;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: #1d1d1f;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: var(--shadow-lg);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 200;
+    }
+    .scroll-top.visible { opacity: 1; transform: translateY(0); }
+    .scroll-top:hover { background: var(--color-accent); }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .doc-nav { padding: 0 20px; }
+      .doc-nav-links { display: none; }
+      .doc-header { padding: 48px 20px 40px; }
+      .doc-body { padding: 0 20px 60px; }
+      .two-col, .three-col, .four-col { grid-template-columns: 1fr; }
+      .content-block { padding: 20px; }
+      .page-section-header { flex-direction: column; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="progress-bar" id="progressBar" style="width:0%"></div>
+
+  <nav class="doc-nav" role="navigation" aria-label="Page navigation">
+    <a href="#" class="doc-nav-brand">Iowa<span>.</span></a>
+    <ul class="doc-nav-links" role="list">
+      <li><a href="#page-1" class="active">Home</a></li>
+      <li><a href="#page-2">About Iowa</a></li>
+      <li><a href="#page-3">Landscapes</a></li>
+      <li><a href="#page-4">Culture</a></li>
+      <li><a href="#page-5">Cities</a></li>
+      <li><a href="#page-6">Visit Iowa</a></li>
+    </ul>
+  </nav>
+
+  <header class="doc-header" role="banner">
+    <p class="doc-header-eyebrow">Site Structure &amp; Content Outline</p>
+    <h1>Iowa Website</h1>
+    <p class="doc-header-sub">A six-page informational website following Apple design principles — generous whitespace, clear hierarchy, and purposeful content.</p>
+    <div class="doc-meta">
+      <div class="doc-meta-item"><strong>Pages:</strong> 6</div>
+      <div class="doc-meta-item"><strong>Design System:</strong> Apple-Inspired</div>
+      <div class="doc-meta-item"><strong>Stack:</strong> HTML / CSS / JS</div>
+      <div class="doc-meta-item"><strong>Version:</strong> 1.0 Draft</div>
+    </div>
+  </header>
+
+  <div class="doc-body">
+
+    <div class="legend" role="note" aria-label="Outline legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-item"><span class="legend-dot h1"></span> H1 — Page Title</div>
+      <div class="legend-item"><span class="legend-dot h2"></span> H2 — Section Heading</div>
+      <div class="legend-item"><span class="legend-dot h3"></span> H3 — Sub-section</div>
+      <div class="legend-item"><span class="legend-dot img"></span> Image Area</div>
+      <div class="legend-item"><span class="legend-dot cta"></span> CTA Element</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         PAGE 1 — HOME / HERO
+    ═══════════════════════════════════════ -->
+    <section class="page-section" id="page-1" aria-labelledby="page1-title">
+      <div class="page-section-header">
+        <div class="page-number" aria-hidden="true">1</div>
+        <div class="page-section-header-text">
+          <h2 id="page1-title">Home / Hero <span class="page-tag">index.html</span></h2>
+          <p>The entry point. Bold visual impact, clear value proposition, and immediate orientation for the visitor.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure" aria-label="Navigation state for Home page">
+        <div class="nav-structure-title">Global Navigation Bar</div>
+        <div class="nav-items">
+          <div class="nav-item current">Iowa</div>
+          <div class="nav-item">About Iowa</div>
+          <div class="nav-item">Landscapes</div>
+          <div class="nav-item">Culture</div>
+          <div class="nav-item">Cities</div>
+          <div class="nav-item cta-nav">Visit Iowa</div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Iowa. More Than You Imagined.</span>
+        </div>
+        <p class="block-description">Full-bleed hero section. Large cinematic image or video background with centered headline and tagline. Occupies 90–100vh on desktop.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-hero/1100/300" alt="Iowa landscape hero — rolling golden fields at dusk with dramatic sky" loading="lazy">
+          <div class="image-callout-label">Hero Image / Video Background — Full-bleed, 100vw × 90–100vh</div>
+        </div>
+        <p class="image-spec">Spec: Aerial drone shot of Iowa farmland at golden hour or Des Moines skyline. Dark gradient overlay from bottom. Text centered, white.</p>
+        <div class="placeholder-copy">"Where the heartland meets the horizon. Discover Iowa's open skies, vibrant cities, and stories waiting to be told."</div>
+        <div class="cta-block">
+          <div class="cta-icon">→</div>
+          <div class="cta-text">Primary CTA: "Explore Iowa" <span>Smooth-scrolls to feature highlights section below</span></div>
+        </div>
+        <div class="cta-block">
+          <div class="cta-icon" style="background:#34c759">↓</div>
+          <div class="cta-text">Secondary CTA: "Plan Your Visit" <span>Links directly to Visit Iowa page (page 6)</span></div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Feature Highlights Strip</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">What Makes Iowa Extraordinary</span>
+        </div>
+        <p class="block-description">Four-column icon + headline + one-liner strip. Apple-style feature grid. Minimal, scannable — icons and short copy only, no images.</p>
+        <div class="four-col">
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#e8f4e8,#c8e6c9);display:flex;align-items:center;justify-content:center;font-size:24px;">🌾</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Rich Farmland</div>
+              <div class="card-mini-desc">The most productive soil on Earth, feeding the nation.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#e8f0fb,#c5d8f5);display:flex;align-items:center;justify-content:center;font-size:24px;">🏙️</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Vibrant Cities</div>
+              <div class="card-mini-desc">Des Moines, Iowa City, Cedar Rapids — culture and cuisine.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#fff3e0,#ffe0b2);display:flex;align-items:center;justify-content:center;font-size:24px;">🎭</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Arts &amp; Culture</div>
+              <div class="card-mini-desc">World-class museums, festivals, and live music scenes.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#f3e5f5,#e1bee7);display:flex;align-items:center;justify-content:center;font-size:24px;">🌊</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Natural Beauty</div>
+              <div class="card-mini-desc">Rivers, lakes, trails, and breathtaking seasonal landscapes.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Destination Teaser</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Start Exploring</span>
+        </div>
+        <p class="block-description">3-column card row teasing top destinations. Each card: image, city name, one-line hook, arrow link. Horizontal scroll on mobile.</p>
+        <div class="three-col">
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/desmoines/400/160" alt="Des Moines skyline at dusk" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Des Moines</div>
+              <div class="card-mini-desc">Iowa's capital — food, art, and energy in the heartland.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/iowacity/400/160" alt="Iowa City riverfront and pedestrian mall" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Iowa City</div>
+              <div class="card-mini-desc">A UNESCO City of Literature with a spirited university culture.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/loesshills/400/160" alt="Loess Hills dramatic ridgeline at golden hour" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Loess Hills</div>
+              <div class="card-mini-desc">Rare wind-sculpted bluffs found only here and in China.</div>
+            </div>
+          </div>
+        </div>
+        <div class="cta-block" style="margin-top:14px">
+          <div class="cta-icon">→</div>
+          <div class="cta-text">CTA: "See All Destinations" <span>Links to Landscapes &amp; Nature page</span></div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Latest Stories</span>
+        </div>
+        <p class="block-description">Two-column editorial teaser. Featured article left (large image), secondary article right. Links to Cities &amp; Towns page and Culture page.</p>
+        <div class="placeholder-copy">"The Field of Dreams: How a Movie Became Iowa's Most Beloved Landmark" — Featured story with pull quote and author byline. Secondary: "RAGBRAI at 50: The World's Greatest Bike Ride."</div>
+        <div class="cta-block">
+          <div class="cta-icon">📖</div>
+          <div class="cta-text">CTA: "Explore Iowa's Culture" <span>Links to Culture &amp; Heritage page</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         PAGE 2 — ABOUT IOWA
+    ═══════════════════════════════════════ -->
+    <section class="page-section" id="page-2" aria-labelledby="page2-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#34c759" aria-hidden="true">2</div>
+        <div class="page-section-header-text">
+          <h2 id="page2-title">About Iowa <span class="page-tag">about.html</span></h2>
+          <p>History, geography, and identity — the soul of the state told with depth and editorial grace.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item current">About Iowa</div>
+          <div class="nav-item">Landscapes</div>
+          <div class="nav-item">Culture</div>
+          <div class="nav-item">Cities</div>
+          <div class="nav-item cta-nav">Visit Iowa</div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">The Heart of America</span>
+        </div>
+        <p class="block-description">Subdued hero — half-height image with page title overlaid. Warm, editorial tone. 50vh on desktop.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-about/1100/220" alt="Iowa countryside panorama — patchwork fields and wide blue sky" loading="lazy">
+          <div class="image-callout-label">About Page Hero — Half-height, 50vh</div>
+        </div>
+        <div class="placeholder-copy">"Iowa sits at the center of the American story — a place where the land shapes the people, and the people shape the nation. From the first Indigenous nations to waves of European settlers, from the Underground Railroad to the Iowa Caucuses, this is a state that has always mattered."</div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">History Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">A History Written in the Land</span>
+        </div>
+        <p class="block-description">Timeline-style layout or alternating text/image rows. Three sub-sections covering Indigenous heritage, settlement era, and modern Iowa.</p>
+        <div class="two-col">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Indigenous Nations</span>
+            </div>
+            <div class="placeholder-copy">"Long before European contact, the Meskwaki, Sioux, and Potawatomi peoples called this land home. Their traditions, place names, and stewardship of the land remain woven into Iowa's identity."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Settlement &amp; Statehood</span>
+            </div>
+            <div class="placeholder-copy">"Iowa became the 29th state in 1846. Waves of German, Czech, and Scandinavian immigrants transformed the prairie into one of the world's most productive agricultural regions."</div>
+          </div>
+        </div>
+        <div class="sub-block" style="margin-top:14px">
+          <div class="content-block-header" style="margin-bottom:8px">
+            <span class="heading-badge h3">H3</span>
+            <span class="heading-text h3-text">Modern Iowa</span>
+          </div>
+          <div class="placeholder-copy">"Today Iowa leads in renewable energy, education, and innovation. The Iowa Caucuses have launched presidential campaigns. Iowa City is a UNESCO City of Literature. The state's story is still being written."</div>
+        </div>
+        <div class="image-callout" style="margin-top:14px">
+          <img src="https://picsum.photos/seed/iowa-capitol/1100/180" alt="Iowa State Capitol building in Des Moines" loading="lazy">
+          <div class="image-callout-label">Image: Iowa State Capitol or historical archive photography</div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Geography Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">A Land of Surprising Variety</span>
+        </div>
+        <p class="block-description">Three-column layout with photographic callouts for each geographic region of Iowa.</p>
+        <div class="three-col">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Loess Hills</span>
+            </div>
+            <div class="placeholder-copy">"Rare wind-deposited bluffs along the Missouri River — found only here and in China. A hiker's paradise of dramatic ridgelines and native prairie."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Mississippi Bluffs</span>
+            </div>
+            <div class="placeholder-copy">"The eastern border traces the mighty Mississippi. Limestone bluffs, river towns, and the Great River Road offer some of the Midwest's most scenic drives."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Prairie Heartland</span>
+            </div>
+            <div class="placeholder-copy">"Iowa's rolling central plains are the engine of American agriculture. Tallgrass prairie remnants, wetlands, and wildlife refuges preserve the original landscape."</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Identity Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Iowa's Character</span>
+        </div>
+        <p class="block-description">Editorial text with pull quote. Covers Iowa's literary tradition, community values, and national significance.</p>
+        <div class="placeholder-copy">"Iowa has produced more writers per capita than almost any other state. From Grant Wood's American Gothic to the Iowa Writers' Workshop — the most celebrated creative writing program in the world — Iowa has always nurtured the arts and the people who make them."</div>
+        <div class="feature-chips">
+          <span class="feature-chip">Iowa Writers' Workshop</span>
+          <span class="feature-chip">Grant Wood</span>
+          <span class="feature-chip">Iowa State Fair</span>
+          <span class="feature-chip">Czech Heritage</span>
+          <span class="feature-chip">Farm-to-Table</span>
+          <span class="feature-chip">RAGBRAI</span>
+          <span class="feature-chip">Iowa Caucuses</span>
+        </div>
+        <div class="cta-block" style="margin-top:14px">
+          <div class="cta-icon">→</div>
+          <div class="cta-text">CTA: "Explore Iowa's Culture &amp; Heritage" <span>Links to Culture &amp; Heritage page</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         PAGE 3 — LANDSCAPES & NATURE
+    ═══════════════════════════════════════ -->
+    <section class="page-section" id="page-3" aria-labelledby="page3-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#ff9500" aria-hidden="true">3</div>
+        <div class="page-section-header-text">
+          <h2 id="page3-title">Landscapes &amp; Nature <span class="page-tag">landscapes.html</span></h2>
+          <p>Iowa's natural world — parks, trails, rivers, and the dramatic beauty of the seasons.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About Iowa</div>
+          <div class="nav-item current">Landscapes</div>
+          <div class="nav-item">Culture</div>
+          <div class="nav-item">Cities</div>
+          <div class="nav-item cta-nav">Visit Iowa</div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Iowa's Natural Wonders</span>
+        </div>
+        <p class="block-description">Full-width cinematic hero. Dramatic landscape photography — aerial or wide-angle. 70vh on desktop.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-nature/1100/260" alt="Aerial view of Iowa's Loess Hills at sunrise with morning mist" loading="lazy">
+          <div class="image-callout-label">Landscapes Hero — Cinematic, 70vh, full-bleed</div>
+        </div>
+        <div class="placeholder-copy">"Iowa's landscapes are a revelation. From the ancient bluffs of the Loess Hills to the wild Mississippi shoreline, from tallgrass prairies to crystal-clear trout streams — this is a state of quiet, profound beauty."</div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Natural Regions</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Explore Iowa's Natural Regions</span>
+        </div>
+        <p class="block-description">Full-width alternating image/text rows — one per natural region. Each: large photo, region name (H3), 2–3 sentences, key highlights list.</p>
+        <div class="two-col" style="margin-bottom:14px">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Loess Hills Scenic Byway</span>
+            </div>
+            <div class="placeholder-copy">"Stretching 220 miles along Iowa's western border, the Loess Hills are a geological marvel. Hike the ridgelines, spot rare prairie plants, and watch the sunset paint the bluffs gold."</div>
+            <div class="feature-chips"><span class="feature-chip">Hiking</span><span class="feature-chip">Wildlife</span><span class="feature-chip">Photography</span></div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Effigy Mounds National Monument</span>
+            </div>
+            <div class="placeholder-copy">"Ancient burial mounds shaped like bears and birds overlook the Mississippi River. A sacred and stunning National Monument preserving 2,000 years of Indigenous history."</div>
+            <div class="feature-chips"><span class="feature-chip">History</span><span class="feature-chip">Hiking</span><span class="feature-chip">River Views</span></div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Upper Iowa River</span>
+            </div>
+            <div class="placeholder-copy">"One of the Midwest's premier paddling destinations. The Upper Iowa winds through limestone bluffs and lush valleys — perfect for canoe and kayak trips of 1 to 5 days."</div>
+            <div class="feature-chips"><span class="feature-chip">Kayaking</span><span class="feature-chip">Camping</span><span class="feature-chip">Fishing</span></div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Backbone State Park</span>
+            </div>
+            <div class="placeholder-copy">"Iowa's oldest state park features dramatic limestone ridges, a spring-fed lake, and miles of trails. In winter, it transforms into a cross-country skiing destination."</div>
+            <div class="feature-chips"><span class="feature-chip">Trails</span><span class="feature-chip">Swimming</span><span class="feature-chip">Winter Sports</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Seasons Section</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Iowa Through the Seasons</span>
+        </div>
+        <p class="block-description">Four-column seasonal grid. Each column: season name (H3), hero image, 3 nature highlights, best-time note.</p>
+        <div class="four-col">
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e8f5e9,#a5d6a7);display:flex;align-items:center;justify-content:center;font-size:26px;">🌸</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Spring</div>
+              <div class="card-mini-desc">Wildflowers, morel mushrooms, and migratory birds return to Iowa's wetlands.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#fff9c4,#fff176);display:flex;align-items:center;justify-content:center;font-size:26px;">☀️</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Summer</div>
+              <div class="card-mini-desc">Corn reaches head-high. Rivers run clear. Evenings glow golden across the plains.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#fff3e0,#ffcc80);display:flex;align-items:center;justify-content:center;font-size:26px;">🍂</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Fall</div>
+              <div class="card-mini-desc">Harvest transforms the landscape into amber and gold. Apple orchards and scenic drives.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <div style="height:60px;background:linear-gradient(135deg,#e3f2fd,#90caf9);display:flex;align-items:center;justify-content:center;font-size:26px;">❄️</div>
+            <div class="card-mini-body">
+              <div class="card-mini-title">Winter</div>
+              <div class="card-mini-desc">Cross-country skiing, ice fishing, and the quiet beauty of snow-covered prairies.</div>
+            </div>
+          </div>
+        </div>
+        <div class="image-callout" style="margin-top:14px">
+          <img src="https://picsum.photos/seed/iowa-seasons/1100/180" alt="Iowa four seasons collage — spring flowers, summer corn, fall foliage, winter snow" loading="lazy">
+          <div class="image-callout-label">Image: Four-panel seasonal collage or tabbed photography</div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">State Parks &amp; Recreation Areas</span>
+        </div>
+        <p class="block-description">Grid of 6 featured state parks. Each card: park photo, name, region tag, key activity icons.</p>
+        <div class="three-col">
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/backbone/400/140" alt="Backbone State Park limestone ridges and lake" loading="lazy">
+            <div class="card-mini-body"><div class="card-mini-title">Backbone State Park</div><div class="card-mini-desc">Northeast Iowa · Hiking, swimming, cross-country skiing</div></div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/palisades/400/140" alt="Palisades-Kepler State Park cedar bluffs" loading="lazy">
+            <div class="card-mini-body"><div class="card-mini-title">Palisades-Kepler</div><div class="card-mini-desc">East Iowa · Cedar River bluffs, trails, camping</div></div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/lacygrant/400/140" alt="Lacey-Keosauqua State Park river bend" loading="lazy">
+            <div class="card-mini-body"><div class="card-mini-title">Lacey-Keosauqua</div><div class="card-mini-desc">Southeast Iowa · Iowa's largest state park, Des Moines River</div></div>
+          </div>
+        </div>
+        <div class="cta-block" style="margin-top:14px">
+          <div class="cta-icon">🗺️</div>
+          <div class="cta-text">CTA: "View All 80+ State Parks" <span>Links to interactive state parks map on Visit Iowa page</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         PAGE 4 — CULTURE & HERITAGE
+    ═══════════════════════════════════════ -->
+    <section class="page-section" id="page-4" aria-labelledby="page4-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#af52de" aria-hidden="true">4</div>
+        <div class="page-section-header-text">
+          <h2 id="page4-title">Culture &amp; Heritage <span class="page-tag">culture.html</span></h2>
+          <p>Arts, food, festivals, and the living traditions that define Iowa's cultural identity.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About Iowa</div>
+          <div class="nav-item">Landscapes</div>
+          <div class="nav-item current">Culture</div>
+          <div class="nav-item">Cities</div>
+          <div class="nav-item cta-nav">Visit Iowa</div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">A Culture Rooted in the Land</span>
+        </div>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-culture/1100/240" alt="Iowa State Fair midway at night with lights and crowds" loading="lazy">
+          <div class="image-callout-label">Culture Hero — Iowa State Fair or arts festival, 60vh</div>
+        </div>
+        <div class="placeholder-copy">"Iowa's culture is as rich as its soil. From the literary legacy of the Iowa Writers' Workshop to the communal joy of the Iowa State Fair, from Czech kolaches to farm-to-table fine dining — Iowa's heritage is alive, evolving, and deeply worth experiencing."</div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Arts &amp; Literature</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Arts &amp; Literature</span>
+        </div>
+        <p class="block-description">Two-column editorial layout. Left: Iowa Writers' Workshop and literary heritage. Right: Visual arts, Grant Wood, and museums.</p>
+        <div class="two-col">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Iowa Writers' Workshop</span>
+            </div>
+            <div class="placeholder-copy">"The most celebrated creative writing program in the world has shaped American literature for over 80 years. Iowa City — a UNESCO City of Literature — is home to more bookshops per capita than almost any city in America."</div>
+            <div class="feature-chips"><span class="feature-chip">UNESCO City of Literature</span><span class="feature-chip">Flannery O'Connor</span><span class="feature-chip">John Irving</span></div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Visual Arts &amp; Grant Wood</span>
+            </div>
+            <div class="placeholder-copy">"Grant Wood's American Gothic — painted in Iowa — is one of the most recognized images in American art. The Cedar Rapids Museum of Art holds the world's largest collection of his work."</div>
+            <div class="feature-chips"><span class="feature-chip">American Gothic</span><span class="feature-chip">Cedar Rapids Museum</span><span class="feature-chip">Pappajohn Sculpture Park</span></div>
+          </div>
+        </div>
+        <div class="image-callout" style="margin-top:14px">
+          <img src="https://picsum.photos/seed/iowa-arts/1100/180" alt="Pappajohn Sculpture Park in Des Moines with outdoor sculptures" loading="lazy">
+          <div class="image-callout-label">Image: Pappajohn Sculpture Park, Des Moines or Iowa Writers' Workshop building</div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Food &amp; Festivals</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Food, Festivals &amp; Traditions</span>
+        </div>
+        <p class="block-description">Three-column grid covering the Iowa State Fair, food culture, and ethnic heritage traditions.</p>
+        <div class="three-col">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">The Iowa State Fair</span>
+            </div>
+            <div class="placeholder-copy">"One million visitors. 11 days. The Iowa State Fair is the quintessential American summer experience — butter sculptures, blue-ribbon pies, live music, and the best corn dogs on Earth."</div>
+            <div class="feature-chips"><span class="feature-chip">August</span><span class="feature-chip">Des Moines</span></div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Farm-to-Table Dining</span>
+            </div>
+            <div class="placeholder-copy">"Iowa's chefs are redefining Midwestern cuisine. From Des Moines' East Village restaurant row to farm dinners in the countryside, the food scene is thriving and deeply local."</div>
+            <div class="feature-chips"><span class="feature-chip">Des Moines</span><span class="feature-chip">Local Farms</span></div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Czech &amp; German Heritage</span>
+            </div>
+            <div class="placeholder-copy">"The Amana Colonies preserve 170 years of German communal tradition. Cedar Rapids' Czech Village celebrates the heritage of Iowa's largest immigrant group with kolaches, polka, and handcrafted goods."</div>
+            <div class="feature-chips"><span class="feature-chip">Amana Colonies</span><span class="feature-chip">Czech Village</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Music &amp; Events</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Music, Events &amp; RAGBRAI</span>
+        </div>
+        <p class="block-description">Editorial feature on Iowa's event calendar. Highlight RAGBRAI, Des Moines Arts Festival, and Tama Powwow.</p>
+        <div class="placeholder-copy">"RAGBRAI — the Register's Annual Great Bicycle Ride Across Iowa — is the world's largest and oldest bicycle touring event. Every July, 20,000 cyclists cross the state from the Missouri River to the Mississippi, passing through small towns that throw the best parties in America."</div>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/ragbrai/1100/180" alt="RAGBRAI cyclists crossing Iowa at sunrise on rural highway" loading="lazy">
+          <div class="image-callout-label">Image: RAGBRAI cyclists or Iowa State Fair crowd — full width</div>
+        </div>
+        <div class="cta-block" style="margin-top:14px">
+          <div class="cta-icon">📅</div>
+          <div class="cta-text">CTA: "See Iowa's Events Calendar" <span>Links to events calendar on Visit Iowa page</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         PAGE 5 — CITIES & TOWNS
+    ═══════════════════════════════════════ -->
+    <section class="page-section" id="page-5" aria-labelledby="page5-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#ff3b30" aria-hidden="true">5</div>
+        <div class="page-section-header-text">
+          <h2 id="page5-title">Cities &amp; Towns <span class="page-tag">cities.html</span></h2>
+          <p>Iowa's urban energy and small-town charm — from the capital to hidden gems worth discovering.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About Iowa</div>
+          <div class="nav-item">Landscapes</div>
+          <div class="nav-item">Culture</div>
+          <div class="nav-item current">Cities</div>
+          <div class="nav-item cta-nav">Visit Iowa</div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h1">H1</span>
+          <span class="heading-text h1-text">Cities Full of Character</span>
+        </div>
+        <p class="block-description">Half-height hero with Des Moines skyline or Iowa City pedestrian mall. 50vh on desktop.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/desmoines-sky/1100/240" alt="Des Moines skyline reflected in the Des Moines River at dusk" loading="lazy">
+          <div class="image-callout-label">Cities Hero — Des Moines skyline or Iowa City, 50vh</div>
+        </div>
+        <div class="placeholder-copy">"Iowa's cities punch above their weight. Des Moines has become one of America's most livable cities. Iowa City is a global literary destination. Cedar Rapids is a craft beer and arts hub. And beyond the cities, Iowa's small towns hold some of the country's most authentic experiences."</div>
+        <div class="feature-chips">
+          <span class="feature-chip" style="background:var(--color-accent);color:#fff;border-color:var(--color-accent)">All</span>
+          <span class="feature-chip">Major Cities</span>
+          <span class="feature-chip">College Towns</span>
+          <span class="feature-chip">River Towns</span>
+          <span class="feature-chip">Small Towns</span>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Featured Cities</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Iowa's Major Cities</span>
+        </div>
+        <p class="block-description">Three large feature cards — one per major city. Each: full-bleed image, city name (H3), population note, 3-sentence description, key highlights, "Explore" CTA.</p>
+        <div class="three-col">
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/desmoines3/400/200" alt="Des Moines East Village neighborhood with colorful murals" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Des Moines <span class="page-tag">Capital</span></div>
+              <div class="card-mini-desc">Iowa's capital and largest city. The East Village, Pappajohn Sculpture Park, a thriving restaurant scene, and the Iowa State Fair make Des Moines a destination in its own right.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/iowacity3/400/200" alt="Iowa City pedestrian mall with bookshops and cafes" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Iowa City <span class="page-tag">Literary</span></div>
+              <div class="card-mini-desc">Home to the University of Iowa and the legendary Writers' Workshop. A UNESCO City of Literature with more bookshops per capita than almost any American city.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/cedarrapids2/400/200" alt="Cedar Rapids Czech Village historic district" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Cedar Rapids <span class="page-tag">Heritage</span></div>
+              <div class="card-mini-desc">Czech Village, the National Czech &amp; Slovak Museum, craft breweries, and the Cedar Rapids Museum of Art — home to the world's largest Grant Wood collection.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Historic Destinations</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Historic Sites &amp; Hidden Gems</span>
+        </div>
+        <p class="block-description">3-column grid of notable Iowa destinations beyond the major cities. Each card: image, name (H3), category tag, 2-sentence description.</p>
+        <div class="three-col">
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/amana2/400/160" alt="Amana Colonies historic village main street" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Amana Colonies <span class="page-tag">History</span></div>
+              <div class="card-mini-desc">Seven villages founded by German communalists in the 1850s. Handcrafted furniture, woolen mills, and hearty German cuisine.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/fieldofdreams2/400/160" alt="Field of Dreams baseball diamond in Dyersville Iowa" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Field of Dreams <span class="page-tag">Iconic</span></div>
+              <div class="card-mini-desc">The Dyersville farm where the 1989 film was shot. Still a working farm, still a place of pilgrimage for baseball fans worldwide.</div>
+            </div>
+          </div>
+          <div class="card-mini">
+            <img src="https://picsum.photos/seed/dubuque/400/160" alt="Dubuque Mississippi riverfront with historic buildings" loading="lazy">
+            <div class="card-mini-body">
+              <div class="card-mini-title">Dubuque <span class="page-tag">River Town</span></div>
+              <div class="card-mini-desc">Iowa's oldest city perches on Mississippi River bluffs. Victorian architecture, the National Mississippi River Museum, and the famous Fenelon Place Elevator.</div>
+            </div>
+          </div>
+        </div>
+        <div class="cta-block" style="margin-top:14px">
+          <div class="cta-icon">+</div>
+          <div class="cta-text">CTA: "Discover More Iowa Towns" <span>Expands to show 6 additional destinations</span></div>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Iowa at a Glance — Destination Map</span>
+        </div>
+        <p class="block-description">Interactive or illustrated map of Iowa showing city and destination pins. Clicking a pin highlights the corresponding card above.</p>
+        <div class="image-callout">
+          <img src="https://picsum.photos/seed/iowa-map/1100/220" alt="Illustrated map of Iowa showing major cities and destinations" loading="lazy">
+          <div class="image-callout-label">Interactive Map — Iowa cities and destinations with clickable pins</div>
+        </div>
+        <p class="image-spec">Spec: SVG-based illustrated map or embedded Mapbox iframe. Pins correspond to destination cards. Hover state shows city name tooltip.</p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         PAGE 6 — VISIT IOWA / CTA
+    ═══════════════════════════════════════ -->
+    <section class="page-section" id="page-6" aria-labelledby="page6-title">
+      <div class="page-section-header">
+        <div class="page-number" style="background:#1d1d1f" aria-hidden="true">6</div>
+        <div class="page-section-header-text">
+          <h2 id="page6-title">Visit Iowa / CTA <span class="page-tag">visit.html</span></h2>
+          <p>Practical information, resources, and conversion — everything a visitor needs to make their Iowa trip a reality.</p>
+        </div>
+      </div>
+
+      <div class="nav-structure">
+        <div class="nav-structure-title">Navigation — Active State</div>
+        <div class="nav-items">
+          <div class="nav-item">Iowa</div>
+          <div class="nav-item">About Iowa</div>
+          <div class="nav-item">Landscapes</div>
+          <div class="nav-item">Culture</div>
+          <div class="nav-item">Cities</div>
+          <div class="nav-item current cta-nav">Visit Iowa</div>
+        </div>
+      </div>
+
+      <div class="content-block" style="background:linear-gradient(135deg,#1d1d1f,#2c2c2e);">
+        <div class="content-block-header">
+          <span class="heading-badge h1" style="background:rgba(255,255,255,0.12);color:#fff">H1</span>
+          <span class="heading-text h1-text" style="color:#fff">Your Iowa Adventure Starts Here</span>
+        </div>
+        <p class="block-description" style="color:rgba(255,255,255,0.6)">Full-width dark hero with strong CTA. Cinematic Iowa image behind dark overlay. Centered headline and two CTA buttons.</p>
+        <div class="placeholder-copy" style="background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.12);color:rgba(255,255,255,0.55);">"Whether you're planning a weekend getaway or a week-long road trip, Iowa is easier to explore than you think. Here's everything you need to know before you go."</div>
+        <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
+          <div class="cta-block" style="flex:1;min-width:200px;background:rgba(0,113,227,0.2);border-color:rgba(0,113,227,0.3)">
+            <div class="cta-icon">📥</div>
+            <div class="cta-text" style="color:#6ab0f5">Download Travel Guide <span style="color:rgba(255,255,255,0.45)">Free PDF — official Iowa visitor guide</span></div>
+          </div>
+          <div class="cta-block" style="flex:1;min-width:200px;background:rgba(52,199,89,0.15);border-color:rgba(52,199,89,0.25)">
+            <div class="cta-icon" style="background:#34c759">📅</div>
+            <div class="cta-text" style="color:#4cd964">Browse Events Calendar <span style="color:rgba(255,255,255,0.45)">Festivals, fairs, and events statewide</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Getting Here</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Getting to Iowa</span>
+        </div>
+        <p class="block-description">Three-column layout covering air, road, and rail options. Each with icon, heading (H3), and practical details.</p>
+        <div class="three-col">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">✈ By Air</span>
+            </div>
+            <div class="placeholder-copy">"Des Moines International Airport (DSM) offers direct flights from Chicago, Dallas, Denver, and Atlanta. Cedar Rapids Airport (CID) serves the eastern corridor with connections to major hubs."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">🚗 By Road</span>
+            </div>
+            <div class="placeholder-copy">"Iowa is intersected by I-80 (east-west) and I-35 (north-south). Chicago is 5 hours east; Kansas City is 3 hours south; Minneapolis is 4 hours north. A car is recommended for exploring rural Iowa."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">🚂 By Rail</span>
+            </div>
+            <div class="placeholder-copy">"Amtrak's California Zephyr stops in Osceola, Creston, Ottumwa, and Burlington. The route connects Chicago to San Francisco with Iowa stops along the way."</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Practical Information</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Good to Know</span>
+        </div>
+        <p class="block-description">Two-column FAQ layout covering accommodation, weather, getting around, and accessibility.</p>
+        <div class="two-col">
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Where to Stay</span>
+            </div>
+            <div class="placeholder-copy">"Iowa offers boutique hotels in Des Moines' East Village, historic B&Bs in the Amana Colonies, lakeside cabins, and campgrounds in 80+ state parks. Budget to luxury options available statewide."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Best Time to Visit</span>
+            </div>
+            <div class="placeholder-copy">"Late spring (May–June) and early fall (September–October) offer the most comfortable weather. Summer brings festivals and the State Fair. Winter offers solitude and cross-country skiing."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Getting Around</span>
+            </div>
+            <div class="placeholder-copy">"A car is recommended for rural Iowa. Des Moines has a growing bike-share network and ride-share services. Iowa City is highly walkable. The Great River Road is a scenic driving route along the Mississippi."</div>
+          </div>
+          <div class="sub-block">
+            <div class="content-block-header" style="margin-bottom:8px">
+              <span class="heading-badge h3">H3</span>
+              <span class="heading-text h3-text">Accessibility</span>
+            </div>
+            <div class="placeholder-copy">"Iowa's state parks and major attractions are ADA accessible. Des Moines and Iowa City have accessible public transit. Contact individual venues for specific accommodation needs."</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Resources</div><div class="section-divider-line"></div></div>
+      <div class="content-block">
+        <div class="content-block-header">
+          <span class="heading-badge h2">H2</span>
+          <span class="heading-text h2-text">Helpful Resources</span>
+        </div>
+        <p class="block-description">Four-column resource card grid. Each card: icon, title, description, download or link CTA.</p>
+        <div class="four-col">
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#e8f0fb,#c5d8f5);display:flex;align-items:center;justify-content:center;font-size:22px;">📄</div>
+            <div class="card-mini-body"><div class="card-mini-title">Travel Guide</div><div class="card-mini-desc">Download the official Iowa Travel Guide PDF.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#e8f5e9,#a5d6a7);display:flex;align-items:center;justify-content:center;font-size:22px;">📅</div>
+            <div class="card-mini-body"><div class="card-mini-title">Events Calendar</div><div class="card-mini-desc">Find festivals, fairs, and events near you.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#fff3e0,#ffe082);display:flex;align-items:center;justify-content:center;font-size:22px;">🗺️</div>
+            <div class="card-mini-body"><div class="card-mini-title">State Parks Map</div><div class="card-mini-desc">Explore Iowa's 80+ state parks and recreation areas.</div></div>
+          </div>
+          <div class="card-mini">
+            <div style="height:56px;background:linear-gradient(135deg,#fce4ec,#f48fb1);display:flex;align-items:center;justify-content:center;font-size:22px;">ℹ️</div>
+            <div class="card-mini-body"><div class="card-mini-title">Visitor Centers</div><div class="card-mini-desc">Find welcome centers and tourism offices statewide.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Contact &amp; Connect</div><div class="section-divider-line"></div></div>
+      <div class="content-block" style="background:linear-gradient(135deg,#1d1d1f,#2c2c2e);">
+        <div class="content-block-header">
+          <span class="heading-badge h2" style="background:rgba(255,255,255,0.1);color:#fff">H2</span>
+          <span class="heading-text h2-text" style="color:#fff">Contact &amp; Connect</span>
+        </div>
+        <p class="block-description" style="color:rgba(255,255,255,0.55)">Contact form and social media links. Clean, minimal layout — name, email, message, submit. Social icons row below.</p>
+        <div class="placeholder-copy" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:rgba(255,255,255,0.45);">
+          <strong style="color:rgba(255,255,255,0.7)">Form fields:</strong> Name (text input) · Email (email input) · Subject (select: General Inquiry / Media / Partnerships / Feedback) · Message (textarea, 4 rows) · Submit button — "Send Message"
+        </div>
+        <div class="feature-chips" style="margin-top:14px">
+          <span class="feature-chip" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.12);color:rgba(255,255,255,0.65)">Twitter / X</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.12);color:rgba(255,255,255,0.65)">Instagram</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.12);color:rgba(255,255,255,0.65)">Facebook</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.12);color:rgba(255,255,255,0.65)">YouTube</span>
+          <span class="feature-chip" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.12);color:rgba(255,255,255,0.65)">Pinterest</span>
+        </div>
+      </div>
+
+      <div class="section-divider"><div class="section-divider-line"></div><div class="section-divider-label">Global Footer</div><div class="section-divider-line"></div></div>
+      <div class="content-block" style="background:#f5f5f7">
+        <div class="content-block-header">
+          <span class="heading-badge footer">Footer</span>
+          <span class="heading-text h3-text">Global Footer — Appears on All Six Pages</span>
+        </div>
+        <p class="block-description">Four-column footer: Logo + tagline | Quick Links | Explore Iowa | Legal. Bottom bar: copyright, privacy policy, terms.</p>
+        <div class="four-col">
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px;font-size:15px">Iowa.</div>
+            <div class="card-mini-desc">The Hawkeye State. Discover what's waiting for you in the heart of America.</div>
+          </div>
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px">Quick Links</div>
+            <div class="card-mini-desc">Home · About Iowa · Landscapes &amp; Nature · Culture &amp; Heritage · Cities &amp; Towns · Visit Iowa</div>
+          </div>
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px">Explore</div>
+            <div class="card-mini-desc">Des Moines · Iowa City · Cedar Rapids · Loess Hills · Field of Dreams · Amana Colonies · Dubuque</div>
+          </div>
+          <div>
+            <div class="card-mini-title" style="margin-bottom:8px">Legal</div>
+            <div class="card-mini-desc">Privacy Policy · Terms of Use · Accessibility Statement · Cookie Preferences · Sitemap</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border-light);font-size:12px;color:var(--color-text-tertiary)">
+          © 2025 Iowa Tourism. All rights reserved. &nbsp;·&nbsp; Made with care in the Hawkeye State.
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <button class="scroll-top" id="scrollTop" aria-label="Scroll to top" title="Back to top">↑</button>
+
+  <script>
+    const progressBar = document.getElementById('progressBar');
+    const scrollTopBtn = document.getElementById('scrollTop');
+    const navLinks = document.querySelectorAll('.doc-nav-links a');
+    const sections = document.querySelectorAll('.page-section');
+
+    function updateProgress() {
+      const scrolled = window.scrollY;
+      const total = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = total > 0 ? (scrolled / total) * 100 : 0;
+      progressBar.style.width = pct + '%';
+      scrollTopBtn.classList.toggle('visible', scrolled > 400);
+    }
+
+    function updateActiveNav() {
+      let current = '';
+      sections.forEach(function(section) {
+        const top = section.getBoundingClientRect().top;
+        if (top <= 80) current = section.id;
+      });
+      navLinks.forEach(function(link) {
+        const href = link.getAttribute('href');
+        link.classList.toggle('active', href === '#' + current);
+      });
+    }
+
+    window.addEventListener('scroll', function() {
+      updateProgress();
+      updateActiveNav();
+    }, { passive: true });
+
+    scrollTopBtn.addEventListener('click', function() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    navLinks.forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        var href = link.getAttribute('href');
+        if (href && href.startsWith('#') && href.length > 1) {
+          e.preventDefault();
+          var target = document.querySelector(href);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    updateProgress();
+  </script>
+</body>
+</html>

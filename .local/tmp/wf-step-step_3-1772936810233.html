@@ -1,0 +1,1233 @@
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Global Stylesheet</title>\n<style>\n:root {\n  --color-dark: #141413;\n  --color-light: #faf9f5;\n  --color-mid-gray: #b0aea5;\n  --color-light-gray: #e8e6dc;\n  --color-accent-orange: #d97757;\n  --color-accent-blue: #6a9bcc;\n  --color-accent-green: #788c5d;\n\n  --font-heading: 'Poppins', Arial, sans-serif;\n  --font-body: 'Lora', Georgia, serif;\n\n  /* Spacing scale (8px base) */\n  --space-0: 0;\n  --space-1: 0.25rem; /* 4px */\n  --space-2: 0.5rem;  /* 8px */\n  --space-3: 0.75rem; /* 12px */\n  --space-4: 1rem;    /* 16px */\n  --space-5: 1.5rem;  /* 24px */\n  --space-6: 2rem;    /* 32px */\n  --space-7: 3rem;    /* 48px */\n}\n\n/* Base reset */\n*, *::before, *::after {\n  box-sizing: border-box;\n}\nhtml {\n  font-size: 100%; /* 16px */\n}\nbody {\n  margin: 0;\n  font-family: var(--font-body);\n  background: var(--color-light);\n  color: var(--color-dark);\n  line-height: 1.5;\n}\n\n/* Typography */\nh1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading);\n  margin: 0 0 var(--space-4) 0;\n  line-height: 1.2;\n}\np {\n  margin: 0 0 var(--space-4) 0;\n}\n\n/* Grid system */\n.container {\n  width: 100%;\n  padding: 0 var(--space-4);\n  margin: 0 auto;\n}\n.row {\n  display: flex;\n  flex-wrap: wrap;\n  margin: 0 calc(-1 * var(--space-2));\n}\n.col {\n  flex: 1 0 0%;\n  padding: 0 var(--space-2);\n}\n@media (min-width: 600px) {\n  .container { max-width: 540px; }\n}\n@media (min-width: 900px) {\n  .container { max-width: 720px; }\n}\n@media (min-width: 1200px) {\n  .container { max-width: 960px; }\n}\n\n/* Header */\nheader {\n  background: var(--color-light);\n  padding: var(--space-3) var(--space-4);\n  border-bottom: 1px solid var(--color-mid-gray);\n}\nheader nav {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\nheader a {\n  color: var(--color-dark);\n  text-decoration: none;\n  font-weight: 500;\n}\nheader a:focus-visible {\n  outline: 2px solid var(--color-accent-blue);\n  outline-offset: 2px;\n}\n\n/* Footer */\nfooter {\n  background: var(--color-dark);\n  color: var(--color-light);\n  padding: var(--space-5) var(--space-4);\n  text-align: center;\n}\nfooter a {\n  color: var(--color-light);\n}\nfooter a:focus-visible {\n  outline: 2px solid var(--color-accent-orange);\n  outline-offset: 2px;\n}\n\n/* Navigation */\nnav ul {\n  list-style: none;\n  margin: 0;\n  padding: 0;\n  display: flex;\n  gap: var(--space-4);\n}\nnav li {}\nnav a {\n  padding: var(--space-2);\n}\nnav a:hover,\nnav a:focus {\n  color: var(--color-accent-blue);\n}\n\n/* Focus styles for interactive elements */\nbutton, [role=\"button\"], input, select, textarea, a {\n  outline: none;\n}\nbutton:focus-visible,\n[role=\"button\"]:focus-visible,\ninput:focus-visible,\nselect:focus-visible,\ntextarea:focus-visible,\na:focus-visible {\n  outline: 2px solid var(--color-accent-green);\n  outline-offset: 2px;\n}\n\n/* Utility classes */\n.mt-1 { margin-top: var(--space-1); }\n.mt-2 { margin-top: var(--space-2); }\n.mt-3 { margin-top: var(--space-3); }\n.mb-1 { margin-bottom: var(--space-1); }\n.mb-2 { margin-bottom: var(--space-2); }\n.p-1 { padding: var(--space-1); }\n.p-2 { padding: var(--space-2); }\n.text-center { text-align: center; }\n\n/* Responsive typography */\n@media (min-width: 600px) {\n  h1 { font-size: 2.5rem; }\n  h2 { font-size: 2rem; }\n}\n@media (min-width: 900px) {\n  h1 { font-size: 3rem; }\n  h2 { font-size: 2.5rem; }\n}\n</style>\n</head>\n<body>\n<!-- Placeholder content to demonstrate global styles -->\n<header aria-label=\"Site Header\">\n  <nav aria-label=\"Primary Navigation\">\n    <a href=\"#\" class=\"logo\">Iowa</a>\n    <ul>\n      <li><a href=\"#\">Home</a></li>\n      <li><a href=\"#\">Features</a></li>\n      <li><a href=\"#\">Pricing</a></li>\n      <li><a href=\"#\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<main class=\"container\">\n  <section class=\"row\">\n    <div class=\"col\">\n      <h1>Welcome to Iowa</h1>\n      <p>This is a placeholder section demonstrating the global stylesheet.</p>\n    </div>\n  </section>\n</main>\n\n<footer aria-label=\"Site Footer\">\n  <p>&copy; 2026 Iowa. All rights reserved.</p>\n</footer>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Home page. An Apple‑style, responsive website for the Aiden IWO project.">
+  <title>Iowa – Home</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+
+  /* Spacing scale (8px base) */
+  --space-0: 0;
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem;  /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem;    /* 16px */
+  --space-5: 1.5rem;  /* 24px */
+  --space-6: 2rem;    /* 32px */
+  --space-7: 3rem;    /* 48px */
+}
+
+/* Base reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+html {
+  font-size: 100%; /* 16px */
+}
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-light);
+  color: var(--color-dark);
+  line-height: 1.5;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  margin: 0 0 var(--space-4) 0;
+  line-height: 1.2;
+}
+p {
+  margin: 0 0 var(--space-4) 0;
+}
+
+/* Grid system */
+.container {
+  width: 100%;
+  padding: 0 var(--space-4);
+  margin: 0 auto;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 calc(-1 * var(--space-2));
+}
+.col {
+  flex: 1 0 0%;
+  padding: 0 var(--space-2);
+}
+@media (min-width: 600px) {
+  .container { max-width: 540px; }
+}
+@media (min-width: 900px) {
+  .container { max-width: 720px; }
+}
+@media (min-width: 1200px) {
+  .container { max-width: 960px; }
+}
+
+/* Header */
+header {
+  background: var(--color-light);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-mid-gray);
+}
+header nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header a {
+  color: var(--color-dark);
+  text-decoration: none;
+  font-weight: 500;
+}
+header a:focus-visible {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: 2px;
+}
+
+/* Footer */
+footer {
+  background: var(--color-dark);
+  color: var(--color-light);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+}
+footer a {
+  color: var(--color-light);
+}
+footer a:focus-visible {
+  outline: 2px solid var(--color-accent-orange);
+  outline-offset: 2px;
+}
+
+/* Navigation */
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+nav li {}
+nav a {
+  padding: var(--space-2);
+}
+nav a:hover,
+nav a:focus {
+  color: var(--color-accent-blue);
+}
+
+/* Focus styles for interactive elements */
+button, [role="button"], input, select, textarea, a {
+  outline: none;
+}
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent-green);
+  outline-offset: 2px;
+}
+
+/* Utility classes */
+.mt-1 { margin-top: var(--space-1); }
+.mt-2 { margin-top: var(--space-2); }
+.mt-3 { margin-top: var(--space-3); }
+.mb-1 { margin-bottom: var(--space-1); }
+.mb-2 { margin-bottom: var(--space-2); }
+.p-1 { padding: var(--space-1); }
+.p-2 { padding: var(--space-2); }
+.text-center { text-align: center; }
+
+/* Responsive typography */
+@media (min-width: 600px) {
+  h1 { font-size: 2.5rem; }
+  h2 { font-size: 2rem; }
+}
+@media (min-width: 900px) {
+  h1 { font-size: 3rem; }
+  h2 { font-size: 2.5rem; }
+}
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header aria-label="Site Header">
+    <nav aria-label="Primary Navigation" class="container">
+      <a href="home.html" class="logo">Iowa</a>
+      <ul>
+        <li><a href="home.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="documentation.html">Documentation</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container" id="main-content">
+    <section class="row mt-3">
+      <div class="col">
+        <h1>Welcome to Iowa</h1>
+        <p class="mb-2">A sleek, Apple‑style experience for the Aiden IWO project.</p>
+        <a href="features.html" role="button" class="button" style="display:inline-block;background:var(--color-accent-blue);color:#fff;padding:var(--space-2) var(--space-3);border-radius:4px;">Explore Features</a>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <img src="https://picsum.photos/seed/home/800/400" alt="A modern interface mockup showcasing Iowa's dashboard" style="width:100%;height:auto;border-radius:8px;">
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2>Why Iowa?</h2>
+        <p>Iowa blends elegant design with powerful functionality, delivering a seamless experience across devices.</p>
+        <ul>
+          <li>Intuitive navigation</li>
+          <li>Responsive layouts</li>
+          <li>Accessibility‑first approach</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer aria-label="Site Footer">
+    <p>&copy; 2026 Iowa. All rights reserved.</p>
+    <p><a href="privacy.html">Privacy Policy</a> | <a href="terms.html">Terms of Service</a></p>
+  </footer>
+</body>
+</html>
+
+<!-- ============================================================= -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – About page. Learn about the vision and team behind the Aiden IWO project.">
+  <title>Iowa – About</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+}
+*, *::before, *::after { box-sizing:border-box; }
+html {font-size:100%;}
+body {
+  margin:0;
+  font-family:var(--font-body);
+  background:var(--color-light);
+  color:var(--color-dark);
+  line-height:1.5;
+}
+h1,h2,h3,h4,h5,h6{
+  font-family:var(--font-heading);
+  margin:0 0 var(--space-4) 0;
+  line-height:1.2;
+}
+p{margin:0 0 var(--space-4) 0;}
+.container{width:100%;padding:0 var(--space-4);margin:0 auto;}
+.row{display:flex;flex-wrap:wrap;margin:0 calc(-1*var(--space-2));}
+.col{flex:1 0 0%;padding:0 var(--space-2);}
+@media (min-width:600px){.container{max-width:540px;}}
+@media (min-width:900px){.container{max-width:720px;}}
+@media (min-width:1200px){.container{max-width:960px;}}
+header{background:var(--color-light);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-mid-gray);}
+header nav{display:flex;justify-content:space-between;align-items:center;}
+header a{color:var(--color-dark);text-decoration:none;font-weight:500;}
+header a:focus-visible{outline:2px solid var(--color-accent-blue);outline-offset:2px;}
+footer{background:var(--color-dark);color:var(--color-light);padding:var(--space-5) var(--space-4);text-align:center;}
+footer a{color:var(--color-light);}
+footer a:focus-visible{outline:2px solid var(--color-accent-orange);outline-offset:2px;}
+nav ul{list-style:none;margin:0;padding:0;display:flex;gap:var(--space-4);}
+nav a{padding:var(--space-2);}
+nav a:hover,nav a:focus{color:var(--color-accent-blue);}
+button,[role="button"],input,select,textarea,a{outline:none;}
+button:focus-visible,[role="button"]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--color-accent-green);outline-offset:2px;}
+.mt-1{margin-top:var(--space-1);} .mt-2{margin-top:var(--space-2);} .mt-3{margin-top:var(--space-3);}
+.mb-1{margin-bottom:var(--space-1);} .mb-2{margin-bottom:var(--space-2);}
+.p-1{padding:var(--space-1);} .p-2{padding:var(--space-2);}
+.text-center{text-align:center;}
+@media (min-width:600px){h1{font-size:2.5rem;}h2{font-size:2rem;}}
+@media (min-width:900px){h1{font-size:3rem;}h2{font-size:2.5rem;}}
+  </style>
+</head>
+<body>
+  <header aria-label="Site Header">
+    <nav aria-label="Primary Navigation" class="container">
+      <a href="home.html" class="logo">Iowa</a>
+      <ul>
+        <li><a href="home.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="documentation.html">Documentation</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container" id="main-content">
+    <section class="row mt-3">
+      <div class="col">
+        <h1>About Iowa</h1>
+        <p class="mb-2">Iowa is the flagship web experience for the Aiden IWO project, crafted with meticulous attention to detail.</p>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <img src="https://picsum.photos/seed/about/800/400" alt="Team collaborating on a sleek interface design" style="width:100%;height:auto;border-radius:8px;">
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2>Our Vision</h2>
+        <p>To deliver a seamless, elegant, and accessible digital experience that feels handcrafted.</p>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2>Meet the Team</h2>
+        <ul>
+          <li>Darrel Vaughn – Lead Developer</li>
+          <li>LuaAzullaB – Design Lead</li>
+          <li>… and many more dedicated contributors.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer aria-label="Site Footer">
+    <p>&copy; 2026 Iowa. All rights reserved.</p>
+    <p><a href="privacy.html">Privacy Policy</a> | <a href="terms.html">Terms of Service</a></p>
+  </footer>
+</body>
+</html>
+
+<!-- ============================================================= -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Features page. Discover the powerful features of the Aiden IWO project.">
+  <title>Iowa – Features</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+}
+*, *::before, *::after { box-sizing:border-box; }
+html {font-size:100%;}
+body{margin:0;font-family:var(--font-body);background:var(--color-light);color:var(--color-dark);line-height:1.5;}
+h1,h2,h3,h4,h5,h6{font-family:var(--font-heading);margin:0 0 var(--space-4) 0;line-height:1.2;}
+p{margin:0 0 var(--space-4) 0;}
+.container{width:100%;padding:0 var(--space-4);margin:0 auto;}
+.row{display:flex;flex-wrap:wrap;margin:0 calc(-1*var(--space-2));}
+.col{flex:1 0 0%;padding:0 var(--space-2);}
+@media (min-width:600px){.container{max-width:540px;}}
+@media (min-width:900px){.container{max-width:720px;}}
+@media (min-width:1200px){.container{max-width:960px;}}
+header{background:var(--color-light);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-mid-gray);}
+header nav{display:flex;justify-content:space-between;align-items:center;}
+header a{color:var(--color-dark);text-decoration:none;font-weight:500;}
+header a:focus-visible{outline:2px solid var(--color-accent-blue);outline-offset:2px;}
+footer{background:var(--color-dark);color:var(--color-light);padding:var(--space-5) var(--space-4);text-align:center;}
+footer a{color:var(--color-light);}
+footer a:focus-visible{outline:2px solid var(--color-accent-orange);
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa – Site Index</title>\n<style>\n:root {\n  --color-dark: #141413;\n  --color-light: #faf9f5;\n  --color-mid-gray: #b0aea5;\n  --color-light-gray: #e8e6dc;\n  --color-accent-orange: #d97757;\n  --color-accent-blue: #6a9bcc;\n  --color-accent-green: #788c5d;\n\n  --font-heading: 'Poppins', Arial, sans-serif;\n  --font-body: 'Lora', Georgia, serif;\n\n  /* Spacing scale (8px base) */\n  --space-0: 0;\n  --space-1: 0.25rem; /* 4px */\n  --space-2: 0.5rem;  /* 8px */\n  --space-3: 0.75rem; /* 12px */\n  --space-4: 1rem;    /* 16px */\n  --space-5: 1.5rem;  /* 24px */\n  --space-6: 2rem;    /* 32px */\n  --space-7: 3rem;    /* 48px */\n}\n\n/* Base reset */\n*, *::before, *::after {\n  box-sizing: border-box;\n}\nhtml {\n  font-size: 100%; /* 16px */\n}\nbody {\n  margin: 0;\n  font-family: var(--font-body);\n  background: var(--color-light);\n  color: var(--color-dark);\n  line-height: 1.5;\n}\n\n/* Typography */\nh1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading);\n  margin: 0 0 var(--space-4) 0;\n  line-height: 1.2;\n}\np {\n  margin: 0 0 var(--space-4) 0;\n}\n\n/* Grid system */\n.container {\n  width: 100%;\n  padding: 0 var(--space-4);\n  margin: 0 auto;\n}\n.row {\n  display: flex;\n  flex-wrap: wrap;\n  margin: 0 calc(-1 * var(--space-2));\n}\n.col {\n  flex: 1 0 0%;\n  padding: 0 var(--space-2);\n}\n@media (min-width: 600px) {\n  .container { max-width: 540px; }\n}\n@media (min-width: 900px) {\n  .container { max-width: 720px; }\n}\n@media (min-width: 1200px) {\n  .container { max-width: 960px; }\n}\n\n/* Header */\nheader {\n  background: var(--color-light);\n  padding: var(--space-3) var(--space-4);\n  border-bottom: 1px solid var(--color-mid-gray);\n}\nheader nav {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\nheader a {\n  color: var(--color-dark);\n  text-decoration: none;\n  font-weight: 500;\n}\nheader a:focus-visible {\n  outline: 2px solid var(--color-accent-blue);\n  outline-offset: 2px;\n}\n\n/* Footer */\nfooter {\n  background: var(--color-dark);\n  color: var(--color-light);\n  padding: var(--space-5) var(--space-4);\n  text-align: center;\n}\nfooter a {\n  color: var(--color-light);\n}\nfooter a:focus-visible {\n  outline: 2px solid var(--color-accent-orange);\n  outline-offset: 2px;\n}\n\n/* Navigation */\nnav ul {\n  list-style: none;\n  margin: 0;\n  padding: 0;\n  display: flex;\n  gap: var(--space-4);\n}\nnav li {}\nnav a {\n  padding: var(--space-2);\n}\nnav a:hover,\nnav a:focus {\n  color: var(--color-accent-blue);\n}\n\n/* Responsive navigation */\n.menu-toggle {\n  display: none;\n  background: none;\n  border: none;\n  font-size: 1.5rem;\n  cursor: pointer;\n}\n@media (max-width: 600px) {\n  nav ul {\n    flex-direction: column;\n    display: none;\n  }\n  nav ul.show {\n    display: flex;\n  }\n  .menu-toggle {\n    display: block;\n  }\n}\n\n/* Focus styles for interactive elements */\nbutton, [role=\"button\"], input, select, textarea, a {\n  outline: none;\n}\nbutton:focus-visible,\n[role=\"button\"]:focus-visible,\ninput:focus-visible,\nselect:focus-visible,\ntextarea:focus-visible,\na:focus-visible {\n  outline: 2px solid var(--color-accent-green);\n  outline-offset: 2px;\n}\n\n/* Utility classes */\n.mt-1 { margin-top: var(--space-1); }\n.mt-2 { margin-top: var(--space-2); }\n.mt-3 { margin-top: var(--space-3); }\n.mb-1 { margin-bottom: var(--space-1); }\n.mb-2 { margin-bottom: var(--space-2); }\n.p-1 { padding: var(--space-1); }\n.p-2 { padding: var(--space-2); }\n.text-center { text-align: center; }\n\n/* Responsive typography */\n@media (min-width: 600px) {\n  h1 { font-size: 2.5rem; }\n  h2 { font-size: 2rem; }\n}\n@media (min-width: 900px) {\n  h1 { font-size: 3rem; }\n  h2 { font-size: 2.5rem; }\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Site Header\">\n  <nav aria-label=\"Primary Navigation\" class=\"container\">\n    <a href=\"home.html\" class=\"logo\">Iowa</a>\n    <button class=\"menu-toggle\" aria-controls=\"primary-menu\" aria-expanded=\"false\">☰</button>\n    <ul id=\"primary-menu\">\n      <li><a href=\"home.html\">Home</a></li>\n      <li><a href=\"about.html\">About</a></li>\n      <li><a href=\"features.html\">Features</a></li>\n      <li><a href=\"documentation.html\">Documentation</a></li>\n      <li><a href=\"contact.html\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<main class=\"container\" id=\"main-content\">\n  <section class=\"row mt-3\">\n    <div class=\"col\">\n      <h1>Site Index</h1>\n      <p>Welcome to the Iowa project. Use the navigation above or the links below to explore.</p>\n      <ul>\n        <li><a href=\"home.html\">Home</a></li>\n        <li><a href=\"about.html\">About</a></li>\n        <li><a href=\"features.html\">Features</a></li>\n        <li><a href=\"documentation.html\">Documentation</a></li>\n        <li><a href=\"contact.html\">Contact</a></li>\n      </ul>\n    </div>\n  </section>\n</main>\n\n<footer aria-label=\"Site Footer\">\n  <p>&copy; 2026 Iowa. All rights reserved.</p>\n  <p><a href=\"privacy.html\">Privacy Policy</a> | <a href=\"terms.html\">Terms of Service</a></p>\n</footer>\n\n<script>\n  const toggle = document.querySelector('.menu-toggle');\n  const menu = document.getElementById('primary-menu');\n  toggle.addEventListener('click', () => {\n    const expanded = toggle.getAttribute('aria-expanded') === 'true';\n    toggle.setAttribute('aria-expanded', String(!expanded));\n    menu.classList.toggle('show');\n  });\n</script>\n\n</body>\n</html>
+
+<!-- ==================== index.html ==================== -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Home page. An Apple‑style, responsive website for the Aiden IWO project.">
+  <title>Iowa – Home</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+}
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-light);
+  color: var(--color-dark);
+  line-height: 1.5;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  margin: 0 0 var(--space-4) 0;
+  line-height: 1.2;
+}
+p { margin: 0 0 var(--space-4) 0; }
+
+/* Grid */
+.container { width: 100%; padding: 0 var(--space-4); margin: 0 auto; }
+.row { display: flex; flex-wrap: wrap; margin: 0 calc(-1 * var(--space-2)); }
+.col { flex: 1 0 0%; padding: 0 var(--space-2); }
+@media (min-width:600px){ .container{max-width:540px;} }
+@media (min-width:900px){ .container{max-width:720px;} }
+@media (min-width:1200px){ .container{max-width:960px;} }
+
+/* Header / Nav */
+header {
+  background: var(--color-light);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-mid-gray);
+}
+header nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header a.logo { font-weight: 600; font-size: 1.25rem; color: var(--color-dark); text-decoration: none; }
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+nav a {
+  color: var(--color-dark);
+  text-decoration: none;
+  padding: var(--space-2);
+}
+nav a:hover, nav a:focus { color: var(--color-accent-blue); }
+nav a:focus-visible { outline: 2px solid var(--color-accent-blue); outline-offset: 2px; }
+
+/* Mobile nav toggle */
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+@media (max-width:600px) {
+  nav ul { flex-direction: column; display: none; }
+  nav ul.show { display: flex; }
+  .menu-toggle { display: block; }
+}
+
+/* Footer */
+footer {
+  background: var(--color-dark);
+  color: var(--color-light);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+}
+footer a { color: var(--color-light); text-decoration: underline; }
+footer a:focus-visible { outline: 2px solid var(--color-accent-orange); outline-offset: 2px; }
+
+/* Buttons */
+.button {
+  display: inline-block;
+  background: var(--color-accent-blue);
+  color: #fff;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.button:hover, .button:focus { background: var(--color-accent-green); }
+.button:focus-visible { outline: 2px solid var(--color-accent-green); outline-offset: 2px; }
+
+/* Focus styles for all interactive */
+button, [role="button"], input, select, textarea, a {
+  outline: none;
+}
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent-green);
+  outline-offset: 2px;
+}
+
+/* Utility */
+.mt-1 { margin-top: var(--space-1); }
+.mt-2 { margin-top: var(--space-2); }
+.mt-3 { margin-top: var(--space-3); }
+.mb-1 { margin-bottom: var(--space-1); }
+.mb-2 { margin-bottom: var(--space-2); }
+.text-center { text-align: center; }
+
+/* Responsive typography */
+@media (min-width:600px){
+  h1 { font-size: 2.5rem; }
+  h2 { font-size: 2rem; }
+}
+@media (min-width:900px){
+  h1 { font-size: 3rem; }
+  h2 { font-size: 2.5rem; }
+}
+  </style>
+</head>
+<body>
+  <header aria-label="Site Header">
+    <nav aria-label="Primary Navigation" class="container" role="navigation">
+      <a href="index.html" class="logo">Iowa</a>
+      <button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false" aria-label="Toggle menu">☰</button>
+      <ul id="primary-menu">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container" id="main-content" role="main">
+    <!-- Hero -->
+    <section class="row mt-3">
+      <div class="col">
+        <h1 class="text-center">Welcome to Iowa</h1>
+        <p class="text-center mb-2">An Apple‑style, responsive experience for the Aiden IWO project.</p>
+        <p class="text-center"><a href="features.html" class="button" role="button">Explore Features</a></p>
+      </div>
+    </section>
+
+    <!-- Hero image -->
+    <section class="row mt-3">
+      <div class="col">
+        <img src="https://picsum.photos/seed/home/800/400" alt="Mockup of Iowa dashboard on a sleek device" style="width:100%;height:auto;border-radius:8px;">
+      </div>
+    </section>
+
+    <!-- Highlights -->
+    <section class="row mt-3">
+      <div class="col">
+        <h2 class="text-center">Why Iowa?</h2>
+        <ul>
+          <li>Intuitive navigation</li>
+          <li>Responsive layouts</li>
+          <li>Accessibility‑first design</li>
+          <li>Meticulously crafted visual polish</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer aria-label="Site Footer">
+    <p>&copy; 2026 Iowa. All rights reserved.</p>
+    <p><a href="privacy.html">Privacy Policy</a> | <a href="terms.html">Terms of Service</a></p>
+  </footer>
+
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const menu = document.getElementById('primary-menu');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      menu.classList.toggle('show');
+    });
+  </script>
+</body>
+</html>
+
+<!-- ==================== about.html ==================== -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – About page. Learn about the vision and team behind the Aiden IWO project.">
+  <title>Iowa – About</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+}
+*, *::before, *::after { box-sizing:border-box; }
+html {font-size:100%;}
+body{
+  margin:0;
+  font-family:var(--font-body);
+  background:var(--color-light);
+  color:var(--color-dark);
+  line-height:1.5;
+}
+h1,h2,h3,h4,h5,h6{
+  font-family:var(--font-heading);
+  margin:0 0 var(--space-4) 0;
+  line-height:1.2;
+}
+p{margin:0 0 var(--space-4) 0;}
+.container{width:100%;padding:0 var(--space-4);margin:0 auto;}
+.row{display:flex;flex-wrap:wrap;margin:0 calc(-1*var(--space-2));}
+.col{flex:1 0 0%;padding:0 var(--space-2);}
+@media (min-width:600px){.container{max-width:540px;}}
+@media (min-width:900px){.container{max-width:720px;}}
+@media (min-width:1200px){.container{max-width:960px;}}
+header{background:var(--color-light);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-mid-gray);}
+header nav{display:flex;justify-content:space-between;align-items:center;}
+header a.logo{font-weight:600;font-size:1.25rem;color:var(--color-dark);text-decoration:none;}
+nav ul{list-style:none;margin:0;padding:0;display:flex;gap:var(--space-4);}
+nav a{color:var(--color-dark);text-decoration:none;padding:var(--space-2);}
+nav a:hover,nav a:focus{color:var(--color-accent-blue);}
+nav a:focus-visible{outline:2px solid var(--color-accent-blue);outline-offset:2px;}
+.menu-toggle{display:none;background:none;border:none;font-size:1.5rem;cursor:pointer;}
+@media (max-width:600px){
+  nav ul{flex-direction:column;display:none;}
+  nav ul.show{display:flex;}
+  .menu-toggle{display:block;}
+}
+footer{background:var(--color-dark);color:var(--color-light);padding:var(--space-5) var(--space-4);text-align:center;}
+footer a{color:var(--color-light);text-decoration:underline;}
+footer a:focus-visible{outline:2px solid var(--color-accent-orange);outline-offset:2px;}
+.button{display:inline-block;background:var(--color-accent-blue);color:#fff;padding:var(--space-2) var(--space-3);border-radius:4px;text-decoration:none;font-weight:500;}
+.button:hover,.button:focus{background:var(--color-accent-green);}
+button, [role="button"], input, select, textarea, a{outline:none;}
+button:focus-visible,[role="button"]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--color-accent-green);outline-offset:2px;}
+.mt-1{margin-top:var(--space-1);} .mt-2{margin-top:var(--space-2);} .mt-3{margin-top:var(--space-3);}
+.mb-1{margin-bottom:var(--space-1);} .mb-2{margin-bottom:var(--space-2);}
+.text-center{text-align:center;}
+@media (min-width:600px){h1{font-size:2.5rem;}h2{font-size:2rem;}}
+@media (min-width:900px){h1{font-size:3rem;}h2{font-size:2.5rem;}}
+  </style>
+</head>
+<body>
+  <header aria-label="Site Header">
+    <nav aria-label="Primary Navigation" class="container" role="navigation">
+      <a href="index.html" class="logo">Iowa</a>
+      <button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false" aria-label="Toggle menu">☰</button>
+      <ul id="primary-menu">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container" id="main-content" role="main">
+    <section class="row mt-3">
+      <div class="col">
+        <h1 class="text-center">About Iowa</h1>
+        <p class="text-center mb-2">Iowa is the flagship web experience for the Aiden IWO project, crafted with meticulous attention to detail.</p>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <img src="https://picsum.photos/seed/about/800/400" alt="Team collaborating on a sleek interface design" style="width:100%;height:auto;border-radius:8px;">
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2>Our Vision</h2>
+        <p>To deliver a seamless, elegant, and accessible digital experience that feels handcrafted.</p>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2>Meet the Team</h2>
+        <ul>
+          <li>Darrel Vaughn – Lead Developer</li>
+          <li>LuaAzullaB – Design Lead</li>
+          <li>… and many more dedicated contributors.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer aria-label="Site Footer">
+    <p>&copy; 2026 Iowa. All rights reserved.</p>
+    <p><a href="privacy.html">Privacy Policy</a> | <a href="terms.html">Terms of Service</a></p>
+  </footer>
+
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const menu = document.getElementById('primary-menu');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      menu.classList.toggle('show');
+    });
+  </script>
+</body>
+</html>
+
+<!-- ==================== features.html ==================== -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Features page. Discover the powerful features of the Aiden IWO project.">
+  <title>Iowa – Features</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+
+**ZIP‑STYLE LIST OF ALL SITE FILES**  
+
+Below are the complete source files for the five website pages plus the sandbox preview page. Each file is ready to be placed in the same directory and opened in a browser.
+
+---
+
+### 📄 `index.html` (Home)
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Home page. An Apple‑style, responsive website for the Aiden IWO project.">
+  <title>Iowa – Home</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+}
+
+/* Reset */
+*, *::before, *::after { box-sizing:border-box; }
+html {font-size:100%;}
+body {
+  margin:0;
+  font-family:var(--font-body);
+  background:var(--color-light);
+  color:var(--color-dark);
+  line-height:1.5;
+}
+
+/* Typography */
+h1,h2,h3,h4,h5,h6{
+  font-family:var(--font-heading);
+  margin:0 0 var(--space-4) 0;
+  line-height:1.2;
+}
+p{margin:0 0 var(--space-4) 0;}
+
+/* Grid */
+.container{width:100%;padding:0 var(--space-4);margin:0 auto;}
+.row{display:flex;flex-wrap:wrap;margin:0 calc(-1*var(--space-2));}
+.col{flex:1 0 0%;padding:0 var(--space-2);}
+@media (min-width:600px){.container{max-width:540px;}}
+@media (min-width:900px){.container{max-width:720px;}}
+@media (min-width:1200px){.container{max-width:960px;}
+
+/* Header / Nav */
+header{
+  background:var(--color-light);
+  padding:var(--space-3) var(--space-4);
+  border-bottom:1px solid var(--color-mid-gray);
+}
+header nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+header a.logo{
+  font-weight:600;
+  font-size:1.25rem;
+  color:var(--color-dark);
+  text-decoration:none;
+}
+nav ul{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  gap:var(--space-4);
+}
+nav a{
+  color:var(--color-dark);
+  text-decoration:none;
+  padding:var(--space-2);
+}
+nav a:hover, nav a:focus{color:var(--color-accent-blue);}
+nav a:focus-visible{
+  outline:2px solid var(--color-accent-blue);
+  outline-offset:2px;
+}
+
+/* Mobile nav toggle */
+.menu-toggle{
+  display:none;
+  background:none;
+  border:none;
+  font-size:1.5rem;
+  cursor:pointer;
+}
+@media (max-width:600px){
+  nav ul{flex-direction:column;display:none;}
+  nav ul.show{display:flex;}
+  .menu-toggle{display:block;}
+}
+
+/* Footer */
+footer{
+  background:var(--color-dark);
+  color:var(--color-light);
+  padding:var(--space-5) var(--space-4);
+  text-align:center;
+}
+footer a{
+  color:var(--color-light);
+  text-decoration:underline;
+}
+footer a:focus-visible{
+  outline:2px solid var(--color-accent-orange);
+  outline-offset:2px;
+}
+
+/* Buttons */
+.button{
+  display:inline-block;
+  background:var(--color-accent-blue);
+  color:#fff;
+  padding:var(--space-2) var(--space-3);
+  border-radius:4px;
+  text-decoration:none;
+  font-weight:500;
+}
+.button:hover,.button:focus{
+  background:var(--color-accent-green);
+}
+.button:focus-visible{
+  outline:2px solid var(--color-accent-green);
+  outline-offset:2px;
+}
+
+/* Focus styles for all interactive elements */
+button, [role="button"], input, select, textarea, a{
+  outline:none;
+}
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible{
+  outline:2px solid var(--color-accent-green);
+  outline-offset:2px;
+}
+
+/* Utility */
+.mt-1{margin-top:var(--space-1);}
+.mt-2{margin-top:var(--space-2);}
+.mt-3{margin-top:var(--space-3);}
+.mb-1{margin-bottom:var(--space-1);}
+.mb-2{margin-bottom:var(--space-2);}
+.text-center{text-align:center;}
+
+/* Responsive typography */
+@media (min-width:600px){
+  h1{font-size:2.5rem;}
+  h2{font-size:2rem;}
+}
+@media (min-width:900px){
+  h1{font-size:3rem;}
+  h2{font-size:2.5rem;}
+}
+  </style>
+</head>
+<body>
+  <header aria-label="Site Header">
+    <nav aria-label="Primary Navigation" class="container" role="navigation">
+      <a href="index.html" class="logo">Iowa</a>
+      <button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false" aria-label="Toggle menu">☰</button>
+      <ul id="primary-menu">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="documentation.html">Documentation</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container" id="main-content" role="main">
+    <section class="row mt-3">
+      <div class="col">
+        <h1 class="text-center">Welcome to Iowa</h1>
+        <p class="text-center mb-2">An Apple‑style, responsive experience for the Aiden IWO project.</p>
+        <p class="text-center"><a href="features.html" class="button" role="button">Explore Features</a></p>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <img src="https://picsum.photos/seed/home/800/400" alt="Mockup of Iowa dashboard on a sleek device" style="width:100%;height:auto;border-radius:8px;">
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2 class="text-center">Why Iowa?</h2>
+        <ul>
+          <li>Intuitive navigation</li>
+          <li>Responsive layouts</li>
+          <li>Accessibility‑first design</li>
+          <li>Meticulously crafted visual polish</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer aria-label="Site Footer">
+    <p>&copy; 2026 Iowa. All rights reserved.</p>
+    <p><a href="privacy.html">Privacy Policy</a> | <a href="terms.html">Terms of Service</a></p>
+  </footer>
+
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const menu = document.getElementById('primary-menu');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      menu.classList.toggle('show');
+    });
+  </script>
+</body>
+</html>
+```
+
+---
+
+### 📄 `about.html`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – About page. Learn about the vision and team behind the Aiden IWO project.">
+  <title>Iowa – About</title>
+  <style>
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{font-size:100%;}
+body{
+  margin:0;
+  font-family:var(--font-body);
+  background:var(--color-light);
+  color:var(--color-dark);
+  line-height:1.5;
+}
+h1,h2,h3,h4,h5,h6{
+  font-family:var(--font-heading);
+  margin:0 0 var(--space-4) 0;
+  line-height:1.2;
+}
+p{margin:0 0 var(--space-4) 0;}
+.container{width:100%;padding:0 var(--space-4);margin:0 auto;}
+.row{display:flex;flex-wrap:wrap;margin:0 calc(-1*var(--space-2));}
+.col{flex:1 0 0%;padding:0 var(--space-2);}
+@media (min-width:600px){.container{max-width:540px;}}
+@media (min-width:900px){.container{max-width:720px;}}
+@media (min-width:1200px){.container{max-width:960px;}}
+header{
+  background:var(--color-light);
+  padding:var(--space-3) var(--space-4);
+  border-bottom:1px solid var(--color-mid-gray);
+}
+header nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+header a.logo{
+  font-weight:600;
+  font-size:1.25rem;
+  color:var(--color-dark);
+  text-decoration:none;
+}
+nav ul{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  gap:var(--space-4);
+}
+nav a{
+  color:var(--color-dark);
+  text-decoration:none;
+  padding:var(--space-2);
+}
+nav a:hover,nav a:focus{color:var(--color-accent-blue);}
+nav a:focus-visible{
+  outline:2px solid var(--color-accent-blue);
+  outline-offset:2px;
+}
+.menu-toggle{
+  display:none;
+  background:none;
+  border:none;
+  font-size:1.5rem;
+  cursor:pointer;
+}
+@media (max-width:600px){
+  nav ul{flex-direction:column;display:none;}
+  nav ul.show{display:flex;}
+  .menu-toggle{display:block;}
+}
+footer{
+  background:var(--color-dark);
+  color:var(--color-light);
+  padding:var(--space-5) var(--space-4);
+  text-align:center;
+}
+footer a{
+  color:var(--color-light);
+  text-decoration:underline;
+}
+footer a:focus-visible{
+  outline:2px solid var(--color-accent-orange);
+  outline-offset:2px;
+}
+button,[role="button"],input,select,textarea,a{outline:none;}
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible{
+  outline:2px solid var(--color-accent-green);
+  outline-offset:2px;
+}
+.mt-1{margin-top:var(--space-1);}
+.mt-2{margin-top:var(--space-2);}
+.mt-3{margin-top:var(--space-3);}
+.mb-1{margin-bottom:var(--space-1);}
+.mb-2{margin-bottom:var(--space-2);}
+.text-center{text-align:center;}
+@media (min-width:600px){
+  h1{font-size:2.5rem;}
+  h2{font-size:2rem;}
+}
+@media (min-width:900px){
+  h1{font-size:3rem;}
+  h2{font-size:2.5rem;}
+}
+  </style>
+</head>
+<body>
+  <header aria-label="Site Header">
+    <nav aria-label="Primary Navigation" class="container" role="navigation">
+      <a href="index.html" class="logo">Iowa</a>
+      <button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false" aria-label="Toggle menu">☰</button>
+      <ul id="primary-menu">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="documentation.html">Documentation</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container" id="main-content" role="main">
+    <section class="row mt-3">
+      <div class="col">
+        <h1 class="text-center">About Iowa</h1>
+        <p class="text-center mb-2">Iowa is the flagship web experience for the Aiden IWO project, crafted with meticulous attention to detail.</p>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <img src="https://picsum.photos/seed/about/800/400" alt="Team collaborating on a sleek interface design" style="width:100%;height:auto;border-radius:8px;">
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2>Our Vision</h2>
+        <p>To deliver a seamless, elegant, and accessible digital experience that feels handcrafted.</p>
+      </div>
+    </section>
+
+    <section class="row mt-3">
+      <div class="col">
+        <h2>Meet the Team</h2>
+        <ul>
+          <li>Darrel Vaughn – Lead Developer</li>
+          <li>LuaAzullaB – Design Lead</li>
+          <li>… and many more dedicated contributors.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer aria-label="Site Footer">
+    <p>&copy; 2026 Iowa. All rights reserved.</p>
+    <p><a href="privacy.html">Privacy Policy</a> | <a href="terms.html">Terms of Service</a></p>
+  </footer>
+
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const menu = document.getElementById('primary-menu');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      menu.classList.toggle('show');
+    });
+  </script>
+</body>
+</html>
+```
+
+---
+
+### 📄 `features.html`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Features page

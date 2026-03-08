@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa — Where the land meets the horizon. Discover the beauty, culture, and spirit of the heartland.">
+  <title>Iowa — The Heartland</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --bg: #ffffff;
+      --bg-alt: #f5f5f7;
+      --text: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --text-tertiary: #86868b;
+      --border: #d2d2d7;
+      --card-bg: #ffffff;
+      --nav-bg: rgba(255,255,255,0.85);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 48px rgba(0,0,0,0.14);
+      --transition: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Skip to content */
+    .skip-link {
+      position: absolute;
+      top: -100px;
+      left: 1rem;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      z-index: 9999;
+      transition: top 0.2s;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 1rem; }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: var(--nav-bg);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      transition: background var(--transition);
+    }
+
+    .nav-logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.85rem;
+      color: var(--text);
+      text-decoration: none;
+      opacity: 0.85;
+      transition: opacity 0.2s;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+
+    .nav-links a:hover, .nav-links a:focus { opacity: 1; color: var(--accent); }
+
+    .nav-cta {
+      background: var(--accent);
+      color: #fff !important;
+      padding: 0.45rem 1.1rem;
+      border-radius: 980px;
+      font-size: 0.82rem !important;
+      font-weight: 500 !important;
+      opacity: 1 !important;
+      transition: background 0.2s !important;
+    }
+    .nav-cta:hover { background: var(--accent-hover) !important; }
+
+    /* Hamburger */
+    .nav-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .nav-toggle span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: var(--transition);
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-toggle { display: flex; }
+      .nav-links.open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 52px;
+        left: 0;
+        right: 0;
+        background: rgba(255,255,255,0.97);
+        backdrop-filter: blur(20px);
+        padding: 1.5rem 2rem;
+        gap: 1.2rem;
+        border-bottom: 1px solid var(--border);
+      }
+    }
+
+    /* Sections */
+    section { scroll-margin-top: 52px; }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      padding: 6rem 2rem 4rem;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg,
+          rgba(0,0,0,0.18) 0%,
+          rgba(0,0,0,0.05) 40%,
+          rgba(0,0,0,0.35) 100%
+        );
+      z-index: 1;
+    }
+
+    .hero-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 760px;
+    }
+
+    .hero-eyebrow {
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 1.2rem;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(8px);
+      padding: 0.4rem 1rem;
+      border-radius: 980px;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    .hero h1 {
+      font-size: clamp(3rem, 8vw, 6.5rem);
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.04em;
+      line-height: 1.0;
+      margin-bottom: 1.5rem;
+      text-shadow: 0 2px 24px rgba(0,0,0,0.25);
+    }
+
+    .hero-sub {
+      font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+      color: rgba(255,255,255,0.9);
+      font-weight: 300;
+      max-width: 520px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.85rem 2rem;
+      border-radius: 980px;
+      font-size: 1rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.25s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,113,227,0.4); }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.35);
+      backdrop-filter: blur(8px);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
+
+    .hero-scroll {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(255,255,255,0.7);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      animation: bounce 2.5s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(8px); }
+    }
+
+    /* Section headers */
+    .section-header {
+      text-align: center;
+      max-width: 640px;
+      margin: 0 auto 4rem;
+    }
+
+    .section-eyebrow {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--text);
+      margin-bottom: 1rem;
+    }
+
+    .section-desc {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+      font-weight: 300;
+    }
+
+    /* Page sections padding */
+    .page-section {
+      padding: 7rem 2rem;
+    }
+
+    .page-section.alt { background: var(--bg-alt); }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 2rem;
+      margin-top: 5rem;
+      text-align: center;
+    }
+
+    .stat-item {
+      padding: 2rem 1.5rem;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .stat-item:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+
+    .stat-number {
+      font-size: 2.8rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 0.4rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .feature-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+
+    .feature-card-img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .feature-card-body {
+      padding: 1.75rem;
+    }
+
+    .feature-card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #e8f4fd, #cce4f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.6rem;
+      color: var(--text);
+    }
+
+    .feature-card p {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    /* About section */
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .about-grid { grid-template-columns: 1fr; gap: 3rem; }
+    }
+
+    .about-text h2 {
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1.5rem;
+    }
+
+    .about-text p {
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+      line-height: 1.75;
+      margin-bottom: 1.2rem;
+    }
+
+    .about-img-wrap {
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .about-img-wrap img {
+      width: 100%;
+      height: 480px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .about-img-badge {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.5rem;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .about-img-badge strong {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.03em;
+    }
+
+    .about-img-badge span {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+      margin-top: 3rem;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(180deg, var(--accent), transparent);
+    }
+
+    .timeline-item {
+      position: relative;
+      padding: 0 0 2.5rem 1.5rem;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -2.35rem;
+      top: 0.35rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 3px rgba(0,113,227,0.2);
+    }
+
+    .timeline-year {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+
+    .timeline-item h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    .timeline-item p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Places */
+    .places-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 2rem;
+    }
+
+    .place-card {
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      box-shadow: var(--shadow);
+      transition: transform var(--transition), box-shadow var(--transition);
+      aspect-ratio: 4/3;
+    }
+    .place-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+    .place-card:hover .place-card-overlay { opacity: 1; }
+    .place-card:hover .place-card-img { transform: scale(1.05); }
+
+    .place-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .place-card-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.75) 100%);
+      opacity: 0.85;
+      transition: opacity var(--transition);
+    }
+
+    .place-card-info {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 1.75rem;
+      color: #fff;
+    }
+
+    .place-card-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 0.25rem 0.7rem;
+      border-radius: 980px;
+      margin-bottom: 0.6rem;
+    }
+
+    .place-card-info h3 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.3rem;
+    }
+
+    .place-card-info p {
+      font-size: 0.85rem;
+      opacity: 0.85;
+      line-height: 1.5;
+    }
+
+    /* Agriculture */
+    .agri-hero {
+      background: linear-gradient(135deg, #f0f7e6 0%, #e8f5d0 50%, #d4edaa 100%);
+      border-radius: var(--radius);
+      padding: 4rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      margin-bottom: 4rem;
+    }
+
+    @media (max-width: 768px) {
+      .agri-hero { grid-template-columns: 1fr; padding: 2.5rem; }
+    }
+
+    .agri-hero h2 {
+      font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+      color: #2d4a1e;
+    }
+
+    .agri-hero p {
+      font-size: 1rem;
+      color: #4a6b35;
+      line-height: 1.7;
+    }
+
+    .agri-img {
+      border-radius: var(--radius-sm);
+      width: 100%;
+      height: 280px;
+      object-fit: cover;
+      box-shadow: var(--shadow);
+    }
+
+    .agri-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .agri-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 2rem;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .agri-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+
+    .agri-card-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.2rem;
+      font-size: 1.6rem;
+    }
+
+    .agri-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .agri-card p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    /* Arts */
+    .arts-mosaic {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 1.5rem;
+      margin-bottom: 4rem;
+    }
+
+    @media (max-width: 768px) {
+      .arts-mosaic { grid-template-columns: 1fr; }
+    }
+
+    .arts-mosaic-main {
+      grid-row: span 2;
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      min-height: 420px;
+    }
+
+    .arts-mosaic-main img,
+    .arts-mosaic-side img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .arts-mosaic-side {
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-height: 195px;
+    }
+
+    .arts-mosaic-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.7) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 2rem;
+      color: #fff;
+    }
+
+    .arts-mosaic-overlay h3 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.4rem;
+    }
+
+    .arts-mosaic-overlay p {
+      font-size: 0.9rem;
+      opacity: 0.85;
+    }
+
+    .arts-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .arts-item {
+      display: flex;
+      gap: 1.2rem;
+      align-items: flex-start;
+      padding: 1.5rem;
+      background: var(--card-bg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      transition: transform var(--transition);
+    }
+    .arts-item:hover { transform: translateY(-3px); }
+
+    .arts-item-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+    }
+
+    .arts-item h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    .arts-item p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Contact */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 4rem;
+      align-items: start;
+    }
+
+    @media (max-width: 768px) {
+      .contact-grid { grid-template-columns: 1fr; gap: 3rem; }
+    }
+
+    .contact-info h2 {
+      font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+
+    .contact-info p {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+
+    .contact-detail {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .contact-detail:last-child { border-bottom: none; }
+
+    .contact-detail-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #e8f4fd, #cce4f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .contact-detail-text strong {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .contact-detail-text span {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    /* Form */
+    .contact-form {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+
+    .form-group {
+      margin-bottom: 1.4rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--bg);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,113,227,0.12);
+    }
+
+    .form-group textarea { resize: vertical; min-height: 130px; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 480px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 1rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 980px;
+      font-size: 1rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-submit:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,113,227,0.35); }
+    .btn-submit:focus { outline: 3px solid rgba(0,113,227,0.4); outline-offset: 2px; }
+
+    /* Footer */
+    footer {
+      background: var(--text);
+      color: rgba(255,255,255,0.7);
+      padding: 4rem 2rem 2rem;
+    }
+
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .footer-top {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 3rem;
+      padding-bottom: 3rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .footer-top { grid-template-columns: 1fr 1fr; gap: 2rem; }
+    }
+
+    @media (max-width: 480px) {
+      .footer-top { grid-template-columns: 1fr; }
+    }
+
+    .footer-brand p {
+      font-size: 0.88rem;
+      line-height: 1.7;
+      margin-top: 0.75rem;
+      max-width: 260px;
+    }
+
+    .footer-brand-name {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    .footer-col h4 {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .footer-col ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .footer-col a {
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.6);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-col a:hover { color: #fff; }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      font-size: 0.82rem;
+    }
+
+    .footer-social {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .footer-social a {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+    .footer-social a:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+    /* Scroll reveal */
+    .reveal {
+      opacity: 0;
+      transform: translateY(32px);
+      transition: opacity 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+
+    /* Accessibility */
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+      .reveal { opacity: 1; transform: none; }
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 0;
+    }
+
+    /* Chip tags */
+    .chip {
+      display: inline-block;
+      padding: 0.3rem 0.8rem;
+      background: rgba(0,113,227,0.08);
+      color: var(--accent);
+      border-radius: 980px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      margin-right: 0.4rem;
+      margin-bottom: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Skip to content -->
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <!-- Navigation -->
+  <nav role="navigation" aria-label="Main navigation">
+    <a href="#home" class="nav-logo" aria-label="Iowa — Home">Iowa</a>
+    <button class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="nav-menu" onclick="toggleNav(this)">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="nav-menu" role="list">
+      <li><a href="#home">Home</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#places">Places</a></li>
+      <li><a href="#agriculture">Agriculture</a></li>
+      <li><a href="#arts">Arts &amp; Culture</a></li>
+      <li><a href="#contact" class="nav-cta">Contact</a></li>
+    </ul>
+  </nav>
+
+  <main id="main">
+
+    <!-- ============================================================
+         SECTION 1: HOME / HERO
+    ============================================================ -->
+    <section id="home" class="hero" aria-label="Welcome to Iowa">
+      <img
+        src="https://picsum.photos/seed/iowa-fields/1600/900"
+        alt="Golden Iowa cornfields stretching to the horizon under a vast blue sky"
+        class="hero-img"
+        loading="eager"
+        fetchpriority="high"
+      >
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="hero-content">
+        <span class="hero-eyebrow">The Heartland State</span>
+        <h1>Iowa</h1>
+        <p class="hero-sub">Where golden fields meet endless skies. Discover the beauty, warmth, and spirit of America's heartland.</p>
+        <div class="hero-actions">
+          <a href="#places" class="btn btn-primary" aria-label="Explore Iowa destinations">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            Explore Iowa
+          </a>
+          <a href="#about" class="btn btn-ghost" aria-label="Learn about Iowa's history">
+            Our Story
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="hero-scroll" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        <span>Scroll</span>
+      </div>
+    </section>
+
+    <!-- Stats row -->
+    <div class="page-section" style="padding-top:5rem;padding-bottom:5rem;">
+      <div class="container">
+        <div class="stats-row">
+          <div class="stat-item reveal">
+            <div class="stat-number">3.2M</div>
+            <div class="stat-label">Residents</div>
+          </div>
+          <div class="stat-item reveal reveal-delay-1">
+            <div class="stat-number">#1</div>
+            <div class="stat-label">Corn Producer</div>
+          </div>
+          <div class="stat-item reveal reveal-delay-2">
+            <div class="stat-number">99</div>
+            <div class="stat-label">Counties</div>
+          </div>
+          <div class="stat-item reveal reveal-delay-3">
+            <div class="stat-number">56K</div>
+            <div class="stat-label">Square Miles</div>
+          </div>
+          <div class="stat-item reveal reveal-delay-4">
+            <div class="stat-number">1846</div>
+            <div class="stat-label">Year of Statehood</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ============================================================
+         SECTION 2: ABOUT IOWA
+    ============================================================ -->
+    <section id="about" class="page-section" aria-labelledby="about-heading">
+      <div class="container">
+        <div class="about-grid">
+          <div class="about-text">
+            <span class="section-eyebrow">Our Story</span>
+            <h2 id="about-heading">A Land Shaped by<br>History &amp; Heart</h2>
+            <p>Iowa's story begins long before European settlement, with Indigenous peoples — the Ioway, Sauk, Meskwaki, and others — who called these fertile plains home for thousands of years. Their legacy lives on in the state's name and in the rich cultural tapestry that defines Iowa today.</p>
+            <p>Admitted to the Union on December 28, 1846, Iowa quickly became the breadbasket of a growing nation. The state's deep black soil, carved by glaciers and enriched by millennia of prairie grasses, proved ideal for agriculture that would feed millions.</p>
+            <p>Today, Iowa balances its agricultural heritage with a thriving economy, world-class universities, and a vibrant arts scene — all while maintaining the genuine warmth and community spirit that has always defined Iowans.</p>
+            <div style="margin-top:1.5rem;">
+              <span class="chip">Founded 1846</span>
+              <span class="chip">Hawkeye State</span>
+              <span class="chip">Des Moines</span>
+              <span class="chip">Mississippi River</span>
+            </div>
+          </div>
+          <div class="about-img-wrap reveal">
+            <img
+              src="https://picsum.photos/seed/iowa-barn/800/600"
+              alt="Classic red Iowa barn surrounded by golden fields at sunset"
+              loading="lazy"
+            >
+            <div class="about-img-badge" aria-label="Iowa statehood year">
+              <strong>1846</strong>
+              <span>Year of Statehood</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div style="margin-top:5rem;">
+          <h3 class="section-title" style="text-align:center;margin-bottom:3rem;">Key Milestones</h3>
+          <div style="max-width:600px;margin:0 auto;">
+            <div class="timeline">
+              <div class="timeline-item reveal">
+                <div class="timeline-year">Pre-1800s</div>
+                <h4>Indigenous Peoples</h4>
+                <p>The Ioway, Sauk, Meskwaki, and Sioux nations inhabit the region, establishing rich cultures along the Mississippi and Missouri rivers.</p>
+              </div>
+              <div class="timeline-item reveal reveal-delay-1">
+                <div class="timeline-year">1803</div>
+                <h4>Louisiana Purchase</h4>
+                <p>Iowa becomes part of the United States through the Louisiana Purchase, opening the territory to American exploration and settlement.</p>
+              </div>
+              <div class="timeline-item reveal reveal-delay-2">
+                <div class="timeline-year">1838</div>
+                <h4>Iowa Territory</h4>
+                <p>The Iowa Territory is established, with Burlington as its first capital, beginning the formal governance of the region.</p>
+              </div>
+              <div class="timeline-item reveal reveal-delay-3">
+                <div class="timeline-year">1846</div>
+                <h4>Statehood</h4>
+                <p>Iowa becomes the 29th state of the Union on December 28, 1846, with Iowa City as the first state capital.</p>
+              </div>
+              <div class="timeline-item reveal reveal-delay-4">
+                <div class="timeline-year">1857</div>
+                <h4>Des Moines Capital</h4>
+                <p>The state capital moves to Des Moines, which grows into a major Midwestern city and financial center.</p>
+              </div>
+              <div class="timeline-item reveal">
+                <div class="timeline-year">Today</div>
+                <h4>Modern Iowa</h4>
+                <p>Iowa leads the nation in renewable energy, agriculture, and education, while preserving its small-town character and community values.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ============================================================
+         SECTION 3: PLACES
+    ============================================================ -->
+    <section id="places" class="page-section alt" aria-labelledby="places-heading">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-eyebrow">Destinations</span>
+          <h2 id="places-heading" class="section-title">Places to Discover</h2>
+          <p class="section-desc">From vibrant cities to serene natural landscapes, Iowa offers a remarkable range of experiences for every kind of traveler.</p>
+        </div>
+
+        <div class="places-grid">
+          <article class="place-card reveal" aria-label="Des Moines destination">
+            <img
+              src="https://picsum.photos/seed/des-moines/800/600"
+              alt="Des Moines skyline reflecting in the Des Moines River at dusk"
+              class="place-card-img"
+              loading="lazy"
+            >
+            <div class="place-card-overlay" aria-hidden="true"></div>
+            <div class="place-card-info">
+              <span class="place-card-tag">Capital City</span>
+              <h3>Des Moines</h3>
+              <p>A thriving capital with world-class museums, a vibrant food scene, and the iconic State Capitol building.</p>
+            </div>
+          </article>
+
+          <article class="place-card reveal reveal-delay-1" aria-label="Iowa City destination">
+            <img
+              src="https://picsum.photos/seed/iowa-city/800/600"
+              alt="University of Iowa campus with historic Old Capitol building"
+              class="place-card-img"
+              loading="lazy"
+            >
+            <div class="place-card-overlay" aria-hidden="true"></div>
+            <div class="place-card-info">
+              <span class="place-card-tag">University Town</span>
+              <h3>Iowa City</h3>
+              <p>Home to the University of Iowa and a UNESCO City of Literature, brimming with culture and creativity.</p>
+            </div>
+          </article>
+
+          <article class="place-card reveal reveal-delay-2" aria-label="Effigy Mounds destination">
+            <img
+              src="https://picsum.photos/seed/effigy-mounds/800/600"
+              alt="Ancient Native American effigy mounds overlooking the Mississippi River valley"
+              class="place-card-img"
+              loading="lazy"
+            >
+            <div class="place-card-overlay" aria-hidden="true"></div>
+            <div class="place-card-info">
+              <span class="place-card-tag">National Monument</span>
+              <h3>Effigy Mounds</h3>
+              <p>Sacred Native American burial mounds overlooking the Mississippi River, a window into ancient history.</p>
+            </div>
+          </article>
+
+          <article class="place-card reveal reveal-delay-3" aria-label="Loess Hills destination">
+            <img
+              src="https://picsum.photos/seed/loess-hills/800/600"
+              alt="Rolling Loess Hills landscape with wildflowers in bloom"
+              class="place-card-img"
+              loading="lazy"
+            >
+            <div class="place-card-overlay" aria-hidden="true"></div>
+            <div class="place-card-info">
+              <span class="place-card-tag">Natural Wonder</span>
+              <h3>Loess Hills</h3>
+              <p>A unique geological formation found only in Iowa and China, offering stunning vistas and rare prairie ecosystems.</p>
+            </div>
+          </article>
+
+          <article class="place-card reveal reveal-delay-1" aria-label="Amana Colonies destination">
+            <img
+              src="https://picsum.photos/seed/amana-colonies/800/600"
+              alt="Historic Amana Colonies village with traditional German architecture"
+              class="place-card-img"
+              loading="lazy"
+            >
+            <div class="place-card-overlay" aria-hidden="true"></div>
+            <div class="place-card-info">
+              <span class="place-card-tag">Historic Village</span>
+              <h3>Amana Colonies</h3>
+              <p>Seven historic villages founded by German immigrants, now a National Historic Landmark with artisan shops and restaurants.</p>
+            </div>
+          </article>
+
+          <article class="place-card reveal reveal-delay-2" aria-label="Bridges of Madison County destination">
+            <img
+              src="https://picsum.photos/seed/madison-county/800/600"
+              alt="Iconic covered bridge in Madison County surrounded by autumn foliage"
+              class="place-card-img"
+              loading="lazy"
+            >
+            <div class="place-card-overlay" aria-hidden="true"></div>
+            <div class="place-card-info">
+              <span class="place-card-tag">Iconic Landmark</span>
+              <h3>Madison County Bridges</h3>
+              <p>Six historic covered bridges immortalized in literature and film, nestled among rolling hills and autumn colors.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ============================================================
+         SECTION 4: AGRICULTURE
+    ============================================================ -->
+    <section id="agriculture" class="page-section" aria-labelledby="agri-heading">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-eyebrow">Farming Heritage</span>
+          <h2 id="agri-heading" class="section-title">Feeding the World</h2>
+          <p class="section-desc">Iowa's agricultural legacy is the foundation of its identity — a story of hard work, innovation, and stewardship of the land.</p>
+        </div>
+
+        <div class="agri-hero reveal">
+          <div>
+            <h2>The Breadbasket of America</h2>
+            <p>Iowa produces more corn and soybeans than almost any other state, contributing billions to the national economy. But Iowa agriculture is more than numbers — it's a way of life passed down through generations of farm families who understand the deep connection between land, labor, and community.</p>
+            <p style="margin-top:1rem;">Today, Iowa farmers are also pioneers in sustainable agriculture and renewable energy, with wind turbines rising alongside corn rows across the prairie landscape.</p>
+          </div>
+          <div>
+            <img
+              src="https://picsum.photos/seed/iowa-corn/700/400"
+              alt="Rows of tall Iowa corn stretching to the horizon in summer"
+              class="agri-img"
+              loading="lazy"
+            >
+          </div>
+        </div>
+
+        <div class="agri-cards">
+          <div class="agri-card reveal">
+            <div class="agri-card-icon" style="background:linear-gradient(135deg,#fff8e1,#ffe082);">
+              <span role="img" aria-label="Corn">🌽</span>
+            </div>
+            <h3>Corn &amp; Soybeans</h3>
+            <p>Iowa ranks #1 in corn production and #2 in soybeans, growing over 2 billion bushels of corn annually on 12.5 million acres of farmland.</p>
+          </div>
+          <div class="agri-card reveal reveal-delay-1">
+            <div class="agri-card-icon" style="background:linear-gradient(135deg,#e8f5e9,#a5d6a7);">
+              <span role="img" aria-label="Wind turbine">🌬️</span>
+            </div>
+            <h3>Renewable Energy</h3>
+            <p>Iowa generates over 60% of its electricity from wind power, leading the nation in wind energy production and sustainable farming practices.</p>
+          </div>
+          <div class="agri-card reveal reveal-delay-2">
+            <div class="agri-card-icon" style="background:linear-gradient(135deg,#fce4ec,#f48fb1);">
+              <span role="img" aria-label="Pig">🐷</span>
+            </div>
+            <h3>Livestock</h3>
+            <p>Iowa is the nation's top pork producer, home to more hogs than people. Cattle, dairy, and poultry operations also contribute significantly to the state's agricultural output.</p>
+          </div>
+          <div class="agri-card reveal reveal-delay-3">
+            <div class="agri-card-icon" style="background:linear-gradient(135deg,#e3f2fd,#90caf9);">
+              <span role="img" aria-label="Tractor">🚜</span>
+            </div>
+            <h3>Farm Innovation</h3>
+            <p>Iowa State University and private companies drive agricultural innovation, from precision farming technology to drought-resistant crop varieties.</p>
+          </div>
+        </div>
+
+        <!-- Agri stats -->
+        <div class="stats-row" style="margin-top:3rem;">
+          <div class="stat-item reveal">
+            <div class="stat-number">$40B</div>
+            <div class="stat-label">Annual Ag Revenue</div>
+          </div>
+          <div class="stat-item reveal reveal-delay-1">
+            <div class="stat-number">85%</div>
+            <div class="stat-label">Land in Farms</div>
+          </div>
+          <div class="stat-item reveal reveal-delay-2">
+            <div class="stat-number">86K</div>
+            <div class="stat-label">Farm Operations</div>
+          </div>
+          <div class="stat-item reveal reveal-delay-3">
+            <div class="stat-number">#1</div>
+            <div class="stat-label">Wind Energy State</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ============================================================
+         SECTION 5: ARTS & CULTURE
+    ============================================================ -->
+    <section id="arts" class="page-section alt" aria-labelledby="arts-heading">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-eyebrow">Arts &amp; Culture</span>
+          <h2 id="arts-heading" class="section-title">A Creative Spirit</h2>
+          <p class="section-desc">From Grant Wood's iconic paintings to world-class festivals, Iowa's cultural life is as rich and varied as its landscape.</p>
+        </div>
+
+        <div class="arts-mosaic reveal">
+          <div class="arts-mosaic-main">
+            <img
+              src="https://picsum.photos/seed/iowa-arts/800/700"
+              alt="Iowa State Fair with colorful rides and crowds celebrating Iowa culture"
+              loading="lazy"
+            >
+            <div class="arts-mosaic-overlay">
+              <h3>Iowa State Fair</h3>
+              <p>One of America's oldest and largest state fairs, celebrating Iowa's culture, agriculture, and community since 1854.</p>
+            </div>
+          </div>
+          <div class="arts-mosaic-side">
+            <img
+              src="https://picsum.photos/seed/iowa-museum/600/400"
+              alt="Des Moines Art Center with modern sculpture garden"
+              loading="lazy"
+            >
+          </div>
+          <div class="arts-mosaic-side">
+            <img
+              src="https://picsum.photos/seed/iowa-music/600/400"
+              alt="Live music performance at an Iowa outdoor festival"
+              loading="lazy"
+            >
+          </div>
+        </div>
+
+        <div class="arts-list">
+          <div class="arts-item reveal">
+            <div class="arts-item-icon" style="background:linear-gradient(135deg,#fce4ec,#f48fb1);">
+              <span role="img" aria-label="Painting">🎨</span>
+            </div>
+            <div>
+              <h4>Grant Wood &amp; American Gothic</h4>
+              <p>Iowa's most famous artist, Grant Wood, painted "American Gothic" in 1930, creating one of the most recognized images in American art history.</p>
+            </div>
+          </div>
+          <div class="arts-item reveal reveal-delay-1">
+            <div class="arts-item-icon" style="background:linear-gradient(135deg,#e8f4fd,#90caf9);">
+              <span role="img" aria-label="Book">📚</span>
+            </div>
+            <div>
+              <h4>Iowa Writers' Workshop</h4>
+              <p>The world's most prestigious creative writing program, based at the University of Iowa, has produced dozens of Pulitzer Prize winners.</p>
+            </div>
+          </div>
+          <div class="arts-item reveal reveal-delay-2">
+            <div class="arts-item-icon" style="background:linear-gradient(135deg,#e8f5e9,#a5d6a7);">
+              <span role="img" aria-label="Music note">🎵</span>
+            </div>
+            <div>
+              <h4>Music Heritage</h4>
+              <p>Iowa is the birthplace of jazz legend Bix Beiderbecke and countless other musicians. The state's music festivals draw visitors from across the country.</p>
+            </div>
+          </div>
+          <div class="arts-item reveal reveal-delay-3">
+            <div class="arts-item-icon" style="background:linear-gradient(135deg,#fff8e1,#ffe082);">
+              <span role="img" aria-label="Theater masks">🎭</span>
+            </div>
+            <div>
+              <h4>Theater &amp; Performance</h4>
+              <p>From the Civic Center of Greater Des Moines to community theaters across the state, Iowa has a thriving performing arts scene.</p>
+            </div>
+          </div>
+          <div class="arts-item reveal">
+            <div class="arts-item-icon" style="background:linear-gradient(135deg,#f3e5f5,#ce93d8);">
+              <span role="img" aria-label="Museum">🏛️</span>
+            </div>
+            <div>
+              <h4>World-Class Museums</h4>
+              <p>The Des Moines Art Center, Figge Art Museum, and State Historical Museum offer exceptional collections spanning centuries of art and history.</p>
+            </div>
+          </div>
+          <div class="arts-item reveal reveal-delay-1">
+            <div class="arts-item-icon" style="background:linear-gradient(135deg,#e0f7fa,#80deea);">
+              <span role="img" aria-label="Film">🎬</span>
+            </div>
+            <div>
+              <h4>Film &amp; Media</h4>
+              <p>Iowa has inspired countless films and stories, from "Field of Dreams" to "The Bridges of Madison County," capturing the state's timeless beauty.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ============================================================
+         SECTION 6: CONTACT
+    ============================================================ -->
+    <section id="contact" class="page-section" aria-labelledby="contact-heading">
+      <div class="container">
+        <div class="contact-grid">
+          <div class="contact-info">
+            <span class="section-eyebrow">Get in Touch</span>
+            <h2 id="contact-heading">Plan Your Iowa Adventure</h2>
+            <p>Whether you're planning a visit, looking for information about living in Iowa, or just want to learn more about the Hawkeye State, we'd love to hear from you.</p>
+
+            <div role="list" aria-label="Contact details">
+              <div class="contact-detail" role="listitem">
+                <div class="contact-detail-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="2" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </div>
+                <div class="contact-detail-text">
+                  <strong>Iowa Tourism Office</strong>
+                  <span>200 East Grand Avenue, Des Moines, IA 50309</span>
+                </div>
+              </div>
+              <div class="contact-detail" role="listitem">
+                <div class="contact-detail-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="2" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z"/></svg>
+                </div>
+                <div class="contact-detail-text">
+                  <strong>Phone</strong>
+                  <span>1-800-345-IOWA (4692)</span>
+                </div>
+              </div>
+              <div class="contact-detail" role="listitem">
+                <div class="contact-detail-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="2" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div class="contact-detail-text">
+                  <strong>Email</strong>
+                  <span>tourism@iowa.gov</span>
+                </div>
+              </div>
+              <div class="contact-detail" role="listitem">
+                <div class="contact-detail-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                </div>
+                <div class="contact-detail-text">
+                  <strong>Office Hours</strong>
+                  <span>Monday – Friday, 8:00 AM – 5:00 PM CT</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="contact-form" role="form" aria-label="Contact form">
+            <h3 style="font-size:1.3rem;font-weight:600;letter-spacing:-0.02em;margin-bottom:1.5rem;">Send Us a Message</h3>
+            <form action="#" method="post" novalidate onsubmit="handleSubmit(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="first-name">First Name <span aria-hidden="true" style="color:#e53e3e;">*</span></label>
+                  <input type="text" id="first-name" name="first-name" autocomplete="given-name" required aria-required="true" placeholder="Jane">
+                </div>
+                <div class="form-group">
+                  <label for="last-name">Last Name <span aria-hidden="true" style="color:#e53e3e;">*</span></label>
+                  <input type="text" id="last-name" name="last-name" autocomplete="family-name" required aria-required="true" placeholder="Doe">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="email">Email Address <span aria-hidden="true" style="color:#e53e3e;">*</span></label>
+                <input type="email" id="email" name="email" autocomplete="email" required aria-required="true" placeholder="jane@example.com">
+              </div>
+              <div class="form-group">
+                <label for="interest">I'm interested in</label>
+                <select id="interest" name="interest">
+                  <option value="">Select a topic…</option>
+                  <option value="tourism">Tourism &amp; Travel</option>
+                  <option value="agriculture">Agriculture</option>
+                  <option value="arts">Arts &amp; Culture</option>
+                  <option value="business">Business &amp; Investment</option>
+                  <option value="education">Education</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="message">Message <span aria-hidden="true" style="color:#e53e3e;">*</span></label>
+                <textarea id="message" name="message" required aria-required="true" placeholder="Tell us how we can help…"></textarea>
+              </div>
+              <button type="submit" class="btn-submit">Send Message</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="footer-brand-name">Iowa</div>
+          <p>The Hawkeye State — where golden fields meet endless skies, and every community tells a story of hard work, innovation, and genuine warmth.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Explore</h4>
+          <ul>
+            <li><a href="#home">Home</a></li>
+            <li><a href="#about">About Iowa</a></li>
+            <li><a href="#places">Places</a></li>
+            <li><a href="#agriculture">Agriculture</a></li>
+            <li><a href="#arts">Arts &amp; Culture</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Destinations</h4>
+          <ul>
+            <li><a href="#places">Des Moines</a></li>
+            <li><a href="#places">Iowa City</a></li>
+            <li><a href="#places">Amana Colonies</a></li>
+            <li><a href="#places">Loess Hills</a></li>
+            <li><a href="#places">Effigy Mounds</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <ul>
+            <li><a href="#contact">Contact Us</a></li>
+            <li><a href="#contact">Tourism Office</a></li>
+            <li><a href="#contact">Plan a Visit</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2024 Iowa Tourism. All rights reserved.</span>
+        <div class="footer-social" aria-label="Social media links">
+          <a href="#" aria-label="Iowa on Facebook">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+          </a>
+          <a href="#" aria-label="Iowa on Twitter">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+          </a>
+          <a href="#" aria-label="Iowa on Instagram">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Navigation toggle
+    function toggleNav(btn) {
+      const menu = document.getElementById('nav-menu');
+      const isOpen = menu.classList.toggle('open');
+      btn.setAttribute('aria-expanded', isOpen);
+    }
+
+    // Close nav on link click (mobile)
+    document.querySelectorAll('#nav-menu a').forEach(link => {
+      link.addEventListener('click', () => {
+        const menu = document.getElementById('nav-menu');
+        const btn = document.querySelector('.nav-toggle');
+        menu.classList.remove('open');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    // Scroll reveal
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // Nav active state on scroll
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-links a');
+
+    const sectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.getAttribute('id');
+          navLinks.forEach(link => {
+            link.style.color = '';
+            link.style.fontWeight = '';
+            if (link.getAttribute('href') === '#' + id) {
+              link.style.color = 'var(--accent)';
+            }
+          });
+        }
+      });
+    }, { threshold: 0.4 });
+
+    sections.forEach(s => sectionObserver.observe(s));
+
+    // Form submission
+    function handleSubmit(e) {
+      e.preventDefault();
+      const btn = e.target.querySelector('.btn-submit');
+      const originalText = btn.textContent;
+      btn.textContent = 'Message Sent! ✓';
+      btn.style.background = '#34c759';
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+        btn.disabled = false;
+        e.target.reset();
+      }, 3500);
+    }
+
+    // Keyboard navigation for nav toggle
+    document.querySelector('.nav-toggle').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleNav(this);
+      }
+    });
+  </script>
+
+</body>
+</html>

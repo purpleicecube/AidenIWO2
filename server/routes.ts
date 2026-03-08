@@ -28,11 +28,16 @@ import {
 } from "@shared/schema";
 import type { LlmSettings } from "@shared/schema";
 import { processWorkOrder, processWorkOrderSafe, isStaleProcessing, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
+import { autoImportSkillsForDescription } from "./skill-auto-import";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig, extractWorkOrderFromChat } from "./llm-client";
 import * as fs from "fs";
 import * as path from "path";
 
 const startTime = Date.now();
+
+function isValidJson(s: string): boolean {
+  try { JSON.parse(s); return true; } catch { return false; }
+}
 
 function buildGccCommit(
   existingGcc: Record<string, any>,
@@ -120,7 +125,7 @@ export async function registerRoutes(
       res.json({
         status: "ok",
         timestamp: new Date().toISOString(),
-        version: "0.7.2",
+        version: "0.8.0",
         uptime,
         services: {
           database: dbHealthy ? "healthy" : "unhealthy",
@@ -1378,6 +1383,41 @@ export async function registerRoutes(
     }
   });
 
+  // Cancel a running or blocked workflow execution
+  app.post("/api/workflow-executions/:id/cancel", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+
+      const cancellableStatuses = ["running", "awaiting_operator", "pending", "blocked"];
+      if (!cancellableStatuses.includes(execution.status)) {
+        return res.status(400).json({
+          message: `Cannot cancel execution with status "${execution.status}". Only running, awaiting_operator, pending, or blocked executions can be cancelled.`,
+        });
+      }
+
+      const updated = await storage.updateWorkflowExecution(req.params.id, {
+        status: "cancelled" as any,
+        completedAt: new Date(),
+      });
+
+      if (execution.workOrderId) {
+        await storage.updateWorkOrder(execution.workOrderId, { status: "cancelled" as any });
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId,
+          tier: 1,
+          action: "Aiden: Workflow Cancelled",
+          message: `Workflow execution cancelled by operator. Previous status: ${execution.status}.`,
+          metadata: { executionId: req.params.id, cancelledBy: (req.user as any)?.email || "admin" },
+        });
+      }
+
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to cancel execution" });
+    }
+  });
+
   // ==================== Tools Routes ====================
 
   app.get("/api/tools", isAuth, requireRole("viewer"), async (_req, res) => {
@@ -1411,6 +1451,28 @@ export async function registerRoutes(
       const existingTools = await storage.getTools();
       const existingSlugs = new Set(existingTools.map(t => t.slug));
 
+      // Category mapping for known Anthropic official skills
+      const categoryMap: Record<string, string> = {
+        "docx": "document", "pdf": "document", "pptx": "document", "xlsx": "document",
+        "algorithmic-art": "creative", "canvas-design": "creative", "frontend-design": "creative",
+        "brand-guidelines": "creative", "theme-factory": "creative", "slack-gif-creator": "creative",
+        "mcp-builder": "development", "webapp-testing": "development",
+        "web-artifacts-builder": "development", "skill-creator": "development",
+        "internal-comms": "productivity", "doc-coauthoring": "productivity",
+      };
+
+      // Helper to parse YAML frontmatter values (handles quoted multi-line strings)
+      const parseFrontmatterValue = (fm: string, key: string): string => {
+        // Try quoted value first (single or double quotes, possibly multi-line)
+        const quotedMatch = fm.match(new RegExp(`^${key}:\\s*"([\\s\\S]*?)"`, "m"))
+          || fm.match(new RegExp(`^${key}:\\s*'([\\s\\S]*?)'`, "m"));
+        if (quotedMatch) return quotedMatch[1].replace(/\s+/g, " ").trim();
+        // Fall back to unquoted single-line
+        const lineMatch = fm.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
+        if (lineMatch) return lineMatch[1].trim();
+        return "";
+      };
+
       const skills: Array<{
         name: string;
         dirName: string;
@@ -1420,6 +1482,10 @@ export async function registerRoutes(
         alreadyImported: boolean;
         hasReferences: boolean;
         referenceFiles: string[];
+        category: string;
+        source: string;
+        fileCount: number;
+        hasScripts: boolean;
       }> = [];
 
       for (const dir of dirs) {
@@ -1433,10 +1499,8 @@ export async function registerRoutes(
         const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
         if (frontmatterMatch) {
           const fm = frontmatterMatch[1];
-          const nameMatch = fm.match(/^name:\s*(.+)$/m);
-          const descMatch = fm.match(/^description:\s*(.+)$/m);
-          if (nameMatch) skillName = nameMatch[1].trim();
-          if (descMatch) description = descMatch[1].trim();
+          skillName = parseFrontmatterValue(fm, "name") || dir.name;
+          description = parseFrontmatterValue(fm, "description");
         }
 
         const slug = `skill-${dir.name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`;
@@ -1451,6 +1515,10 @@ export async function registerRoutes(
           .filter(f => f !== "SKILL.md" && f.endsWith(".md"));
         referenceFiles = [...referenceFiles, ...additionalFiles];
 
+        // Count all files and detect scripts
+        const allFiles = fs.readdirSync(path.join(skillsDir, dir.name), { recursive: true }) as string[];
+        const hasScripts = allFiles.some((f: string) => f.toString().includes("scripts/") || f.toString().endsWith(".py") || f.toString().endsWith(".sh"));
+
         skills.push({
           name: skillName,
           dirName: dir.name,
@@ -1460,8 +1528,18 @@ export async function registerRoutes(
           alreadyImported: existingSlugs.has(slug),
           hasReferences,
           referenceFiles,
+          category: categoryMap[dir.name] || "general",
+          source: "anthropic",
+          fileCount: allFiles.length,
+          hasScripts,
         });
       }
+
+      // Sort: not-imported first, then alphabetical
+      skills.sort((a, b) => {
+        if (a.alreadyImported !== b.alreadyImported) return a.alreadyImported ? 1 : -1;
+        return a.name.localeCompare(b.name);
+      });
 
       res.json(skills);
     } catch (err: any) {
@@ -2224,7 +2302,8 @@ export async function registerRoutes(
   app.get("/api/artifacts", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const folderId = req.query.folderId as string | undefined;
-      const items = await storage.getArtifacts(folderId === "root" ? null : folderId);
+      const sourceId = req.query.sourceId as string | undefined;
+      const items = await storage.getArtifacts(sourceId ? undefined : (folderId === "root" ? null : folderId), sourceId);
       res.json(items);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch artifacts" });
@@ -2238,6 +2317,37 @@ export async function registerRoutes(
       res.json(artifact);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch artifact" });
+    }
+  });
+
+  app.get("/api/artifacts/:id/download", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const artifact = await storage.getArtifact(req.params.id);
+      if (!artifact) return res.status(404).json({ message: "Artifact not found" });
+      if (!artifact.content) return res.status(404).json({ message: "Artifact has no content" });
+
+      const mimeType = artifact.mimeType || "application/octet-stream";
+      const ext = (artifact.name || "").split(".").pop()?.toLowerCase() || "";
+      const binaryExts = ["pptx", "ppt", "docx", "doc", "xlsx", "xls", "pdf", "zip", "gz", "tar", "7z", "rar", "png", "jpg", "jpeg", "gif", "webp"];
+      const isBinary = binaryExts.includes(ext) ||
+        mimeType.includes("vnd.openxmlformats") || mimeType.includes("octet-stream") ||
+        mimeType.includes("pdf") || mimeType.includes("zip") || mimeType.includes("gzip") ||
+        mimeType.includes("msword") || mimeType.includes("ms-excel") || mimeType.includes("ms-powerpoint") ||
+        mimeType.startsWith("image/");
+
+      res.setHeader("Content-Disposition", `attachment; filename="${artifact.name}"`);
+      res.setHeader("Content-Type", mimeType);
+
+      if (isBinary) {
+        const buffer = Buffer.from(artifact.content, "base64");
+        res.setHeader("Content-Length", buffer.length);
+        res.send(buffer);
+      } else {
+        res.setHeader("Content-Length", Buffer.byteLength(artifact.content, "utf-8"));
+        res.send(artifact.content);
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Failed to download artifact" });
     }
   });
 
@@ -2441,9 +2551,18 @@ export async function registerRoutes(
         return res.status(404).json({ message: "No renderable preview available for this session" });
       }
 
+      // P0-D: B+ Hardening — LLM-generated HTML only.
+      // Tight CSP: no external CDNs, no unsafe-eval.
+      // Set SANDBOX_ALLOW_CUSTOM_HTML=true in dev to restore permissive mode.
+      const allowCustomHtml = process.env.SANDBOX_ALLOW_CUSTOM_HTML === "true" && process.env.NODE_ENV !== "production";
+      const csp = allowCustomHtml
+        ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.pyodide.org https://pyodide-cdn2.iodide.io; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;"
+        : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; frame-ancestors 'self';";
+
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.pyodide.org https://pyodide-cdn2.iodide.io; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;");
+      res.setHeader("Content-Security-Policy", csp);
       res.setHeader("X-Frame-Options", "SAMEORIGIN");
+      res.setHeader("X-Content-Type-Options", "nosniff");
       res.send(result.html);
     } catch (err) {
       res.status(500).json({ message: "Failed to load preview" });
@@ -2786,7 +2905,7 @@ ${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s
 - Timestamp: ${new Date().toISOString()}
 
 === PLATFORM IDENTITY & ATTRIBUTIONS ===
-Platform: AIDEN_IWO v0.7.2 — Intelligent Work Orchestration
+Platform: AIDEN_IWO v0.8.0 — Intelligent Work Orchestration
 Lead Developer & Principal Technical Architect: Darrel Vaughn (LuaAzullaB / 10Touros)
 Architecture: IWO/PDOE two-tier orchestration (Aiden Tier 1 + Sub-Agent Tier 2)
 Four foundational lineages:
@@ -2849,12 +2968,17 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
 
       const lines = reply.split("\n");
       const actionLines: string[] = [];
+      const workflowActionLines: string[] = [];
       const contentLines: string[] = [];
       const actionLineRegex = /^<!--\s*AIDEN_ACTION:CREATE_WORK_ORDER:(\{.*\})\s*-->$/;
+      const workflowActionLineRegex = /^<!--\s*AIDEN_ACTION:EXECUTE_WORKFLOW:(\{.*\})\s*-->$/;
       for (const line of lines) {
-        const match = line.trim().match(actionLineRegex);
-        if (match) {
-          actionLines.push(match[1]);
+        const woMatch = line.trim().match(actionLineRegex);
+        const wfMatch = line.trim().match(workflowActionLineRegex);
+        if (woMatch) {
+          actionLines.push(woMatch[1]);
+        } else if (wfMatch) {
+          workflowActionLines.push(wfMatch[1]);
         } else {
           contentLines.push(line);
         }
@@ -2993,6 +3117,113 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
       } else {
         reply = contentLines.join("\n");
       }
+
+      // ── EXECUTE_WORKFLOW action handler ────────────────────────────────────
+      if (workflowActionLines.length > 0 && canCreateOrders) {
+        // Always strip action blocks from visible reply, even if workflow creation fails
+        reply = contentLines.join("\n");
+        console.log(`[Chat Workflow] Creating workflow from chat action`);
+        for (const actionJson of workflowActionLines.slice(0, 1)) {
+          try {
+            // Sanitize: LLMs sometimes emit trailing `}}` instead of `}` — strip extras
+            let sanitizedJson = actionJson.trim();
+            while (sanitizedJson.endsWith("}}") && !isValidJson(sanitizedJson)) {
+              sanitizedJson = sanitizedJson.slice(0, -1);
+            }
+            const actionData = JSON.parse(sanitizedJson);
+            const templateName = String(actionData.name || "Aiden Chat Workflow").slice(0, 200);
+            const templateGoal = String(actionData.goal || actionData.name || "").slice(0, 2000);
+            const templateCategory = String(actionData.category || "general");
+            const steps = Array.isArray(actionData.steps) ? actionData.steps : [];
+            if (steps.length === 0) {
+              console.warn("[Chat Workflow] No steps defined — skipping workflow creation");
+              continue;
+            }
+
+            const activeSubAgents = await storage.getActiveSubAgents();
+
+            const template = await storage.createWorkflowTemplate({
+              name: templateName,
+              description: templateGoal,
+              goal: templateGoal,
+              category: templateCategory,
+              executionMode: "autonomous",
+              status: "active",
+            });
+
+            for (let i = 0; i < steps.length; i++) {
+              const step = steps[i];
+              const assignTo: string | null = step.assignTo || step.agent || null;
+              let assignedSubAgentId: string | null = null;
+              if (assignTo) {
+                const lower = assignTo.toLowerCase();
+                const matched = activeSubAgents.find(a =>
+                  a.name.toLowerCase().includes(lower) ||
+                  lower.includes(a.name.toLowerCase().split(" ")[0])
+                );
+                assignedSubAgentId = matched?.id || null;
+              }
+              const stepDesc = String(step.description || "");
+              const stepName = String(step.name || `Step ${i + 1}`);
+              const autoToolIds = await autoImportSkillsForDescription(stepDesc, stepName);
+              const explicitToolIds: string[] = Array.isArray(step.tools) ? step.tools : [];
+              const mergedToolIds = Array.from(new Set([...explicitToolIds, ...autoToolIds]));
+              if (autoToolIds.length > 0) {
+                console.log(`[Chat Workflow] Auto-imported ${autoToolIds.length} skill(s) for step "${stepName}": ${autoToolIds.join(", ")}`);
+              }
+
+              await storage.createWorkflowStep({
+                templateId: template.id,
+                stepKey: String(step.stepKey || `step_${i + 1}`),
+                name: stepName.slice(0, 200),
+                description: stepDesc.slice(0, 2000),
+                order: Number(step.order ?? i + 1),
+                stepType: "internal",
+                assignedSubAgentId,
+                toolIds: mergedToolIds,
+              });
+            }
+
+            const execution = await startWorkflowExecution(
+              template.id,
+              null,
+              templateGoal,
+              { source: "chat", sessionId, actor: actor.actorName }
+            );
+
+            if (!execution) {
+              console.error("[Chat Workflow] startWorkflowExecution returned null — aborting");
+              continue;
+            }
+
+            setImmediate(async () => {
+              try {
+                await advanceWorkflowExecution(execution.id);
+              } catch (advErr) {
+                console.error("[Chat Workflow] Failed to advance first step:", advErr);
+              }
+            });
+
+            actionResults.push({
+              type: "EXECUTE_WORKFLOW",
+              workOrderId: execution.id,
+              correlationId: execution.id,
+              autoProcessed: true,
+            });
+
+            reply = reply.replaceAll("{{WORKFLOW_EXECUTION_ID}}", execution.id);
+            reply = reply.replaceAll("{{WORKFLOW_ID}}", execution.id);
+
+            // execution_logs.work_order_id is NOT NULL — skip log for chat-originated workflows
+            // (workflow execution already tracked via workflow_executions table)
+            console.log(`[Chat Workflow] Workflow "${templateName}" created. Execution ID: ${execution.id}. Steps: ${steps.length}.`);
+
+          } catch (wfErr: any) {
+            console.error("[Chat Workflow] Failed to create/start workflow:", wfErr);
+          }
+        }
+      }
+      // ── end EXECUTE_WORKFLOW handler ────────────────────────────────────────
 
       reply = reply.trimEnd();
 

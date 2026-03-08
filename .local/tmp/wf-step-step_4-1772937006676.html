@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style Home page for project Iowa – clean, minimalist design with hero, feature highlights and navigation.">
+  <title>Iowa – Home</title>
+  <style>
+    :root {
+      /* Apple‑inspired design tokens */
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --color-border: #c6c6c8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --radius: 8px;
+      --spacing: 16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      line-height: 1.5;
+    }
+    a { color: var(--color-primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      position: sticky;
+      top: 0;
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+      z-index: 10;
+    }
+    .nav {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing);
+    }
+    .nav ul {
+      list-style: none;
+      display: flex;
+      gap: var(--spacing);
+      margin: 0;
+      padding: 0;
+    }
+    .nav li { }
+    .nav a { font-weight: 500; }
+
+    main { max-width: 1200px; margin: 0 auto; padding: var(--spacing); }
+
+    .hero {
+      text-align: center;
+      padding: calc(2 * var(--spacing)) var(--spacing);
+    }
+    .hero h1 { font-size: 2.5rem; margin: 0 0 var(--spacing); }
+    .hero p { font-size: 1.125rem; color: var(--color-text-secondary); margin: 0 0 var(--spacing); }
+    .hero img { width: 100%; max-height: 400px; object-fit: cover; border-radius: var(--radius); margin-top: var(--spacing); }
+    .hero .cta {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background: var(--color-primary);
+      color: #fff;
+      border-radius: var(--radius);
+      font-weight: 600;
+      margin-top: var(--spacing);
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: var(--spacing);
+      margin: calc(2 * var(--spacing)) 0;
+    }
+    .feature-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--spacing);
+      text-align: center;
+    }
+    .feature-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: var(--radius);
+      margin-bottom: var(--spacing);
+    }
+    .feature-card h3 { margin: 0 0 var(--spacing); font-size: 1.25rem; }
+    .feature-card p { font-size: 0.95rem; color: var(--color-text-secondary); }
+
+    footer {
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-border);
+      text-align: center;
+      padding: var(--spacing);
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-top: calc(3 * var(--spacing));
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav class="nav">
+      <div class="logo"><strong>Iowa</strong></div>
+      <ul>
+        <li><a href="home.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <h1 id="hero-title">Welcome to Iowa</h1>
+      <p>Elegant, Apple‑inspired web experience built with pure HTML & CSS.</p>
+      <a href="features.html" class="cta">Explore Features</a>
+      <img src="https://picsum.photos/seed/homehero/1200/400" alt="Abstract Apple‑style visual">
+    </section>
+
+    <section class="features" aria-label="Key features">
+      <div class="feature-card">
+        <img src="https://picsum.photos/seed/feature1/400/300" alt="Feature 1 illustration">
+        <h3>Seamless Design</h3>
+        <p>Minimalist layouts that feel familiar and intuitive.</p>
+      </div>
+      <div class="feature-card">
+        <img src="https://picsum.photos/seed/feature2/400/300" alt="Feature 2 illustration">
+        <h3>Responsive Everywhere</h3>
+        <p>Looks great on phones, tablets, and desktops.</p>
+      </div>
+      <div class="feature-card">
+        <img src="https://picsum.photos/seed/feature3/400/300" alt="Feature 3 illustration">
+        <h3>Fast Performance</h3>
+        <p>No external libraries – pure, lightweight code.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa. All rights reserved.
+  </footer>
+</body>
+</html>
+
+<!-- about.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style About page for project Iowa – company story, mission, and values.">
+  <title>Iowa – About</title>
+  <style>
+    :root {
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --color-border: #c6c6c8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --radius: 8px;
+      --spacing: 16px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin:0; font-family:var(--font-family); background:var(--color-bg); color:var(--color-text-primary); line-height:1.5; }
+    a { color:var(--color-primary); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    header { position:sticky; top:0; background:var(--color-surface); border-bottom:1px solid var(--color-border); z-index:10; }
+    .nav { max-width:1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:var(--spacing); }
+    .nav ul { list-style:none; display:flex; gap:var(--spacing); margin:0; padding:0; }
+    .nav a { font-weight:500; }
+    main { max-width:1200px; margin:0 auto; padding:var(--spacing); }
+    .hero { text-align:center; padding:calc(2*var(--spacing)) var(--spacing); }
+    .hero h1 { font-size:2.5rem; margin:0 0 var(--spacing); }
+    .hero p { font-size:1.125rem; color:var(--color-text-secondary); margin:0 0 var(--spacing); }
+    .section { margin:calc(2*var(--spacing)) 0; }
+    .section h2 { font-size:1.75rem; margin-bottom:var(--spacing); }
+    .section p { color:var(--color-text-secondary); }
+    footer { background:var(--color-surface); border-top:1px solid var(--color-border); text-align:center; padding:var(--spacing); font-size:0.875rem; color:var(--color-text-secondary); margin-top:calc(3*var(--spacing)); }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav class="nav">
+      <div class="logo"><strong>Iowa</strong></div>
+      <ul>
+        <li><a href="home.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="about-title">
+      <h1 id="about-title">Our Story</h1>
+      <p>Inspired by Apple’s design philosophy, Iowa delivers clean, intuitive web experiences.</p>
+    </section>
+
+    <section class="section" aria-labelledby="mission-title">
+      <h2 id="mission-title">Mission</h2>
+      <p>To craft digital products that feel as natural as using a Mac – simple, powerful, and delightful.</p>
+    </section>
+
+    <section class="section" aria-labelledby="values-title">
+      <h2 id="values-title">Values</h2>
+      <p>Minimalism, performance, accessibility, and meticulous craftsmanship guide everything we do.</p>
+    </section>
+
+    <section class="section" aria-labelledby="team-title">
+      <h2 id="team-title">Team</h2>
+      <p>Our team blends seasoned designers and engineers who share a passion for elegant code.</p>
+      <img src="https://picsum.photos/seed/team/1200/400" alt="Team photo – collaborative workspace" style="width:100%;border-radius:var(--radius);margin-top:var(--spacing);">
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa. All rights reserved.
+  </footer>
+</body>
+</html>
+
+<!-- features.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style Features page for project Iowa – showcase of product capabilities.">
+  <title>Iowa – Features</title>
+  <style>
+    :root {
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --color-border: #c6c6c8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --radius: 8px;
+      --spacing: 16px;
+    }
+    *, *::before, *::after { box-sizing:border-box; }
+    body { margin:0; font-family:var(--font-family); background:var(--color-bg); color:var(--color-text-primary); line-height:1.5; }
+    a { color:var(--color-primary); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    header { position:sticky; top:0; background:var(--color-surface); border-bottom:1px solid var(--color-border); z-index:10; }
+    .nav { max-width:1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:var(--spacing); }
+    .nav ul { list-style:none; display:flex; gap:var(--spacing); margin:0; padding:0; }
+    .nav a { font-weight:500; }
+    main { max-width:1200px; margin:0 auto; padding:var(--spacing); }
+    .hero { text-align:center; padding:calc(2*var(--spacing)) var(--spacing); }
+    .hero h1 { font-size:2.5rem; margin:0 0 var(--spacing); }
+    .hero p { font-size:1.125rem; color:var(--color-text-secondary); margin:0 0 var(--spacing); }
+    .features-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+      gap:var(--spacing);
+      margin:calc(2*var(--spacing)) 0;
+    }
+    .feature {
+      background:var(--color-surface);
+      border:1px solid var(--color-border);
+      border-radius:var(--radius);
+      padding:var(--spacing);
+      text-align:center;
+    }
+    .feature img { width:100%; height:150px; object-fit:cover; border-radius:var(--radius); margin-bottom:var(--spacing); }
+    .feature h3 { margin:0 0 var(--spacing); font-size:1.25rem; }
+    .feature p { font-size:0.95rem; color:var(--color-text-secondary); }
+    footer { background:var(--color-surface); border-top:1px solid var(--color-border); text-align:center; padding:var(--spacing); font-size:0.875rem; color:var(--color-text-secondary); margin-top:calc(3*var(--spacing)); }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav class="nav">
+      <div class="logo"><strong>Iowa</strong></div>
+      <ul>
+        <li><a href="home.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="features-title">
+      <h1 id="features-title">Features</h1>
+      <p>What makes Iowa stand out – pure, elegant, and powerful.</p>
+    </section>
+
+    <section class="features-grid" aria-label="Feature list">
+
+<!-- style.css -->
+:root {
+  /* Apple‑inspired design tokens */
+  --color-bg: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-primary: #007aff;
+  --color-primary-dark: #0051a2;
+  --color-primary-light: #66b2ff;
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #6e6e73;
+  --color-muted: #d2d2d7;
+  --color-border: #c6c6c8;
+  --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --radius: 8px;
+  --spacing: 16px;
+}
+
+/* Global reset & base */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+/* Header & navigation */
+header {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 10;
+}
+.nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing);
+}
+.nav .logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: var(--color-text-primary);
+}
+.nav .logo svg { width: 24px; height: 24px; fill: var(--color-primary); }
+.nav ul {
+  list-style: none;
+  display: flex;
+  gap: var(--spacing);
+  margin: 0;
+  padding: 0;
+}
+.nav li { }
+.nav a { font-weight: 500; }
+
+/* Mobile menu toggle */
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.menu-toggle svg { width: 24px; height: 24px; fill: var(--color-text-primary); }
+
+/* Responsive navigation */
+@media (max-width: 768px) {
+  .nav ul {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+  }
+  .nav ul.open { max-height: 500px; /* enough for all items */ }
+  .menu-toggle { display: block; }
+}
+
+/* Footer */
+footer {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  padding: var(--spacing);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+.footer .social {
+  margin-top: var(--spacing);
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing);
+}
+.footer .social a svg {
+  width: 20px;
+  height: 20px;
+  fill: var(--color-text-secondary);
+}
+.footer .social a:hover svg { fill: var(--color-primary); }
+
+/* Utility */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* End of style.css */
+
+<!-- nav.html -->
+<header aria-label="Main navigation">
+  <nav class="nav">
+    <!-- Logo (simple SVG) -->
+    <div class="logo">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4h16v16H4z" />
+      </svg>
+      <span>Iowa</span>
+    </div>
+
+    <!-- Mobile menu toggle -->
+    <button class="menu-toggle" aria-controls="primary-navigation" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="visually-hidden">Menu</span>
+    </button>
+
+    <!-- Navigation links -->
+    <ul id="primary-navigation">
+      <li><a href="home.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="features.html">Features</a></li>
+      <li><a href="pricing.html">Pricing</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+
+<script>
+  // Simple mobile menu toggle script
+  const toggle = document.querySelector('.menu-toggle');
+  const navList = document.getElementById('primary-navigation');
+
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true' || false;
+    toggle.setAttribute('aria-expanded', !expanded);
+    navList.classList.toggle('open');
+  });
+</script>
+
+<!-- footer.html -->
+<footer class="footer" aria-label="Site footer">
+  <p>© 2026 Iowa. All rights reserved.</p>
+  <div class="social">
+    <a href="#" aria-label="Twitter">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M22.46 6c-.77.35-1.6.58-2.46.69a4.28 4.28 0 0 0 1.88-2.37 8.59 8.59 0 0 1-2.71 1.04 4.26 4.26 0 0 0-7.26 3.88A12.09 12.09 0 0 1 3.15 4.9a4.26 4.26 0 0 0 1.32 5.68 4.22 4.22 0 0 1-1.93-.53v.05a4.26 4.26 0 0 0 3.42 4.18 4.28 4.28 0 0 1-1.92.07 4.27 4.27 0 0 0 3.98 2.96A8.55 8.55 0 0 1 2 19.54a12.07 12.07 0 0 0 6.55 1.92c7.86 0 12.16-6.51 12.16-12.16 0-.19-.01-.37-.02-.56A8.68 8.68 0 0 0 24 5.56a8.48 8.48 0 0 1-2.54.7z"/>
+      </svg>
+    </a>
+    <a href="#" aria-label="Facebook">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M22 12a10 10 0 1 0-11.5 9.9v-7h-2v-3h2V9.5c0-2 1.2-3.1 3-3.1.9 0 1.8.07 2 .1v2.3h-1.4c-1.1 0-1.3.5-1.3 1.2V12h2.6l-.4 3h-2.2v7A10 10 0 0 0 22 12z"/>
+      </svg>
+    </a>
+    <a href="#" aria-label="LinkedIn">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M19 0h-14c-2.8 0-5 2.2-5 5v14c0 2.8 2.2 5 5 5h14c2.8 0 5-2.2 5-5v-14c0-2.8-2.2-5-5-5zm-11 19h-3v-9h3v9zm-1.5-10.3c-1 0-1.8-.8-1.8-1.8s.8-1.8 1.8-1.8 1.8.8 1.8 1.8-.8 1.8-1.8 1.8zm13.5 10.3h-3v-4.5c0-1.1-.9-2-2-2s-2 .9-2 2v4.5h-3v-9h3v1.3c.6-.9 1.7-1.3 2.8-1.3 2.2 0 4 1.8 4 4v5z"/>
+      </svg>
+    </a>
+  </div>
+</footer>

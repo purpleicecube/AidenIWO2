@@ -437,9 +437,27 @@ export async function executeTool(
   }
 }
 
-export async function getAvailableToolsForAgent(subAgentId?: string): Promise<Array<{ slug: string; name: string; type: string; description: string }>> {
+export interface AvailableTool {
+  slug: string;
+  name: string;
+  type: string;
+  description: string;
+  executionMode?: string | null;
+  skillContent?: string | null;
+}
+
+export async function getAvailableToolsForAgent(subAgentId?: string): Promise<AvailableTool[]> {
   const allTools = await storage.getTools();
   const activeTools = allTools.filter(t => t.status === "active" && !t.restricted);
+
+  const mapTool = (t: typeof activeTools[number]): AvailableTool => ({
+    slug: t.slug,
+    name: t.name,
+    type: t.type,
+    description: t.description || t.skillContent?.slice(0, 100) || `${t.type} tool`,
+    executionMode: t.executionMode || null,
+    skillContent: t.executionMode === "prompt_injection" ? (t.skillContent || null) : null,
+  });
 
   if (subAgentId) {
     const assigned = await storage.getSubAgentTools(subAgentId);
@@ -447,19 +465,9 @@ export async function getAvailableToolsForAgent(subAgentId?: string): Promise<Ar
       const enabledIds = new Set(assigned.filter(a => a.enabled !== false).map(a => a.toolId));
       const disabledIds = new Set(assigned.filter(a => a.enabled === false).map(a => a.toolId));
       const entitledTools = activeTools.filter(t => !disabledIds.has(t.id) && (enabledIds.has(t.id) || t.accessTier === "any" || t.accessTier === "tier2"));
-      return entitledTools.map(t => ({
-        slug: t.slug,
-        name: t.name,
-        type: t.type,
-        description: t.description || t.skillContent?.slice(0, 100) || `${t.type} tool`,
-      }));
+      return entitledTools.map(mapTool);
     }
   }
 
-  return activeTools.filter(t => t.accessTier === "any" || t.accessTier === "tier2").map(t => ({
-    slug: t.slug,
-    name: t.name,
-    type: t.type,
-    description: t.description || t.skillContent?.slice(0, 100) || `${t.type} tool`,
-  }));
+  return activeTools.filter(t => t.accessTier === "any" || t.accessTier === "tier2").map(mapTool);
 }

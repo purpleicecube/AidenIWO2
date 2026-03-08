@@ -401,7 +401,7 @@ export default function AttributionsPage() {
         </Card>
 
         <footer className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-muted-foreground space-y-1">
-          <p>AIDEN_IWO v0.7.2 — Intelligent Work Orchestration</p>
+          <p>AIDEN_IWO2 v0.8.0 — Intelligent Work Orchestration</p>
           <p className="text-xs">Lead Developer &amp; Principal Technical Architect: Darrel Vaughn | LuaAzullaB</p>
         </footer>
       </div>

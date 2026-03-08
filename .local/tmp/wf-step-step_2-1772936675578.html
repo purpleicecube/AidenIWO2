@@ -1,0 +1,200 @@
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa - Apple‑style Mockup</title>\n<style>\n:root{\n  --bg:#faf9f5;\n  --text:#141413;\n  --accent:#6a9bcc;\n  --gray:#b0aea5;\n  --font-heading:\"Poppins\",Arial,sans-serif;\n  --font-body:\"Lora\",Georgia,serif;\n}\nbody{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--text);}\nheader{background:#fff;padding:1rem 2rem;box-shadow:0 2px 4px rgba(0,0,0,0.1);display:flex;justify-content:space-between;align-items:center;}\nnav a{margin:0 1rem;color:var(--text);text-decoration:none;font-weight:500;}\nnav a.active{color:var(--accent);}\nsection{padding:2rem 2rem;max-width:960px;margin:auto;display:none;}\nsection.active{display:block;}\nh1,h2{font-family:var(--font-heading);margin-top:0;}\nbutton{background:var(--accent);color:#fff;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;}\nfooter{background:#fff;padding:1rem 2rem;text-align:center;font-size:0.9rem;box-shadow:0 -2px 4px rgba(0,0,0,0.1);}\nimg{max-width:100%;border-radius:8px;}\n</style>\n</head>\n<body>\n<header>\n<h1>Iowa</h1>\n<nav aria-label=\"Main navigation\">\n<a href=\"#\" data-page=\"home\" class=\"active\">Home</a>\n<a href=\"#\" data-page=\"about\">About</a>\n<a href=\"#\" data-page=\"features\">Features</a>\n<a href=\"#\" data-page=\"docs\">Docs</a>\n<a href=\"#\" data-page=\"contact\">Contact</a>\n</nav>\n</header>\n\n<section id=\"home\" class=\"active\">\n<h2>Welcome to Iowa</h2>\n<img src=\"https://picsum.photos/seed/home/800/400\" alt=\"Scenic placeholder image\">\n<p>Experience the elegance and simplicity of our platform. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>\n<button>Get Started</button>\n</section>\n\n<section id=\"about\">\n<h2>About Iowa</h2>\n<img src=\"https://picsum.photos/seed/about/800/400\" alt=\"About placeholder image\">\n<p>Iowa is built with meticulous craftsmanship, delivering a seamless experience.</p>\n</section>\n\n<section id=\"features\">\n<h2>Features</h2>\n<ul>\n<li>Intuitive Design</li>\n<li>High Performance</li>\n<li>Robust Security</li>\n<li>Scalable Architecture</li>\n</ul>\n<img src=\"https://picsum.photos/seed/features/800/400\" alt=\"Features placeholder image\">\n</section>\n\n<section id=\"docs\">\n<h2>Documentation</h2>\n<p>Find comprehensive guides and API references.</p>\n<img src=\"https://picsum.photos/seed/docs/800/400\" alt=\"Documentation placeholder image\">\n</section>\n\n<section id=\"contact\">\n<h2>Contact Us</h2>\n<p>We’d love to hear from you.</p>\n<form aria-label=\"Contact form\">\n<label for=\"name\">Name</label><br>\n<input type=\"text\" id=\"name\" name=\"name\" required><br><br>\n<label for=\"email\">Email</label><br>\n<input type=\"email\" id=\"email\" name=\"email\" required><br><br>\n<label for=\"message\">Message</label><br>\n<textarea id=\"message\" name=\"message\" rows=\"4\" required></textarea><br><br>\n<button type=\"submit\">Send</button>\n</form>\n</section>\n\n<footer>\n<p>&copy; 2026 Iowa. All rights reserved.</p>\n</footer>\n\n<script>\nconst links=document.querySelectorAll('nav a');\nconst sections=document.querySelectorAll('section');\nlinks.forEach(link=>{\n  link.addEventListener('click',e=>{\n    e.preventDefault();\n    const page=link.dataset.page;\n    links.forEach(l=>l.classList.toggle('active',l===link));\n    sections.forEach(sec=>sec.classList.toggle('active',sec.id===page));\n  });\n});\n</script>\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa – Apple‑style Mockup</title>\n<style>\n:root {\n  /* Anthropic Brand Colors */\n  --bg: #faf9f5;               /* Light */\n  --text: #141413;            /* Dark */\n  --gray: #b0aea5;            /* Mid Gray */\n  --light-gray: #e8e6dc;      /* Light Gray */\n  --accent-primary: #d97757; /* Orange */\n  --accent-secondary: #6a9bcc;/* Blue */\n  --accent-tertiary: #788c5d; /* Green */\n  /* Typography */\n  --font-heading: \"Poppins\", Arial, sans-serif;\n  --font-body: \"Lora\", Georgia, serif;\n}\n\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody {\n  margin: 0;\n  font-family: var(--font-body);\n  background: var(--bg);\n  color: var(--text);\n  line-height: 1.6;\n}\nheader {\n  background: #fff;\n  padding: 1rem 2rem;\n  box-shadow: 0 2px 4px rgba(0,0,0,0.08);\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\nnav a {\n  margin: 0 1rem;\n  color: var(--text);\n  text-decoration: none;\n  font-weight: 500;\n  transition: color 0.2s;\n}\nnav a:hover {\n  color: var(--accent-secondary);\n}\nnav a.active {\n  color: var(--accent-primary);\n}\nsection {\n  padding: 2rem 2rem;\n  max-width: 960px;\n  margin: auto;\n  display: none;\n}\nsection.active { display: block; }\n\nh1, h2 {\n  font-family: var(--font-heading);\n  margin-top: 0;\n  color: var(--text);\n}\n\nbutton {\n  background: var(--accent-primary);\n  color: #fff;\n  border: none;\n  padding: 0.5rem 1rem;\n  border-radius: 4px;\n  cursor: pointer;\n  font-family: var(--font-heading);\n  transition: background 0.2s;\n}\nbutton:hover { background: var(--accent-tertiary); }\n\nfooter {\n  background: #fff;\n  padding: 1rem 2rem;\n  text-align: center;\n  font-size: 0.9rem;\n  box-shadow: 0 -2px 4px rgba(0,0,0,0.08);\n}\n\nimg { max-width: 100%; border-radius: 8px; }\n\nform { display: grid; gap: 0.5rem; max-width: 400px; }\nlabel { font-weight: 600; }\ninput, textarea { padding: 0.4rem; border: 1px solid var(--gray); border-radius: 4px; font-family: var(--font-body); }\n\n/* Accessibility focus */\na:focus, button:focus, input:focus, textarea:focus { outline: 2px solid var(--accent-secondary); outline-offset: 2px; }\n</style>\n</head>\n<body>\n<header>\n  <h1>Iowa</h1>\n  <nav aria-label=\"Main navigation\">\n    <a href=\"#\" data-page=\"home\" class=\"active\">Home</a>\n    <a href=\"#\" data-page=\"about\">About</a>\n    <a href=\"#\" data-page=\"features\">Features</a>\n    <a href=\"#\" data-page=\"docs\">Docs</a>\n    <a href=\"#\" data-page=\"contact\">Contact</a>\n  </nav>\n</header>\n\n<section id=\"home\" class=\"active\">\n  <h2>Welcome to Iowa</h2>\n  <img src=\"https://picsum.photos/seed/home/800/400\" alt=\"Scenic placeholder image of a serene landscape\">\n  <p>Experience the elegance and simplicity of our platform. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>\n  <button>Get Started</button>\n</section>\n\n<section id=\"about\">\n  <h2>About Iowa</h2>\n  <img src=\"https://picsum.photos/seed/about/800/400\" alt=\"Illustration representing the concept of "about" with abstract shapes\">\n  <p>Iowa is built with meticulous craftsmanship, delivering a seamless experience.</p>\n</section>\n\n<section id=\"features\">\n  <h2>Features</h2>\n  <ul>\n    <li>Intuitive Design</li>\n    <li>High Performance</li>\n    <li>Robust Security</li>\n    <li>Scalable Architecture</li>\n  </ul>\n  <img src=\"https://picsum.photos/seed/features/800/400\" alt=\"Collage of icons representing various product features\">\n</section>\n\n<section id=\"docs\">\n  <h2>Documentation</h2>\n  <p>Find comprehensive guides and API references.</p>\n  <img src=\"https://picsum.photos/seed/docs/800/400\" alt=\"Open book with digital overlay symbolizing documentation\">\n</section>\n\n<section id=\"contact\">\n  <h2>Contact Us</h2>\n  <p>We’d love to hear from you.</p>\n  <form aria-label=\"Contact form\">\n    <label for=\"name\">Name</label>\n    <input type=\"text\" id=\"name\" name=\"name\" required>\n    <label for=\"email\">Email</label>\n    <input type=\"email\" id=\"email\" name=\"email\" required>\n    <label for=\"message\">Message</label>\n    <textarea id=\"message\" name=\"message\" rows=\"4\" required></textarea>\n    <button type=\"submit\">Send</button>\n  </form>\n</section>\n\n<footer>\n  <p>&copy; 2026 Iowa. All rights reserved.</p>\n</footer>\n\n<script>\n  const links = document.querySelectorAll('nav a');\n  const sections = document.querySelectorAll('section');\n  links.forEach(link => {\n    link.addEventListener('click', e => {\n      e.preventDefault();\n      const page = link.dataset.page;\n      links.forEach(l => l.classList.toggle('active', l === link));\n      sections.forEach(sec => sec.classList.toggle('active', sec.id === page));\n    });\n  });\n</script>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="High‑fidelity mockup of the Iowa website – a polished, Apple‑style five‑page site showcasing home, about, features, documentation, and contact pages.">
+  <title>Iowa – Apple‑style Mockup</title>
+  <style>
+    :root {
+      /* Anthropic Brand Colors */
+      --bg: #faf9f5;               /* Light */
+      --text: #141413;            /* Dark */
+      --gray: #b0aea5;            /* Mid Gray */
+      --light-gray: #e8e6dc;      /* Light Gray */
+      --accent-primary: #d97757; /* Orange */
+      --accent-secondary: #6a9bcc;/* Blue */
+      --accent-tertiary: #788c5d; /* Green */
+
+      /* Typography */
+      --font-heading: "Poppins", Arial, sans-serif;
+      --font-body: "Lora", Georgia, serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    header {
+      background: #fff;
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav a {
+      margin: 0 1rem;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--accent-secondary); }
+    nav a.active { color: var(--accent-primary); }
+
+    main { overflow-x: hidden; }
+
+    section {
+      padding: 2rem 2rem;
+      max-width: 960px;
+      margin: auto;
+      display: none;
+    }
+    section.active { display: block; }
+
+    h1, h2 {
+      font-family: var(--font-heading);
+      margin-top: 0;
+      color: var(--text);
+    }
+
+    button {
+      background: var(--accent-primary);
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--font-heading);
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--accent-tertiary); }
+
+    footer {
+      background: #fff;
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 0.9rem;
+      box-shadow: 0 -2px 4px rgba(0,0,0,0.08);
+    }
+
+    img { max-width: 100%; border-radius: 8px; }
+
+    form {
+      display: grid;
+      gap: 0.5rem;
+      max-width: 400px;
+    }
+    label { font-weight: 600; }
+    input, textarea {
+      padding: 0.4rem;
+      border: 1px solid var(--gray);
+      border-radius: 4px;
+      font-family: var(--font-body);
+    }
+
+    a:focus, button:focus, input:focus, textarea:focus {
+      outline: 2px solid var(--accent-secondary);
+      outline-offset: 2px;
+    }
+
+    /* Full‑viewport container for PNG‑style capture */
+    .viewport {
+      width: 100vw;
+      min-height: 100vh;
+      background: var(--bg);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Iowa</h1>
+    <nav aria-label="Main navigation">
+      <a href="#" data-page="home" class="active">Home</a>
+      <a href="#" data-page="about">About</a>
+      <a href="#" data-page="features">Features</a>
+      <a href="#" data-page="docs">Docs</a>
+      <a href="#" data-page="contact">Contact</a>
+    </nav>
+  </header>
+
+  <main class="viewport">
+    <section id="home" class="active">
+      <h2>Welcome to Iowa</h2>
+      <img src="https://picsum.photos/seed/home/800/400" alt="Scenic placeholder image of a serene landscape">
+      <p>Experience the elegance and simplicity of our platform. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+      <button>Get Started</button>
+    </section>
+
+    <section id="about">
+      <h2>About Iowa</h2>
+      <img src="https://picsum.photos/seed/about/800/400" alt="Illustration representing the concept of about with abstract shapes">
+      <p>Iowa is built with meticulous craftsmanship, delivering a seamless experience.</p>
+    </section>
+
+    <section id="features">
+      <h2>Features</h2>
+      <ul>
+        <li>Intuitive Design</li>
+        <li>High Performance</li>
+        <li>Robust Security</li>
+        <li>Scalable Architecture</li>
+      </ul>
+      <img src="https://picsum.photos/seed/features/800/400" alt="Collage of icons representing various product features">
+    </section>
+
+    <section id="docs">
+      <h2>Documentation</h2>
+      <p>Find comprehensive guides and API references.</p>
+      <img src="https://picsum.photos/seed/docs/800/400" alt="Open book with digital overlay symbolizing documentation">
+    </section>
+
+    <section id="contact">
+      <h2>Contact Us</h2>
+      <p>We’d love to hear from you.</p>
+      <form aria-label="Contact form">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required>
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" required></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Iowa. All rights reserved.</p>
+  </footer>
+
+  <script>
+    const links = document.querySelectorAll('nav a');
+    const sections = document.querySelectorAll('section');
+
+    links.forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        const page = link.dataset.page;
+        links.forEach(l => l.classList.toggle('active', l === link));
+        sections.forEach(sec => sec.classList.toggle('active', sec.id === page));
+      });
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta name=\"description\" content=\"High‑fidelity mockup of the Iowa website – a polished, Apple‑style five‑page site showcasing home, about, features, documentation, and contact pages.\">\n  <title>Iowa – Apple‑style Mockup</title>\n  <style>\n    :root {\n      /* Anthropic Brand Colors */\n      --bg: #faf9f5;               /* Light */\n      --text: #141413;            /* Dark */\n      --gray: #b0aea5;            /* Mid Gray */\n      --light-gray: #e8e6dc;      /* Light Gray */\n      --accent-primary: #d97757; /* Orange */\n      --accent-secondary: #6a9bcc;/* Blue */\n      --accent-tertiary: #788c5d; /* Green */\n\n      /* Typography */\n      --font-heading: \"Poppins\", Arial, sans-serif;\n      --font-body: \"Lora\", Georgia, serif;\n    }\n\n    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }\n\n    html, body { height: 100%; }\n\n    body {\n      font-family: var(--font-body);\n      background: var(--bg);\n      color: var(--text);\n      line-height: 1.6;\n    }\n\n    header {\n      background: #fff;\n      padding: 1rem 2rem;\n      box-shadow: 0 2px 4px rgba(0,0,0,0.08);\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n    }\n\n    nav a {\n      margin: 0 1rem;\n      color: var(--text);\n      text-decoration: none;\n      font-weight: 500;\n      transition: color 0.2s;\n    }\n    nav a:hover { color: var(--accent-secondary); }\n    nav a.active { color: var(--accent-primary); }\n\n    main { overflow-x: hidden; }\n\n    section {\n      padding: 2rem 2rem;\n      max-width: 960px;\n      margin: auto;\n      display: none;\n    }\n    section.active { display: block; }\n\n    h1, h2 {\n      font-family: var(--font-heading);\n      margin-top: 0;\n      color: var(--text);\n    }\n\n    button {\n      background: var(--accent-primary);\n      color: #fff;\n      border: none;\n      padding: 0.5rem 1rem;\n      border-radius: 4px;\n      cursor: pointer;\n      font-family: var(--font-heading);\n      transition: background 0.2s;\n    }\n    button:hover { background: var(--accent-tertiary); }\n\n    footer {\n      background: #fff;\n      padding: 1rem 2rem;\n      text-align: center;\n      font-size: 0.9rem;\n      box-shadow: 0 -2px 4px rgba(0,0,0,0.08);\n    }\n\n    img { max-width: 100%; border-radius: 8px; }\n\n    form {\n      display: grid;\n      gap: 0.5rem;\n      max-width: 400px;\n    }\n    label { font-weight: 600; }\n    input, textarea {\n      padding: 0.4rem;\n      border: 1px solid var(--gray);\n      border-radius: 4px;\n      font-family: var(--font-body);\n    }\n\n    a:focus, button:focus, input:focus, textarea:focus {\n      outline: 2px solid var(--accent-secondary);\n      outline-offset: 2px;\n    }\n\n    /* Full‑viewport container for PNG‑style capture */\n    .viewport {\n      width: 100vw;\n      min-height: 100vh;\n      background: var(--bg);\n    }\n  </style>\n</head>\n<body>\n  <header>\n    <h1>Iowa</h1>\n    <nav aria-label=\"Main navigation\">\n      <a href=\"#\" data-page=\"home\" class=\"active\">Home</a>\n      <a href=\"#\" data-page=\"about\">About</a>\n      <a href=\"#\" data-page=\"features\">Features</a>\n      <a href=\"#\" data-page=\"docs\">Docs</a>\n      <a href=\"#\" data-page=\"contact\">Contact</a>\n    </nav>\n  </header>\n\n  <main class=\"viewport\">\n    <section id=\"home\" class=\"active\">\n      <h2>Welcome to Iowa</h2>\n      <img src=\"https://picsum.photos/seed/home/800/400\" alt=\"Scenic placeholder image of a serene landscape\">\n      <p>Experience the elegance and simplicity of our platform. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>\n      <button>Get Started</button>\n    </section>\n\n    <section id=\"about\">\n      <h2>About Iowa</h2>\n      <img src=\"https://picsum.photos/seed/about/800/400\" alt=\"Illustration representing the concept of about with abstract shapes\">\n      <p>Iowa is built with meticulous craftsmanship, delivering a seamless experience.</p>\n    </section>\n\n    <section id=\"features\">\n      <h2>Features</h2>\n      <ul>\n        <li>Intuitive Design</li>\n        <li>High Performance</li>\n        <li>Robust Security</li>\n        <li>Scalable Architecture</li>\n      </ul>\n      <img src=\"https://picsum.photos/seed/features/800/400\" alt=\"Collage of icons representing various product features\">\n    </section>\n\n    <section id=\"docs\">\n      <h2>Documentation</h2>\n      <p>Find comprehensive guides and API references.</p>\n      <img src=\"https://picsum.photos/seed/docs/800/400\" alt=\"Open book with digital overlay symbolizing documentation\">\n    </section>\n\n    <section id=\"contact\">\n      <h2>Contact Us</h2>\n      <p>We’d love to hear from you.</p>\n      <form aria-label=\"Contact form\">\n        <label for=\"name\">Name</label>\n        <input type=\"text\" id=\"name\" name=\"name\" required>\n        <label for=\"email\">Email</label>\n        <input type=\"email\" id=\"email\" name=\"email\" required>\n        <label for=\"message\">Message</label>\n        <textarea id=\"message\" name=\"message\" rows=\"4\" required></textarea>\n        <button type=\"submit\">Send</button>\n      </form>\n    </section>\n  </main>\n\n  <footer>\n    <p>&copy; 2026 Iowa. All rights reserved.</p>\n  </footer>\n\n  <script>\n    const links = document.querySelectorAll('nav a');\n    const sections = document.querySelectorAll('section');\n\n    links.forEach(link => {\n      link.addEventListener('click', e => {\n        e.preventDefault();\n        const page = link.dataset.page;\n        links.forEach(l => l.classList.toggle('active', l === link));\n        sections.forEach(sec => sec.classList.toggle('active', sec.id === page));\n      });\n    });\n  </script>\n</body>\n</html>

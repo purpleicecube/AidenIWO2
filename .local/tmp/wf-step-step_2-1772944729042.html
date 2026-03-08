@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa — Brand Guidelines and CSS custom properties for a consistent visual language.">
+  <title>Iowa – Brand Guidelines</title>
+  <style>
+    /* Import fonts (fallback to system fonts if unavailable) */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Lora:wght@400;600&display=swap');
+
+    /* Brand color palette */
+    :root {
+      /* Core colors */
+      --color-dark: #141413;          /* Primary text & dark backgrounds */
+      --color-light: #faf9f5;         /* Light backgrounds & text on dark */
+      --color-mid-gray: #b0aea5;      /* Secondary elements */
+      --color-light-gray: #e8e6dc;    /* Subtle backgrounds */
+
+      /* Accent colors */
+      --color-accent-orange: #d97757; /* Primary accent */
+      --color-accent-blue:   #6a9bcc; /* Secondary accent */
+      --color-accent-green:  #788c5d; /* Tertiary accent */
+
+      /* Typography */
+      --font-heading: 'Poppins', Arial, sans-serif;
+      --font-body:    'Lora', Georgia, serif;
+
+      /* Spacing tokens (base 4px grid) */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+    }
+
+    /* Global resets */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Global typography & colors */
+    body {
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--color-dark);
+      background-color: var(--color-light);
+      padding: var(--space-5);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-family: var(--font-heading);
+      color: var(--color-dark);
+      margin-top: var(--space-5);
+      margin-bottom: var(--space-3);
+    }
+
+    p {
+      margin-bottom: var(--space-4);
+    }
+
+    a {
+      color: var(--color-accent-blue);
+      text-decoration: underline;
+    }
+
+    a:hover {
+      color: var(--color-accent-green);
+    }
+
+    .accent {
+      color: var(--color-accent-orange);
+    }
+
+    .section {
+      margin-bottom: var(--space-6);
+    }
+
+    .color-swatch {
+      display: inline-block;
+      width: 48px;
+      height: 48px;
+      border: 1px solid var(--color-mid-gray);
+      margin-right: var(--space-2);
+    }
+
+    .swatch-label {
+      font-size: 0.875rem;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <header class="section">
+    <h1>Iowa – Brand Guidelines</h1>
+    <p class="accent">A polished visual language built on Anthropic’s official brand system.</p>
+  </header>
+
+  <section class="section">
+    <h2>Color Palette</h2>
+    <div>
+      <div class="color-swatch" style="background:#141413;"></div><span class="swatch-label">--color-dark</span>
+    </div>
+    <div>
+      <div class="color-swatch" style="background:#faf9f5;"></div><span class="swatch-label">--color-light</span>
+    </div>
+    <div>
+      <div class="color-swatch" style="background:#b0aea5;"></div><span class="swatch-label">--color-mid-gray</span>
+    </div>
+    <div>
+      <div class="color-swatch" style="background:#e8e6dc;"></div><span class="swatch-label">--color-light-gray</span>
+    </div>
+    <div>
+      <div class="color-swatch" style="background:#d97757;"></div><span class="swatch-label">--color-accent-orange</span>
+    </div>
+    <div>
+      <div class="color-swatch" style="background:#6a9bcc;"></div><span class="swatch-label">--color-accent-blue</span>
+    </div>
+    <div>
+      <div class="color-swatch" style="background:#788c5d;"></div><span class="swatch-label">--color-accent-green</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Typography</h2>
+    <p><strong>Headings:</strong> <span style="font-family: var(--font-heading);">Poppins (fallback: Arial)</span></p>
+    <p><strong>Body text:</strong> <span style="font-family: var(--font-body);">Lora (fallback: Georgia)</span></p>
+  </section>
+
+  <section class="section">
+    <h2>Spacing Tokens</h2>
+    <ul>
+      <li>--space-1: 4px</li>
+      <li>--space-2: 8px</li>
+      <li>--space-3: 12px</li>
+      <li>--space-4: 16px</li>
+      <li>--space-5: 24px</li>
+      <li>--space-6: 32px</li>
+    </ul>
+  </section>
+
+  <footer class="section">
+    <p>All styles are defined as CSS custom properties for easy theming across the Iowa site.</p>
+  </footer>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"description\" content=\"Iowa – Responsive website showcasing layout components.\">\n<title>Iowa</title>\n<style>\n@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Lora:wght@400;600&display=swap');\n\n:root{\n--color-dark:#141413;\n--color-light:#faf9f5;\n--color-mid-gray:#b0aea5;\n--color-light-gray:#e8e6dc;\n--color-accent-orange:#d97757;\n--color-accent-blue:#6a9bcc;\n--color-accent-green:#788c5d;\n--font-heading:'Poppins',Arial,sans-serif;\n--font-body:'Lora',Georgia,serif;\n--space-1:4px;\n--space-2:8px;\n--space-3:12px;\n--space-4:16px;\n--space-5:24px;\n--space-6:32px;\n}\n\n*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n\nbody{\nfont-family:var(--font-body);\nfont-size:16px;\nline-height:1.6;\ncolor:var(--color-dark);\nbackground-color:var(--color-light);\n}\n\nheader{\ndisplay:flex;\nalign-items:center;\njustify-content:space-between;\npadding:var(--space-4);\nbackground-color:var(--color-light-gray);\n}\nheader .logo{\nfont-family:var(--font-heading);\nfont-size:1.5rem;\ncolor:var(--color-accent-orange);\n}\nnav ul{\nlist-style:none;\ndisplay:flex;\ngap:var(--space-3);\n}\nnav a{\ntext-decoration:none;\ncolor:var(--color-dark);\nfont-weight:600;\n}\nnav a:hover{color:var(--color-accent-blue);}\n\n.hero{\nposition:relative;\ntext-align:center;\ncolor:var(--color-light);\n}\n.hero img{\nwidth:100%;\nheight:auto;\ndisplay:block;\n}\n.hero .overlay{\nposition:absolute;\ntop:0;left:0;width:100%;height:100%;\nbackground:rgba(0,0,0,0.4);\ndisplay:flex;\nflex-direction:column;\njustify-content:center;\nalign-items:center;\n}\n.hero h1{\nfont-family:var(--font-heading);\nfont-size:2rem;\nmargin-bottom:var(--space-3);\n}\n.hero p{\nfont-size:1rem;\nmax-width:600px;\n}\n\n.grid{\ndisplay:grid;\ngap:var(--space-4);\npadding:var(--space-5);\n}\n.grid-item{\nbackground-color:var(--color-light-gray);\npadding:var(--space-4);\nborder-radius:8px;\n}\n\nfooter{\nbackground-color:var(--color-mid-gray);\ncolor:var(--color-light);\ntext-align:center;\npadding:var(--space-5);\n}\n\n@media (min-width:640px){\nnav ul{gap:var(--space-4);}\n.hero h1{font-size:2.5rem;}\n.hero p{font-size:1.125rem;}\n.grid{grid-template-columns:repeat(2,1fr);}\n}\n@media (min-width:1024px){\n.hero h1{font-size:3rem;}\n.grid{grid-template-columns:repeat(3,1fr);}\n}\n@media (min-width:1440px){\n.hero h1{font-size:3.5rem;}\n.grid{grid-template-columns:repeat(4,1fr);}\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Main navigation\">\n<div class=\"logo\">Iowa</div>\n<nav aria-label=\"Primary\">\n<ul>\n<li><a href=\"#\">Home</a></li>\n<li><a href=\"#\">About</a></li>\n<li><a href=\"#\">Services</a></li>\n<li><a href=\"#\">Contact</a></li>\n</ul>\n</nav>\n</header>\n\n<section class=\"hero\" aria-label=\"Hero\">\n<img src=\"https://picsum.photos/seed/hero/1200/600\" alt=\"Scenic view of Iowa landscape\">\n<div class=\"overlay\">\n<h1>Discover Iowa</h1>\n<p>Experience the heartland's vibrant culture, stunning landscapes, and welcoming communities.</p>\n</div>\n</section>\n\n<main class=\"grid\" aria-label=\"Content grid\">\n<div class=\"grid-item\">\n<h2>Explore</h2>\n<p>From rolling hills to bustling cities, find adventures for every traveler.</p>\n<img src=\"https://picsum.photos/seed/explore/400/300\" alt=\"Exploration image\" style=\"width:100%;height:auto;margin-top:var(--space-3);\">\n</div>\n<div class=\"grid-item\">\n<h2>History</h2>\n<p>Delve into a rich heritage that shaped the nation.</p>\n<img src=\"https://picsum.photos/seed/history/400/300\" alt=\"Historical site image\" style=\"width:100%;height:auto;margin-top:var(--space-3);\">\n</div>\n<div class=\"grid-item\">\n<h2>Food</h2>\n<p>Savor farm-to-table delights and iconic regional dishes.</p>\n<img src=\"https://picsum.photos/seed/food/400/300\" alt=\"Food image\" style=\"width:100%;height:auto;margin-top:var(--space-3);\">\n</div>\n<div class=\"grid-item\">\n<h2>Events</h2>\n<p>Join festivals, fairs, and community gatherings year-round.</p>\n<img src=\"https://picsum.photos/seed/events/400/300\" alt=\"Event image\" style=\"width:100%;height:auto;margin-top:var(--space-3);\">\n</div>\n</main>\n\n<footer aria-label=\"Site footer\">\n<p>&copy; 2024 Iowa. All rights reserved.</p>\n</footer>\n</body>\n</html>
+
+<!-- home.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iowa – Home</title>
+<meta name="description" content="Discover Iowa – the heartland’s vibrant culture, stunning landscapes, and welcoming communities.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Lora:wght@400;600&display=swap');
+
+:root{
+  --color-dark:#141413;
+  --color-light:#faf9f5;
+  --color-mid-gray:#b0aea5;
+  --color-light-gray:#e8e6dc;
+  --color-accent-orange:#d97757;
+  --color-accent-blue:#6a9bcc;
+  --color-accent-green:#788c5d;
+  --font-heading:'Poppins',Arial,sans-serif;
+  --font-body:'Lora',Georgia,serif;
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:24px;
+  --space-6:32px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-body);
+  font-size:16px;
+  line-height:1.6;
+  color:var(--color-dark);
+  background-color:var(--color-light);
+}
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:var(--space-4);
+  background-color:var(--color-light-gray);
+}
+header .logo{
+  font-family:var(--font-heading);
+  font-size:1.5rem;
+  color:var(--color-accent-orange);
+}
+nav ul{
+  list-style:none;
+  display:flex;
+  gap:var(--space-3);
+}
+nav a{
+  text-decoration:none;
+  color:var(--color-dark);
+  font-weight:600;
+}
+nav a:hover{color:var(--color-accent-blue);}
+.menu-toggle{
+  display:none;
+  background:none;
+  border:none;
+  font-size:1.5rem;
+  cursor:pointer;
+}
+@media (max-width:640px){
+  nav ul{
+    flex-direction:column;
+    display:none;
+  }
+  nav ul.open{
+    display:flex;
+  }
+  .menu-toggle{
+    display:block;
+  }
+}
+.hero{
+  position:relative;
+  text-align:center;
+  color:var(--color-light);
+}
+.hero img{
+  width:100%;
+  height:auto;
+  display:block;
+}
+.hero .overlay{
+  position:absolute;
+  top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.4);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+.hero h1{
+  font-family:var(--font-heading);
+  font-size:2rem;
+  margin-bottom:var(--space-3);
+}
+.hero p{
+  font-size:1rem;
+  max-width:600px;
+}
+.grid{
+  display:grid;
+  gap:var(--space-4);
+  padding:var(--space-5);
+}
+.grid-item{
+  background-color:var(--color-light-gray);
+  padding:var(--space-4);
+  border-radius:8px;
+}
+footer{
+  background-color:var(--color-mid-gray);
+  color:var(--color-light);
+  text-align:center;
+  padding:var(--space-5);
+}
+@media (min-width:640px){
+  nav ul{gap:var(--space-4);}
+  .hero h1{font-size:2.5rem;}
+  .hero p{font-size:1.125rem;}
+  .grid{grid-template-columns:repeat(2,1fr);}
+}
+@media (min-width:1024px){
+  .hero h1{font-size:3rem;}
+  .grid{grid-template-columns:repeat(3,1fr);}
+}
+@media (min-width:1440px){
+  .hero h1{font-size:3.5rem;}
+  .grid{grid-template-columns:repeat(4,1fr);}
+}
+</style>
+</head>
+<body>
+<header aria-label="Main navigation">
+  <div class="logo">Iowa</div>
+  <button class="menu-toggle" aria-label="Toggle menu">☰</button>
+  <nav aria-label="Primary">
+    <ul>
+      <li><a href="home.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="gallery.html">Gallery</a></li>
+      <li><a href="blog.html">Blog</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section class="hero" aria-label="Hero">
+  <img src="https://picsum.photos/seed/hero/1200/600" alt="Scenic view of Iowa landscape">
+  <div class="overlay">
+    <h1>Discover Iowa</h1>
+    <p>Experience the heartland's vibrant culture, stunning landscapes, and welcoming communities.</p>
+  </div>
+</section>
+
+<main class="grid" aria-label="Featured highlights">
+  <div class="grid-item">
+    <h2>Explore</h2>
+    <p>From rolling hills to bustling cities, find adventures for every traveler.</p>
+    <img src="https://picsum.photos/seed/explore/400/300" alt="Exploration of Iowa" style="width:100%;height:auto;margin-top:var(--space-3);">
+  </div>
+  <div class="grid-item">
+    <h2>History</h2>
+    <p>Delve into a rich heritage that shaped the nation.</p>
+    <img src="https://picsum.photos/seed/history/400/300" alt="Historical site in Iowa" style="width:100%;height:auto;margin-top:var(--space-3);">
+  </div>
+  <div class="grid-item">
+    <h2>Food</h2>
+    <p>Savor farm‑to‑table delights and iconic regional dishes.</p>
+    <img src="https://picsum.photos/seed/food/400/300" alt="Iowa cuisine" style="width:100%;height:auto;margin-top:var(--space-3);">
+  </div>
+  <div class="grid-item">
+    <h2>Events</h2>
+    <p>Join festivals, fairs, and community gatherings year‑round.</p>
+    <img src="https://picsum.photos/seed/events/400/300" alt="Iowa festival" style="width:100%;height:auto;margin-top:var(--space-3);">
+  </div>
+</main>
+
+<footer aria-label="Site footer">
+  <p>&copy; 2024 Iowa. All rights reserved.</p>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const toggle=document.querySelector('.menu-toggle');
+  const navUl=document.querySelector('nav ul');
+  toggle.addEventListener('click',function(){
+    navUl.classList.toggle('open');
+  });
+});
+</script>
+</body>
+</html>
+
+<!-- about.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iowa – About</title>
+<meta name="description" content="Learn about Iowa’s history, culture, and the spirit that makes the heartland unique.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Lora:wght@400;600&display=swap');
+
+:root{
+  --color-dark:#141413;
+  --color-light:#faf9f5;
+  --color-mid-gray:#b0aea5;
+  --color-light-gray:#e8e6dc;
+  --color-accent-orange:#d97757;
+  --color-accent-blue:#6a9bcc;
+  --color-accent-green:#788c5d;
+  --font-heading:'Poppins',Arial,sans-serif;
+  --font-body:'Lora',Georgia,serif;
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:24px;
+  --space-6:32px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-body);
+  font-size:16px;
+  line-height:1.6;
+  color:var(--color-dark);
+  background-color:var(--color-light);
+}
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:var(--space-4);
+  background-color:var(--color-light-gray);
+}
+header .logo{
+  font-family:var(--font-heading);
+  font-size:1.5rem;
+  color:var(--color-accent-orange);
+}
+nav ul{
+  list-style:none;
+  display:flex;
+  gap:var(--space-3);
+}
+nav a{
+  text-decoration:none;
+  color:var(--color-dark);
+  font-weight:600;
+}
+nav a:hover{color:var(--color-accent-blue);}
+.menu-toggle{
+  display:none;
+  background:none;
+  border:none;
+  font-size:1.5rem;
+  cursor:pointer;
+}
+@media (max-width:640px){
+  nav ul{flex-direction:column;display:none;}
+  nav ul.open{display:flex;}
+  .menu-toggle{display:block;}
+}
+.hero{
+  position:relative;
+  text-align:center;
+  color:var(--color-light);
+}
+.hero img{
+  width:100%;
+  height:auto;
+  display:block;
+}
+.hero .overlay{
+  position:absolute;
+  top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.4);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+.hero h1{
+  font-family:var(--font-heading);
+  font-size:2rem;
+  margin-bottom:var(--space-3);
+}
+.hero p{
+  font-size:1rem;
+  max-width:600px;
+}
+section.content{
+  padding:var(--space-5);
+}
+section.content h2{
+  font-family:var(--font-heading);
+  margin-top:var(--space-5);
+}
+footer{
+  background-color:var(--color-mid-gray);
+  color:var(--color-light);
+  text-align:center;
+  padding:var(--space-5);
+}
+@media (min-width:640px){
+  nav ul{gap:var(--space-4);}
+  .hero h1{font-size:2.5rem;}
+  .hero p{font-size:1.125rem;}
+}
+@media (min-width:1024px){
+  .hero h1{font-size:3rem;}
+}
+@media (min-width:1440px){
+  .hero h1{font-size:3.5rem;}
+}
+</style>
+</head>
+<body>
+<header aria-label="Main navigation">
+  <div class="logo">Iowa</div>
+  <button class="menu-toggle" aria-label="Toggle menu">☰</button>
+  <nav aria-label="Primary">
+    <ul>
+      <li><a href="home.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="gallery.html">Gallery</a></li>
+      <li><a href="blog.html">Blog</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section class="hero" aria-label="About hero">
+  <img src="https://picsum.photos/seed/about/1200/600" alt="Panoramic view of Iowa farmland at sunrise">
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Full‑site sandbox preview combining all pages with a single navigation menu.">
+  <title>Iowa – Sandbox Preview</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Lora:wght@400;600&display=swap');
+
+    :root{
+      --color-dark:#141413;
+      --color-light:#faf9f5;
+      --color-mid-gray:#b0aea5;
+      --color-light-gray:#e8e6dc;
+      --color-accent-orange:#d97757;
+      --color-accent-blue:#6a9bcc;
+      --color-accent-green:#788c5d;
+      --font-heading:'Poppins',Arial,sans-serif;
+      --font-body:'Lora',Georgia,serif;
+      --space-1:4px;
+      --space-2:8px;
+      --space-3:12px;
+      --space-4:16px;
+      --space-5:24px;
+      --space-6:32px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:var(--font-body);
+      font-size:16px;
+      line-height:1.6;
+      color:var(--color-dark);
+      background-color:var(--color-light);
+    }
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:var(--space-4);
+      background-color:var(--color-light-gray);
+      position:sticky;
+      top:0;
+      z-index:10;
+    }
+    header .logo{
+      font-family:var(--font-heading);
+      font-size:1.5rem;
+      color:var(--color-accent-orange);
+    }
+    nav ul{
+      list-style:none;
+      display:flex;
+      gap:var(--space-3);
+    }
+    nav a{
+      text-decoration:none;
+      color:var(--color-dark);
+      font-weight:600;
+    }
+    nav a:hover{color:var(--color-accent-blue);}
+    .menu-toggle{
+      display:none;
+      background:none;
+      border:none;
+      font-size:1.5rem;
+      cursor:pointer;
+    }
+    @media (max-width:640px){
+      nav ul{
+        flex-direction:column;
+        display:none;
+      }
+      nav ul.open{display:flex}
+      .menu-toggle{display:block}
+    }
+    .hero{
+      position:relative;
+      text-align:center;
+      color:var(--color-light);
+    }
+    .hero img{
+      width:100%;
+      height:auto;
+      display:block;
+    }
+    .hero .overlay{
+      position:absolute;
+      top:0;left:0;width:100%;height:100%;
+      background:rgba(0,0,0,0.4);
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+    }
+    .hero h1{
+      font-family:var(--font-heading);
+      font-size:2rem;
+      margin-bottom:var(--space-3);
+    }
+    .hero p{
+      font-size:1rem;
+      max-width:600px;
+    }
+    .grid{
+      display:grid;
+      gap:var(--space-4);
+      padding:var(--space-5);
+    }
+    .grid-item{
+      background-color:var(--color-light-gray);
+      padding:var(--space-4);
+      border-radius:8px;
+    }
+    footer{
+      background-color:var(--color-mid-gray);
+      color:var(--color-light);
+      text-align:center;
+      padding:var(--space-5);
+    }
+    @media (min-width:640px){
+      nav ul{gap:var(--space-4);}
+      .hero h1{font-size:2.5rem;}
+      .hero p{font-size:1.125rem;}
+      .grid{grid-template-columns:repeat(2,1fr);}
+    }
+    @media (min-width:1024px){
+      .hero h1{font-size:3rem;}
+      .grid{grid-template-columns:repeat(3,1fr);}
+    }
+    @media (min-width:1440px){
+      .hero h1{font-size:3.5rem;}
+      .grid{grid-template-columns:repeat(4,1fr);}
+    }
+  </style>
+</head>
+<body>
+  <!-- Global Header / Navigation -->
+  <header aria-label="Main navigation">
+    <div class="logo">Iowa</div>
+    <button class="menu-toggle" aria-label="Toggle menu">☰</button>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#gallery">Gallery</a></li>
+        <li><a href="#blog">Blog</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Home Section -->
+  <section id="home">
+    <div class="hero" aria-label="Hero">
+      <img src="https://picsum.photos/seed/hero/1200/600" alt="Scenic view of Iowa landscape">
+      <div class="overlay">
+        <h1>Discover Iowa</h1>
+        <p>Experience the heartland's vibrant culture, stunning landscapes, and welcoming communities.</p>
+      </div>
+    </div>
+
+    <main class="grid" aria-label="Featured highlights">
+      <div class="grid-item">
+        <h2>Explore</h2>
+        <p>From rolling hills to bustling cities, find adventures for every traveler.</p>
+        <img src="https://picsum.photos/seed/explore/400/300" alt="Exploration of Iowa" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>History</h2>
+        <p>Delve into a rich heritage that shaped the nation.</p>
+        <img src="https://picsum.photos/seed/history/400/300" alt="Historical site in Iowa" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>Food</h2>
+        <p>Savor farm‑to‑table delights and iconic regional dishes.</p>
+        <img src="https://picsum.photos/seed/food/400/300" alt="Iowa cuisine" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>Events</h2>
+        <p>Join festivals, fairs, and community gatherings year‑round.</p>
+        <img src="https://picsum.photos/seed/events/400/300" alt="Iowa festival" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+    </main>
+  </section>
+
+  <!-- About Section -->
+  <section id="about">
+    <div class="hero" aria-label="About hero">
+      <img src="https://picsum.photos/seed/about/1200/600" alt="Panoramic view of Iowa farmland at sunrise">
+      <div class="overlay">
+        <h1>About Iowa</h1>
+        <p>Learn about Iowa’s history, culture, and the spirit that makes the heartland unique.</p>
+      </div>
+    </div>
+
+    <section class="grid" aria-label="About content" style="padding:var(--space-5);">
+      <div class="grid-item">
+        <h2>Heritage</h2>
+        <p>Iowa’s story is woven from the threads of agriculture, industry, and community.</p>
+        <img src="https://picsum.photos/seed/heritage/400/300" alt="Historic Iowa scene" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>Culture</h2>
+        <p>From music festivals to local art, Iowa celebrates creativity year‑round.</p>
+        <img src="https://picsum.photos/seed/culture/400/300" alt="Iowa cultural event" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+    </section>
+  </section>
+
+  <!-- Services Section (placeholder) -->
+  <section id="services">
+    <div class="hero" aria-label="Services hero">
+      <img src="https://picsum.photos/seed/services/1200/600" alt="Collage representing Iowa services">
+      <div class="overlay">
+        <h1>Our Services</h1>
+        <p>Explore what Iowa offers to residents and visitors alike.</p>
+      </div>
+    </div>
+
+    <section class="grid" aria-label="Services list" style="padding:var(--space-5);">
+      <div class="grid-item">
+        <h2>Tourism</h2>
+        <p>Guided tours, outdoor adventures, and heritage trails.</p>
+        <img src="https://picsum.photos/seed/tourism/400/300" alt="Tourist activity in Iowa" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>Education</h2>
+        <p>World‑class universities and community learning programs.</p>
+        <img src="https://picsum.photos/seed/education/400/300" alt="Iowa campus" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>Business</h2>
+        <p>Support for startups, agriculture tech, and sustainable enterprises.</p>
+        <img src="https://picsum.photos/seed/business/400/300" alt="Business meeting in Iowa" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+    </section>
+  </section>
+
+  <!-- Gallery Section (placeholder) -->
+  <section id="gallery">
+    <div class="hero" aria-label="Gallery hero">
+      <img src="https://picsum.photos/seed/gallery/1200/600" alt="Collage of Iowa landscapes">
+      <div class="overlay">
+        <h1>Gallery</h1>
+        <p>A visual journey through Iowa’s most breathtaking moments.</p>
+      </div>
+    </div>
+
+    <section class="grid" aria-label="Image gallery" style="padding:var(--space-5);">
+      <div class="grid-item"><img src="https://picsum.photos/seed/gallery1/400/300" alt="Iowa field" style="width:100%;height:auto;"></div>
+      <div class="grid-item"><img src="https://picsum.photos/seed/gallery2/400/300" alt="Iowa cityscape" style="width:100%;height:auto;"></div>
+      <div class="grid-item"><img src="https://picsum.photos/seed/gallery3/400/300" alt="Iowa river" style="width:100%;height:auto;"></div>
+      <div class="grid-item"><img src="https://picsum.photos/seed/gallery4/400/300" alt="Iowa night sky" style="width:100%;height:auto;"></div>
+    </section>
+  </section>
+
+  <!-- Blog Section (placeholder) -->
+  <section id="blog">
+    <div class="hero" aria-label="Blog hero">
+      <img src="https://picsum.photos/seed/blog/1200/600" alt="Open notebook on a wooden table">
+      <div class="overlay">
+        <h1>Blog</h1>
+        <p>Stories, news, and insights from the heartland.</p>
+      </div>
+    </div>
+
+    <section class="grid" aria-label="Blog posts" style="padding:var(--space-5);">
+      <div class="grid-item">
+        <h2>Harvest Festival Highlights</h2>
+        <p>Recap of the annual celebration that brings communities together.</p>
+        <img src="https://picsum.photos/seed/blog1/400/300" alt="Harvest festival" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>Innovations in Agri‑Tech</h2>
+        <p>How Iowa farms are leading the way with cutting‑edge technology.</p>
+        <img src="https://picsum.photos/seed/blog2/400/300" alt="Agri‑tech equipment" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+      <div class="grid-item">
+        <h2>Hidden Trails You Must Explore</h2>
+        <p>A guide to lesser‑known hiking routes across the state.</p>
+        <img src="https://picsum.photos/seed/blog3/400/300" alt="Trail in Iowa woods" style="width:100%;height:auto;margin-top:var(--space-3);">
+      </div>
+    </section>
+  </section>
+
+  <!-- Contact Section (placeholder) -->
+  <section id="contact">
+    <div class="hero" aria-label="Contact hero">
+      <img src="https://picsum.photos/seed/contact/1200/600" alt="Friendly staff at a desk">
+      <div class="overlay">
+        <h1>Contact Us</h1>
+        <p>We’d love to hear from you. Reach out for any inquiries.</p>
+      </div>
+    </div>
+
+    <section style="padding:var(--space-5);">
+      <h2>Get in Touch</h2>
+      <p><strong>Email:</strong> <a href="mailto:info@iowa.com">info@iowa.com</a></p>
+      <p><strong>Phone:</strong> +1 (555) 123‑4567</p>
+      <p><strong>Address:</strong> 123 Main St, Des Moines, IA 50309, USA</p>
+    </section>
+  </section>
+
+  <footer aria-label="Site footer">
+    <p>&copy; 2024 Iowa. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded',function(){
+      const toggle=document.querySelector('.menu-toggle');
+      const navUl=document.querySelector('nav ul');
+      toggle.addEventListener('click',function(){
+        navUl.classList.toggle('open');
+      });
+    });
+  </script>
+</body>
+</html>
+
+/* Anthropic Brand Guidelines CSS */
+:root {
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+  --font-heading: 'Poppins', Arial, sans-serif;
+  --font-body: 'Lora', Georgia, serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+}
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+/* Base typography */
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-dark);
+  background-color: var(--color-light);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--color-dark);
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-3);
+}
+
+/* Links */
+a {
+  color: var(--color-accent-blue);
+  text-decoration: underline;
+}
+a:hover { color: var(--color-accent-green); }
+
+/* Utility classes */
+.flex { display:flex; }
+.flex-col { flex-direction:column; }
+.items-center { align-items:center; }
+.justify-center { justify-content:center; }
+.text-center { text-align:center; }
+.mt-1 { margin-top: var(--space-1); }
+.mt-2 { margin-top: var(--space-2); }
+.mt-3 { margin-top: var(--space-3); }
+.mt-4 { margin-top: var(--space-4); }
+.mt-5 { margin-top: var(--space-5); }
+.mb-1 { margin-bottom: var(--space-1); }
+.mb-2 { margin-bottom: var(--space-2); }
+.mb-3 { margin-bottom: var(--space-3); }
+.mb-4 { margin-bottom: var(--space-4); }
+.mb-5 { margin-bottom: var(--space-5); }
+.p-1 { padding: var(--space-1); }
+.p-2 { padding: var(--space-2); }
+.p-3 { padding: var(--space-3); }
+.p-4 { padding: var(--space-4); }
+.p-5 { padding: var(--space-5); }
+.gap-1 { gap: var(--space-1); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+.gap-4 { gap: var(--space-4); }
+.gap-5 { gap: var(--space-5); }
+
+/* Grid utilities */
+.grid { display:grid; gap: var(--space-4); }
+.grid-cols-2 { grid-template-columns: repeat(2,1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3,1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4,1fr); }
+
+/* Responsive breakpoints */
+@media (min-width:640px) {
+  .grid { gap: var(--space-5); }
+}
+@media (min-width:1024px) {
+  .grid { gap: var(--space-6); }
+}
+
+/* Accent */
+.accent { color: var(--color-accent-orange); }
+
+/* Section spacing */
+.section { margin-bottom: var(--space-6); }
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa – About</title>\n<meta name=\"description\" content=\"Learn about Iowa’s history, culture, and the spirit that makes the heartland unique.\">\n<style>\n/* Brand Guidelines CSS */\n:root {\n  --color-dark: #141413;\n  --color-light: #faf9f5;\n  --color-mid-gray: #b0aea5;\n  --color-light-gray: #e8e6dc;\n  --color-accent-orange: #d97757;\n  --color-accent-blue: #6a9bcc;\n  --color-accent-green: #788c5d;\n  --font-heading: 'Poppins', Arial, sans-serif;\n  --font-body: 'Lora', Georgia, serif;\n  --space-1: 4px;\n  --space-2: 8px;\n  --space-3: 12px;\n  --space-4: 16px;\n  --space-5: 24px;\n  --space-6: 32px;\n}\n*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }\nbody {\n  font-family: var(--font-body);\n  font-size:16px;\n  line-height:1.6;\n  color: var(--color-dark);\n  background-color: var(--color-light);\n}\nh1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading);\n  color: var(--color-dark);\n  margin-top: var(--space-5);\n  margin-bottom: var(--space-3);\n}\na {\n  color: var(--color-accent-blue);\n  text-decoration: underline;\n}\na:hover { color: var(--color-accent-green); }\nheader {\n  display:flex;\n  align-items:center;\n  justify-content:space-between;\n  padding: var(--space-4);\n  background-color: var(--color-light-gray);\n}\n.logo {\n  font-family: var(--font-heading);\n  font-size:1.5rem;\n  color: var(--color-accent-orange);\n}\nnav ul {\n  list-style:none;\n  display:flex;\n  gap: var(--space-3);\n}\nnav a {\n  text-decoration:none;\n  color: var(--color-dark);\n  font-weight:600;\n}\nnav a:hover { color: var(--color-accent-blue); }\n.menu-toggle {\n  display:none;\n  background:none;\n  border:none;\n  font-size:1.5rem;\n  cursor:pointer;\n}\n@media (max-width:640px){\n  nav ul { flex-direction:column; display:none; }\n  nav ul.open { display:flex; }\n  .menu-toggle { display:block; }\n}\n.hero {\n  position:relative;\n  text-align:center;\n  color: var(--color-light);\n}\n.hero img {\n  width:100%;\n  height:auto;\n  display:block;\n}\n.hero .overlay {\n  position:absolute;\n  top:0; left:0; width:100%; height:100%;\n  background:rgba(0,0,0,0.4);\n  display:flex;\n  flex-direction:column;\n  justify-content:center;\n  align-items:center;\n}\n.hero h1 {\n  font-family: var(--font-heading);\n  font-size:2rem;\n  margin-bottom: var(--space-3);\n}\n.hero p {\n  font-size:1rem;\n  max-width:600px;\n}\nsection.content {\n  padding: var(--space-5);\n}\nsection.content h2 {\n  margin-top: var(--space-5);\n}\nfooter {\n  background-color: var(--color-mid-gray);\n  color: var(--color-light);\n  text-align:center;\n  padding: var(--space-5);\n}\n@media (min-width:640px){\n  nav ul { gap: var(--space-4); }\n  .hero h1 { font-size:2.5rem; }\n  .hero p { font-size:1.125rem; }\n}\n@media (min-width:1024px){\n  .hero h1 { font-size:3rem; }\n}\n@media (min-width:1440px){\n  .hero h1 { font-size:3.5rem; }\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Main navigation\">\n  <div class=\"logo\">Iowa</div>\n  <button class=\"menu-toggle\" aria-label=\"Toggle menu\">☰</button>\n  <nav aria-label=\"Primary\">\n    <ul>\n      <li><a href=\"home.html\">Home</a></li>\n      <li><a href=\"about.html\">About</a></li>\n      <li><a href=\"services.html\">Services</a></li>\n      <li><a href=\"gallery.html\">Gallery</a></li>\n      <li><a href=\"contact.html\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<section class=\"hero\" aria-label=\"About hero\">\n  <img src=\"https://picsum.photos/seed/about/1200/600\" alt=\"Panoramic view of Iowa farmland at sunrise\">\n  <div class=\"overlay\">\n    <h1>About Iowa</h1>\n    <p>Learn about Iowa’s history, culture, and the spirit that makes the heartland unique.</p>\n  </div>\n</section>\n\n<section class=\"content\" aria-label=\"About content\">\n  <h2>Heritage</h2>\n  <p>Iowa’s story is woven from the threads of agriculture, industry, and community.</p>\n  <img src=\"https://picsum.photos/seed/heritage/800/400\" alt=\"Historic Iowa scene\" style=\"width:100%;height:auto;margin-top:var(--space-3);\">\n  <h2>Culture</h2>\n  <p>From music festivals to local art, Iowa celebrates creativity year‑round.</p>\n  <img src=\"https://picsum.photos/seed/culture/800/400\" alt=\"Iowa cultural event\" style=\"width:100%;height:auto;margin-top:var(--space-3);\">\n</section>\n\n<footer aria-label=\"Site footer\">\n  <p>&copy; 2024 Iowa. All rights reserved.</p>\n</footer>\n\n<script>\ndocument.addEventListener('DOMContentLoaded', function(){\n  const toggle = document.querySelector('.menu-toggle');\n  const navUl = document.querySelector('nav ul');\n  toggle.addEventListener('click', function(){\n    navUl.classList.toggle('open');\n  });\n});\n</script>\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa – Gallery</title>\n<meta name=\"description\" content=\"Iowa – Photo gallery showcasing landscapes and moments.\">\n<style>\n:root {\n  --color-dark: #141413;\n  --color-light: #faf9f5;\n  --color-mid-gray: #b0aea5;\n  --color-light-gray: #e8e6dc;\n  --color-accent-orange: #d97757;\n  --color-accent-blue: #6a9bcc;\n  --color-accent-green: #788c5d;\n  --font-heading: 'Poppins', Arial, sans-serif;\n  --font-body: 'Lora', Georgia, serif;\n  --space-1: 4px;\n  --space-2: 8px;\n  --space-3: 12px;\n  --space-4: 16px;\n  --space-5: 24px;\n  --space-6: 32px;\n}\n*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }\nbody {\n  font-family: var(--font-body);\n  font-size:16px;\n  line-height:1.6;\n  color: var(--color-dark);\n  background-color: var(--color-light);\n}\nh1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading);\n  color: var(--color-dark);\n  margin-top: var(--space-5);\n  margin-bottom: var(--space-3);\n}\na { color: var(--color-accent-blue); text-decoration: underline; }\na:hover { color: var(--color-accent-green); }\nheader {\n  display:flex;\n  align-items:center;\n  justify-content:space-between;\n  padding: var(--space-4);\n  background-color: var(--color-light-gray);\n}\nheader .logo { font-family: var(--font-heading); font-size:1.5rem; color: var(--color-accent-orange); }\nnav ul { list-style:none; display:flex; gap: var(--space-3); }\nnav a { text-decoration:none; color: var(--color-dark); font-weight:600; }\nnav a:hover { color: var(--color-accent-blue); }\n.menu-toggle { display:none; background:none; border:none; font-size:1.5rem; cursor:pointer; }\n@media (max-width:640px) {\n  nav ul { flex-direction:column; display:none; }\n  nav ul.open { display:flex; }\n  .menu-toggle { display:block; }\n}\n.hero { position:relative; text-align:center; color: var(--color-light); }\n.hero img { width:100%; height:auto; display:block; }\n.hero .overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:flex; flex-direction:column; justify-content:center; align-items:center; }\n.hero h1 { font-family: var(--font-heading); font-size:2rem; margin-bottom: var(--space-3); }\n.hero p { font-size:1rem; max-width:600px; }\n.grid { display:grid; gap: var(--space-4); padding: var(--space-5); }\n.grid-item { background-color: var(--color-light-gray); padding: var(--space-4); border-radius:8px; }\nfooter { background-color: var(--color-mid-gray); color: var(--color-light); text-align:center; padding: var(--space-5); }\n@media (min-width:640px) {\n  nav ul { gap: var(--space-4); }\n  .hero h1 { font-size:2.5rem; }\n  .hero p { font-size:1.125rem; }\n  .grid { grid-template-columns:repeat(2,1fr); }\n}\n@media (min-width:1024px) {\n  .hero h1 { font-size:3rem; }\n  .grid { grid-template-columns:repeat(3,1fr); }\n}\n@media (min-width:1440px) {\n  .hero h1 { font-size:3.5rem; }\n  .grid { grid-template-columns:repeat(4,1fr); }\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Main navigation\">\n  <div class=\"logo\">Iowa</div>\n  <button class=\"menu-toggle\" aria-label=\"Toggle menu\">☰</button>\n  <nav aria-label=\"Primary\">\n    <ul>\n      <li><a href=\"home.html\">Home</a></li>\n      <li><a href=\"about.html\">About</a></li>\n      <li><a href=\"services.html\">Services</a></li>\n      <li><a href=\"gallery.html\">Gallery</a></li>\n      <li><a href=\"blog.html\">Blog</a></li>\n      <li><a href=\"contact.html\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<section class=\"hero\" aria-label=\"Gallery hero\">\n  <img src=\"https://picsum.photos/seed/gallery-hero/1200/600\" alt=\"Collage of Iowa landscapes\">\n  <div class=\"overlay\">\n    <h1>Gallery</h1>\n    <p>Explore the visual beauty of Iowa through our curated photo collection.</p>\n  </div>\n</section>\n\n<main class=\"grid\" aria-label=\"Image gallery\">\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery1/400/300\" alt=\"Iowa field\" style=\"width:100%;height:auto;\"></div>\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery2/400/300\" alt=\"Iowa cityscape\" style=\"width:100%;height:auto;\"></div>\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery3/400/300\" alt=\"Iowa river\" style=\"width:100%;height:auto;\"></div>\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery4/400/300\" alt=\"Iowa night sky\" style=\"width:100%;height:auto;\"></div>\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery5/400/300\" alt=\"Iowa farmland\" style=\"width:100%;height:auto;\"></div>\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery6/400/300\" alt=\"Iowa sunset\" style=\"width:100%;height:auto;\"></div>\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery7/400/300\" alt=\"Iowa forest\" style=\"width:100%;height:auto;\"></div>\n  <div class=\"grid-item\"><img src=\"https://picsum.photos/seed/gallery8/400/300\" alt=\"Iowa highway\" style=\"width:100%;height:auto;\"></div>\n</main>\n\n<footer aria-label=\"Site footer\">\n  <p>&copy; 2024 Iowa. All rights reserved.</p>\n</footer>\n\n<script>\ndocument.addEventListener('DOMContentLoaded',function(){\n  const toggle=document.querySelector('.menu-toggle');\n  const navUl=document.querySelector('nav ul');\n  toggle.addEventListener('click',function(){\n    navUl.classList.toggle('open');\n  });\n});\n</script>\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"description\" content=\"Iowa – Contact page with a simple form.\">\n<title>Iowa – Contact</title>\n<style>\n/* Brand guidelines CSS */\n:root {\n  --color-dark: #141413;\n  --color-light: #faf9f5;\n  --color-mid-gray: #b0aea5;\n  --color-light-gray: #e8e6dc;\n  --color-accent-orange: #d97757;\n  --color-accent-blue: #6a9bcc;\n  --color-accent-green: #788c5d;\n  --font-heading: 'Poppins', Arial, sans-serif;\n  --font-body: 'Lora', Georgia, serif;\n  --space-1: 4px;\n  --space-2: 8px;\n  --space-3: 12px;\n  --space-4: 16px;\n  --space-5: 24px;\n  --space-6: 32px;\n}\n*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }\nbody {\n  font-family: var(--font-body);\n  font-size:16px;\n  line-height:1.6;\n  color: var(--color-dark);\n  background-color: var(--color-light);\n  padding: var(--space-5);\n}\nheader {\n  display:flex;\n  align-items:center;\n  justify-content:space-between;\n  padding: var(--space-4);\n  background-color: var(--color-light-gray);\n}\nheader .logo {\n  font-family: var(--font-heading);\n  font-size:1.5rem;\n  color: var(--color-accent-orange);\n}\nnav ul {\n  list-style:none;\n  display:flex;\n  gap: var(--space-3);\n}\nnav a {\n  text-decoration:none;\n  color: var(--color-dark);\n  font-weight:600;\n}\nnav a:hover { color: var(--color-accent-blue); }\n.menu-toggle {\n  display:none;\n  background:none;\n  border:none;\n  font-size:1.5rem;\n  cursor:pointer;\n}\n@media (max-width:640px) {\n  nav ul { flex-direction:column; display:none; }\n  nav ul.open { display:flex; }\n  .menu-toggle { display:block; }\n}\nsection.hero {\n  position:relative;\n  text-align:center;\n  color: var(--color-light);\n  margin-bottom: var(--space-6);\n}\nsection.hero img {\n  width:100%;\n  height:auto;\n  display:block;\n}\nsection.hero .overlay {\n  position:absolute;\n  top:0; left:0; width:100%; height:100%;\n  background:rgba(0,0,0,0.4);\n  display:flex;\n  flex-direction:column;\n  justify-content:center;\n  align-items:center;\n}\nsection.hero h1 {\n  font-family: var(--font-heading);\n  font-size:2rem;\n  margin-bottom: var(--space-3);\n}\nsection.hero p {\n  font-size:1rem;\n  max-width:600px;\n}\nform {\n  max-width:600px;\n  margin:0 auto;\n  background-color: var(--color-light-gray);\n  padding: var(--space-5);\n  border-radius:8px;\n}\nform .form-group { margin-bottom: var(--space-4); }\nform label {\n  display:block;\n  margin-bottom: var(--space-1);\n  font-weight:600;\n}\nform input, form textarea {\n  width:100%;\n  padding: var(--space-2);\n  border:1px solid var(--color-mid-gray);\n  border-radius:4px;\n  font-family: var(--font-body);\n}\nform textarea { resize:vertical; min-height:120px; }\nform button {\n  background-color: var(--color-accent-orange);\n  color: var(--color-light);\n  border:none;\n  padding: var(--space-2) var(--space-4);\n  font-family: var(--font-heading);\n  font-size:1rem;\n  cursor:pointer;\n  border-radius:4px;\n}\nform button:hover { background-color: var(--color-accent-blue); }\nfooter {\n  background-color: var(--color-mid-gray);\n  color: var(--color-light);\n  text-align:center;\n  padding: var(--space-5);\n  margin-top: var(--space-6);\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Main navigation\">\n  <div class=\"logo\">Iowa</div>\n  <button class=\"menu-toggle\" aria-label=\"Toggle menu\">☰</button>\n  <nav aria-label=\"Primary\">\n    <ul>\n      <li><a href=\"home.html\">Home</a></li>\n      <li><a href=\"about.html\">About</a></li>\n      <li><a href=\"services.html\">Services</a></li>\n      <li><a href=\"gallery.html\">Gallery</a></li>\n      <li><a href=\"blog.html\">Blog</a></li>\n      <li><a href=\"contact.html\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<section class=\"hero\" aria-label=\"Contact hero\">\n  <img src=\"https://picsum.photos/seed/contact/1200/600\" alt=\"Friendly staff at a desk\">\n  <div class=\"overlay\">\n    <h1>Contact Us</h1>\n    <p>We’d love to hear from you. Fill out the form below and we’ll get back to you shortly.</p>\n  </div>\n</section>\n\n<main>\n  <form aria-label=\"Contact form\" novalidate>\n    <div class=\"form-group\">\n      <label for=\"name\">Name</label>\n      <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"Your name\" required>\n    </div>\n    <div class=\"form-group\">\n      <label for=\"email\">Email</label>\n      <input type=\"email\" id=\"email\" name=\"email\" placeholder=\"you@example.com\" required>\n    </div>\n    <div class=\"form-group\">\n      <label for=\"message\">Message</label>\n      <textarea id=\"message\" name=\"message\" placeholder=\"Your message\" required></textarea>\n    </div>\n    <button type=\"submit\">Submit</button>\n  </form>\n</main>\n\n<footer aria-label=\"Site footer\">\n  <p>&copy; 2024 Iowa. All rights reserved.</p>\n</footer>\n\n<script>\ndocument.addEventListener('DOMContentLoaded',function(){\n  const toggle=document.querySelector('.menu-toggle');\n  const navUl=document.querySelector('nav ul');\n  toggle.addEventListener('click',function(){\n    navUl.classList.toggle('open');\n  });\n});\n</script>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – Services. Explore the range of services offered to residents and visitors across the heartland.">
+  <title>Iowa – Services</title>
+  <style>
+    /* Anthropic Brand Guidelines CSS (step_r1) */
+    :root {
+      --color-dark: #141413;
+      --color-light: #faf9f5;
+      --color-mid-gray: #b0aea5;
+      --color-light-gray: #e8e6dc;
+      --color-accent-orange: #d97757;
+      --color-accent-blue: #6a9bcc;
+      --color-accent-green: #788c5d;
+      --font-heading: 'Poppins', Arial, sans-serif;
+      --font-body: 'Lora', Georgia, serif;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--color-dark);
+      background-color: var(--color-light);
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: var(--font-heading);
+      color: var(--color-dark);
+      margin-top: var(--space-5);
+      margin-bottom: var(--space-3);
+    }
+    a {
+      color: var(--color-accent-blue);
+      text-decoration: underline;
+    }
+    a:hover { color: var(--color-accent-green); }
+    .accent { color: var(--color-accent-orange); }
+
+    .flex { display:flex; }
+    .flex-col { flex-direction:column; }
+    .items-center { align-items:center; }
+    .justify-center { justify-content:center; }
+    .text-center { text-align:center; }
+    .mt-1 { margin-top: var(--space-1); }
+    .mt-2 { margin-top: var(--space-2); }
+    .mt-3 { margin-top: var(--space-3); }
+    .mt-4 { margin-top: var(--space-4); }
+    .mt-5 { margin-top: var(--space-5); }
+    .mb-1 { margin-bottom: var(--space-1); }
+    .mb-2 { margin-bottom: var(--space-2); }
+    .mb-3 { margin-bottom: var(--space-3); }
+    .mb-4 { margin-bottom: var(--space-4); }
+    .mb-5 { margin-bottom: var(--space-5); }
+    .p-1 { padding: var(--space-1); }
+    .p-2 { padding: var(--space-2); }
+    .p-3 { padding: var(--space-3); }
+    .p-4 { padding: var(--space-4); }
+    .p-5 { padding: var(--space-5); }
+    .gap-1 { gap: var(--space-1); }
+    .gap-2 { gap: var(--space-2); }
+    .gap-3 { gap: var(--space-3); }
+    .gap-4 { gap: var(--space-4); }
+    .gap-5 { gap: var(--space-5); }
+
+    .grid { display:grid; gap: var(--space-4); }
+    .grid-cols-2 { grid-template-columns: repeat(2,1fr); }
+    .grid-cols-3 { grid-template-columns: repeat(3,1fr); }
+    .grid-cols-4 { grid-template-columns: repeat(4,1fr); }
+
+    @media (min-width:640px) { .grid { gap: var(--space-5); } }
+    @media (min-width:1024px) { .grid { gap: var(--space-6); } }
+
+    .accent { color: var(--color-accent-orange); }
+    .section { margin-bottom: var(--space-6); }
+
+    /* Header / Navigation */
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:var(--space-4);
+      background-color:var(--color-light-gray);
+      position:sticky;
+      top:0;
+      z-index:10;
+    }
+    header .logo {
+      font-family:var(--font-heading);
+      font-size:1.5rem;
+      color:var(--color-accent-orange);
+    }
+    nav ul {
+      list-style:none;
+      display:flex;
+      gap:var(--space-3);
+    }
+    nav a {
+      text-decoration:none;
+      color:var(--color-dark);
+      font-weight:600;
+    }
+    nav a:hover { color:var(--color-accent-blue); }
+    .menu-toggle {
+      display:none;
+      background:none;
+      border:none;
+      font-size:1.5rem;
+      cursor:pointer;
+    }
+    @media (max-width:640px) {
+      nav ul { flex-direction:column; display:none; }
+      nav ul.open { display:flex; }
+      .menu-toggle { display:block; }
+    }
+
+    /* Hero */
+    .hero {
+      position:relative;
+      text-align:center;
+      color:var(--color-light);
+    }
+    .hero img {
+      width:100%;
+      height:auto;
+      display:block;
+    }
+    .hero .overlay {
+      position:absolute;
+      top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.4);
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+    }
+    .hero h1 {
+      font-family:var(--font-heading);
+      font-size:2rem;
+      margin-bottom:var(--space-3);
+    }
+    .hero p {
+      font-size:1rem;
+      max-width:600px;
+    }
+
+    /* Service cards */
+    .grid-item {
+      background-color:var(--color-light-gray);
+      padding:var(--space-4);
+      border-radius:8px;
+    }
+    .grid-item h3 {
+      margin-bottom:var(--space-2);
+    }
+    .grid-item p {
+      margin-bottom:var(--space-3);
+    }
+    .grid-item img {
+      width:100%;
+      height:auto;
+      margin-top:var(--space-3);
+      border-radius:4px;
+    }
+
+    footer {
+      background-color:var(--color-mid-gray);
+      color:var(--color-light);
+      text-align:center;
+      padding:var(--space-5);
+    }
+
+    @media (min-width:640px) {
+      nav ul { gap:var(--space-4); }
+      .hero h1 { font-size:2.5rem; }
+      .hero p { font-size:1.125rem; }
+      .grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media (min-width:1024px) {
+      .hero h1 { font-size:3rem; }
+      .grid { grid-template-columns:repeat(3,1fr); }
+    }
+    @media (min-width:1440px) {
+      .hero h1 { font-size:3.5rem; }
+      .grid { grid-template-columns:repeat(4,1fr); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header / Navigation -->
+  <header aria-label="Main navigation">
+    <div class="logo">Iowa</div>
+    <button class="menu-toggle" aria-label="Toggle menu">☰</button>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="home.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="gallery.html">Gallery</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero" aria-label="Services hero">
+    <img src="https://picsum.photos/seed/services-hero/1200/600" alt="Collage representing Iowa services">
+    <div class="overlay">
+      <h1>Our Services</h1>
+      <p>Discover the range of offerings that make Iowa a thriving community.</p>
+    </div>
+  </section>
+
+  <!-- Services Grid -->
+  <main class="grid" aria-label="Services list" style="padding:var(--space-5);">
+    <div class="grid-item">
+      <h3>Tourism</h3>
+      <p>Guided tours, outdoor adventures, and heritage trails for every explorer.</p>
+      <img src="https://picsum.photos/seed/tourism/400/300" alt="Tourist activity in Iowa">
+    </div>
+    <div class="grid-item">
+      <h3>Education</h3>
+      <p>World‑class universities, community workshops, and lifelong learning programs.</p>
+      <img src="https://picsum.photos/seed/education/400/300" alt="Iowa campus">
+    </div>
+    <div class="grid-item">
+      <h3>Business Support</h3>
+      <p>Incubator spaces, agricultural tech, and sustainable enterprise consulting.</p>
+      <img src="https://picsum.photos/seed/business/400/300" alt="Business meeting in Iowa">
+    </div>
+    <div class="grid-item">
+      <h3>Healthcare</h3>
+      <p>Comprehensive medical services, wellness centers, and emergency care.</p>
+      <img src="https://picsum.photos/seed/healthcare/400/300" alt="Healthcare facility in Iowa">
+    </div>
+    <div class="grid-item">
+      <h3>Transportation</h3>
+      <p>Reliable public transit, bike lanes, and intercity connections.</p>
+      <img src="https://picsum.photos/seed/transport/400/300" alt="Transportation hub in Iowa">
+    </div>
+    <div class="grid-item">
+      <h3>Community Events</h3>
+      <p>Festivals, fairs, and cultural gatherings that celebrate local spirit.</p>
+      <img src="https://picsum.photos/seed/events/400/300" alt="Community event in Iowa">
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer aria-label="Site footer">
+    <p>&copy; 2024 Iowa. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const toggle = document.querySelector('.menu-toggle');
+      const navUl = document.querySelector('nav ul');
+      toggle.addEventListener('click', function () {
+        navUl.classList.toggle('open');
+      });
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"description\" content=\"Iowa – Full‑site sandbox preview with navigation and embedded page previews.\">\n<title>Iowa – Sandbox Preview</title>\n<style>\n/* Brand guidelines CSS from step_r1 */\n:root {\n  --color-dark:#141413;\n  --color-light:#faf9f5;\n  --color-mid-gray:#b0aea5;\n  --color-light-gray:#e8e6dc;\n  --color-accent-orange:#d97757;\n  --color-accent-blue:#6a9bcc;\n  --color-accent-green:#788c5d;\n  --font-heading:'Poppins', Arial, sans-serif;\n  --font-body:'Lora', Georgia, serif;\n  --space-1:4px;\n  --space-2:8px;\n  --space-3:12px;\n  --space-4:16px;\n  --space-5:24px;\n  --space-6:32px;\n}\n*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\nbody{\n  font-family:var(--font-body);\n  font-size:16px;\n  line-height:1.6;\n  color:var(--color-dark);\n  background-color:var(--color-light);\n  padding:var(--space-5);\n}\nheader{\n  display:flex;\n  align-items:center;\n  justify-content:space-between;\n  padding:var(--space-4);\n  background-color:var(--color-light-gray);\n  position:sticky;\n  top:0;\n  z-index:10;\n}\nheader .logo{\n  font-family:var(--font-heading);\n  font-size:1.5rem;\n  color:var(--color-accent-orange);\n}\nnav ul{\n  list-style:none;\n  display:flex;\n  gap:var(--space-3);\n}\nnav a{\n  text-decoration:none;\n  color:var(--color-dark);\n  font-weight:600;\n}\nnav a:hover{color:var(--color-accent-blue);}\n.menu-toggle{\n  display:none;\n  background:none;\n  border:none;\n  font-size:1.5rem;\n  cursor:pointer;\n}\n@media (max-width:640px){\n  nav ul{\n    flex-direction:column;\n    display:none;\n  }\n  nav ul.open{display:flex}\n  .menu-toggle{display:block}\n}\nsection{\n  margin-top:var(--space-6);\n}\niframe{\n  width:100%;\n  border:none;\n  border-radius:8px;\n  height:600px;\n}\n@media (min-width:640px){\n  nav ul{gap:var(--space-4);}\n}\n@media (min-width:1024px){\n  iframe{height:800px;}\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Main navigation\">\n  <div class=\"logo\">Iowa Sandbox</div>\n  <button class=\"menu-toggle\" aria-label=\"Toggle menu\">☰</button>\n  <nav aria-label=\"Primary\">\n    <ul>\n      <li><a href=\"#home\">Home</a></li>\n      <li><a href=\"#about\">About</a></li>\n      <li><a href=\"#services\">Services</a></li>\n      <li><a href=\"#gallery\">Gallery</a></li>\n      <li><a href=\"#blog\">Blog</a></li>\n      <li><a href=\"#contact\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<section id=\"home\">\n  <h2>Home</h2>\n  <iframe src=\"home.html\" title=\"Home page preview\"></iframe>\n</section>\n\n<section id=\"about\">\n  <h2>About</h2>\n  <iframe src=\"about.html\" title=\"About page preview\"></iframe>\n</section>\n\n<section id=\"services\">\n  <h2>Services</h2>\n  <iframe src=\"services.html\" title=\"Services page preview\"></iframe>\n</section>\n\n<section id=\"gallery\">\n  <h2>Gallery</h2>\n  <iframe src=\"gallery.html\" title=\"Gallery page preview\"></iframe>\n</section>\n\n<section id=\"blog\">\n  <h2>Blog</h2>\n  <iframe src=\"blog.html\" title=\"Blog page preview\"></iframe>\n</section>\n\n<section id=\"contact\">\n  <h2>Contact</h2>\n  <iframe src=\"contact.html\" title=\"Contact page preview\"></iframe>\n</section>\n\n<footer aria-label=\"Site footer\">\n  <p>&copy; 2024 Iowa. All rights reserved.</p>\n</footer>\n\n<script>\ndocument.addEventListener('DOMContentLoaded',function(){\n  const toggle=document.querySelector('.menu-toggle');\n  const navUl=document.querySelector('nav ul');\n  toggle.addEventListener('click',function(){\n    navUl.classList.toggle('open');\n  });\n});\n</script>\n</body>\n</html>

@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iowa Site Assets Overview</title>
+<style>
+:root{
+--color-bg:#f5f5f7;
+--color-surface:#ffffff;
+--color-primary:#007aff;
+--color-primary-dark:#0051a2;
+--color-primary-light:#66b2ff;
+--color-text-primary:#1d1d1f;
+--color-text-secondary:#6e6e73;
+--color-muted:#d2d2d7;
+}
+body{
+font-family:Arial,Helvetica,sans-serif;
+background:var(--color-bg);
+color:var(--color-text-primary);
+margin:0;
+padding:2rem;
+}
+h1{
+color:var(--color-primary);
+}
+section{
+background:var(--color-surface);
+padding:1rem;
+margin-bottom:1rem;
+border-radius:8px;
+box-shadow:0 2px 4px rgba(0,0,0,0.1);
+}
+pre{
+background:#eee;
+padding:1rem;
+overflow:auto;
+}
+</style>
+</head>
+<body>
+<h1>Iowa Site Assets Overview</h1>
+<section aria-labelledby="pages">
+<h2 id="pages">Pages</h2>
+<ul>
+<li><strong>Home</strong>: Welcome to Iowa, your Apple‑style experience.</li>
+<li><strong>About</strong>: Learn about Iowa’s mission and vision.</li>
+<li><strong>Features</strong>: Discover the key features of Iowa.</li>
+<li><strong>Pricing</strong>: Explore pricing plans and options.</li>
+<li><strong>Contact</strong>: Get in touch with us.</li>
+</ul>
+</section>
+<section aria-labelledby="design-tokens">
+<h2 id="design-tokens">Design Tokens</h2>
+<pre id="tokens"></pre>
+</section>
+<script type="application/json" id="site-data">
+{
+  "pages": [
+    {"title":"Home","placeholderCopy":"Welcome to Iowa, your Apple‑style experience."},
+    {"title":"About","placeholderCopy":"Learn about Iowa’s mission and vision."},
+    {"title":"Features","placeholderCopy":"Discover the key features of Iowa."},
+    {"title":"Pricing","placeholderCopy":"Explore pricing plans and options."},
+    {"title":"Contact","placeholderCopy":"Get in touch with us."}
+  ],
+  "designTokens": {
+    "colorBg":"#f5f5f7",
+    "colorSurface":"#ffffff",
+    "colorPrimary":"#007aff",
+    "colorPrimaryDark":"#0051a2",
+    "colorPrimaryLight":"#66b2ff",
+    "colorTextPrimary":"#1d1d1f",
+    "colorTextSecondary":"#6e6e73",
+    "colorMuted":"#d2d2d7"
+  }
+}
+</script>
+<script>
+const data = JSON.parse(document.getElementById('site-data').textContent);
+document.getElementById('tokens').textContent = JSON.stringify(data.designTokens, null, 2);
+</script>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"description\" content=\"Apple‑style navigation bar and footer for Iowa website\">\n<title>Iowa – Navigation & Footer</title>\n<style>\n:root{\n--color-bg:#f5f5f7;\n--color-surface:#ffffff;\n--color-primary:#007aff;\n--color-primary-dark:#0051a2;\n--color-primary-light:#66b2ff;\n--color-text-primary:#1d1d1f;\n--color-text-secondary:#6e6e73;\n--color-muted:#d2d2d7;\n}\nbody{\nfont-family:Arial,Helvetica,sans-serif;\nmargin:0;\nbackground:var(--color-bg);\ncolor:var(--color-text-primary);\n}\nheader{\nbackground:var(--color-surface);\nborder-bottom:1px solid var(--color-muted);\n}\nnav{\nmax-width:1200px;\nmargin:0 auto;\ndisplay:flex;\nalign-items:center;\njustify-content:space-between;\npadding:0.5rem 1rem;\n}\n.logo img{\nheight:40px;\n}\nnav ul{\nlist-style:none;\ndisplay:flex;\ngap:1.5rem;\nmargin:0;\npadding:0;\n}\nnav a{\ntext-decoration:none;\ncolor:var(--color-text-primary);\nfont-weight:500;\npadding:0.25rem 0;\n}\nnav a:hover,\nnav a:focus{\ncolor:var(--color-primary);\n}\nnav a.active{\ncolor:var(--color-primary);\nborder-bottom:2px solid var(--color-primary);\n}\nfooter{\nbackground:var(--color-surface);\nborder-top:1px solid var(--color-muted);\npadding:1rem 0;\nfont-size:0.875rem;\n}\nfooter .container{\nmax-width:1200px;\nmargin:0 auto;\ndisplay:flex;\njustify-content:space-between;\nalign-items:center;\npadding:0 1rem;\n}\nfooter .social a{\nmargin-left:0.5rem;\n}\nfooter .social img{\nheight:24px;\nwidth:24px;\n}\n</style>\n</head>\n<body>\n<header>\n<nav aria-label=\"Main navigation\">\n<div class=\"logo\">\n<img src=\"https://picsum.photos/seed/logo/40/40\" alt=\"Iowa logo placeholder\">\n</div>\n<ul>\n<li><a href=\"#\" class=\"active\">Home</a></li>\n<li><a href=\"#\">About</a></li>\n<li><a href=\"#\">Features</a></li>\n<li><a href=\"#\">Pricing</a></li>\n<li><a href=\"#\">Contact</a></li>\n</ul>\n</nav>\n</header>\n\n<main>\n<!-- Page content would go here -->\n</main>\n\n<footer aria-label=\"Site footer\">\n<div class=\"container\">\n<div>&copy; 2024 Iowa. All rights reserved.</div>\n<div class=\"social\">\n<a href=\"#\" aria-label=\"Twitter\"><img src=\"https://picsum.photos/seed/twitter/24/24\" alt=\"Twitter icon\"></a>\n<a href=\"#\" aria-label=\"Facebook\"><img src=\"https://picsum.photos/seed/facebook/24/24\" alt=\"Facebook icon\"></a>\n<a href=\"#\" aria-label=\"Instagram\"><img src=\"https://picsum.photos/seed/instagram/24/24\" alt=\"Instagram icon\"></a>\n</div>\n</div>\n</footer>\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"description\" content=\"Apple‑style website prototype for Iowa\">\n<title>Iowa – Apple‑style Site</title>\n<style>\n:root{\n--color-bg:#f5f5f7;\n--color-surface:#ffffff;\n--color-primary:#007aff;\n--color-primary-dark:#0051a2;\n--color-primary-light:#66b2ff;\n--color-text-primary:#1d1d1f;\n--color-text-secondary:#6e6e73;\n--color-muted:#d2d2d7;\n--spacing-unit:1rem;\n--font-heading:\"Helvetica Neue\",Helvetica,Arial,sans-serif;\n--font-body:Arial,Helvetica,sans-serif;\n}\nbody{\nfont-family:var(--font-body);\nbackground:var(--color-bg);\ncolor:var(--color-text-primary);\nmargin:0;\npadding:0;\n}\nheader{\nbackground:var(--color-surface);\nbox-shadow:0 2px 4px rgba(0,0,0,0.1);\n}\nnav{\ndisplay:flex;\njustify-content:center;\ngap:var(--spacing-unit);\npadding:var(--spacing-unit);\n}\nnav a{\ncolor:var(--color-primary);\ntext-decoration:none;\nfont-weight:600;\n}\nnav a:hover{\ncolor:var(--color-primary-dark);\n}\nsection{\nmax-width:800px;\nmargin:var(--spacing-unit) auto;\nbackground:var(--color-surface);\npadding:calc(var(--spacing-unit)*2);\nborder-radius:8px;\nbox-shadow:0 2px 4px rgba(0,0,0,0.1);\n}\nh1,h2{\nfont-family:var(--font-heading);\ncolor:var(--color-primary);\nmargin-top:0;\n}\nh1{\nfont-size:2.5rem;\n}\nh2{\nfont-size:2rem;\nmargin-bottom:0.5rem;\n}\np{\nline-height:1.6;\nmargin:0.5rem 0;\n}\n.feature-cards{\ndisplay:grid;\ngrid-template-columns:repeat(auto-fit,minmax(200px,1fr));\ngap:var(--spacing-unit);\n}\n.card{\nbackground:var(--color-bg);\npadding:var(--spacing-unit);\nborder-radius:6px;\nbox-shadow:0 1px 3px rgba(0,0,0,0.1);\n}\n.pricing-table{\nwidth:100%;\nborder-collapse:collapse;\nmargin-top:var(--spacing-unit);\n}\n.pricing-table th, .pricing-table td{\nborder:1px solid var(--color-muted);\npadding:var(--spacing-unit);\ntext-align:center;\n}\n.pricing-table th{\nbackground:var(--color-primary);\ncolor:#fff;\n}\nfooter{\nbackground:var(--color-surface);\ntext-align:center;\npadding:var(--spacing-unit);\nfont-size:0.9rem;\ncolor:var(--color-text-secondary);\nmargin-top:var(--spacing-unit);\n}\ninput, textarea{\nwidth:100%;\npadding:0.5rem;\nmargin-top:0.25rem;\nmargin-bottom:0.5rem;\nborder:1px solid var(--color-muted);\nborder-radius:4px;\nfont-family:inherit;\n}\nbutton{\nbackground:var(--color-primary);\ncolor:#fff;\nborder:none;\npadding:0.75rem 1.5rem;\nborder-radius:4px;\nfont-size:1rem;\ncursor:pointer;\n}\nbutton:hover{\nbackground:var(--color-primary-dark);\n}\n</style>\n</head>\n<body>\n<header>\n<nav aria-label=\"Main navigation\">\n<a href=\"#home\">Home</a>\n<a href=\"#about\">About</a>\n<a href=\"#features\">Features</a>\n<a href=\"#pricing\">Pricing</a>\n<a href=\"#contact\">Contact</a>\n</nav>\n</header>\n\n<section id=\"home\" aria-labelledby=\"home-title\">\n<h1 id=\"home-title\">Welcome to Iowa</h1>\n<p>Experience an Apple‑inspired design with clean typography, subtle colors, and intuitive UI.</p>\n<img src=\"https://picsum.photos/seed/home/800/400\" alt=\"Scenic view representing Iowa\" style=\"width:100%;border-radius:8px;margin-top:var(--spacing-unit);\">\n</section>\n\n<section id=\"about\" aria-labelledby=\"about-title\">\n<h2 id=\"about-title\">About Iowa</h2>\n<p>Iowa is a conceptual project showcasing how Apple‑style design principles can be applied to web experiences.</p>\n<p>Our mission is to blend simplicity with elegance, delivering a seamless user journey.</p>\n</section>\n\n<section id=\"features\" aria-labelledby=\"features-title\">\n<h2 id=\"features-title\">Features</h2>\n<div class=\"feature-cards\">\n<div class=\"card\">\n<h3>Clean Layout</h3>\n<p>Responsive grid system with generous whitespace.</p>\n</div>\n<div class=\"card\">\n<h3>Typography</h3>\n<p>Apple‑like fonts and hierarchy for readability.</p>\n</div>\n<div class=\"card\">\n<h3>Color Palette</h3>\n<p>Subtle, muted tones with a vibrant primary accent.</p>\n</div>\n<div class=\"card\">\n<h3>Accessibility</h3>\n<p>ARIA labels and high contrast for inclusive design.</p>\n</div>\n</div>\n</section>\n\n<section id=\"pricing\" aria-labelledby=\"pricing-title\">\n<h2 id=\"pricing-title\">Pricing</h2>\n<table class=\"pricing-table\" aria-label=\"Pricing plans\">\n<thead>\n<tr>\n<th>Plan</th>\n<th>Price</th>\n<th>Features</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Basic</td>\n<td>Free</td>\n<td>Core components, community support</td>\n</tr>\n<tr>\n<td>Pro</td>\n<td>$9/mo</td>\n<td>Advanced UI, priority support</td>\n</tr>\n<tr>\n<td>Enterprise</td>\n<td>Contact us</td>\n<td>Custom solutions, dedicated account manager</td>\n</tr>\n</tbody>\n</table>\n</section>\n\n<section id=\"contact\" aria-labelledby=\"contact-title\">\n<h2 id=\"contact-title\">Contact Us</h2>\n<form aria-label=\"Contact form\">\n<label for=\"name\">Name</label>\n<input type=\"text\" id=\"name\" name=\"name\" placeholder=\"Your name\" required>\n<label for=\"email\">Email</label>\n<input type=\"email\" id=\"email\" name=\"email\" placeholder=\"you@example.com\" required>\n<label for=\"message\">Message</label>\n<textarea id=\"message\" name=\"message\" rows=\"4\" placeholder=\"Your message\" required></textarea>\n<button type=\"submit\">Send Message</button>\n</form>\n</section>\n\n<footer>\n<p>&copy; 2024 Iowa. All rights reserved.</p>\n</footer>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style single‑page website prototype for Iowa, featuring a consistent navigation bar, responsive layout, and polished visual design.">
+  <title>Iowa – Apple‑style Site</title>
+  <style>
+    :root{
+      --color-bg:#f5f5f7;
+      --color-surface:#ffffff;
+      --color-primary:#007aff;
+      --color-primary-dark:#0051a2;
+      --color-primary-light:#66b2ff;
+      --color-text-primary:#1d1d1f;
+      --color-text-secondary:#6e6e73;
+      --color-muted:#d2d2d7;
+      --spacing-unit:1rem;
+      --font-heading:"Helvetica Neue",Helvetica,Arial,sans-serif;
+      --font-body:Arial,Helvetica,sans-serif;
+    }
+    *, *::before, *::after { box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--font-body);
+      background:var(--color-bg);
+      color:var(--color-text-primary);
+      line-height:1.6;
+    }
+    header{
+      background:var(--color-surface);
+      border-bottom:1px solid var(--color-muted);
+    }
+    nav{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0.5rem 1rem;
+      flex-wrap:wrap;
+      gap:var(--spacing-unit);
+    }
+    .logo img{
+      height:40px;
+    }
+    nav ul{
+      list-style:none;
+      display:flex;
+      gap:1.5rem;
+      margin:0;
+      padding:0;
+    }
+    nav a{
+      text-decoration:none;
+      color:var(--color-text-primary);
+      font-weight:500;
+      padding:0.25rem 0;
+    }
+    nav a:hover,
+    nav a:focus{
+      color:var(--color-primary);
+    }
+    nav a.active{
+      color:var(--color-primary);
+      border-bottom:2px solid var(--color-primary);
+    }
+    main{
+      padding:var(--spacing-unit);
+    }
+    section{
+      max-width:800px;
+      margin:var(--spacing-unit) auto;
+      background:var(--color-surface);
+      padding:calc(var(--spacing-unit)*2);
+      border-radius:8px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1,h2{
+      font-family:var(--font-heading);
+      color:var(--color-primary);
+      margin-top:0;
+    }
+    h1{font-size:2.5rem;}
+    h2{font-size:2rem;margin-bottom:0.5rem;}
+    .feature-cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:var(--spacing-unit);
+    }
+    .card{
+      background:var(--color-bg);
+      padding:var(--spacing-unit);
+      border-radius:6px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    }
+    .pricing-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:var(--spacing-unit);
+    }
+    .pricing-table th,
+    .pricing-table td{
+      border:1px solid var(--color-muted);
+      padding:var(--spacing-unit);
+      text-align:center;
+    }
+    .pricing-table th{
+      background:var(--color-primary);
+      color:#fff;
+    }
+    form{
+      display:flex;
+      flex-direction:column;
+    }
+    form label{
+      margin-top:0.5rem;
+    }
+    input, textarea{
+      width:100%;
+      padding:0.5rem;
+      margin-top:0.25rem;
+      margin-bottom:0.5rem;
+      border:1px solid var(--color-muted);
+      border-radius:4px;
+      font-family:inherit;
+    }
+    button{
+      background:var(--color-primary);
+      color:#fff;
+      border:none;
+      padding:0.75rem 1.5rem;
+      border-radius:4px;
+      font-size:1rem;
+      cursor:pointer;
+      margin-top:0.5rem;
+    }
+    button:hover{
+      background:var(--color-primary-dark);
+    }
+    footer{
+      background:var(--color-surface);
+      border-top:1px solid var(--color-muted);
+      padding:1rem 0;
+      font-size:0.875rem;
+    }
+    footer .container{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:0 1rem;
+    }
+    footer .social a{
+      margin-left:0.5rem;
+    }
+    footer .social img{
+      height:24px;
+      width:24px;
+    }
+    /* Responsive */
+    @media (max-width:600px){
+      nav{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      nav ul{
+        flex-direction:column;
+        gap:0.5rem;
+      }
+      footer .container{
+        flex-direction:column;
+        gap:0.5rem;
+        text-align:center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <header>
+    <nav aria-label="Main navigation">
+      <div class="logo">
+        <img src="https://picsum.photos/seed/logo/40/40" alt="Iowa logo placeholder">
+      </div>
+      <ul>
+        <li><a href="#home" class="active">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home Section -->
+    <section id="home" aria-labelledby="home-title">
+      <h1 id="home-title">Welcome to Iowa</h1>
+      <p>Experience an Apple‑inspired design with clean typography, subtle colors, and intuitive UI.</p>
+      <img src="https://picsum.photos/seed/home/800/400" alt="Scenic view representing Iowa" style="width:100%;border-radius:8px;margin-top:var(--spacing-unit);">
+    </section>
+
+    <!-- About Section -->
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">About Iowa</h2>
+      <p>Iowa is a conceptual project showcasing how Apple‑style design principles can be applied to web experiences.</p>
+      <p>Our mission is to blend simplicity with elegance, delivering a seamless user journey.</p>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <div class="feature-cards">
+        <div class="card">
+          <h3>Clean Layout</h3>
+          <p>Responsive grid system with generous whitespace.</p>
+        </div>
+        <div class="card">
+          <h3>Typography</h3>
+          <p>Apple‑like fonts and hierarchy for readability.</p>
+        </div>
+        <div class="card">
+          <h3>Color Palette</h3>
+          <p>Subtle, muted tones with a vibrant primary accent.</p>
+        </div>
+        <div class="card">
+          <h3>Accessibility</h3>
+          <p>ARIA labels and high contrast for inclusive design.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" aria-labelledby="pricing-title">
+      <h2 id="pricing-title">Pricing</h2>
+      <table class="pricing-table" aria-label="Pricing plans">
+        <thead>
+          <tr>
+            <th>Plan</th>
+            <th>Price</th>
+            <th>Features</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Basic</td>
+            <td>Free</td>
+            <td>Core components, community support</td>
+          </tr>
+          <tr>
+            <td>Pro</td>
+            <td>$9/mo</td>
+            <td>Advanced UI, priority support</td>
+          </tr>
+          <tr>
+            <td>Enterprise</td>
+            <td>Contact us</td>
+            <td>Custom solutions, dedicated account manager</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Contact Us</h2>
+      <form aria-label="Contact form">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required>
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required>
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" placeholder="Your message" required></textarea>
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer aria-label="Site footer">
+    <div class="container">
+      <div>&copy; 2024 Iowa. All rights reserved.</div>
+      <div class="social">
+        <a href="#" aria-label="Twitter"><img src="https://picsum.photos/seed/twitter/24/24" alt="Twitter icon"></a>
+        <a href="#" aria-label="Facebook"><img src="https://picsum.photos/seed/facebook/24/24" alt="Facebook icon"></a>
+        <a href="#" aria-label="Instagram"><img src="https://picsum.photos/seed/instagram/24/24" alt="Instagram icon"></a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Design Tokens (from step_1) -->
+  <script type="application/json" id="site-data">
+  {
+    "pages": [
+      {"title":"Home","placeholderCopy":"Welcome to Iowa, your Apple‑style experience."},
+      {"title":"About","placeholderCopy":"Learn about Iowa’s mission and vision."},
+      {"title":"Features","placeholderCopy":"Discover the key features of Iowa."},
+      {"title":"Pricing","placeholderCopy":"Explore pricing plans and options."},
+      {"title":"Contact","placeholderCopy":"Get in touch with us."}
+    ],
+    "designTokens": {
+      "colorBg":"#f5f5f7",
+      "colorSurface":"#ffffff",
+      "colorPrimary":"#007aff",
+      "colorPrimaryDark":"#0051a2",
+      "colorPrimaryLight":"#66b2ff",
+      "colorTextPrimary":"#1d1d1f",
+      "colorTextSecondary":"#6e6e73",
+      "colorMuted":"#d2d2d7"
+    }
+  }
+  </script>
+  <script>
+    // Populate design token display (optional)
+    const data = JSON.parse(document.getElementById('site-data').textContent);
+    // Example: you could render tokens somewhere if needed
+
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const targetId = this.getAttribute('href').substring(1);
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          e.preventDefault();
+          targetEl.scrollIntoView({ behavior: 'smooth' });
+          // Update active link styling
+          document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+          this.classList.add('active');
+        }
+      });
+    });
+
+    // Basic link validation on load
+    window.addEventListener('load', () => {
+      document.querySelectorAll('nav a').forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.startsWith('#')) {
+          const id = href.substring(1);
+          if (!document.getElementById(id)) {
+            console.warn(`Navigation link points to missing section: ${href}`);
+            link.style.textDecoration = 'line-through';
+            link.title = 'Target section not found';
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style single‑page website prototype for Iowa, featuring a consistent navigation bar, responsive layout, and polished visual design.">
+  <title>Iowa – Apple‑style Site</title>
+  <style>
+    :root{
+      --color-bg:#f5f5f7;
+      --color-surface:#ffffff;
+      --color-primary:#007aff;
+      --color-primary-dark:#0051a2;
+      --color-primary-light:#66b2ff;
+      --color-text-primary:#1d1d1f;
+      --color-text-secondary:#6e6e73;
+      --color-muted:#d2d2d7;
+      --spacing-unit:1rem;
+      --font-heading:"Helvetica Neue",Helvetica,Arial,sans-serif;
+      --font-body:Arial,Helvetica,sans-serif;
+    }
+    *, *::before, *::after { box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--font-body);
+      background:var(--color-bg);
+      color:var(--color-text-primary);
+      line-height:1.6;
+    }
+    header{
+      background:var(--color-surface);
+      border-bottom:1px solid var(--color-muted);
+    }
+    nav{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0.5rem 1rem;
+      flex-wrap:wrap;
+      gap:var(--spacing-unit);
+    }
+    .logo img{
+      height:40px;
+    }
+    nav ul{
+      list-style:none;
+      display:flex;
+      gap:1.5rem;
+      margin:0;
+      padding:0;
+    }
+    nav a{
+      text-decoration:none;
+      color:var(--color-text-primary);
+      font-weight:500;
+      padding:0.25rem 0;
+    }
+    nav a:hover,
+    nav a:focus{
+      color:var(--color-primary);
+    }
+    nav a:focus{
+      outline:2px solid var(--color-primary);
+      outline-offset:2px;
+    }
+    nav a.active{
+      color:var(--color-primary);
+      border-bottom:2px solid var(--color-primary);
+    }
+    main{
+      padding:var(--spacing-unit);
+    }
+    section{
+      max-width:800px;
+      margin:var(--spacing-unit) auto;
+      background:var(--color-surface);
+      padding:calc(var(--spacing-unit)*2);
+      border-radius:8px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1,h2{
+      font-family:var(--font-heading);
+      color:var(--color-primary);
+      margin-top:0;
+    }
+    h1{font-size:2.5rem;}
+    h2{font-size:2rem;margin-bottom:0.5rem;}
+    .feature-cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:var(--spacing-unit);
+    }
+    .card{
+      background:var(--color-bg);
+      padding:var(--spacing-unit);
+      border-radius:6px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    }
+    .pricing-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:var(--spacing-unit);
+    }
+    .pricing-table th,
+    .pricing-table td{
+      border:1px solid var(--color-muted);
+      padding:var(--spacing-unit);
+      text-align:center;
+    }
+    .pricing-table th{
+      background:var(--color-primary);
+      color:#fff;
+    }
+    form{
+      display:flex;
+      flex-direction:column;
+    }
+    form label{
+      margin-top:0.5rem;
+    }
+    input, textarea{
+      width:100%;
+      padding:0.5rem;
+      margin-top:0.25rem;
+      margin-bottom:0.5rem;
+      border:1px solid var(--color-muted);
+      border-radius:4px;
+      font-family:inherit;
+    }
+    button{
+      background:var(--color-primary);
+      color:#fff;
+      border:none;
+      padding:0.75rem 1.5rem;
+      border-radius:4px;
+      font-size:1rem;
+      cursor:pointer;
+      margin-top:0.5rem;
+    }
+    button:hover{
+      background:var(--color-primary-dark);
+    }
+    footer{
+      background:var(--color-surface);
+      border-top:1px solid var(--color-muted);
+      padding:1rem 0;
+      font-size:0.875rem;
+    }
+    footer .container{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:0 1rem;
+    }
+    footer .social a{
+      margin-left:0.5rem;
+    }
+    footer .social img{
+      height:24px;
+      width:24px;
+    }
+    /* Responsive */
+    @media (max-width:600px){
+      nav{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      nav ul{
+        flex-direction:column;
+        gap:0.5rem;
+      }
+      footer .container{
+        flex-direction:column;
+        gap:0.5rem;
+        text-align:center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <header>
+    <nav aria-label="Main navigation">
+      <div class="logo">
+        <img src="https://picsum.photos/seed/logo/40/40" alt="Iowa logo placeholder">
+      </div>
+      <ul>
+        <li><a href="#home" class="active">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home Section -->
+    <section id="home" aria-labelledby="home-title">
+      <h1 id="home-title">Welcome to Iowa</h1>
+      <p>Experience an Apple‑inspired design with clean typography, subtle colors, and intuitive UI.</p>
+      <img src="https://picsum.photos/seed/home/800/400" alt="Scenic view representing Iowa" style="width:100%;border-radius:8px;margin-top:var(--spacing-unit);">
+    </section>
+
+    <!-- About Section -->
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">About Iowa</h2>
+      <p>Iowa is a conceptual project showcasing how Apple‑style design principles can be applied to web experiences.</p>
+      <p>Our mission is to blend simplicity with elegance, delivering a seamless user journey.</p>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <div class="feature-cards">
+        <div class="card">
+          <h3>Clean Layout</h3>
+          <p>Responsive grid system with generous whitespace.</p>
+        </div>
+        <div class="card">
+          <h3>Typography</h3>
+          <p>Apple‑like fonts and hierarchy for readability.</p>
+        </div>
+        <div class="card">
+          <h3>Color Palette</h3>
+          <p>Subtle, muted tones with a vibrant primary accent.</p>
+        </div>
+        <div class="card">
+          <h3>Accessibility</h3>
+          <p>ARIA labels and high contrast for inclusive design.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" aria-labelledby="pricing-title">
+      <h2 id="pricing-title">Pricing</h2>
+      <table class="pricing-table" aria-label="Pricing plans">
+        <thead>
+          <tr>
+            <th>Plan</th>
+            <th>Price</th>
+            <th>Features</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Basic</td>
+            <td>Free</td>
+            <td>Core components, community support</td>
+          </tr>
+          <tr>
+            <td>Pro</td>
+            <td>$9/mo</td>
+            <td>Advanced UI, priority support</td>
+          </tr>
+          <tr>
+            <td>Enterprise</td>
+            <td>Contact us</td>
+            <td>Custom solutions, dedicated account manager</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Contact Us</h2>
+      <form aria-label="Contact form">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required>
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required>
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" placeholder="Your message" required></textarea>
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer aria-label="Site footer">
+    <div class="container">
+      <div>&copy; 2024 Iowa. All rights reserved.</div>
+      <div class="social">
+        <a href="#" aria-label="Twitter"><img src="https://picsum.photos/seed/twitter/24/24" alt="Twitter icon"></a>
+        <a href="#" aria-label="Facebook"><img src="https://picsum.photos/seed/facebook/24/24" alt="Facebook icon"></a>
+        <a href="#" aria-label="Instagram"><img src="https://picsum.photos/seed/instagram/24/24" alt="Instagram icon"></a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Design Tokens (from step_1) -->
+  <script type="application/json" id="site-data">
+  {
+    "pages": [
+      {"title":"Home","placeholderCopy":"Welcome to Iowa, your Apple‑style experience."},
+      {"title":"About","placeholderCopy":"Learn about Iowa’s mission and vision."},
+      {"title":"Features","placeholderCopy":"Discover the key features of Iowa."},
+      {"title":"Pricing","placeholderCopy":"Explore pricing plans and options."},
+      {"title":"Contact","placeholderCopy":"Get in touch with us."}
+    ],
+    "designTokens": {
+      "colorBg":"#f5f5f7",
+      "colorSurface":"#ffffff",
+      "colorPrimary":"#007aff",
+      "colorPrimaryDark":"#0051a2",
+      "colorPrimaryLight":"#66b2ff",
+      "colorTextPrimary":"#1d1d1f",
+      "colorTextSecondary":"#6e6e73",
+      "colorMuted":"#d2d2d7"
+    }
+  }
+  </script>
+  <script>
+    // Populate design token display (optional)
+    const data = JSON.parse(document.getElementById('site-data').textContent);
+    // Example: you could render tokens somewhere if needed
+
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const targetId = this.getAttribute('href').substring(1);
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          e.preventDefault();
+          targetEl.scrollIntoView({ behavior: 'smooth' });
+          // Update active link styling
+          document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+          this.classList.add('active');
+        }
+      });
+    });
+
+    // Basic link validation on load
+    window.addEventListener('load', () => {
+      document.querySelectorAll('nav a').forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.startsWith('#')) {
+          const id = href.substring(1);
+          if (!document.getElementById(id)) {
+            console.warn(`Navigation link points to missing section: ${href}`);
+            link.style.textDecoration = 'line-through';
+            link.title = 'Target section not found';
+          }
+        }
+      });
+
+      // Accessibility audit: check for missing alt attributes
+      document.querySelectorAll('img').forEach(img => {
+        if (!img.hasAttribute('alt') || img.getAttribute('alt').trim() === '') {
+          console.warn('Image missing alt attribute:', img);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Navigation Bar</title>\n<style>\n:root{\n  --color-bg:#f5f5f7;\n  --color-surface:#ffffff;\n  --color-primary:#007aff;\n  --color-primary-dark:#0051a2;\n  --color-primary-light:#66b2ff;\n  --color-text-primary:#1d1d1f;\n  --color-muted:#d2d2d7;\n}\nbody{\n  margin:0;\n  font-family:Arial,Helvetica,sans-serif;\n  background:var(--color-bg);\n}\na{\n  text-decoration:none;\n  color:var(--color-text-primary);\n}\na:focus{\n  outline:2px solid var(--color-primary);\n  outline-offset:2px;\n}\nnav{\n  background:var(--color-surface);\n  border-bottom:1px solid var(--color-muted);\n}\nnav .container{\n  max-width:1200px;\n  margin:0 auto;\n  display:flex;\n  align-items:center;\n  justify-content:space-between;\n  padding:0.5rem 1rem;\n}\nnav ul{\n  list-style:none;\n  display:flex;\n  gap:1.5rem;\n  margin:0;\n  padding:0;\n}\nnav li{\n  display:flex;\n  align-items:center;\n}\nnav li svg{\n  width:20px;\n  height:20px;\n  margin-right:0.4rem;\n  fill:currentColor;\n}\nnav a{\n  font-weight:500;\n  padding:0.25rem 0;\n}\nnav a:hover,\nnav a:focus{\n  color:var(--color-primary);\n}\nnav a.active{\n  color:var(--color-primary);\n  border-bottom:2px solid var(--color-primary);\n}\n.skip-link{\n  position:absolute;\n  left:-999px;\n  top:auto;\n  width:1px;\n  height:1px;\n  overflow:hidden;\n}\n.skip-link:focus{\n  position:static;\n  width:auto;\n  height:auto;\n  margin:0.5rem;\n  background:#fff;\n  color:#000;\n  padding:0.5rem;\n  z-index:1000;\n}\n</style>\n</head>\n<body>\n<a href=\"#main-content\" class=\"skip-link\">Skip to content</a>\n<nav role=\"navigation\" aria-label=\"Main navigation\">\n  <div class=\"container\">\n    <div class=\"logo\">\n      <!-- placeholder logo -->\n      <svg aria-hidden=\"true\" viewBox=\"0 0 100 20\"><text x=\"0\" y=\"15\" font-size=\"15\" fill=\"var(--color-primary)\">Iowa</text></svg>\n    </div>\n    <ul>\n      <li><a href=\"#home\" class=\"active\"><svg viewBox=\"0 0 24 24\"><path d=\"M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z\"/></svg>Home</a></li>\n      <li><a href=\"#about\"><svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\"/></svg>About</a></li>\n      <li><a href=\"#features\"><svg viewBox=\"0 0 24 24\"><path d=\"M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 8h14v-2H7v2zm0-4h14v-2H7v2zm0-6v2h14V7H7z\"/></svg>Features</a></li>\n      <li><a href=\"#pricing\"><svg viewBox=\"0 0 24 24\"><path d=\"M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z\"/></svg>Pricing</a></li>\n      <li><a href=\"#contact\"><svg viewBox=\"0 0 24 24\"><path d=\"M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z\"/></svg>Contact</a></li>\n    </ul>\n  </div>\n</nav>\n<main id=\"main-content\">\n  <!-- Page content placeholder -->\n</main>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Footer Component</title>
+  <style>
+    :root{
+      --color-bg:#f5f5f7;
+      --color-surface:#ffffff;
+      --color-primary:#007aff;
+      --color-muted:#d2d2d7;
+      --color-text-primary:#1d1d1f;
+    }
+    footer{
+      background:var(--color-surface);
+      border-top:1px solid var(--color-muted);
+      padding:1rem 0;
+      font-size:0.875rem;
+      color:var(--color-text-primary);
+    }
+    footer .container{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:1rem;
+      padding:0 1rem;
+    }
+    footer .sitemap{
+      display:flex;
+      flex-wrap:wrap;
+      gap:1rem;
+      list-style:none;
+      margin:0;
+      padding:0;
+    }
+    footer .sitemap a{
+      color:var(--color-text-primary);
+      text-decoration:none;
+    }
+    footer .sitemap a:hover,
+    footer .sitemap a:focus{
+      color:var(--color-primary);
+    }
+    footer .social{
+      display:flex;
+      gap:0.5rem;
+    }
+    footer .social a{
+      display:inline-block;
+      width:24px;
+      height:24px;
+      color:var(--color-text-primary);
+    }
+    footer .social a:hover,
+    footer .social a:focus{
+      color:var(--color-primary);
+    }
+    svg{
+      width:100%;
+      height:100%;
+      fill:currentColor;
+    }
+  </style>
+</head>
+<body>
+  <footer role="contentinfo" aria-label="Site footer">
+    <div class="container">
+      <div>&copy; 2024 Iowa. All rights reserved.</div>
+      <ul class="sitemap">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+      <div class="social">
+        <a href="#" aria-label="Twitter">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.46 6c-.77.35-1.6.58-2.46.69a4.3 4.3 0 001.88-2.37 8.59 8.59 0 01-2.73 1.04 4.28 4.28 0 00-7.3 3.9A12.14 12.14 0 013 4.79a4.28 4.28 0 001.33 5.71 4.24 4.24 0 01-1.94-.54v.05a4.28 4.28 0 003.44 4.2 4.3 4.3 0 01-1.93.07 4.28 4.28 0 003.99 2.97A8.6 8.6 0 012 19.54a12.13 12.13 0 006.56 1.92c7.88 0 12.2-6.53 12.2-12.2 0-.19-.01-.39-.02-.58A8.72 8.72 0 0024 5.5a8.5 8.5 0 01-2.54.7z"/></svg>
+        </a>
+        <a href="#" aria-label="Facebook">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 5 3.66 9.13 8.44 9.88v-6.99h-2.54v-2.89h2.54V9.41c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.23.2 2.23.2v2.45h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.44 2.89h-2.34v6.99C18.34 21.13 22 17 22 12z"/></svg>
+        </a>
+        <a href="#" aria-label="Instagram">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.58.01 4.85.07 1.17.06 1.96.24 2.42.41a4.9 4.9 0 011.78 1.03 4.9 4.9 0 011.03 1.78c.17.46.35 1.25.41 2.42.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.06 1.17-.24 1.96-.41 2.42a4.9 4.9 0 01-1.03 1.78 4.9 4.9 0 01-1.78 1.03c-.46.17-1.25.35-2.42.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.06-1.96-.24-2.42-.41a4.9 4.9 0 01-1.78-1.03 4.9 4.9 0 01-1.03-1.78c-.17-.46-.35-1.25-.41-2.42C2.21 15.58 2.2 15.2 2.2 12s.01-3.58.07-4.85c.06-1.17.24-1.96.41-2.42a4.9 4.9 0 011.03-1.78 4.9 4.9 0 011.78-1.03c.46-.17 1.25-.35 2.42-.41C8.42 2.21 8.8 2.2 12 2.2zm0-2.2C8.74 0 8.33.01 7.05.07 5.78.13 4.78.33 4 .58a7.1 7.1 0 00-2.58 1.5A7.1 7.1 0 00.58 4c-.25.78-.45 1.78-.51 3.05C0 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.27.51 3.05a7.1 7.1 0 001.5 2.58 7.1 7.1 0 002.58 1.5c.78.25 1.78.45 3.05.51C8.33 24 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.27-.26 3.05-.51a7.1 7.1 0 002.58-1.5 7.1 7.1 0 001.5-2.58c.25-.78.45-1.78.51-3.05.06-1.28.07
+
+**index.html** (Home page)
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Home – Apple‑style landing page for Iowa">
+  <title>Iowa – Home</title>
+  <style>
+    :root{
+      --color-bg:#f5f5f7;
+      --color-surface:#ffffff;
+      --color-primary:#007aff;
+      --color-primary-dark:#0051a2;
+      --color-primary-light:#66b2ff;
+      --color-text-primary:#1d1d1f;
+      --color-text-secondary:#6e6e73;
+      --color-muted:#d2d2d7;
+      --spacing-unit:1rem;
+      --font-heading:"Helvetica Neue",Helvetica,Arial,sans-serif;
+      --font-body:Arial,Helvetica,sans-serif;
+    }
+    *, *::before, *::after { box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--font-body);
+      background:var(--color-bg);
+      color:var(--color-text-primary);
+      line-height:1.6;
+    }
+    header{
+      background:var(--color-surface);
+      border-bottom:1px solid var(--color-muted);
+    }
+    nav{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0.5rem 1rem;
+      flex-wrap:wrap;
+      gap:var(--spacing-unit);
+    }
+    .logo img{
+      height:40px;
+    }
+    nav ul{
+      list-style:none;
+      display:flex;
+      gap:1.5rem;
+      margin:0;
+      padding:0;
+    }
+    nav a{
+      text-decoration:none;
+      color:var(--color-text-primary);
+      font-weight:500;
+      padding:0.25rem 0;
+    }
+    nav a:hover,
+    nav a:focus{
+      color:var(--color-primary);
+    }
+    nav a.active{
+      color:var(--color-primary);
+      border-bottom:2px solid var(--color-primary);
+    }
+    main{
+      padding:var(--spacing-unit);
+    }
+    section{
+      max-width:800px;
+      margin:var(--spacing-unit) auto;
+      background:var(--color-surface);
+      padding:calc(var(--spacing-unit)*2);
+      border-radius:8px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1,h2{
+      font-family:var(--font-heading);
+      color:var(--color-primary);
+      margin-top:0;
+    }
+    h1{font-size:2.5rem;}
+    h2{font-size:2rem;margin-bottom:0.5rem;}
+    .feature-cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:var(--spacing-unit);
+    }
+    .card{
+      background:var(--color-bg);
+      padding:var(--spacing-unit);
+      border-radius:6px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    }
+    .pricing-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:var(--spacing-unit);
+    }
+    .pricing-table th,
+    .pricing-table td{
+      border:1px solid var(--color-muted);
+      padding:var(--spacing-unit);
+      text-align:center;
+    }
+    .pricing-table th{
+      background:var(--color-primary);
+      color:#fff;
+    }
+    form{
+      display:flex;
+      flex-direction:column;
+    }
+    form label{
+      margin-top:0.5rem;
+    }
+    input, textarea{
+      width:100%;
+      padding:0.5rem;
+      margin-top:0.25rem;
+      margin-bottom:0.5rem;
+      border:1px solid var(--color-muted);
+      border-radius:4px;
+      font-family:inherit;
+    }
+    button{
+      background:var(--color-primary);
+      color:#fff;
+      border:none;
+      padding:0.75rem 1.5rem;
+      border-radius:4px;
+      font-size:1rem;
+      cursor:pointer;
+      margin-top:0.5rem;
+    }
+    button:hover{
+      background:var(--color-primary-dark);
+    }
+    footer{
+      background:var(--color-surface);
+      border-top:1px solid var(--color-muted);
+      padding:1rem 0;
+      font-size:0.875rem;
+    }
+    footer .container{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:0 1rem;
+      flex-wrap:wrap;
+      gap:1rem;
+    }
+    footer .sitemap{
+      display:flex;
+      flex-wrap:wrap;
+      gap:1rem;
+      list-style:none;
+      margin:0;
+      padding:0;
+    }
+    footer .sitemap a{
+      color:var(--color-text-primary);
+      text-decoration:none;
+    }
+    footer .sitemap a:hover,
+    footer .sitemap a:focus{
+      color:var(--color-primary);
+    }
+    footer .social{
+      display:flex;
+      gap:0.5rem;
+    }
+    footer .social a{
+      display:inline-block;
+      width:24px;
+      height:24px;
+      color:var(--color-text-primary);
+    }
+    footer .social a:hover,
+    footer .social a:focus{
+      color:var(--color-primary);
+    }
+    svg{
+      width:100%;
+      height:100%;
+      fill:currentColor;
+    }
+    @media (max-width:600px){
+      nav{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      nav ul{
+        flex-direction:column;
+        gap:0.5rem;
+      }
+      footer .container{
+        flex-direction:column;
+        gap:0.5rem;
+        text-align:center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <header>
+    <nav aria-label="Main navigation">
+      <div class="logo">
+        <img src="https://picsum.photos/seed/logo/40/40" alt="Iowa logo placeholder">
+      </div>
+      <ul>
+        <li><a href="index.html" class="active">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" aria-labelledby="home-title">
+      <h1 id="home-title">Welcome to Iowa</h1>
+      <p>Experience an Apple‑inspired design with clean typography, subtle colors, and intuitive UI.</p>
+      <img src="https://picsum.photos/seed/home/800/400" alt="Scenic view representing Iowa" style="width:100%;border-radius:8px;margin-top:var(--spacing-unit);">
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer aria-label="Site footer">
+    <div class="container">
+      <div>&copy; 2024 Iowa. All rights reserved.</div>
+      <ul class="sitemap">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="features.html">Features</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+      <div class="social">
+        <a href="#" aria-label="Twitter">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.46 6c-.77.35-1.6.58-2.46.69a4.3 4.3 0 001.88-2.37 8.59 8.59 0 01-2.73 1.04 4.28 4.28 0 00-7.3 3.9A12.14 12.14 0 013 4.79a4.28 4.28 0 001.33 5.71 4.24 4.24 0 01-1.94-.54v.05a4.28 4.28 0 003.44 4.2 4.3 4.3 0 01-1.93.07 4.28 4.28 0 003.99 2.97A8.6 8.6 0 012 19.54a12.13 12.13 0 006.56 1.92c7.88 0 12.2-6.53 12.2-12.2 0-.19-.01-.39-.02-.58A8.72 8.72 0 0024 5.5a8.5 8.5 0 01-2.54.7z"/></svg>
+        </a>
+        <a href="#" aria-label="Facebook">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 5 3.66 9.13 8.44 9.88v-6.99h-2.54v-2.89h2.54V9.41c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.23.2 2.23.2v2.45h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.44 2.89h-2.34v6.99C18.34 21.13 22 17 22 12z"/></svg>
+        </a>
+        <a href="#" aria-label="Instagram">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.58.01 4.85.07 1.17.06 1.96.24 2.42.41a4.9 4.9 0 011.78 1.03 4.9 4.9 0 011.03 1.78c.17.46.35 1.25.41 2.42.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.06 1.17-.24 1.96-.41 2.42a4.9 4.9 0 01-1.03 1.78 4.9 4.9 0 01-1.78 1.03c-.46.17-1.25.35-2.42.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.06-1.96-.24-2.42-.41a4.9 4.9 0 01-1.78-1.03 4.9 4.9 0 01-1.03-1.78c-.17-.46-.35-1.25-.41-2.42C2.21 15.58 2.2 15.2 2.2 12s.01-3.58.07-4.85c.06-1.17.24-1.96.41-2.42a4.9 4.9 0 011.03-1.78 4.9 4.9 0 011.78-1.03c.46-.17 1.25-.35 2.42-.41C8.42 2.21 8.8 2.2 12 2.2z"/></svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
+```
+
+**about.html**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="About – Apple‑style page for Iowa">
+  <title>Iowa – About</title>
+  <style>
+    /* Same CSS as index.html (omitted for brevity – copy the <style> block from index.html) */
+    :root{
+      --color-bg:#f5f5f7;
+      --color-surface:#ffffff;
+      --color-primary:#007aff;
+      --color-primary-dark:#0051a2;
+      --color-primary-light:#66b2ff;
+      --color-text-primary:#1d1d1f;
+      --color-text-secondary:#6e6e73;
+      --color-muted:#d2d2d7;
+      --spacing-unit:1rem;
+      --font-heading:"Helvetica Neue",Helvetica,Arial,sans-serif;
+      --font-body:Arial,Helvetica,sans-serif;
+    }
+    *, *::before, *::after { box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--font-body);
+      background:var(--color-bg);
+      color:var(--color-text-primary);
+      line-height:1.6;
+    }
+    header{
+      background:var(--color-surface);
+      border-bottom:1px solid var(--color-muted);
+    }
+    nav{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0.5rem 1rem;
+      flex-wrap:wrap;
+      gap:var(--spacing-unit);
+    }
+    .logo img{height:40px;}
+    nav ul{
+      list-style:none;
+      display:flex;
+      gap:1.5rem;
+      margin:0;
+      padding:0;
+    }
+    nav a{
+      text-decoration:none;
+      color:var(--color-text-primary);
+      font-weight:500;
+      padding:0.25rem 0;
+    }
+    nav a:hover, nav a:focus{color:var(--color-primary);}
+    nav a.active{color:var(--color-primary);border-bottom:2px solid var(--color-primary);}
+    main{padding:var(--spacing-unit);}
+    section{
+      max-width:800px;
+      margin:var(--spacing-unit) auto;
+      background:var(--color-surface);
+      padding:calc(var(--spacing-unit)*2);
+      border-radius:8px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1,h2{
+      font-family:var
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style single‑page website prototype for Iowa, featuring a consistent navigation bar, responsive layout, and polished visual design.">
+  <title>Iowa – Apple‑style Site</title>
+  <style>
+    :root{
+      --color-bg:#f5f5f7;
+      --color-surface:#ffffff;
+      --color-primary:#007aff;
+      --color-primary-dark:#0051a2;
+      --color-primary-light:#66b2ff;
+      --color-text-primary:#1d1d1f;
+      --color-text-secondary:#6e6e73;
+      --color-muted:#d2d2d7;
+      --spacing-unit:1rem;
+      --font-heading:"Helvetica Neue",Helvetica,Arial,sans-serif;
+      --font-body:Arial,Helvetica,sans-serif;
+    }
+    *, *::before, *::after { box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--font-body);
+      background:var(--color-bg);
+      color:var(--color-text-primary);
+      line-height:1.6;
+    }
+    /* Skip link – hidden until focused */
+    .skip-link{
+      position:absolute;
+      left:-999px;
+      top:auto;
+      width:1px;
+      height:1px;
+      overflow:hidden;
+    }
+    .skip-link:focus{
+      position:static;
+      width:auto;
+      height:auto;
+      margin:0.5rem;
+      background:#fff;
+      color:#000;
+      padding:0.5rem;
+      z-index:1000;
+    }
+    header{
+      background:var(--color-surface);
+      border-bottom:1px solid var(--color-muted);
+    }
+    nav{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0.5rem 1rem;
+      flex-wrap:wrap;
+      gap:var(--spacing-unit);
+    }
+    nav[role="navigation"]{
+      /* explicit role for accessibility */
+    }
+    .logo img{
+      height:40px;
+    }
+    nav ul{
+      list-style:none;
+      display:flex;
+      gap:1.5rem;
+      margin:0;
+      padding:0;
+    }
+    nav a{
+      text-decoration:none;
+      color:var(--color-text-primary);
+      font-weight:500;
+      padding:0.25rem 0;
+    }
+    nav a:hover,
+    nav a:focus{
+      color:var(--color-primary);
+    }
+    nav a:focus{
+      outline:2px solid var(--color-primary);
+      outline-offset:2px;
+    }
+    nav a.active{
+      color:var(--color-primary);
+      border-bottom:2px solid var(--color-primary);
+    }
+    main{
+      padding:var(--spacing-unit);
+    }
+    section{
+      max-width:800px;
+      margin:var(--spacing-unit) auto;
+      background:var(--color-surface);
+      padding:calc(var(--spacing-unit)*2);
+      border-radius:8px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1,h2{
+      font-family:var(--font-heading);
+      color:var(--color-primary);
+      margin-top:0;
+    }
+    h1{font-size:2.5rem;}
+    h2{font-size:2rem;margin-bottom:0.5rem;}
+    .feature-cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:var(--spacing-unit);
+    }
+    .card{
+      background:var(--color-bg);
+      padding:var(--spacing-unit);
+      border-radius:6px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    }
+    .pricing-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:var(--spacing-unit);
+    }
+    .pricing-table th,
+    .pricing-table td{
+      border:1px solid var(--color-muted);
+      padding:var(--spacing-unit);
+      text-align:center;
+    }
+    .pricing-table th{
+      background:var(--color-primary);
+      color:#fff;
+    }
+    form{
+      display:flex;
+      flex-direction:column;
+    }
+    form label{
+      margin-top:0.5rem;
+    }
+    input, textarea{
+      width:100%;
+      padding:0.5rem;
+      margin-top:0.25rem;
+      margin-bottom:0.5rem;
+      border:1px solid var(--color-muted);
+      border-radius:4px;
+      font-family:inherit;
+    }
+    input:focus,
+    textarea:focus{
+      outline:2px solid var(--color-primary);
+      outline-offset:2px;
+    }
+    button{
+      background:var(--color-primary);
+      color:#fff;
+      border:none;
+      padding:0.75rem 1.5rem;
+      border-radius:4px;
+      font-size:1rem;
+      cursor:pointer;
+      margin-top:0.5rem;
+    }
+    button:hover{
+      background:var(--color-primary-dark);
+    }
+    button:focus{
+      outline:2px solid var(--color-primary);
+      outline-offset:2px;
+    }
+    footer{
+      background:var(--color-surface);
+      border-top:1px solid var(--color-muted);
+      padding:1rem 0;
+      font-size:0.875rem;
+    }
+    footer .container{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:0 1rem;
+    }
+    footer .social a{
+      margin-left:0.5rem;
+    }
+    footer .social img{
+      height:24px;
+      width:24px;
+    }
+    /* Responsive */
+    @media (max-width:600px){
+      nav{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      nav ul{
+        flex-direction:column;
+        gap:0.5rem;
+      }
+      footer .container{
+        flex-direction:column;
+        gap:0.5rem;
+        text-align:center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Skip link for keyboard users -->
+  <a href="#main-content" class="skip-link">Skip to content</a>
+
+  <!-- Navigation Bar -->
+  <header>
+    <nav aria-label="Main navigation" role="navigation">
+      <div class="logo">
+        <img src="https://picsum.photos/seed/logo/40/40" alt="Iowa logo placeholder">
+      </div>
+      <ul>
+        <li><a href="#home" class="active">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <!-- Home Section -->
+    <section id="home" aria-labelledby="home-title">
+      <h1 id="home-title">Welcome to Iowa</h1>
+      <p>Experience an Apple‑inspired design with clean typography, subtle colors, and intuitive UI.</p>
+      <img src="https://picsum.photos/seed/home/800/400" alt="Scenic view representing Iowa" style="width:100%;border-radius:8px;margin-top:var(--spacing-unit);">
+    </section>
+
+    <!-- About Section -->
+    <section id="about" aria-labelledby="about-title">
+      <h2 id="about-title">About Iowa</h2>
+      <p>Iowa is a conceptual project showcasing how Apple‑style design principles can be applied to web experiences.</p>
+      <p>Our mission is to blend simplicity with elegance, delivering a seamless user journey.</p>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <div class="feature-cards">
+        <div class="card">
+          <h3>Clean Layout</h3>
+          <p>Responsive grid system with generous whitespace.</p>
+        </div>
+        <div class="card">
+          <h3>Typography</h3>
+          <p>Apple‑like fonts and hierarchy for readability.</p>
+        </div>
+        <div class="card">
+          <h3>Color Palette</h3>
+          <p>Subtle, muted tones with a vibrant primary accent.</p>
+        </div>
+        <div class="card">
+          <h3>Accessibility</h3>
+          <p>ARIA labels and high contrast for inclusive design.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" aria-labelledby="pricing-title">
+      <h2 id="pricing-title">Pricing</h2>
+      <table class="pricing-table" aria-label="Pricing plans">
+        <thead>
+          <tr>
+            <th>Plan</th>
+            <th>Price</th>
+            <th>Features</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Basic</td>
+            <td>Free</td>
+            <td>Core components, community support</td>
+          </tr>
+          <tr>
+            <td>Pro</td>
+            <td>$9/mo</td>
+            <td>Advanced UI, priority support</td>
+          </tr>
+          <tr>
+            <td>Enterprise</td>
+            <td>Contact us</td>
+            <td>Custom solutions, dedicated account manager</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Contact Us</h2>
+      <form aria-label="Contact form">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required>
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required>
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" placeholder="Your message" required></textarea>
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer aria-label="Site footer">
+    <div class="container">
+      <div>&copy; 2024 Iowa. All rights reserved.</div>
+      <div class="social">
+        <a href="#" aria-label="Twitter"><img src="https://picsum.photos/seed/twitter/24/24" alt="Twitter icon"></a>
+        <a href="#" aria-label="Facebook"><img src="https://picsum.photos/seed/facebook/24/24" alt="Facebook icon"></a>
+        <a href="#" aria-label="Instagram"><img src="https://picsum.photos/seed/instagram/24/24" alt="Instagram icon"></a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Design Tokens (from step_1) – retained for reference only -->
+  <script type="application/json" id="site-data">
+  {
+    "pages": [
+      {"title":"Home","placeholderCopy":"Welcome to Iowa, your Apple‑style experience."},
+      {"title":"About","placeholderCopy":"Learn about Iowa’s mission and vision."},
+      {"title":"Features","placeholderCopy":"Discover the key features of Iowa."},
+      {"title":"Pricing","placeholderCopy":"Explore pricing plans and options."},
+      {"title":"Contact","placeholderCopy":"Get in touch with us."}
+    ],
+    "designTokens": {
+      "colorBg":"#f5f5f7",
+      "colorSurface":"#ffffff",
+      "colorPrimary":"#007aff",
+      "colorPrimaryDark":"#0051a2",
+      "colorPrimaryLight":"#66b2ff",
+      "colorTextPrimary":"#1d1d1f",
+      "colorTextSecondary":"#6e6e73",
+      "colorMuted":"#d2d2d7"
+    }
+  }
+  </script>
+  <script>
+    // Smooth scrolling for anchor links and active state handling
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const targetId = this.getAttribute('href').substring(1);
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          e.preventDefault();
+          targetEl.scrollIntoView({ behavior: 'smooth' });
+          // Update active link styling
+          document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+          this.classList.add('active');
+        }
+      });
+    });
+
+    // Basic link validation on load – now just logs to console (no visual strike‑through)
+    window.addEventListener('load', () => {
+      document.querySelectorAll('nav a').forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.startsWith('#')) {
+          const id = href.substring(1);
+          if (!document.getElementById(id)) {
+            console.warn(`Navigation link points to missing section: ${href}`);
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa Site – Preview Instructions</title>\n<style>\n  body {font-family: Arial, Helvetica, sans-serif; margin: 2rem; line-height: 1.6;}\n  a {color: #007aff;}\n  pre {background: #f5f5f5; padding: 1rem; overflow-x: auto;}\n  code {font-family: monospace; background: #eaeaea; padding: 0.2rem 0.4rem; border-radius: 3px;}\n</style>\n</head>\n<body>\n<h1>Preview Iowa Site</h1>\n<p>To preview the Iowa website in the sandbox environment, you have two options:</p>\n<ol>\n  <li>Open any of the HTML files (e.g., <code>home.html</code>, <code>about.html</code>, <code>features.html</code>, <code>pricing.html</code>, <code>contact.html</code>) directly in your browser.</li>\n  <li>Drag the entire folder containing the site files into the sandbox iframe. The sandbox will automatically serve the files.</li>\n</ol>\n<p>A convenience <code>index.html</code> is provided that redirects to the Home page:</p>\n<pre><code>&lt;!DOCTYPE html&gt;\n&lt;html&gt;\n&lt;head&gt;\n  &lt;meta http-equiv=\"refresh\" content=\"0; url=home.html\"&gt;\n  &lt;title&gt;Iowa Site&lt;/title&gt;\n&lt;/head&gt;\n&lt;body&gt;\n  Redirecting to &lt;a href=\"home.html\"&gt;Home&lt;/a&gt;...\n&lt;/body&gt;\n&lt;/html&gt;\n</code></pre>\n<p>All site files (the five HTML pages, any assets, and this README) are packaged in <code>iowa-site.zip</code>. Use the one‑click preview link below to load the archive in the sandbox:</p>\n<p><a href=\"sandbox://preview?files=iowa-site.zip\">▶ Preview Iowa Site in Sandbox</a></p>\n</body>\n</html>

@@ -4,12 +4,41 @@ import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, runAidenQua
 import { fileWorkOrderOutput } from "./workspace-filing";
 import { pocketflowExecute } from "./pocketflow";
 import { getAvailableToolsForAgent } from "./tool-executor";
+import { autoImportSkillsForDescription } from "./skill-auto-import";
 import {
   selectProjectManager, resolvePmLlmConfig,
   pmReviewStepOutput, pmRequestStepRevision,
   pmAssembleWorkProduct, pmEscalateToAiden, aidenExecutiveReview,
   type PmReviewResult,
 } from "./workflow-pm";
+
+// ─── GCC Authority Model ──────────────────────────────────────────────────────
+// Per AIDEN IWO Tier 1 spec (AIDEN_IWOv0.1.0.md):
+//
+//   Command | Tier 1            | Tier 2
+//   --------|-------------------|--------------------
+//   CONTEXT | Full access       | Read-only
+//   COMMIT  | Full access       | Own branch only
+//   BRANCH  | Create + approve  | Propose only
+//   MERGE   | EXCLUSIVE         | DENIED (hard fail)
+//
+// P0-C: B+ Hardening — deny-by-default for Tier 2 authority violations.
+// Full BRANCH/MERGE implementation: Phase P2.
+
+export type GccCommand = "CONTEXT" | "COMMIT" | "BRANCH" | "MERGE";
+export type GccTier = "tier1" | "tier1.5" | "tier2";
+
+export function validateGccCommand(command: GccCommand, tier: GccTier): void {
+  if (command === "MERGE" && tier !== "tier1") {
+    throw new Error(
+      `[GCC] AUTHORITY VIOLATION: ${tier} attempted MERGE — DENIED. MERGE is exclusive to Tier 1. Escalating to HITL.`
+    );
+  }
+  if (command === "BRANCH" && tier === "tier2") {
+    // Tier 2 may only propose a branch, never execute one. Downgrade + warn.
+    console.warn("[GCC] Tier 2 BRANCH attempt downgraded to proposal — Tier 1 approval required before execution.");
+  }
+}
 
 function updateWorkOrderGcc(
   existing: object | null | undefined,
@@ -248,13 +277,18 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     metadata: { llmSource, llmModel: effectiveLlmConfig?.model, llmProvider: effectiveLlmConfig?.provider, subAgentName: targetSubAgent?.name },
   });
 
+  // P0-C: Validate GCC authority before dispatching to Tier 2.
+  // Tier 2 execution is permitted to COMMIT to its own branch only.
+  // Any MERGE attempt from Tier 2 is a hard fail → HITL escalation.
+  validateGccCommand("COMMIT", "tier2");
+
   const orderWithAgent = { ...order, assignedSubAgentId: targetSubAgent?.id || null };
-  const tier2Result: Tier2Result = await pocketflowExecute(
+  let tier2Result: Tier2Result = await pocketflowExecute(
     orderWithAgent,
     tier1Result,
     effectiveLlmConfig,
     settings || null,
-    { maxIterations: 3, convergenceThreshold: 0.8 }
+    { maxIterations: 9, convergenceThreshold: 0.75 }
   );
 
   if (tier2Result.blocked) {
@@ -324,7 +358,8 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       iterations,
       stepCount,
       executorLabel,
-      hadSearchTools
+      hadSearchTools,
+      tier2Result.output?.postProcessedFile ?? null
     );
 
     await storage.createExecutionLog({
@@ -378,7 +413,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
 
   if (qualityReview.recommendation === "request_revision" && !qualityReview.approved) {
     const controlMode = targetSubAgent?.controlMode || "aiden";
-    const maxAutoRevisions = 2;
+    const maxAutoRevisions = 4;
     const baseRevisionCount = ((order.gccMemory as any)?.["gcc.metadata"]?.revisionAttempts || 0);
     const canAutoRevise = controlMode === "aiden" && baseRevisionCount < maxAutoRevisions && hasLlm;
 
@@ -433,7 +468,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
           revisedTier1,
           effectiveLlmConfig,
           settings || null,
-          { maxIterations: 3, convergenceThreshold: 0.8, revisionContext }
+          { maxIterations: 9, convergenceThreshold: 0.75, revisionContext }
         );
 
         await storage.createExecutionLog({
@@ -955,6 +990,15 @@ export async function advanceWorkflowExecution(executionId: string) {
       stepResult = await executeWorkflowStep(stepDef, previousResults, execution.goal || "", toolNames, useLLM, settings);
     }
 
+    // Check for "Tool Needed" signal BEFORE marking step complete
+    const opSettingsForTN = await storage.getOperationalSettings();
+    const platformMode = opSettingsForTN?.currentMode || "semi_autonomous";
+    const toolNeededResult = await handleToolNeededSignal(
+      stepResult.output, stepDef, platformMode, execution, nextStepRun, executionId
+    );
+    if (toolNeededResult?.hitlBlocked) return storage.getWorkflowExecution(executionId);
+    if (toolNeededResult?.retryQueued) return advanceWorkflowExecution(executionId);
+
     await storage.updateWorkflowStepRun(nextStepRun.id, {
       status: "completed", completedAt: new Date(),
       output: stepResult.output,
@@ -1130,8 +1174,97 @@ async function findSubAgentForStep(step: WorkflowStep): Promise<SubAgent | undef
   return activeAgents[0];
 }
 
+/**
+ * handleToolNeededSignal
+ * Detects a "Tool Needed" request block in a step's output (emitted by Mark and other
+ * CODEX-governed sub-agents) and takes the appropriate action based on platform execution mode:
+ *   manual        → surface HITL block, return { hitlBlocked: true }
+ *   semi_autonomous | autonomous → auto-provision matching skill, re-queue step, return { retryQueued: true }
+ * Returns null if no Tool Needed signal was detected.
+ */
+async function handleToolNeededSignal(
+  output: any,
+  stepDef: WorkflowStep,
+  mode: string,
+  execution: any,
+  stepRun: WorkflowStepRun,
+  executionId: string,
+): Promise<{ retryQueued: boolean; hitlBlocked: boolean } | null> {
+  const outputStr = typeof output === "string" ? output : JSON.stringify(output || "");
+
+  // Detect Mark's Tool Needed output block (supports bold markdown or plain text)
+  const toolNeededMatch =
+    outputStr.match(/\*\*Tool Needed\*\*\s*:\s*([^\n]+)/i) ||
+    outputStr.match(/Tool Needed\s*:\s*([^\n]+)/i);
+
+  if (!toolNeededMatch) return null;
+
+  const toolName = toolNeededMatch[1].trim().replace(/^\[|\]$/g, "");
+  console.log(`[Tool Needed] Signal detected: "${toolName}" in step "${stepDef.name}". Platform mode: ${mode}`);
+
+  if (mode === "manual") {
+    // Manual mode: surface as HITL block — operator must provision tool
+    await storage.updateWorkflowStepRun(stepRun.id, { status: "awaiting_operator" });
+    await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
+    if (execution.workOrderId) {
+      await storage.updateWorkOrder(execution.workOrderId, { status: "awaiting_operator" });
+      await storage.createExecutionLog({
+        workOrderId: execution.workOrderId, tier: 1,
+        action: "HITL: Tool Needed",
+        message: `Step "${stepDef.name}" signaled Tool Needed: "${toolName}". Manual mode — awaiting operator to provision tool.`,
+        metadata: { stepKey: stepDef.stepKey, toolNeeded: toolName, mode },
+      });
+    }
+    return { retryQueued: false, hitlBlocked: true };
+  }
+
+  // Semi-autonomous / Autonomous: auto-provision from skill catalog
+  const importedIds = await autoImportSkillsForDescription(toolName, toolName);
+  if (importedIds.length === 0) {
+    console.warn(`[Tool Needed] No matching skill found for: "${toolName}" — proceeding without auto-provision.`);
+    return null;
+  }
+
+  // Merge new tool IDs into the step definition for this and future runs
+  const existingToolIds = Array.from(stepDef.toolIds as string[] || []);
+  const mergedIds = Array.from(new Set([...existingToolIds, ...importedIds]));
+  await storage.updateWorkflowStep(stepDef.id, { toolIds: mergedIds });
+
+  if (execution.workOrderId) {
+    await storage.createExecutionLog({
+      workOrderId: execution.workOrderId, tier: 1,
+      action: "Auto-Provisioned Tool",
+      message: `Step "${stepDef.name}" requested tool "${toolName}" — auto-provisioned ${importedIds.length} skill(s) in ${mode} mode. Re-queuing step for retry.`,
+      metadata: { stepKey: stepDef.stepKey, toolNeeded: toolName, importedIds, mode },
+    });
+  }
+
+  // Re-queue step for retry with new tools in context
+  await storage.updateWorkflowStepRun(stepRun.id, {
+    status: "pending",
+    completedAt: null,
+    startedAt: null,
+    output: null,
+  });
+
+  return { retryQueued: true, hitlBlocked: false };
+}
+
 async function getToolsForStep(step: WorkflowStep, subAgentId: string | null) {
-  const stepToolIds = (step.toolIds as string[]) || [];
+  // Read platform execution mode — auto-import only in semi_autonomous or autonomous mode
+  const opSettings = await storage.getOperationalSettings();
+  const execMode = opSettings?.currentMode || "semi_autonomous";
+
+  let autoToolIds: string[] = [];
+  if (execMode !== "manual") {
+    // Auto-import any skills that match this step's description (no-op if already imported)
+    autoToolIds = await autoImportSkillsForDescription(step.description || "", step.name);
+  } else {
+    console.log(`[getToolsForStep] Manual mode — skipping skill auto-import for step "${step.name}". Sub-agent must request tools explicitly.`);
+  }
+
+  const rawIds = (step.toolIds as string[] || []).concat(autoToolIds);
+  const stepToolIds = rawIds.filter((id, idx) => rawIds.indexOf(id) === idx);
   const allTools = await storage.getTools();
   const stepTools = allTools.filter((t) => stepToolIds.includes(t.id));
 

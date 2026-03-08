@@ -1,12 +1,42 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Layers, Shield, Zap, GitBranch, Bot, ArrowRight } from "lucide-react";
+import { Layers, Shield, Zap, GitBranch, Bot, ArrowRight, LogIn, Loader2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 
 export default function LandingPage() {
   const [loginPending, setLoginPending] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        window.location.reload();
+      } else {
+        setLoginError(data.message || "Login failed");
+      }
+    } catch {
+      setLoginError("Connection error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!loginPending) return;
@@ -40,7 +70,7 @@ export default function LandingPage() {
               <Layers className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-tight">AIDEN_IWO | FF.AI</span>
+              <span className="text-sm font-semibold tracking-tight">AIDEN_IWO2 | FF.AI</span>
               <span className="text-[10px] text-muted-foreground">Orchestration Engine</span>
             </div>
           </div>
@@ -62,10 +92,38 @@ export default function LandingPage() {
             <p className="text-lg text-muted-foreground max-w-lg">
               Aiden is your AI-powered Tier 1 manager. It evaluates policy, routes work orders to specialized sub-agents, and orchestrates multi-step workflows — autonomously.
             </p>
-            <div className="flex gap-4">
-              <Button size="lg" asChild data-testid="button-login-hero" onClick={() => setLoginPending(true)}>
+            <div className="space-y-4">
+              <form onSubmit={handlePasswordLogin} className="flex flex-col gap-2 max-w-sm">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  data-testid="input-login-email"
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  data-testid="input-login-password"
+                />
+                {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+                <Button type="submit" disabled={isSubmitting} data-testid="button-login-submit">
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
+                  Sign In
+                </Button>
+              </form>
+              <div className="flex items-center gap-3 max-w-sm">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <Button size="lg" variant="outline" asChild data-testid="button-login-hero" onClick={() => setLoginPending(true)}>
                 <a href="/api/login" target="_blank" rel="noopener noreferrer">
-                  {loginPending ? "Waiting for login…" : "Get Started"}
+                  {loginPending ? "Waiting for login…" : "Quick Login (Local Dev)"}
                   {!loginPending && <ArrowRight className="w-4 h-4 ml-2" />}
                 </a>
               </Button>
@@ -154,7 +212,7 @@ export default function LandingPage() {
 
       <footer className="py-8 px-6 border-t border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground space-y-1">
-          <p>AIDEN_IWO v0.7.2 — Intelligent Work Orchestration</p>
+          <p>AIDEN_IWO2 v0.8.0 — Intelligent Work Orchestration</p>
           <p className="text-xs">Lead Developer &amp; Principal Technical Architect: Darrel Vaughn | LuaAzullaB</p>
           <a href="/attributions" className="inline-block mt-2 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors" data-testid="link-attributions-landing">
             Attributions &amp; Licenses

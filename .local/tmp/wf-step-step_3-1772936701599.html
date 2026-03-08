@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Tokens</title>
+  <style>
+    :root {
+      /* Colors */
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #d2d2d7;
+      --color-border: #c6c6c8;
+
+      /* Spacing */
+      --spacing-xxs: 4px;
+      --spacing-xs: 8px;
+      --spacing-sm: 12px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-xxl: 48px;
+
+      /* Typography */
+      --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-family-serif: Georgia, Times, "Times New Roman", serif;
+      --font-size-xs: 0.75rem;   /* 12px */
+      --font-size-sm: 0.875rem;  /* 14px */
+      --font-size-base: 1rem;    /* 16px */
+      --font-size-lg: 1.125rem;  /* 18px */
+      --font-size-xl: 1.25rem;   /* 20px */
+      --font-size-2xl: 1.5rem;   /* 24px */
+      --font-size-3xl: 1.875rem; /* 30px */
+      --font-size-4xl: 2.25rem;  /* 36px */
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 700;
+      --line-height-base: 1.5;
+    }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-family-sans);
+      margin: 0;
+      padding: var(--spacing-md);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--color-text-primary);
+      margin-top: var(--spacing-lg);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    p {
+      margin-bottom: var(--spacing-sm);
+    }
+  </style>
+</head>
+<body>
+  <h1>Design Tokens</h1>
+  <p>This document defines CSS custom properties for colors, spacing, and typography following an Apple‑style visual guide.</p>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Design Tokens – Iowa Site</title>\n<style>\n  :root {\n    /* Colors extracted from step_2 */\n    --color-bg: #f5f5f7;\n    --color-surface: #ffffff;\n    --color-primary: #007aff;\n    --color-text: #1d1d1f;\n    --color-muted: #c7c7cc;\n  }\n  body {\n    font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n    background: var(--color-bg);\n    color: var(--color-text);\n    margin: 0;\n    padding: 2rem;\n    line-height: 1.6;\n  }\n  h1 {\n    font-size: 2rem;\n    margin-bottom: 1rem;\n  }\n  h2 {\n    font-size: 1.5rem;\n    margin-top: 2rem;\n    margin-bottom: 0.5rem;\n  }\n  .token-table {\n    width: 100%;\n    border-collapse: collapse;\n    margin-top: 0.5rem;\n  }\n  .token-table th, .token-table td {\n    border: 1px solid #ccc;\n    padding: 0.5rem;\n    text-align: left;\n  }\n  .token-swatch {\n    display: inline-block;\n    width: 1rem;\n    height: 1rem;\n    border: 1px solid #000;\n    vertical-align: middle;\n    margin-right: 0.5rem;\n  }\n</style>\n</head>\n<body>\n  <h1>Design Tokens</h1>\n  <section>\n    <h2>Colors</h2>\n    <table class=\"token-table\">\n      <tr><th>Variable</th><th>Value</th><th>Swatch</th></tr>\n      <tr><td>--color-bg</td><td>#f5f5f7</td><td><span class=\"token-swatch\" style=\"background:#f5f5f7;\"></span></td></tr>\n      <tr><td>--color-surface</td><td>#ffffff</td><td><span class=\"token-swatch\" style=\"background:#ffffff;\"></span></td></tr>\n      <tr><td>--color-primary</td><td>#007aff</td><td><span class=\"token-swatch\" style=\"background:#007aff;\"></span></td></tr>\n      <tr><td>--color-text</td><td>#1d1d1f</td><td><span class=\"token-swatch\" style=\"background:#1d1d1f;\"></span></td></tr>\n      <tr><td>--color-muted</td><td>#c7c7cc</td><td><span class=\"token-swatch\" style=\"background:#c7c7cc;\"></span></td></tr>\n    </table>\n  </section>\n  <section>\n    <h2>Typography</h2>\n    <p>No explicit typography tokens were defined in the provided step_2 source. Default system fonts will be used (see body CSS).</p>\n  </section>\n  <section>\n    <h2>Spacing</h2>\n    <p>No explicit spacing tokens were defined in the provided step_2 source.</p>\n  </section>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑inspired website prototype – Iowa project">
+  <title>Iowa – Home</title>
+  <style>
+    :root {
+      /* Design Tokens (from step 2) */
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #c7c7cc;
+      --spacing-xxs: 4px;
+      --spacing-xs: 8px;
+      --spacing-sm: 12px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-xxl: 48px;
+      --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-family-serif: Georgia, Times, "Times New Roman", serif;
+      --font-size-xs: 0.75rem;   /* 12px */
+      --font-size-sm: 0.875rem;  /* 14px */
+      --font-size-base: 1rem;    /* 16px */
+      --font-size-lg: 1.125rem;  /* 18px */
+      --font-size-xl: 1.25rem;   /* 20px */
+      --font-size-2xl: 1.5rem;   /* 24px */
+      --font-size-3xl: 1.875rem; /* 30px */
+      --font-size-4xl: 2.25rem;  /* 36px */
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 700;
+      --line-height-base: 1.5;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: var(--spacing-lg);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-family-sans);
+      line-height: var(--line-height-base);
+    }
+    header, nav, main, footer { max-width: 1200px; margin: 0 auto; }
+    header { text-align: center; padding: var(--spacing-xl) 0; }
+    header h1 { font-size: var(--font-size-4xl); margin: 0; }
+    nav { margin-bottom: var(--spacing-lg); }
+    nav ul { list-style: none; display: flex; gap: var(--spacing-md); justify-content: center; padding: 0; margin: 0; }
+    nav a {
+      text-decoration: none;
+      color: var(--color-primary);
+      font-weight: var(--font-weight-medium);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: 4px;
+    }
+    nav a:hover, nav a:focus { background: var(--color-primary-light); color: #fff; }
+    main { background: var(--color-surface); padding: var(--spacing-lg); border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    h2 { font-size: var(--font-size-3xl); margin-top: 0; }
+    p { margin-bottom: var(--spacing-md); }
+    .hero { position: relative; overflow: hidden; border-radius: 8px; margin-bottom: var(--spacing-lg); }
+    .hero img { width: 100%; height: auto; display: block; }
+    .hero .overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6));
+      display: flex;
+      align-items: flex-end;
+      padding: var(--spacing-lg);
+      color: #fff;
+    }
+    .hero h2 { margin: 0; font-size: var(--font-size-4xl); }
+    .cta {
+      display: inline-block;
+      background: var(--color-primary);
+      color: #fff;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: var(--font-weight-medium);
+    }
+    .cta:hover, .cta:focus { background: var(--color-primary-dark); }
+    footer { text-align: center; margin-top: var(--spacing-xxl); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+    @media (max-width: 768px) {
+      nav ul { flex-direction: column; }
+      header h1 { font-size: var(--font-size-3xl); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Iowa – Apple‑Inspired Web Experience</h1>
+  </header>
+  <nav aria-label="Primary navigation">
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="features.html">Features</a></li>
+      <li><a href="pricing.html">Pricing</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
+  <main>
+    <section class="hero" aria-label="Hero image">
+      <img src="https://picsum.photos/seed/hero/1200/500" alt="Abstract technology background">
+      <div class="overlay">
+        <h2>Welcome to Iowa</h2>
+      </div>
+    </section>
+    <section>
+      <h2>Introducing Iowa</h2>
+      <p>Experience a clean, Apple‑inspired design language built with modern HTML5 and CSS3. This prototype showcases responsive layout, semantic markup, and a cohesive visual system powered by design tokens.</p>
+      <a class="cta" href="features.html">Explore Features</a>
+    </section>
+  </main>
+  <footer>
+    <p>&copy; 2026 Iowa Project – All rights reserved.</p>
+  </footer>
+</body>
+</html>
+
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Home page of the Iowa Apple‑inspired web experience">
+  <title>Iowa – Home</title>
+  <style>
+    :root {
+      /* Colors */
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #c7c7cc;
+
+      /* Spacing */
+      --spacing-xxs: 4px;
+      --spacing-xs: 8px;
+      --spacing-sm: 12px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-xxl: 48px;
+
+      /* Typography */
+      --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-family-serif: Georgia, Times, "Times New Roman", serif;
+      --font-size-xs: 0.75rem;   /* 12px */
+      --font-size-sm: 0.875rem;  /* 14px */
+      --font-size-base: 1rem;    /* 16px */
+      --font-size-lg: 1.125rem;  /* 18px */
+      --font-size-xl: 1.25rem;   /* 20px */
+      --font-size-2xl: 1.5rem;   /* 24px */
+      --font-size-3xl: 1.875rem; /* 30px */
+      --font-size-4xl: 2.25rem;  /* 36px */
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 700;
+      --line-height-base: 1.5;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: var(--spacing-lg);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-family-sans);
+      line-height: var(--line-height-base);
+    }
+
+    header, nav, main, footer { max-width: 1200px; margin: 0 auto; }
+
+    header {
+      text-align: center;
+      padding: var(--spacing-xl) 0;
+    }
+
+    header h1 {
+      font-size: var(--font-size-4xl);
+      margin: 0;
+    }
+
+    nav {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: var(--spacing-md);
+      justify-content: center;
+      padding: 0;
+      margin: 0;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: var(--color-primary);
+      font-weight: var(--font-weight-medium);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: 4px;
+    }
+
+    nav a:hover,
+    nav a:focus {
+      background: var(--color-primary-light);
+      color: #fff;
+    }
+
+    main {
+      background: var(--color-surface);
+      padding: var(--spacing-lg);
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      font-size: var(--font-size-3xl);
+      margin-top: 0;
+    }
+
+    p {
+      margin-bottom: var(--spacing-md);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: 8px;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .hero img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .hero .overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6));
+      display: flex;
+      align-items: flex-end;
+      padding: var(--spacing-lg);
+      color: #fff;
+    }
+
+    .hero .overlay h2 {
+      margin: 0;
+      font-size: var(--font-size-4xl);
+    }
+
+    .cta {
+      display: inline-block;
+      background: var(--color-primary);
+      color: #fff;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .cta:hover,
+    .cta:focus {
+      background: var(--color-primary-dark);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: var(--spacing-xxl);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+    }
+
+    @media (max-width: 768px) {
+      nav ul { flex-direction: column; }
+      header h1 { font-size: var(--font-size-3xl); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Iowa – Apple‑Inspired Web Experience</h1>
+  </header>
+
+  <nav aria-label="Primary navigation">
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="features.html">Features</a></li>
+      <li><a href="pricing.html">Pricing</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="hero" aria-label="Hero image">
+      <img src="https://picsum.photos/seed/hero/1200/500" alt="Abstract technology background">
+      <div class="overlay">
+        <h2>Welcome to Iowa</h2>
+      </div>
+    </section>
+
+    <section>
+      <h2>Introducing Iowa</h2>
+      <p>Experience a clean, Apple‑inspired design language built with modern HTML5 and CSS3. This prototype showcases responsive layout, semantic markup, and a cohesive visual system powered by design tokens.</p>
+      <a class="cta" href="features.html">Explore Features</a>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Iowa Project – All rights reserved.</p>
+  </footer>
+</body>
+</html>
+
+<!-- about.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="About page of the Iowa Apple‑inspired web experience">
+  <title>Iowa – About</title>
+  <style>
+    :root {
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #c7c7cc;
+      --spacing-xxs: 4px;
+      --spacing-xs: 8px;
+      --spacing-sm: 12px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-xxl: 48px;
+      --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-size-xs: 0.75rem;
+      --font-size-sm: 0.875rem;
+      --font-size-base: 1rem;
+      --font-size-lg: 1.125rem;
+      --font-size-xl: 1.25rem;
+      --font-size-2xl: 1.5rem;
+      --font-size-3xl: 1.875rem;
+      --font-size-4xl: 2.25rem;
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 700;
+      --line-height-base: 1.5;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: var(--spacing-lg);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-family-sans);
+      line-height: var(--line-height-base);
+    }
+
+    header, nav, main, footer { max-width: 1200px; margin: 0 auto; }
+
+    header { text-align: center; padding: var(--spacing-xl) 0; }
+    header h1 { font-size: var(--font-size-4xl); margin: 0; }
+
+    nav { margin-bottom: var(--spacing-lg); }
+    nav ul { list-style: none; display: flex; gap: var(--spacing-md); justify-content: center; padding: 0; margin: 0; }
+    nav a { text-decoration: none; color: var(--color-primary); font-weight: var(--font-weight-medium); padding: var(--spacing-xs) var(--spacing-sm); border-radius: 4px; }
+    nav a:hover, nav a:focus { background: var(--color-primary-light); color: #fff; }
+
+    main {
+      background: var(--color-surface);
+      padding: var(--spacing-lg);
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    h2 { font-size: var(--font-size-3xl); margin-top: 0; }
+    p { margin-bottom: var(--spacing-md); }
+
+    .team {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing-lg);
+    }
+
+    .team-member {
+      text-align: center;
+    }
+
+    .team-member img {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    footer { text-align: center; margin-top: var(--spacing-xxl); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+    @media (max-width: 768px) {
+      nav ul { flex-direction: column; }
+      header h1 { font-size: var(--font-size-3xl); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Iowa – About</h1>
+  </header>
+
+  <nav aria-label="Primary navigation">
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="features.html">Features</a></li>
+      <li><a href="pricing.html">Pricing</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section>
+      <h2>Our Vision</h2>
+      <p>We aim to bring the elegance and simplicity of Apple’s design philosophy to every web experience. Iowa blends clean aesthetics with intuitive interactions, delivering a seamless user journey.</p>
+    </section>
+
+    <section>
+      <h2>Meet the Team</h2>
+      <div class="team">
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team1/120/120" alt="Portrait of Alex">
+          <h3>Alex</h3>
+          <p>Lead Designer</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team2/120/120" alt="Portrait of Jamie">
+          <h3>Jamie</h3>
+          <p>Front‑End Engineer</p>
+        </div>
+        <div class="team-member">
+          <img src="https://picsum.photos/seed/team3/120/120" alt="Portrait of Sam">
+          <h3>Sam</h3>
+          <p>Product Manager</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Iowa Project – All rights reserved.</p>
+  </footer>
+</body>
+</html>
+
+<!-- features.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Features page of the Iowa Apple‑inspired web experience">
+  <title>Iowa – Features</title>
+  <style>
+    :root {
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #c7c7cc;
+      --spacing-xxs: 4px;
+      --spacing-xs: 8px;
+      --spacing-sm: 12px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-xxl: 48px;
+      --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-size-xs: 0.75rem;
+      --font-size-sm: 0.875rem;
+      --font-size-base: 1rem;
+      --font-size-lg: 1.125rem;
+      --font-size-xl: 1.25rem;
+      --font-size-2xl: 1.5rem;
+      --font-size-3xl: 1.875rem;
+      --font-size-4xl: 2.25rem;
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 700;
+      --line-height-base: 1.5;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: var(--spacing-lg);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-family-sans);
+      line-height: var(--line-height-base);
+    }
+
+    header, nav, main, footer { max-width: 1200px; margin: 0 auto; }
+
+    header { text-align: center; padding: var(--spacing-xl) 0; }
+    header h1 { font-size: var(--font-size-4xl); margin: 0; }
+
+    nav { margin-bottom: var(--spacing-lg); }
+    nav ul { list-style: none; display: flex; gap: var(--spacing-md); justify-content: center; padding: 0; margin: 0; }
+    nav a { text-decoration: none; color: var(--color-primary); font-weight: var(--font-weight-medium); padding: var(--spacing-xs) var(--spacing-sm); border-radius: 4px; }
+    nav a:hover, nav a:focus { background: var(--color-primary-light); color: #fff; }
+
+    main {
+      background: var(--color-surface);
+      padding: var(--spacing-lg);
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    h2 { font-size: var(--font-size-3xl); margin-top: 0; }
+    p { margin-bottom: var(--spacing-md); }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: var(--spacing-lg);
+    }
+
+    .feature-card {
+      border: 1px solid var(--color-muted);
+      border-radius: 8px;
+      padding: var(--spacing-md);
+      background: var(--color-bg);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      font-size: var(--font-size-2xl);
+      color: var(--color-primary);
+    }
+
+    footer { text-align: center; margin-top: var(--spacing-xxl); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+    @media (max-width: 768px) {
+      nav ul { flex-direction: column; }
+      header h1 { font-size: var(--font-size-3xl); }
+    }
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta name=\"description\" content=\"Apple‑inspired Iowa website sandbox preview\">\n  <title>Iowa – Sandbox Preview</title>\n  <style>\n    :root {\n      --color-bg: #f5f5f7;\n      --color-surface: #ffffff;\n      --color-primary: #007aff;\n      --color-primary-dark: #0051a2;\n      --color-primary-light: #66b2ff;\n      --color-text-primary: #1d1d1f;\n      --color-text-secondary: #6e6e73;\n      --color-muted: #c7c7cc;\n      --spacing-xxs: 4px;\n      --spacing-xs: 8px;\n      --spacing-sm: 12px;\n      --spacing-md: 16px;\n      --spacing-lg: 24px;\n      --spacing-xl: 32px;\n      --spacing-xxl: 48px;\n      --font-family-sans: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n      --font-family-serif: Georgia, Times, \"Times New Roman\", serif;\n      --font-size-xs: 0.75rem;\n      --font-size-sm: 0.875rem;\n      --font-size-base: 1rem;\n      --font-size-lg: 1.125rem;\n      --font-size-xl: 1.25rem;\n      --font-size-2xl: 1.5rem;\n      --font-size-3xl: 1.875rem;\n      --font-size-4xl: 2.25rem;\n      --font-weight-regular: 400;\n      --font-weight-medium: 500;\n      --font-weight-bold: 700;\n      --line-height-base: 1.5;\n    }\n    *, *::before, *::after { box-sizing: border-box; }\n    body {\n      margin: 0;\n      padding: var(--spacing-lg);\n      background: var(--color-bg);\n      color: var(--color-text-primary);\n      font-family: var(--font-family-sans);\n      line-height: var(--line-height-base);\n    }\n    header, nav, main, footer { max-width: 1200px; margin: 0 auto; }\n    header { text-align: center; padding: var(--spacing-xl) 0; }\n    header h1 { font-size: var(--font-size-4xl); margin: 0; }\n    nav { margin-bottom: var(--spacing-lg); }\n    nav ul { list-style: none; display: flex; gap: var(--spacing-md); justify-content: center; padding: 0; margin: 0; }\n    nav a {\n      text-decoration: none;\n      color: var(--color-primary);\n      font-weight: var(--font-weight-medium);\n      padding: var(--spacing-xs) var(--spacing-sm);\n      border-radius: 4px;\n    }\n    nav a:hover, nav a:focus { background: var(--color-primary-light); color: #fff; }\n    main { background: var(--color-surface); padding: var(--spacing-lg); border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }\n    h2 { font-size: var(--font-size-3xl); margin-top: 0; }\n    p { margin-bottom: var(--spacing-md); }\n    .hero { position: relative; overflow: hidden; border-radius: 8px; margin-bottom: var(--spacing-lg); }\n    .hero img { width: 100%; height: auto; display: block; }\n    .hero .overlay {\n      position: absolute;\n      inset: 0;\n      background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6));\n      display: flex;\n      align-items: flex-end;\n      padding: var(--spacing-lg);\n      color: #fff;\n    }\n    .hero .overlay h2 { margin: 0; font-size: var(--font-size-4xl); }\n    .cta {\n      display: inline-block;\n      background: var(--color-primary);\n      color: #fff;\n      padding: var(--spacing-sm) var(--spacing-md);\n      border-radius: 4px;\n      text-decoration: none;\n      font-weight: var(--font-weight-medium);\n    }\n    .cta:hover, .cta:focus { background: var(--color-primary-dark); }\n    .team { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-lg); }\n    .team-member { text-align: center; }\n    .team-member img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: var(--spacing-sm); }\n    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--spacing-lg); }\n    .feature-card { border: 1px solid var(--color-muted); border-radius: 8px; padding: var(--spacing-md); background: var(--color-bg); }\n    .feature-card h3 { margin-top: 0; font-size: var(--font-size-2xl); color: var(--color-primary); }\n    footer { text-align: center; margin-top: var(--spacing-xxl); font-size: var(--font-size-sm); color: var(--color-text-secondary); }\n    @media (max-width: 768px) {\n      nav ul { flex-direction: column; }\n      header h1 { font-size: var(--font-size-3xl); }\n    }\n  </style>\n</head>\n<body>\n  <header>\n    <h1>Iowa – Apple‑Inspired Web Experience</h1>\n  </header>\n  <nav aria-label=\"Primary navigation\">\n    <ul>\n      <li><a href=\"#home\">Home</a></li>\n      <li><a href=\"#about\">About</a></li>\n      <li><a href=\"#features\">Features</a></li>\n      <li><a href=\"#pricing\">Pricing</a></li>\n      <li><a href=\"#contact\">Contact</a></li>\n    </ul>\n  </nav>\n  <main>\n    <!-- Home Page -->\n    <div id=\"home\" class=\"page\">\n      <section class=\"hero\" aria-label=\"Hero image\">\n        <img src=\"https://picsum.photos/seed/hero/1200/500\" alt=\"Abstract technology background\">\n        <div class=\"overlay\"><h2>Welcome to Iowa</h2></div>\n      </section>\n      <section>\n        <h2>Introducing Iowa</h2>\n        <p>Experience a clean, Apple‑inspired design language built with modern HTML5 and CSS3. This prototype showcases responsive layout, semantic markup, and a cohesive visual system powered by design tokens.</p>\n        <a class=\"cta\" href=\"#features\">Explore Features</a>\n      </section>\n    </div>\n    <!-- About Page -->\n    <div id=\"about\" class=\"page\" style=\"display:none;\">\n      <section>\n        <h2>Our Vision</h2>\n        <p>We aim to bring the elegance and simplicity of Apple’s design philosophy to every web experience. Iowa blends clean aesthetics with intuitive interactions, delivering a seamless user journey.</p>\n      </section>\n      <section>\n        <h2>Meet the Team</h2>\n        <div class=\"team\">\n          <div class=\"team-member\"><img src=\"https://picsum.photos/seed/team1/120/120\" alt=\"Portrait of Alex\"><h3>Alex</h3><p>Lead Designer</p></div>\n          <div class=\"team-member\"><img src=\"https://picsum.photos/seed/team2/120/120\" alt=\"Portrait of Jamie\"><h3>Jamie</h3><p>Front‑End Engineer</p></div>\n          <div class=\"team-member\"><img src=\"https://picsum.photos/seed/team3/120/120\" alt=\"Portrait of Sam\"><h3>Sam</h3><p>Product Manager</p></div>\n        </div>\n      </section>\n    </div>\n    <!-- Features Page -->\n    <div id=\"features\" class=\"page\" style=\"display:none;\">\n      <section>\n        <h2>Features</h2>\n        <p>Explore the core capabilities of Iowa.</p>\n        <div class=\"features-grid\">\n          <div class=\"feature-card\"><h3>Responsive Layout</h3><p>Adapts gracefully to any screen size.</p></div>\n          <div class=\"feature-card\"><h3>Design Tokens</h3><p>Consistent colors, spacing, and typography.</p></div>\n          <div class=\"feature-card\"><h3>Semantic HTML</h3><p>Improved accessibility and SEO.</p></div>\n          <div class=\"feature-card\"><h3>Fast Load</h3><p>Optimized assets for quick rendering.</p></div>\n        </div>\n      </section>\n    </div>\n    <!-- Pricing Page -->\n    <div id=\"pricing\" class=\"page\" style=\"display:none;\">\n      <section>\n        <h2>Pricing</h2>\n        <p>Simple, transparent pricing for every project.</p>\n        <ul>\n          <li>Starter – Free</li>\n          <li>Pro – $49/month</li>\n          <li>Enterprise – Custom</li>\n        </ul>\n        <a class=\"cta\" href=\"#contact\">Get in Touch</a>\n      </section>\n    </div>\n    <!-- Contact Page -->\n    <div id=\"contact\" class=\"page\" style=\"display:none;\">\n      <section>\n        <h2>Contact Us</h2>\n        <p>We’d love to hear from you. Reach out via email or phone.</p>\n        <p>Email: <a href=\"mailto:info@iowa.example.com\">info@iowa.example.com</a></p>\n        <p>Phone: +1 (555) 123‑4567</p>\n      </section>\n    </div>\n  </main>\n  <footer>\n    <p>&copy; 2026 Iowa Project – All rights reserved.</p>\n  </footer>\n  <script>\n    function showPage(){\n      var hash = location.hash || '#home';\n      var pages = document.querySelectorAll('.page');\n      pages.forEach(function(p){ p.style.display = 'none'; });\n      var target = document.querySelector(hash);\n      if(target){ target.style.display = 'block'; }\n    }\n    window.addEventListener('hashchange', showPage);\n    window.addEventListener('load', showPage);\n  </script>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑inspired Iowa website sandbox preview">
+  <title>Iowa – Sandbox Preview</title>
+  <style>
+    :root {
+      --color-bg: #f5f5f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-primary-dark: #0051a2;
+      --color-primary-light: #66b2ff;
+      --color-text-primary: #1d1d1f;
+      --color-text-secondary: #6e6e73;
+      --color-muted: #c7c7cc;
+      --spacing-xxs: 4px;
+      --spacing-xs: 8px;
+      --spacing-sm: 12px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-xxl: 48px;
+      --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-family-serif: Georgia, Times, "Times New Roman", serif;
+      --font-size-xs: 0.75rem;
+      --font-size-sm: 0.875rem;
+      --font-size-base: 1rem;
+      --font-size-lg: 1.125rem;
+      --font-size-xl: 1.25rem;
+      --font-size-2xl: 1.5rem;
+      --font-size-3xl: 1.875rem;
+      --font-size-4xl: 2.25rem;
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 700;
+      --line-height-base: 1.5;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: var(--spacing-lg);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-family-sans);
+      line-height: var(--line-height-base);
+    }
+    header, nav, main, footer { max-width: 1200px; margin: 0 auto; }
+    header { text-align: center; padding: var(--spacing-xl) 0; }
+    header h1 { font-size: var(--font-size-4xl); margin: 0; }
+    .usage-note { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--spacing-md); text-align: center; }
+    nav { margin-bottom: var(--spacing-lg); }
+    nav ul { list-style: none; display: flex; gap: var(--spacing-md); justify-content: center; padding: 0; margin: 0; }
+    nav a {
+      text-decoration: none;
+      color: var(--color-primary);
+      font-weight: var(--font-weight-medium);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: 4px;
+    }
+    nav a:hover, nav a:focus { background: var(--color-primary-light); color: #fff; }
+    main { background: var(--color-surface); padding: var(--spacing-lg); border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    h2 { font-size: var(--font-size-3xl); margin-top: 0; }
+    p { margin-bottom: var(--spacing-md); }
+    .hero { position: relative; overflow: hidden; border-radius: 8px; margin-bottom: var(--spacing-lg); }
+    .hero img { width: 100%; height: auto; display: block; }
+    .hero .overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6));
+      display: flex;
+      align-items: flex-end;
+      padding: var(--spacing-lg);
+      color: #fff;
+    }
+    .hero .overlay h2 { margin: 0; font-size: var(--font-size-4xl); }
+    .cta {
+      display: inline-block;
+      background: var(--color-primary);
+      color: #fff;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: var(--font-weight-medium);
+    }
+    .cta:hover, .cta:focus { background: var(--color-primary-dark); }
+    .team { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-lg); }
+    .team-member { text-align: center; }
+    .team-member img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: var(--spacing-sm); }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--spacing-lg); }
+    .feature-card { border: 1px solid var(--color-muted); border-radius: 8px; padding: var(--spacing-md); background: var(--color-bg); }
+    .feature-card h3 { margin-top: 0; font-size: var(--font-size-2xl); color: var(--color-primary); }
+    footer { text-align: center; margin-top: var(--spacing-xxl); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+    @media (max-width: 768px) {
+      nav ul { flex-direction: column; }
+      header h1 { font-size: var(--font-size-3xl); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Iowa – Apple‑Inspired Web Experience</h1>
+  </header>
+  <p class="usage-note">Use the navigation menu above (or the hash links) to switch between Home, About, Features, Pricing, and Contact pages.</p>
+  <nav aria-label="Primary navigation">
+    <ul>
+      <li><a href="#home">Home</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+  <main>
+    <!-- Home Page -->
+    <div id="home" class="page">
+      <section class="hero" aria-label="Hero image">
+        <img src="https://picsum.photos/seed/hero/1200/500" alt="Abstract technology background">
+        <div class="overlay"><h2>Welcome to Iowa</h2></div>
+      </section>
+      <section>
+        <h2>Introducing Iowa</h2>
+        <p>Experience a clean, Apple‑inspired design language built with modern HTML5 and CSS3. This prototype showcases responsive layout, semantic markup, and a cohesive visual system powered by design tokens.</p>
+        <a class="cta" href="#features">Explore Features</a>
+      </section>
+    </div>
+    <!-- About Page -->
+    <div id="about" class="page" style="display:none;">
+      <section>
+        <h2>Our Vision</h2>
+        <p>We aim to bring the elegance and simplicity of Apple’s design philosophy to every web experience. Iowa blends clean aesthetics with intuitive interactions, delivering a seamless user journey.</p>
+      </section>
+      <section>
+        <h2>Meet the Team</h2>
+        <div class="team">
+          <div class="team-member"><img src="https://picsum.photos/seed/team1/120/120" alt="Portrait of Alex"><h3>Alex</h3><p>Lead Designer</p></div>
+          <div class="team-member"><img src="https://picsum.photos/seed/team2/120/120" alt="Portrait of Jamie"><h3>Jamie</h3><p>Front‑End Engineer</p></div>
+          <div class="team-member"><img src="https://picsum.photos/seed/team3/120/120" alt="Portrait of Sam"><h3>Sam</h3><p>Product Manager</p></div>
+        </div>
+      </section>
+    </div>
+    <!-- Features Page -->
+    <div id="features" class="page" style="display:none;">
+      <section>
+        <h2>Features</h2>
+        <p>Explore the core capabilities of Iowa.</p>
+        <div class="features-grid">
+          <div class="feature-card"><h3>Responsive Layout</h3><p>Adapts gracefully to any screen size.</p></div>
+          <div class="feature-card"><h3>Design Tokens</h3><p>Consistent colors, spacing, and typography.</p></div>
+          <div class="feature-card"><h3>Semantic HTML</h3><p>Improved accessibility and SEO.</p></div>
+          <div class="feature-card"><h3>Fast Load</h3><p>Optimized assets for quick rendering.</p></div>
+        </div>
+      </section>
+    </div>
+    <!-- Pricing Page -->
+    <div id="pricing" class="page" style="display:none;">
+      <section>
+        <h2>Pricing</h2>
+        <p>Simple, transparent pricing for every project.</p>
+        <ul>
+          <li>Starter – Free</li>
+          <li>Pro – $49/month</li>
+          <li>Enterprise – Custom</li>
+        </ul>
+        <a class="cta" href="#contact">Get in Touch</a>
+      </section>
+    </div>
+    <!-- Contact Page -->
+    <div id="contact" class="page" style="display:none;">
+      <section>
+        <h2>Contact Us</h2>
+        <p>We’d love to hear from you. Reach out via email or phone.</p>
+        <p>Email: <a href="mailto:info@iowa.example.com">info@iowa.example.com</a></p>
+        <p>Phone: +1 (555) 123‑4567</p>
+      </section>
+    </div>
+  </main>
+  <footer>
+    <p>&copy; 2026 Iowa Project – All rights reserved.</p>
+  </footer>
+  <script>
+    function showPage(){
+      var hash = location.hash || '#home';
+      var pages = document.querySelectorAll('.page');
+      pages.forEach(function(p){ p.style.display = 'none'; });
+      var target = document.querySelector(hash);
+      if(target){ target.style.display = 'block'; }
+    }
+    window.addEventListener('hashchange', showPage);
+    window.addEventListener('load', showPage);
+  </script>
+</body>
+</html>

@@ -40,6 +40,7 @@ import {
   Trash2,
   Loader2,
   Play,
+  Square,
   ChevronDown,
   ChevronUp,
   ListOrdered,
@@ -217,17 +218,133 @@ function StepCard({
   );
 }
 
+const runFormSchema = z.object({
+  goal: z.string().min(3, "Goal must be at least 3 characters"),
+  executionMode: z.enum(["manual", "semi_autonomous", "autonomous"]),
+});
+type RunForm = z.infer<typeof runFormSchema>;
+
+function RunWorkflowDialog({
+  template,
+  open,
+  onOpenChange,
+}: {
+  template: WorkflowTemplate | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const form = useForm<RunForm>({
+    resolver: zodResolver(runFormSchema),
+    defaultValues: { goal: template?.goal || "", executionMode: "semi_autonomous" },
+  });
+
+  // Reset goal when template changes
+  const templateGoal = template?.goal || "";
+  const formReset = form.reset;
+  const executionMode = form.watch("executionMode");
+  void executionMode; // used via watch
+
+  const runMutation = useMutation({
+    mutationFn: (values: RunForm) =>
+      apiRequest("POST", "/api/workflow-executions", {
+        templateId: template?.id,
+        goal: values.goal,
+        executionMode: values.executionMode,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions"] });
+      toast({ title: "Workflow started" });
+      onOpenChange(false);
+      formReset({ goal: "", executionMode: "semi_autonomous" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to start workflow", description: err.message, variant: "destructive" });
+    },
+  });
+
+  function onSubmit(values: RunForm) {
+    runMutation.mutate(values);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Run Workflow — {template?.name}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="goal"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Goal</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder={templateGoal || "Describe what this run should achieve"}
+                      className="resize-none"
+                      rows={3}
+                      data-testid="input-run-goal"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="executionMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Execution Mode</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-run-mode">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="autonomous">Autonomous — full auto</SelectItem>
+                      <SelectItem value="semi_autonomous">Semi-Autonomous — auto with guardrails</SelectItem>
+                      <SelectItem value="manual">Manual — operator approves each step</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={runMutation.isPending} data-testid="button-run-confirm">
+                {runMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                Run
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function TemplateCard({
   template,
   onEdit,
   onDelete,
   onExpand,
+  onRun,
   isExpanded,
 }: {
   template: WorkflowTemplate;
   onEdit: (t: WorkflowTemplate) => void;
   onDelete: (id: string) => void;
   onExpand: (id: string) => void;
+  onRun: (t: WorkflowTemplate) => void;
   isExpanded: boolean;
 }) {
   return (
@@ -285,6 +402,15 @@ function TemplateCard({
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              size="icon"
+              variant="ghost"
+              title="Run workflow"
+              onClick={() => onRun(template)}
+              data-testid={`button-run-template-${template.id}`}
+            >
+              <Play className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </Button>
             <Button
               size="icon"
               variant="ghost"
@@ -598,6 +724,7 @@ function ExpandedSteps({ templateId }: { templateId: string }) {
                         <SelectContent>
                           <SelectItem value="general">General</SelectItem>
                           <SelectItem value="project_manager">Project Manager</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
                           <SelectItem value="deployment">Deployment</SelectItem>
                           <SelectItem value="maintenance">Maintenance</SelectItem>
                           <SelectItem value="incident">Incident</SelectItem>
@@ -693,6 +820,7 @@ export default function WorkflowsPage() {
   const [editingTemplate, setEditingTemplate] =
     useState<WorkflowTemplate | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [runDialogTemplate, setRunDialogTemplate] = useState<WorkflowTemplate | null>(null);
 
   const { data: templates, isLoading } = useQuery<WorkflowTemplate[]>({
     queryKey: ["/api/workflow-templates"],
@@ -787,6 +915,17 @@ export default function WorkflowsPage() {
     },
   });
 
+  const cancelExecutionMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/workflow-executions/${id}/cancel`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions"] });
+      toast({ title: "Workflow stopped" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to stop workflow", description: err.message, variant: "destructive" });
+    },
+  });
+
   function openCreate() {
     setEditingTemplate(null);
     form.reset({
@@ -875,6 +1014,7 @@ export default function WorkflowsPage() {
                 onEdit={openEdit}
                 onDelete={(id) => deleteMutation.mutate(id)}
                 onExpand={toggleExpand}
+                onRun={(t) => setRunDialogTemplate(t)}
                 isExpanded={expandedId === template.id}
               />
               {expandedId === template.id && (
@@ -961,6 +1101,23 @@ export default function WorkflowsPage() {
                     <ExecutionStatusIcon status={exec.status} />
                     {exec.status}
                   </Badge>
+                  {["running", "awaiting_operator", "pending", "blocked"].includes(exec.status) && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Stop execution"
+                      className="h-6 w-6"
+                      disabled={cancelExecutionMutation.isPending}
+                      onClick={() => cancelExecutionMutation.mutate(exec.id)}
+                      data-testid={`button-stop-execution-${exec.id}`}
+                    >
+                      {cancelExecutionMutation.isPending ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Square className="w-3 h-3 text-red-500" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -1194,6 +1351,12 @@ export default function WorkflowsPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <RunWorkflowDialog
+        template={runDialogTemplate}
+        open={runDialogTemplate !== null}
+        onOpenChange={(v) => { if (!v) setRunDialogTemplate(null); }}
+      />
     </div>
   );
 }

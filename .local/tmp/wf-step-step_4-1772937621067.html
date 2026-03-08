@@ -1,0 +1,578 @@
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Deploy Sandbox Preview Deck</title>\n</head>\n<body style=\"margin:0;padding:0;display:flex;flex-direction:column;align-items:center;background:#f0f0f0;\">\n  <!-- Slide 1: Title -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#141413;color:#faf9f5;font-family:Poppins,Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:60pt 60pt 0;\">\n      <h1 style=\"font-size:44pt;margin:0 0 16pt;\">Deploy Sandbox Preview</h1>\n      <p style=\"font-size:22pt;margin:0;color:#d97757;\">Secure, fast, and shareable</p>\n    </div>\n  </section>\n\n  <!-- Slide 2: Overview -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;\">\n    <div style=\"width:720pt;height:6pt;background:#6a9bcc;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Overview</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;\">\n        <li>Goal: Provide a sandbox environment for previewing the new HTML site.</li>\n        <li>Stakeholders: Product, Engineering, QA, and Marketing.</li>\n        <li>Outcome: Shareable link with live PPTX preview.</li>\n      </ul>\n      <div style=\"width:100%;height:150pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n  <!-- Slide 3: Deployment Process -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;\">\n    <div style=\"width:720pt;height:6pt;background:#788c5d;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Deployment Process</h2>\n      <ol style=\"font-size:16pt;margin:0;padding-left:28pt;line-height:1.6;\">\n        <li>Build the HTML site (codename Iowa) with production assets.</li>\n        <li>Upload the site to the sandbox server.</li>\n        <li>Generate the PPTX deck from this HTML.</li>\n        <li>Publish both artifacts and obtain shareable URLs.</li>\n      </ol>\n      <div style=\"width:100%;height:120pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n  <!-- Slide 4: Benefits -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Benefits</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;\">\n        <li>Instant feedback loop for stakeholders.</li>\n        <li>Reduced risk before production launch.</li>\n        <li>Easy distribution via a single link.</li>\n        <li>Consistent branding across site and deck.</li>\n      </ul>\n      <div style=\"width:100%;height:130pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n  <!-- Slide 5: Call to Action -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#141413;color:#faf9f5;font-family:Poppins,Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#6a9bcc;\"></div>\n    <div style=\"padding:60pt 60pt 0;\">\n      <h1 style=\"font-size:38pt;margin:0 0 16pt;\">Next Steps</h1>\n      <p style=\"font-size:20pt;margin:0;color:#6a9bcc;\">\n        • Review the sandbox preview link.<br/>\n        • Provide feedback within 48 hours.<br/>\n        • Approve for production rollout.<br/>\n      </p>\n      <div style=\"width:100%;height:80pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apple‑style minimal website – Home, About, Features, Demo, Contact">
+  <title>Iowa – Apple‑style Site</title>
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --color-bg: #ffffff;
+      --color-text: #111111;
+      --color-primary: #0071e3;
+      --color-muted: #666666;
+      --max-width: 960px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      background: var(--color-bg);
+      border-bottom: 1px solid #e5e5e5;
+      z-index: 10;
+    }
+    nav {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.8rem 1rem;
+    }
+    nav a {
+      color: var(--color-text);
+      text-decoration: none;
+      margin: 0 0.8rem;
+      font-weight: 500;
+    }
+    nav a:hover { color: var(--color-primary); }
+    main { width: 100%; }
+    section {
+      padding: 4rem 1rem;
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .hero {
+      text-align: center;
+    }
+    .hero img {
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+    h1, h2 {
+      margin-top: 0;
+      font-weight: 600;
+    }
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 2rem; color: var(--color-primary); }
+    p { margin: 1rem 0; }
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+    .feature {
+      flex: 1 1 calc(33% - 2rem);
+      min-width: 260px;
+    }
+    .feature h3 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .demo-canvas {
+      width: 100%;
+      max-width: 800px;
+      height: 400px;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin: 0 auto;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    input, textarea {
+      padding: 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-family: var(--font-sans);
+      font-size: 1rem;
+    }
+    button {
+      align-self: flex-start;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      padding: 0.8rem 1.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button:hover { background: #005bb5; }
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      font-size: 0.9rem;
+      color: var(--color-muted);
+      border-top: 1px solid #e5e5e5;
+    }
+    @media (max-width: 768px) {
+      .features { flex-direction: column; }
+      .feature { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav>
+      <div><strong>Iowa</strong></div>
+      <div>
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#features">Features</a>
+        <a href="#demo">Demo</a>
+        <a href="#contact">Contact</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" class="hero">
+      <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='800'%20height='400'%3E%3Crect%20width='800'%20height='400'%20fill='%23e0e0e0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23888'%20font-size='24'%20font-family='Arial%2CHelvetica%2Csans-serif'%3EHome%20Hero%3C/text%3E%3C/svg%3E"
+           alt="Minimalist hero image representing home">
+      <h1>Welcome to Iowa</h1>
+      <p>Elegant, simple, and powerful. Experience the seamless design inspired by Apple’s timeless aesthetic.</p>
+    </section>
+
+    <!-- About -->
+    <section id="about">
+      <h2>About Iowa</h2>
+      <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='800'%20height='300'%3E%3Crect%20width='800'%20height='300'%20fill='%23d0d0d0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23666'%20font-size='20'%20font-family='Arial%2CHelvetica%2Csans-serif'%3EAbout%20Image%3C/text%3E%3C/svg%3E"
+           alt="Illustration about the product" style="width:100%;max-width:800px;border-radius:8px;">
+      <p>Iowa is a showcase of clean typography, generous whitespace, and subtle interactions. Built with modern HTML, CSS, and vanilla JavaScript, it runs instantly on any device.</p>
+    </section>
+
+    <!-- Features -->
+    <section id="features">
+      <h2>Features</h2>
+      <div class="features">
+        <div class="feature">
+          <h3>Minimalist Design</h3>
+          <p>Every element is purposeful, with a focus on clarity and elegance.</p>
+        </div>
+        <div class="feature">
+          <h3>Responsive Layout</h3>
+          <p>Adapts flawlessly from mobile to desktop, preserving the visual hierarchy.</p>
+        </div>
+        <div class="feature">
+          <h3>Smooth Scrolling</h3>
+          <p>Native CSS smooth scrolling creates a fluid navigation experience.</p>
+        </div>
+        <div class="feature">
+          <h3>High‑Resolution Imagery</h3>
+          <p>Placeholder SVGs act as crisp, scalable hero images.</p>
+        </div>
+        <div class="feature">
+          <h3>Accessible Markup</h3>
+          <p>Semantic HTML, ARIA labels, and sufficient color contrast.</p>
+        </div>
+        <div class="feature">
+          <h3>Zero Dependencies</h3>
+          <p>No external libraries – pure HTML, CSS, and JavaScript.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo -->
+    <section id="demo">
+      <h2>Demo</h2>
+      <p>Below is a simple interactive canvas that demonstrates smooth animation – a nod to Apple’s subtle motion design.</p>
+      <canvas id="demoCanvas" class="demo-canvas" aria-label="Demo animation canvas"></canvas>
+      <script>
+        const canvas = document.getElementById('demoCanvas');
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = canvas.offsetWidth * dpr;
+        canvas.height = canvas.offsetHeight * dpr;
+        ctx.scale(dpr, dpr);
+
+        let angle = 0;
+        function draw() {
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          const cx = canvas.width / (2*dpr);
+          const cy = canvas.height / (2*dpr);
+          const radius = 60;
+          ctx.fillStyle = '#0071e3';
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(angle)*30, cy + Math.sin(angle)*30, radius, 0, Math.PI*2);
+          ctx.fill();
+          angle += 0.02;
+          requestAnimationFrame(draw);
+        }
+        draw();
+      </script>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact">
+      <h2>Contact Us</h2>
+      <p>Have questions or want to collaborate? Fill out the form below.</p>
+      <form aria-label="Contact form" onsubmit="event.preventDefault(); alert('Thank you! Your message has been received.');">
+        <input type="text" name="name" placeholder="Your name" aria-label="Name" required>
+        <input type="email" name="email" placeholder="you@example.com" aria-label="Email" required>
+        <textarea name="message" rows="4" placeholder="Your message" aria-label="Message" required></textarea>
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    © 2024 Iowa – All rights reserved.
+  </footer>
+</body>
+</html>
+
+https://sandbox.example.com/preview/iowa-preview
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<title>Deploy Sandbox Preview Deck</title>\n</head>\n<body style=\"margin:0;padding:0;display:flex;flex-direction:column;align-items:center;background:#f0f0f0;\">\n  <!-- Slide 1: Title -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#141413;color:#faf9f5;font-family:Poppins,Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:60pt 60pt 0;\">\n      <h1 style=\"font-size:44pt;margin:0 0 16pt;\">Deploy Sandbox Preview</h1>\n      <p style=\"font-size:22pt;margin:0;color:#d97757;\">Secure, fast, and shareable</p>\n    </div>\n  </section>\n\n  <!-- Slide 2: Overview -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;\">\n    <div style=\"width:720pt;height:6pt;background:#6a9bcc;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Overview</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;\">\n        <li>Goal: Provide a sandbox environment for previewing the new HTML site.</li>\n        <li>Stakeholders: Product, Engineering, QA, and Marketing.</li>\n        <li>Outcome: Shareable link with live PPTX preview.</li>\n      </ul>\n      <div style=\"width:100%;height:150pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n  <!-- Slide 3: Deployment Process -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;\">\n    <div style=\"width:720pt;height:6pt;background:#788c5d;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Deployment Process</h2>\n      <ol style=\"font-size:16pt;margin:0;padding-left:28pt;line-height:1.6;\">\n        <li>Build the HTML site (codename Iowa) with production assets.</li>\n        <li>Upload the site to the sandbox server.</li>\n        <li>Generate the PPTX deck from this HTML.</li>\n        <li>Publish both artifacts and obtain shareable URLs.</li>\n      </ol>\n      <div style=\"width:100%;height:120pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n  <!-- Slide 4: Benefits -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Benefits</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;\">\n        <li>Instant feedback loop for stakeholders.</li>\n        <li>Reduced risk before production launch.</li>\n        <li>Easy distribution via a single link.</li>\n        <li>Consistent branding across site and deck.</li>\n      </ul>\n      <div style=\"width:100%;height:130pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n  <!-- Slide 5: Call to Action -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#141413;color:#faf9f5;font-family:Poppins,Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#6a9bcc;\"></div>\n    <div style=\"padding:60pt 60pt 0;\">\n      <h1 style=\"font-size:38pt;margin:0 0 16pt;\">Next Steps</h1>\n      <ul style=\"font-size:20pt;margin:0;color:#6a9bcc;list-style-type:disc;padding-left:24pt;\">\n        <li>Review the sandbox preview link.</li>\n        <li>Provide feedback within 48 hours.</li>\n        <li>Approve for production rollout.</li>\n      </ul>\n      <div style=\"width:100%;height:80pt;background:#e8e6dc;margin-top:20pt;\"></div>\n    </div>\n  </section>\n\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <meta name="description" content="Apple‑style minimal website – Home, About, Features, Demo, Contact">\n  <title>Iowa – Apple‑style Site</title>\n  <style>\n    :root {\n      --font-sans: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n      --color-bg: #ffffff;\n      --color-text: #111111;\n      --color-primary: #0071e3;\n      --color-muted: #666666;\n      --max-width: 960px;\n    }\n    *, *::before, *::after { box-sizing: border-box; }\n    html { scroll-behavior: smooth; }\n    body {\n      margin: 0;\n      font-family: var(--font-sans);\n      background: var(--color-bg);\n      color: var(--color-text);\n      line-height: 1.6;\n    }\n    header {\n      position: sticky;\n      top: 0;\n      background: var(--color-bg);\n      border-bottom: 1px solid #e5e5e5;\n      z-index: 10;\n    }\n    nav {\n      max-width: var(--max-width);\n      margin: 0 auto;\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      padding: 0.8rem 1rem;\n    }\n    nav a {\n      color: var(--color-text);\n      text-decoration: none;\n      margin: 0 0.8rem;\n      font-weight: 500;\n    }\n    nav a:hover { color: var(--color-primary); }\n    main { width: 100%; }\n    section {\n      padding: 4rem 1rem;\n      max-width: var(--max-width);\n      margin: 0 auto;\n    }\n    .hero { text-align: center; }\n    .hero img {\n      width: 100%;\n      max-width: 800px;\n      height: auto;\n      border-radius: 8px;\n      margin-bottom: 2rem;\n    }\n    h1, h2 { margin-top: 0; font-weight: 600; }\n    h1 { font-size: 2.5rem; }\n    h2 { font-size: 2rem; color: var(--color-primary); }\n    p { margin: 1rem 0; }\n    .features {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 2rem;\n    }\n    .feature {\n      flex: 1 1 calc(33% - 2rem);\n      min-width: 260px;\n    }\n    .feature h3 {\n      font-size: 1.4rem;\n      margin-bottom: 0.5rem;\n    }\n    .demo-canvas {\n      width: 100%;\n      max-width: 800px;\n      height: 400px;\n      background: #f0f0f0;\n      border: 1px solid #ddd;\n      border-radius: 8px;\n      margin: 0 auto;\n    }\n    form {\n      display: flex;\n      flex-direction: column;\n      gap: 1rem;\n      max-width: 500px;\n      margin: 0 auto;\n    }\n    input, textarea {\n      padding: 0.8rem;\n      border: 1px solid #ccc;\n      border-radius: 4px;\n      font-family: var(--font-sans);\n      font-size: 1rem;\n    }\n    button {\n      align-self: flex-start;\n      background: var(--color-primary);\n      color: #fff;\n      border: none;\n      padding: 0.8rem 1.6rem;\n      border-radius: 4px;\n      cursor: pointer;\n      font-size: 1rem;\n    }\n    button:hover { background: #005bb5; }\n    footer {\n      text-align: center;\n      padding: 2rem 1rem;\n      font-size: 0.9rem;\n      color: var(--color-muted);\n      border-top: 1px solid #e5e5e5;\n    }\n    @media (max-width: 768px) {\n      .features { flex-direction: column; }\n      .feature { flex: 1 1 100%; }\n    }\n  </style>\n</head>\n<body>\n  <header aria-label="Main navigation">\n    <nav>\n      <div><strong>Iowa</strong></div>\n      <div>\n        <a href="#home">Home</a>\n        <a href="#about">About</a>\n        <a href="#features">Features</a>\n        <a href="#demo">Demo</a>\n        <a href="#contact">Contact</a>\n      </div>\n    </nav>\n  </header>\n\n  <main>\n    <!-- Home -->\n    <section id="home" class="hero">\n      <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='800'%20height='400'%3E%3Crect%20width='800'%20height='400'%20fill='%23e0e0e0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23888'%20font-size='24'%20font-family='Arial%2CHelvetica%2Csans-serif'%3EHome%20Hero%3C/text%3E%3C/svg%3E" alt="Minimalist hero image representing home">\n      <h1>Welcome to Iowa</h1>\n      <p>Elegant, simple, and powerful. Experience the seamless design inspired by Apple’s timeless aesthetic.</p>\n    </section>\n\n    <!-- About -->\n    <section id="about">\n      <h2>About Iowa</h2>\n      <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='800'%20height='300'%3E%3Crect%20width='800'%20height='300'%20fill='%23d0d0d0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23666'%20font-size='20'%20font-family='Arial%2CHelvetica%2Csans-serif'%3EAbout%20Image%3C/text%3E%3C/svg%3E" alt="Illustration about the product" style="width:100%;max-width:800px;border-radius:8px;">\n      <p>Iowa is a showcase of clean typography, generous whitespace, and subtle interactions. Built with modern HTML, CSS, and vanilla JavaScript, it runs instantly on any device.</p>\n    </section>\n\n    <!-- Features -->\n    <section id="features">\n      <h2>Features</h2>\n      <div class="features">\n        <div class="feature">\n          <h3>Minimalist Design</h3>\n          <p>Every element is purposeful, with a focus on clarity and elegance.</p>\n        </div>\n        <div class="feature">\n          <h3>Responsive Layout</h3>\n          <p>Adapts flawlessly from mobile to desktop, preserving the visual hierarchy.</p>\n        </div>\n        <div class="feature">\n          <h3>Smooth Scrolling</h3>\n          <p>Native CSS smooth scrolling creates a fluid navigation experience.</p>\n        </div>\n        <div class="feature">\n          <h3>High‑Resolution Imagery</h3>\n          <p>Placeholder SVGs act as crisp, scalable hero images.</p>\n        </div>\n        <div class="feature">\n          <h3>Accessible Markup</h3>\n          <p>Semantic HTML, ARIA labels, and sufficient color contrast.</p>\n        </div>\n        <div class="feature">\n          <h3>Zero Dependencies</h3>\n          <p>No external libraries – pure HTML, CSS, and JavaScript.</p>\n        </div>\n      </div>\n    </section>\n\n    <!-- Demo -->\n    <section id="demo">\n      <h2>Demo</h2>\n      <p>Below is a simple interactive canvas that demonstrates smooth animation – a nod to Apple’s subtle motion design.</p>\n      <canvas id="demoCanvas" class="demo-canvas" aria-label="Demo animation canvas"></canvas>\n      <script>\n        const canvas = document.getElementById('demoCanvas');\n        const ctx = canvas.getContext('2d');\n        const dpr = window.devicePixelRatio || 1;\n        canvas.width = canvas.offsetWidth * dpr;\n        canvas.height = canvas.offsetHeight * dpr;\n        ctx.scale(dpr, dpr);\n\n        let angle = 0;\n        function draw() {\n          ctx.clearRect(0,0,canvas.width,canvas.height);\n          const cx = canvas.width / (2*dpr);\n          const cy = canvas.height / (2*dpr);\n          const radius = 60;\n          ctx.fillStyle = '#0071e3';\n          ctx.beginPath();\n          ctx.arc(cx + Math.cos(angle)*30, cy + Math.sin(angle)*30, radius, 0, Math.PI*2);\n          ctx.fill();\n          angle += 0.02;\n          requestAnimationFrame(draw);\n        }\n        draw();\n      </script>\n    </section>\n\n    <!-- Contact -->\n    <section id="contact">\n      <h2>Contact Us</h2>\n      <p>Have questions or want to collaborate? Fill out the form below.</p>\n      <form aria-label="Contact form" onsubmit="event.preventDefault(); alert('Thank you! Your message has been received.');">\n        <input type="text" name="name" placeholder="Your name" aria-label="Name" required>\n        <input type="email" name="email" placeholder="you@example.com" aria-label="Email" required>\n        <textarea name="message" rows="4" placeholder="Your message" aria-label="Message" required></textarea>\n        <button type="submit">Send Message</button>\n      </form>\n    </section>\n  </main>\n\n  <footer>\n    © 2024 Iowa – All rights reserved.\n  </footer>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sandbox preview for the Iowa Apple‑style site and Deploy Sandbox Preview PPTX deck">
+  <title>Iowa Sandbox Preview</title>
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --color-bg: #ffffff;
+      --color-text: #111111;
+      --color-primary: #0071e3;
+      --color-muted: #666666;
+      --max-width: 960px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      background: var(--color-bg);
+      border-bottom: 1px solid #e5e5e5;
+      z-index: 10;
+    }
+    nav {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.8rem 1rem;
+    }
+    nav a {
+      color: var(--color-text);
+      text-decoration: none;
+      margin: 0 0.8rem;
+      font-weight: 500;
+    }
+    nav a:hover { color: var(--color-primary); }
+    main { width: 100%; }
+    section {
+      padding: 4rem 1rem;
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .hero { text-align: center; }
+    .hero img {
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+    h1, h2, h3 {
+      margin-top: 0;
+      font-weight: 600;
+    }
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 2rem; color: var(--color-primary); }
+    h3 { font-size: 1.4rem; }
+    p { margin: 1rem 0; }
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+    .feature {
+      flex: 1 1 calc(33% - 2rem);
+      min-width: 260px;
+    }
+    .demo-canvas {
+      width: 100%;
+      max-width: 800px;
+      height: 400px;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin: 0 auto;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    input, textarea {
+      padding: 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-family: var(--font-sans);
+      font-size: 1rem;
+    }
+    button {
+      align-self: flex-start;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      padding: 0.8rem 1.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button:hover { background: #005bb5; }
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      font-size: 0.9rem;
+      color: var(--color-muted);
+      border-top: 1px solid #e5e5e5;
+    }
+    @media (max-width: 768px) {
+      .features { flex-direction: column; }
+      .feature { flex: 1 1 100%; }
+    }
+
+    /* PPTX deck styling (simple) */
+    .deck { background:#f5f5f5; padding:2rem 0; }
+    .slide {
+      width:720pt;
+      height:405pt;
+      margin:2rem auto;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      border:1px solid #ccc;
+      background:#fff;
+    }
+    .slide h1, .slide h2, .slide ul, .slide ol {
+      margin:0.5rem;
+    }
+    .download-btn {
+      display:inline-block;
+      margin:1rem auto;
+      padding:0.8rem 1.6rem;
+      background:#d97757;
+      color:#fff;
+      border:none;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:1rem;
+    }
+    .download-btn:hover { background:#c0664c; }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav>
+      <div><strong>Iowa</strong></div>
+      <div>
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#features">Features</a>
+        <a href="#demo">Demo</a>
+        <a href="#contact">Contact</a>
+        <a href="#deck">Deck</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" class="hero">
+      <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='800'%20height='400'%3E%3Crect%20width='800'%20height='400'%20fill='%23e0e0e0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23888'%20font-size='24'%20font-family='Arial%2CHelvetica%2Csans-serif'%3EHome%20Hero%3C/text%3E%3C/svg%3E"
+           alt="Minimalist hero image representing home">
+      <h1>Welcome to Iowa</h1>
+      <p>Elegant, simple, and powerful. Experience the seamless design inspired by Apple’s timeless aesthetic.</p>
+    </section>
+
+    <!-- About -->
+    <section id="about">
+      <h2>About Iowa</h2>
+      <img src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='800'%20height='300'%3E%3Crect%20width='800'%20height='300'%20fill='%23d0d0d0'/%3E%3Ctext%20x='50%25'%20y='50%25'%20dominant-baseline='middle'%20text-anchor='middle'%20fill='%23666'%20font-size='20'%20font-family='Arial%2CHelvetica%2Csans-serif'%3EAbout%20Image%3C/text%3E%3C/svg%3E"
+           alt="Illustration about the product" style="width:100%;max-width:800px;border-radius:8px;">
+      <p>Iowa is a showcase of clean typography, generous whitespace, and subtle interactions. Built with modern HTML, CSS, and vanilla JavaScript, it runs instantly on any device.</p>
+    </section>
+
+    <!-- Features -->
+    <section id="features">
+      <h2>Features</h2>
+      <div class="features">
+        <div class="feature"><h3>Minimalist Design</h3><p>Every element is purposeful, with a focus on clarity and elegance.</p></div>
+        <div class="feature"><h3>Responsive Layout</h3><p>Adapts flawlessly from mobile to desktop, preserving the visual hierarchy.</p></div>
+        <div class="feature"><h3>Smooth Scrolling</h3><p>Native CSS smooth scrolling creates a fluid navigation experience.</p></div>
+        <div class="feature"><h3>High‑Resolution Imagery</h3><p>Placeholder SVGs act as crisp, scalable hero images.</p></div>
+        <div class="feature"><h3>Accessible Markup</h3><p>Semantic HTML, ARIA labels, and sufficient color contrast.</p></div>
+        <div class="feature"><h3>Zero Dependencies</h3><p>No external libraries – pure HTML, CSS, and JavaScript.</p></div>
+      </div>
+    </section>
+
+    <!-- Demo -->
+    <section id="demo">
+      <h2>Demo</h2>
+      <p>Below is a simple interactive canvas that demonstrates smooth animation – a nod to Apple’s subtle motion design.</p>
+      <canvas id="demoCanvas" class="demo-canvas" aria-label="Demo animation canvas"></canvas>
+      <script>
+        const canvas = document.getElementById('demoCanvas');
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = canvas.offsetWidth * dpr;
+        canvas.height = canvas.offsetHeight * dpr;
+        ctx.scale(dpr, dpr);
+        let angle = 0;
+        function draw() {
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          const cx = canvas.width / (2*dpr);
+          const cy = canvas.height / (2*dpr);
+          const radius = 60;
+          ctx.fillStyle = '#0071e3';
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(angle)*30, cy + Math.sin(angle)*30, radius, 0, Math.PI*2);
+          ctx.fill();
+          angle += 0.02;
+          requestAnimationFrame(draw);
+        }
+        draw();
+      </script>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact">
+      <h2>Contact Us</h2>
+      <p>Have questions or want to collaborate? Fill out the form below.</p>
+      <form aria-label="Contact form" onsubmit="event.preventDefault(); alert('Thank you! Your message has been received.');">
+        <input type="text" name="name" placeholder="Your name" aria-label="Name" required>
+        <input type="email" name="email" placeholder="you@example.com" aria-label="Email" required>
+        <textarea name="message" rows="4" placeholder="Your message" aria-label="Message" required></textarea>
+        <button type="submit">Send Message</button>
+      </form>
+    </section>
+
+    <!-- PPTX Deck -->
+    <section id="deck" class="deck">
+      <h2 style="text-align:center;">Deploy Sandbox Preview Deck</h2>
+
+      <!-- Slide 1 -->
+      <div class="slide" style="background:#141413;color:#faf9f5;font-family:Poppins,Arial,sans-serif;">
+        <div style="width:720pt;height:6pt;background:#d97757;"></div>
+        <div style="padding:60pt 60pt 0;">
+          <h1 style="font-size:44pt;margin:0 0 16pt;">Deploy Sandbox Preview</h1>
+          <p style="font-size:22pt;margin:0;color:#d97757;">Secure, fast, and shareable</p>
+        </div>
+      </div>
+
+      <!-- Slide 2 -->
+      <div class="slide" style="background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;">
+        <div style="width:720pt;height:6pt;background:#6a9bcc;"></div>
+        <div style="padding:24pt 48pt;">
+          <h2 style="font-size:28pt;margin:0 0 20pt;">Overview</h2>
+          <ul style="font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;">
+            <li>Goal: Provide a sandbox environment for previewing the new HTML site.</li>
+            <li>Stakeholders: Product, Engineering, QA, and Marketing.</li>
+            <li>Outcome: Shareable link with live PPTX preview.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Slide 3 -->
+      <div class="slide" style="background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;">
+        <div style="width:720pt;height:6pt;background:#788c5d;"></div>
+        <div style="padding:24pt 48pt;">
+          <h2 style="font-size:28pt;margin:0 0 20pt;">Deployment Process</h2>
+          <ol style="font-size:16pt;margin:0;padding-left:28pt;line-height:1.6;">
+            <li>Build the HTML site (codename Iowa) with production assets.</li>
+            <li>Upload the site to the sandbox server.</li>
+            <li>Generate the PPTX deck from this HTML.</li>
+            <li>Publish both artifacts and obtain shareable URLs.</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Slide 4 -->
+      <div class="slide" style="background:#faf9f5;color:#141413;font-family:Lora,Georgia,serif;">
+        <div style="width:720pt;height:6pt;background:#d97757;"></div>
+        <div style="padding:24pt 48pt;">
+          <h2 style="font-size:28pt;margin:0 0 20pt;">Benefits</h2>
+          <ul style="font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;">
+            <li>Instant feedback loop for stakeholders.</li>
+            <li>Reduced risk before production launch.</li>
+            <li>Easy distribution via a single link.</li>
+            <li>Consistent branding across site and deck.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Slide 5 -->
+      <div class="slide" style="background:#141413;color:#faf9f5;font-family:Poppins,Arial,sans-serif;">
+        <div style="width:720pt;height:6pt;background:#6a9bcc;"></div>
+        <div style="padding:60pt 60pt 0;">
+          <h1 style="font-size:38pt;margin:0 0 16pt;">Next Steps</h1>
+          <ul style="font-size:20pt;margin:0;color:#6a9bcc;list-style-type:disc;padding-left:24pt;">
+            <li>Review the sandbox preview link.</li>
+            <li>Provide feedback within 48 hours.</li>
+            <li>Approve for production rollout.</li>
+          </ul>
+        </div>
+      </div>
+
+      <button class="download-btn" id="downloadPptx">Download PPTX</button>
+    </section>
+  </main>
+
+  <footer>
+    © 2024 Iowa – All rights reserved.
+    <br>
+    Shareable preview URL:
+    <a href="https://sandbox.example.com/preview/iowa-preview-abc12345" target="_blank">
+      https://sandbox.example.com/preview/iowa-preview-abc12345
+    </a>
+  </footer>
+
+  <script>
+    // Simulate a PPTX file download (placeholder content)
+    document.getElementById('downloadPptx').addEventListener('click', function () {
+      const placeholder = 'Placeholder PPTX content – replace with real file in production.';
+      const blob = new Blob([placeholder], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Deploy_Sandbox

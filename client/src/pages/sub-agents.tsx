@@ -1009,8 +1009,8 @@ export default function SubAgentsPage() {
                               {...field}
                               value={field.value || ""}
                               placeholder="Custom instructions for this sub-agent's LLM. Leave blank for auto-generated prompt based on the agent's name and type."
-                              className="resize-none text-xs"
-                              rows={3}
+                              className="text-xs font-mono"
+                              rows={10}
                               data-testid="input-llm-system-prompt"
                             />
                           </FormControl>

@@ -1,3 +1,10 @@
+import * as fs from "fs";
+import * as path from "path";
+import { execSync } from "child_process";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { storage } from "./storage";
 import type { WorkOrder, LlmSettings } from "@shared/schema";
 import type { Tier1Result, Tier2Result, EffectiveLlmConfig } from "./llm-client";
@@ -8,7 +15,7 @@ import {
   llmRefine,
   effectiveConfigToSettings,
 } from "./llm-client";
-import { executeTool, getAvailableToolsForAgent, type ToolExecResult } from "./tool-executor";
+import { executeTool, getAvailableToolsForAgent, type ToolExecResult, type AvailableTool } from "./tool-executor";
 
 function shouldBlockFallback(order: WorkOrder): { blocked: boolean; reason: string | null } {
   if (order.type === "incident" && order.priority === "critical") {
@@ -106,9 +113,10 @@ export interface SharedDict {
   finalMessage: string;
   deliverableType: "document" | "code" | "image" | "mixed";
   deliverableTitle: string;
+  postProcessedFile: { path: string; mimeType: string; size: number } | null;
 
   revisionContext?: string;
-  availableTools: Array<{ slug: string; name: string; type: string; description: string }>;
+  availableTools: AvailableTool[];
   toolResults: ToolExecResult[];
   logs: Array<{ node: string; message: string; metadata?: any }>;
 }
@@ -150,6 +158,7 @@ function createSharedDict(
     finalMessage: "",
     deliverableType: "document",
     deliverableTitle: "",
+    postProcessedFile: null,
     availableTools: [],
     toolResults: [],
     logs: [],
@@ -183,7 +192,17 @@ function getEffectiveApiKey(dict: SharedDict): string | undefined {
 }
 
 function getSystemPrompt(dict: SharedDict): string {
-  return dict.llmConfig?.systemPrompt || dict.llmSettings?.systemPrompt || "";
+  const base = dict.llmConfig?.systemPrompt || dict.llmSettings?.systemPrompt || "";
+
+  // Inject skill content from prompt_injection tools into system prompt
+  const injectedSkills = (dict.availableTools || [])
+    .filter(t => t.executionMode === "prompt_injection" && t.skillContent)
+    .map(t => `\n\n---\n## Skill: ${t.name}\n${t.skillContent}`)
+    .join("");
+
+  if (!injectedSkills) return base;
+
+  return base + "\n\n# LOADED SKILLS\nThe following skills have been loaded into your context. Use their instructions when the work order requires their capabilities." + injectedSkills;
 }
 
 async function nodeValidateWorkOrder(dict: SharedDict): Promise<NodeResult> {
@@ -282,7 +301,14 @@ async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
       dict.currentStepIndex = dict.planSteps.findIndex(s => s.status === "pending");
       if (dict.currentStepIndex === -1) dict.currentStepIndex = 0;
     } else {
-      dict.planSteps = planned.map(s => ({ ...s, status: "pending" as const }));
+      const rawSteps = planned.map(s => ({ ...s, status: "pending" as const }));
+      // Sanitize: remove dependency IDs that don't reference any step in this plan.
+      // LLMs sometimes hallucinate dep IDs (wrong names, extra steps) causing deadlocks.
+      const stepIds = new Set(rawSteps.map(s => s.id));
+      dict.planSteps = rawSteps.map(s => ({
+        ...s,
+        dependencies: s.dependencies.filter(depId => stepIds.has(depId)),
+      }));
       dict.currentStepIndex = 0;
     }
 
@@ -319,7 +345,8 @@ function getReadySteps(dict: SharedDict): PlanStep[] {
     if (step.status !== "pending") return false;
     return step.dependencies.every(depId => {
       const dep = dict.planSteps.find(s => s.id === depId);
-      return dep && dep.status === "completed";
+      // If dep ID doesn't exist in the plan (hallucinated/stale), treat as satisfied.
+      return !dep || dep.status === "completed";
     });
   });
 }
@@ -604,7 +631,8 @@ async function nodeEvaluate(dict: SharedDict): Promise<NodeResult> {
       dict.workOrder,
       combinedOutput,
       dict.planSteps,
-      apiKey
+      apiKey,
+      detectRequiredFormat(dict)
     );
 
     dict.evaluationScore = evalResult.score;
@@ -745,14 +773,375 @@ function cleanDeliverable(raw: string): string {
   return cleaned;
 }
 
+/**
+ * Detect if the work order deliverable should be a specific file format
+ * based on work order description and assigned tool skills.
+ */
+function detectRequiredFormat(dict: SharedDict): "pptx" | "pdf" | null {
+  const text = `${dict.workOrder.title} ${dict.workOrder.description}`.toLowerCase();
+
+  // Explicit keyword matching takes priority over skill-based detection
+  const hasPdfKeywords = /\b(pdf|portable\s*document)\b/.test(text);
+  if (hasPdfKeywords) return "pdf";
+
+  const hasPptxKeywords = /\b(pptx|powerpoint|slide\s*deck|presentation|pitch\s*deck|slides)\b/.test(text);
+  if (hasPptxKeywords) return "pptx";
+
+  // Fall back to skill-based detection
+  const hasPptxSkill = dict.availableTools.some(
+    t => t.executionMode === "prompt_injection" && /pptx|powerpoint|presentation/i.test(t.slug + " " + t.name)
+  );
+  if (hasPptxSkill) return "pptx";
+
+  const hasPdfSkill = dict.availableTools.some(
+    t => t.executionMode === "prompt_injection" && /pdf/i.test(t.slug + " " + t.name)
+  );
+  if (hasPdfSkill) return "pdf";
+
+  return null;
+}
+
+/**
+ * Inject a professional CSS stylesheet into a pandoc-generated HTML document
+ * before LibreOffice renders it to PDF.
+ */
+function injectPdfStyles(html: string, title: string): string {
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  const css = `
+<style>
+  /* ── Page: zero margins — Chromium/Playwright respects this for full-bleed ── */
+  @page { margin: 0; }
+
+  /* ── Override pandoc's default narrow body (max-width:36em, margin:auto) ── */
+  html, body {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* ── Base typography ── */
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.6;
+    color: #1a1a1a;
+  }
+
+  /* ── Header bar: edge-to-edge, full-bleed ── */
+  .doc-header {
+    background: #0d1b3e;
+    color: #ffffff;
+    padding: 18px 25mm 15px 25mm;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .doc-header .doc-eyebrow {
+    font-size: 7.5pt;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #7eb3ff;
+    margin-bottom: 5px;
+  }
+  .doc-header .doc-title {
+    font-size: 20pt;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
+  }
+  .doc-header .doc-subtitle {
+    font-size: 9pt;
+    color: #a8c4e8;
+    margin-top: 5px;
+  }
+
+  /* ── Body content area: padding provides page margins ── */
+  .doc-body {
+    padding: 14mm 25mm 20mm 25mm;
+    box-sizing: border-box;
+  }
+
+  /* ── Headings ── */
+  h1 {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0d1b3e;
+    border-bottom: 2px solid #0d1b3e;
+    padding-bottom: 5px;
+    margin: 20px 0 10px 0;
+  }
+  h2 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #1a3a6b;
+    margin: 16px 0 6px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #2c5282;
+    margin: 12px 0 5px 0;
+  }
+
+  /* ── Paragraphs ── */
+  p { margin: 0 0 9px 0; }
+
+  /* ── Lists ── */
+  ul, ol { margin: 5px 0 10px 22px; padding: 0; }
+  ul { list-style-type: disc; }
+  ol { list-style-type: decimal; }
+  li { margin-bottom: 4px; padding-left: 3px; }
+  li strong { color: #1a3a6b; }
+
+  /* ── Strong ── */
+  strong { font-weight: 700; }
+
+  /* ── HR → section divider ── */
+  hr { border: none; border-top: 1px solid #d0dae8; margin: 18px 0; }
+
+  /* ── Callout box ── */
+  blockquote {
+    background: #eef4ff;
+    border-left: 4px solid #1a3a6b;
+    padding: 9px 14px;
+    margin: 12px 0;
+    font-style: normal;
+    color: #1a2a4a;
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* ── Footer: fixed to bottom of every page — Chromium supports position:fixed in print ── */
+  .doc-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #0d1b3e;
+    color: #7eb3ff;
+    font-size: 7.5pt;
+    padding: 6px 25mm;
+    display: flex;
+    justify-content: space-between;
+    box-sizing: border-box;
+  }
+  .doc-footer span { line-height: 1.4; }
+</style>`;
+
+  // Build header/footer — natural full-width with @page margin: 0
+  const headerBlock = `
+<div class="doc-header">
+  <div class="doc-eyebrow">AIDEN IWO Platform</div>
+  <div class="doc-title">${title}</div>
+  <div class="doc-subtitle">Confidential &nbsp;|&nbsp; ${today}</div>
+</div>
+<div class="doc-body">`;
+
+  const footerBlock = `</div>
+<div class="doc-footer">
+  <span>AIDEN IWO — Confidential</span>
+  <span>${today}</span>
+</div>`;
+
+  // Inject CSS into <head>, wrap body content
+  let result = html;
+  result = result.replace(/<\/head>/, `${css}\n</head>`);
+
+  // Remove pandoc's title block — pandoc wraps the metadata title in:
+  //   <header id="title-block-header"><h1 class="title">...</h1></header>
+  // This duplicates our header bar, so strip it entirely.
+  result = result.replace(
+    /<body[^>]*>([\s\S]*?)<\/body>/i,
+    (_match: string, bodyContent: string) => {
+      let stripped = bodyContent
+        // Strip pandoc's title-block header element
+        .replace(/<header[^>]*id=["']title-block-header["'][^>]*>[\s\S]*?<\/header>\s*/i, "")
+        // Fallback: strip any lone leading H1 (single-line — covers simple cases)
+        .replace(/^\s*<h1[^>]*>[^<]*<\/h1>\s*/i, "");
+      return `<body>\n${headerBlock}\n${stripped}\n${footerBlock}\n</body>`;
+    }
+  );
+
+  return result;
+}
+
+/**
+ * Post-process the deliverable: convert markdown to the required output format.
+ * Currently supports markdown → .pptx conversion via python-pptx.
+ */
+async function nodePostProcess(dict: SharedDict): Promise<void> {
+  const format = detectRequiredFormat(dict);
+  if (!format) return;
+
+  if (format === "pptx") {
+    try {
+      // Detect whether the sub-agent produced HTML slides or markdown
+      const deliverable = dict.finalDeliverable;
+      const isHtmlSlides = /<section[^>]*class=["'][^"']*slide[^"']*["']/i.test(deliverable.slice(0, 1000)) ||
+        (/<!DOCTYPE html|<html/i.test(deliverable.slice(0, 200)) && /<section/i.test(deliverable));
+
+      const scriptPath = isHtmlSlides
+        ? path.resolve(process.cwd(), "server/scripts/html-to-pptx.cjs")
+        : path.resolve(process.cwd(), "server/scripts/md-to-pptx.py");
+
+      if (!fs.existsSync(scriptPath)) {
+        await emitNodeLog(dict, "PostProcess", "PPTX conversion script not found — skipping", { scriptPath });
+        return;
+      }
+
+      // Write deliverable to temp file
+      const tmpDir = path.resolve(".local/tmp");
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const ext = isHtmlSlides ? "html" : "md";
+      const inputPath = path.join(tmpDir, `${dict.workOrder.id}.${ext}`);
+      const outputPath = path.join(tmpDir, `${dict.workOrder.id}.pptx`);
+      fs.writeFileSync(inputPath, dict.finalDeliverable, "utf-8");
+
+      // Run conversion (html2pptx needs more time — Playwright launches a browser per slide)
+      const title = dict.deliverableTitle || dict.workOrder.title;
+      const cmd = isHtmlSlides
+        ? `node "${scriptPath}" --input "${inputPath}" --output "${outputPath}"`
+        : `python3 "${scriptPath}" --input "${inputPath}" --output "${outputPath}" --title "${title.replace(/"/g, '\\"')}"`;
+
+      await emitNodeLog(dict, "PostProcess", `Converting deliverable to PPTX via ${isHtmlSlides ? "html2pptx" : "md-to-pptx"}`, { isHtmlSlides });
+
+      const result = execSync(cmd, { timeout: isHtmlSlides ? 90000 : 30000, encoding: "utf-8" });
+
+      const parsed = JSON.parse(result.trim());
+      if (parsed.success && fs.existsSync(outputPath)) {
+        const stats = fs.statSync(outputPath);
+        dict.postProcessedFile = {
+          path: outputPath,
+          mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          size: stats.size,
+        };
+
+        // Update the deliverable message to note the file was generated
+        dict.finalMessage += ` A .pptx file (${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB) has been generated.`;
+
+        await emitNodeLog(dict, "PostProcess", `PPTX generated: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB`, {
+          format: "pptx",
+          slideCount: parsed.slideCount,
+          fileSize: stats.size,
+          path: outputPath,
+        });
+      }
+
+      // Clean up input temp file
+      fs.unlinkSync(inputPath);
+    } catch (err: any) {
+      await emitNodeLog(dict, "PostProcess", `PPTX conversion failed: ${err.message}`, { error: err.message });
+    }
+  }
+
+  if (format === "pdf") {
+    try {
+      const tmpDir = path.resolve(".local/tmp");
+      fs.mkdirSync(tmpDir, { recursive: true });
+
+      const title = (dict.deliverableTitle || dict.workOrder.title).replace(/"/g, '\\"');
+      const mdPath = path.join(tmpDir, `${dict.workOrder.id}.md`);
+      const htmlPath = path.join(tmpDir, `${dict.workOrder.id}.html`);
+      const pdfPath = path.join(tmpDir, `${dict.workOrder.id}.pdf`);
+
+      fs.writeFileSync(mdPath, dict.finalDeliverable, "utf-8");
+
+      await emitNodeLog(dict, "PostProcess", "Converting deliverable to PDF via pandoc + Playwright Chromium");
+
+      // Step 1: markdown → standalone HTML (pandoc handles markdown reliably)
+      execSync(
+        `pandoc "${mdPath}" -t html5 --standalone --metadata title="${title}" -o "${htmlPath}"`,
+        { timeout: 30000, encoding: "utf-8" }
+      );
+
+      if (!fs.existsSync(htmlPath)) {
+        throw new Error("pandoc failed to produce HTML intermediate file");
+      }
+
+      // Step 1b: Inject professional CSS + header/footer layout
+      const rawHtml = fs.readFileSync(htmlPath, "utf-8");
+      const styledHtml = injectPdfStyles(rawHtml, dict.deliverableTitle || dict.workOrder.title);
+      fs.writeFileSync(htmlPath, styledHtml, "utf-8");
+
+      // Step 2: HTML → PDF via Playwright Chromium (full CSS support: position:fixed, @page, full-bleed)
+      const pdfScriptPath = path.resolve(process.cwd(), "server/scripts/html-to-pdf.cjs");
+      const pdfResult = execSync(
+        `node "${pdfScriptPath}" --input "${htmlPath}" --output "${pdfPath}"`,
+        { timeout: 60000, encoding: "utf-8" }
+      );
+
+      let pdfScriptOutput: any = {};
+      try { pdfScriptOutput = JSON.parse(pdfResult.trim()); } catch { /* non-JSON stderr mixed in */ }
+
+      if (!fs.existsSync(pdfPath) || !pdfScriptOutput.success) {
+        throw new Error(`Playwright PDF conversion failed: ${pdfScriptOutput.error || "no output file"}`);
+      }
+
+      const stats = fs.statSync(pdfPath);
+
+      // Move PDF to workspace artifacts directory
+      const safeTitle = (dict.deliverableTitle || dict.workOrder.title)
+        .replace(/[^a-z0-9_\-\s]/gi, "")
+        .trim()
+        .replace(/\s+/g, "_")
+        .slice(0, 60);
+      const artifactDir = path.resolve(".local/workspace/05_Artifacts");
+      fs.mkdirSync(artifactDir, { recursive: true });
+      const finalPdfPath = path.join(artifactDir, `${safeTitle}.pdf`);
+      fs.copyFileSync(pdfPath, finalPdfPath);
+
+      dict.postProcessedFile = {
+        path: finalPdfPath,
+        mimeType: "application/pdf",
+        size: stats.size,
+      };
+
+      dict.finalMessage += ` A PDF document (${(stats.size / 1024).toFixed(0)}KB) has been generated.`;
+
+      await emitNodeLog(dict, "PostProcess", `PDF generated: ${(stats.size / 1024).toFixed(0)}KB`, {
+        format: "pdf",
+        fileSize: stats.size,
+        path: finalPdfPath,
+      });
+
+      // Clean up temp files
+      fs.unlinkSync(mdPath);
+      fs.unlinkSync(htmlPath);
+      fs.unlinkSync(pdfPath);
+    } catch (err: any) {
+      await emitNodeLog(dict, "PostProcess", `PDF conversion failed: ${err.message}`, { error: err.message });
+    }
+  }
+}
+
 async function nodeBuildResponse(dict: SharedDict): Promise<NodeResult> {
   const orderText = `${dict.workOrder.title} ${dict.workOrder.description}`.toLowerCase();
-  const expectsHtml = /\b(html|web\s*page|landing\s*page|homepage|website|web\s*app|dashboard\s*page|interactive\s*page)\b/i.test(orderText) ||
-    (/sandbox/i.test(orderText));
+  // BUG-011 fix: PPTX-bound or PDF-bound work orders must never be routed to HTML assembly,
+  // even if "sandbox" or another HTML-adjacent keyword appears in the order text.
+  const detectedFormat = detectRequiredFormat(dict);
+  const requiresPptx = detectedFormat === "pptx";
+  const requiresPdf = detectedFormat === "pdf";
+  const expectsHtml = !requiresPptx && !requiresPdf && (
+    /\b(html|web\s*page|landing\s*page|homepage|website|web\s*app|dashboard\s*page|interactive\s*page)\b/i.test(orderText) ||
+    (/sandbox/i.test(orderText))
+  );
 
   let combinedDeliverable: string;
 
-  if (expectsHtml) {
+  if (requiresPdf) {
+    // For PDF: use only the most recent completed step output — never concatenate iterations.
+    // Multiple iteration outputs of the same document create duplicate pages.
+    const lastStepOutput = dict.stepResults.length > 0
+      ? dict.stepResults[dict.stepResults.length - 1].output
+      : null;
+    const fallbackValues = Object.values(dict.accumulatedOutputs);
+    combinedDeliverable = lastStepOutput
+      ? cleanDeliverable(lastStepOutput)
+      : fallbackValues.length > 0 ? cleanDeliverable(fallbackValues[fallbackValues.length - 1]) : "";
+  } else if (expectsHtml) {
     const bestHtml = selectBestHtmlOutput(dict.accumulatedOutputs);
     if (bestHtml) {
       combinedDeliverable = cleanDeliverable(bestHtml);
@@ -765,8 +1154,18 @@ async function nodeBuildResponse(dict: SharedDict): Promise<NodeResult> {
         : Object.values(dict.accumulatedOutputs).join("\n\n");
     }
   } else {
-    const allOutputs = Object.values(dict.accumulatedOutputs);
-    combinedDeliverable = allOutputs.join("\n\n");
+    // BUG-025 fix: Use only the last iteration's step outputs to prevent content duplication.
+    // On refinement loops, new steps get new IDs — all iterations accumulate in accumulatedOutputs.
+    // Joining across iterations produces duplicate full-document content.
+    const lastIterResults = dict.stepResults.filter(r => r.iteration === dict.iteration);
+    const targetResults = lastIterResults.length > 0 ? lastIterResults : dict.stepResults;
+    const contentOutputs = targetResults
+      .filter(r => !isIntermediateOutput(r.output))
+      .map(r => r.output);
+    combinedDeliverable = contentOutputs.length > 0
+      ? contentOutputs.join("\n\n")
+      : Object.values(dict.accumulatedOutputs).filter(v => !isIntermediateOutput(v)).join("\n\n")
+        || Object.values(dict.accumulatedOutputs).join("\n\n");
   }
 
   if (!combinedDeliverable.trim() && dict.stepResults.length === 0) {
@@ -877,6 +1276,7 @@ export async function pocketflowExecute(
 
     if (evalResult.action === "converged" || evalResult.action === "best_effort") {
       await nodeBuildResponse(dict);
+      await nodePostProcess(dict);
       return buildSuccessResult(dict);
     }
 
@@ -884,6 +1284,7 @@ export async function pocketflowExecute(
       const refineResult = await nodeRefine(dict);
       if (refineResult.action === "converged") {
         await nodeBuildResponse(dict);
+        await nodePostProcess(dict);
         return buildSuccessResult(dict);
       }
 
@@ -900,6 +1301,7 @@ export async function pocketflowExecute(
     score: dict.evaluationScore,
   });
   await nodeBuildResponse(dict);
+  await nodePostProcess(dict);
   return buildSuccessResult(dict);
 }
 
@@ -947,6 +1349,7 @@ function buildSuccessResult(dict: SharedDict): Tier2Result {
       deliverable: dict.finalDeliverable,
       deliverableType: dict.deliverableType,
       deliverableTitle: dict.deliverableTitle,
+      postProcessedFile: dict.postProcessedFile || undefined,
     },
     pocketflow: {
       iterations: dict.iteration + 1,

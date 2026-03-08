@@ -146,6 +146,11 @@ const tier2ResponseSchema = z.object({
     deliverable: z.string().optional(),
     deliverableType: z.enum(["document", "code", "image", "mixed"]).optional(),
     deliverableTitle: z.string().optional(),
+    postProcessedFile: z.object({
+      path: z.string(),
+      mimeType: z.string(),
+      size: z.number(),
+    }).optional(),
   }).optional(),
   pocketflow: z.object({
     iterations: z.number().optional(),
@@ -411,7 +416,8 @@ CRITICAL ROUTING RULE: If the operator explicitly names or requests a specific s
 
   const config = getProviderConfig(settings);
   const apiKey = getApiKey(config.apiKeyEnvVar);
-  const client = new OpenAI({ apiKey, baseURL: config.baseURL });
+  // timeout: 45s max, maxRetries: 1 — prevents indefinite hang on rate limits
+  const client = new OpenAI({ apiKey, baseURL: config.baseURL, timeout: 45000, maxRetries: 1 });
   const messages = [
     { role: "system", content: chatSystemPrompt },
     ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
@@ -579,12 +585,32 @@ Work Order:
 
   try {
     const raw = await callLLM(settings, settings.systemPrompt, prompt);
+    console.log("[tier1] LLM raw response length:", raw?.length, "preview:", raw?.substring(0, 200));
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : raw;
     const parsed = safeJsonParse(jsonStr);
-    return tier1ResponseSchema.parse(parsed);
+
+    if (!parsed || typeof parsed !== "object" || Object.keys(parsed).length === 0) {
+      console.error("[tier1] LLM returned empty or non-object response:", raw?.substring(0, 500));
+      return {
+        approved: false,
+        reason: "LLM returned an empty response. The API key or model may be misconfigured.",
+        mode: "manual_review",
+        handler: null,
+      };
+    }
+
+    // Apply defaults for missing fields to handle partial LLM responses
+    const withDefaults = {
+      approved: typeof parsed.approved === "boolean" ? parsed.approved : false,
+      reason: parsed.reason || parsed.explanation || parsed.message || "No reason provided by LLM",
+      mode: parsed.mode || (parsed.approved ? "auto" : "manual_review"),
+      handler: parsed.handler || parsed.sub_agent || parsed.agent || null,
+    };
+
+    return tier1ResponseSchema.parse(withDefaults);
   } catch (err: any) {
-    console.error("Tier 1 LLM error:", err.message);
+    console.error("[tier1] LLM evaluation error:", err.message);
     return {
       approved: false,
       reason: `LLM evaluation failed: ${err.message}. Blocking for safety.`,
@@ -937,8 +963,15 @@ export async function llmEvaluate(
   order: WorkOrder,
   combinedOutput: string,
   planSteps: Array<{ id: string; name: string; status: string }>,
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  platformFormat?: "pdf" | "pptx" | null
 ): Promise<{ score: number; meetsCriteria: boolean; gaps: string[]; strengths: string[]; reasoning: string }> {
+  const formatNote = platformFormat === "pdf"
+    ? `\nPLATFORM NOTE: This work order requires a PDF deliverable. The platform's post-processor automatically converts the sub-agent's markdown/text output to a styled PDF binary. The sub-agent CANNOT and SHOULD NOT produce a binary PDF file. Evaluate ONLY the quality, structure, and completeness of the text/markdown content. Do NOT penalize for "not a PDF file", "no binary generated", or "cannot verify PDF". Score the content on its own merits.`
+    : platformFormat === "pptx"
+    ? `\nPLATFORM NOTE: This work order requires a PPTX deliverable. The platform's post-processor automatically converts the sub-agent's markdown/HTML output to a PowerPoint binary. Evaluate ONLY content quality — do NOT penalize for missing binary file.`
+    : "";
+
   const prompt = `You are evaluating the quality and completeness of a work order's deliverable.
 
 Work Order:
@@ -946,7 +979,7 @@ Work Order:
 - Description: ${order.description}
 - Type: ${order.type}
 - Priority: ${order.priority}
-
+${formatNote}
 Steps executed: ${planSteps.filter(s => s.status === "completed").map(s => s.name).join(", ")}
 Steps failed: ${planSteps.filter(s => s.status === "failed").map(s => s.name).join(", ") || "none"}
 
@@ -1151,7 +1184,8 @@ export async function runAidenQualityReview(
   iterations: number,
   stepCount: number,
   executorName: string,
-  hadSearchTools?: boolean
+  hadSearchTools?: boolean,
+  postProcessedFile?: { path: string; mimeType: string; size: number } | null
 ): Promise<AidenQualityReview> {
   const structuralCheck = runStructuralPreCheck(order, deliverable);
   if (!structuralCheck.pass && structuralCheck.severity === "hard") {
@@ -1203,8 +1237,8 @@ Rules:
 - Only flag issues that the executor COULD reasonably fix given its capabilities (see below)
 - NEVER approve a deliverable that contains raw JSON data, escape characters (\n \t), or placeholder text like "Headline 1 – Source" — these indicate the deliverable was not properly rendered
 - If the work order asked for HTML, the deliverable MUST be a complete, well-formed HTML document — not markdown about HTML, not JSON describing HTML
+${postProcessedFile ? `- *** MANDATORY RULE — POST-PROCESSING FILE EXISTS: A binary file (${postProcessedFile.mimeType}, ${(postProcessedFile.size / 1024).toFixed(0)}KB) was automatically generated from the markdown/text deliverable below. This means: (1) file format requirement = AUTOMATICALLY SATISFIED — do NOT flag "deliverable is HTML", "deliverable is markdown", "not a PDF", "not a PowerPoint", "missing .pdf", "missing .pptx", "cannot verify page count", or any file format/save location issues, (2) the binary file was produced by the platform post-processor, not the sub-agent, (3) score the file format dimension as 1.0, (4) evaluate ONLY content quality: structure, completeness, writing quality, and whether the content addresses the work order topic. ***` : ""}
 ${capabilitiesNote}
-
 Work Order:
 - Title: ${order.title}
 - Description: ${order.description || "No description"}

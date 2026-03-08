@@ -1,0 +1,376 @@
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa – Apple‑Style Site</title>\n<meta name=\"description\" content=\"Apple‑inspired website showcasing Iowa project. Clean design, smooth navigation.\">\n<style>\n:root{\n  --bg:#fff;\n  --text:#111;\n  --accent:#0071e3;\n  --nav-height:60px;\n}\n*{margin:0;padding:0;box-sizing:border-box;}\nhtml{scroll-behavior:smooth;}\nbody{\n  font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n  color:var(--text);\n  background:var(--bg);\n  line-height:1.6;\n}\nheader{\n  position:fixed;top:0;left:0;width:100%;height:var(--nav-height);\n  background:rgba(255,255,255,0.9);\n  backdrop-filter:blur(10px);\n  display:flex;align-items:center;justify-content:center;\n  box-shadow:0 1px 4px rgba(0,0,0,0.1);\n  z-index:1000;\n}\nnav ul{\n  list-style:none;display:flex;gap:2rem;\n}\nnav a{\n  text-decoration:none;color:var(--text);\n  font-weight:500;\n}\nnav a:hover, nav a.active{color:var(--accent);}\nsection{\n  padding:calc(var(--nav-height) + 4rem) 2rem 4rem;\n  max-width:1200px;margin:auto;\n}\nsection h1{\n  font-size:2.5rem;margin-bottom:1rem;\n}\nsection p{\n  font-size:1.125rem;margin-bottom:1.5rem;\n}\n.hero{\n  display:flex;flex-direction:column;align-items:center;text-align:center;\n}\n.hero img{\n  width:100%;max-width:800px;height:auto;border-radius:8px;margin-top:2rem;\n}\nimg.responsive{width:100%;height:auto;border-radius:8px;}\nfooter{\n  text-align:center;padding:2rem;color:#666;font-size:.875rem;\n}\n@media(min-width:768px){\n  .hero{flex-direction:row;text-align:left;align-items:flex-start;}\n  .hero div{flex:1;padding-right:2rem;}\n  .hero img{flex:1;max-width:none;margin-top:0;}\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Main navigation\">\n  <nav>\n    <ul>\n      <li><a href=\"#home\" class=\"active\">Home</a></li>\n      <li><a href=\"#about\">About</a></li>\n      <li><a href=\"#products\">Products</a></li>\n      <li><a href=\"#solutions\">Solutions</a></li>\n      <li><a href=\"#contact\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<section id=\"home\" aria-label=\"Home\">\n  <div class=\"hero\">\n    <div>\n      <h1>Welcome to Iowa</h1>\n      <p>Experience the elegance of Apple‑inspired design, crafted for simplicity and performance.</p>\n    </div>\n    <img src=\"https://picsum.photos/seed/home/800/400\" alt=\"Elegant product showcase\">\n  </div>\n</section>\n\n<section id=\"about\" aria-label=\"About\">\n  <h1>About Iowa</h1>\n  <p>Iowa is a conceptual project that embodies clean aesthetics, seamless interaction, and meticulous craftsmanship.</p>\n  <img src=\"https://picsum.photos/seed/about/800/400\" alt=\"Team collaboration\" class=\"responsive\">\n</section>\n\n<section id=\"products\" aria-label=\"Products\">\n  <h1>Products</h1>\n  <p>Our product line showcases refined hardware and software experiences.</p>\n  <img src=\"https://picsum.photos/seed/products/800/400\" alt=\"Product lineup\" class=\"responsive\">\n</section>\n\n<section id=\"solutions\" aria-label=\"Solutions\">\n  <h1>Solutions</h1>\n  <p>We provide integrated solutions that blend hardware, software, and services into a unified ecosystem.</p>\n  <img src=\"https://picsum.photos/seed/solutions/800/400\" alt=\"Integrated solutions diagram\" class=\"responsive\">\n</section>\n\n<section id=\"contact\" aria-label=\"Contact\">\n  <h1>Contact</h1>\n  <p>Get in touch to learn more about Iowa and how it can elevate your experience.</p>\n  <p>Email: <a href=\"mailto:info@iowa.com\">info@iowa.com</a></p>\n  <img src=\"https://picsum.photos/seed/contact/800/400\" alt=\"Contact illustration\" class=\"responsive\">\n</section>\n\n<footer>\n  © 2026 Iowa. All rights reserved.\n</footer>\n\n<script>\ndocument.querySelectorAll('nav a').forEach(link=>{\n  link.addEventListener('click',function(){\n    document.querySelectorAll('nav a').forEach(l=>l.classList.remove('active'));\n    this.classList.add('active');\n  });\n});\n</script>\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Iowa – Apple‑Style Site</title>\n<meta name=\"description\" content=\"Apple‑inspired website showcasing Iowa project. Clean design, smooth navigation.\">\n<style>\n:root{\n  --bg:#fff;\n  --text:#111;\n  --accent:#0071e3;\n  --nav-height:60px;\n}\n*{margin:0;padding:0;box-sizing:border-box;}\nhtml{scroll-behavior:smooth;}\nbody{\n  font-family:-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n  color:var(--text);\n  background:var(--bg);\n  line-height:1.6;\n}\nheader{\n  position:fixed;top:0;left:0;width:100%;height:var(--nav-height);\n  background:rgba(255,255,255,0.9);\n  backdrop-filter:blur(10px);\n  display:flex;align-items:center;justify-content:center;\n  box-shadow:0 1px 4px rgba(0,0,0,0.1);\n  z-index:1000;\n}\nnav ul{\n  list-style:none;display:flex;gap:2rem;\n}\nnav a{\n  text-decoration:none;color:var(--text);\n  font-weight:500;\n}\nnav a:hover, nav a.active{color:var(--accent);}\nsection{\n  padding:calc(var(--nav-height) + 4rem) 2rem 4rem;\n  max-width:1200px;margin:auto;\n}\nsection h1{\n  font-size:2.5rem;margin-bottom:1rem;\n}\nsection p{\n  font-size:1.125rem;margin-bottom:1.5rem;\n}\n.hero{\n  display:flex;flex-direction:column;align-items:center;text-align:center;\n}\n.hero img{\n  width:100%;max-width:800px;height:auto;border-radius:8px;margin-top:2rem;\n}\nimg.responsive{width:100%;height:auto;border-radius:8px;}\nfooter{\n  text-align:center;padding:2rem;color:#666;font-size:.875rem;\n}\n@media(min-width:768px){\n  .hero{flex-direction:row;text-align:left;align-items:flex-start;}\n  .hero div{flex:1;padding-right:2rem;}\n  .hero img{flex:1;max-width:none;margin-top:0;}\n}\n</style>\n</head>\n<body>\n<header aria-label=\"Main navigation\">\n  <nav>\n    <ul>\n      <li><a href=\"#home\" class=\"active\">Home</a></li>\n      <li><a href=\"#about\">About</a></li>\n      <li><a href=\"#products\">Products</a></li>\n      <li><a href=\"#solutions\">Solutions</a></li>\n      <li><a href=\"#contact\">Contact</a></li>\n    </ul>\n  </nav>\n</header>\n\n<section id=\"home\" aria-label=\"Home\">\n  <div class=\"hero\">\n    <div>\n      <h1>Welcome to Iowa</h1>\n      <p>Experience the elegance of Apple‑inspired design, crafted for simplicity and performance.</p>\n    </div>\n    <img src=\"https://picsum.photos/seed/home/800/400\" alt=\"Elegant product showcase\">\n  </div>\n</section>\n\n<section id=\"about\" aria-label=\"About\">\n  <h1>About Iowa</h1>\n  <p>Iowa is a conceptual project that embodies clean aesthetics, seamless interaction, and meticulous craftsmanship.</p>\n  <img src=\"https://picsum.photos/seed/about/800/400\" alt=\"Team collaboration\" class=\"responsive\">\n</section>\n\n<section id=\"products\" aria-label=\"Products\">\n  <h1>Products</h1>\n  <p>Our product line showcases refined hardware and software experiences.</p>\n  <img src=\"https://picsum.photos/seed/products/800/400\" alt=\"Product lineup\" class=\"responsive\">\n</section>\n\n<section id=\"solutions\" aria-label=\"Solutions\">\n  <h1>Solutions</h1>\n  <p>We provide integrated solutions that blend hardware, software, and services into a unified ecosystem.</p>\n  <img src=\"https://picsum.photos/seed/solutions/800/400\" alt=\"Integrated solutions diagram\" class=\"responsive\">\n</section>\n\n<section id=\"contact\" aria-label=\"Contact\">\n  <h1>Contact</h1>\n  <p>Get in touch to learn more about Iowa and how it can elevate your experience.</p>\n  <p>Email: <a href=\"mailto:info@iowa.com\">info@iowa.com</a></p>\n  <img src=\"https://picsum.photos/seed/contact/800/400\" alt=\"Contact illustration\" class=\"responsive\">\n</section>\n\n<footer>\n  © 2026 Iowa. All rights reserved.\n</footer>\n\n<script>\ndocument.querySelectorAll('nav a').forEach(link=>{\n  link.addEventListener('click',function(){\n    document.querySelectorAll('nav a').forEach(l=>l.classList.remove('active'));\n    this.classList.add('active');\n  });\n});\n</script>\n</body>\n</html>
+
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Iowa – Apple‑Style Presentation</title></head><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0;padding:0;">
+<section class="slide" style="width:720pt;height:405pt;background:#091C53;">
+  <div style="width:720pt;height:6pt;background:#8B49E2;"></div>
+  <div style="padding:60pt 60pt 0;">
+    <h1 style="color:#fff;font-family:Arial;font-size:44pt;margin:0 0 16pt;">Iowa – Apple‑Style Presentation</h1>
+    <p style="color:#8B49E2;font-family:Arial;font-size:22pt;margin:0;">Elegant Design, Seamless Experience</p>
+  </div>
+</section>
+<section class="slide" style="width:720pt;height:405pt;background:#F3F4FA;">
+  <div style="width:720pt;height:6pt;background:#8B49E2;"></div>
+  <div style="padding:24pt 48pt;">
+    <h2 style="color:#091C53;font-family:Arial;font-size:28pt;margin:0 0 20pt;">Welcome</h2>
+    <ul style="color:#2D2D2D;font-family:Arial;font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;">
+      <li>Experience the elegance of Apple‑inspired design.</li>
+      <li>Clean aesthetics, smooth navigation, meticulous craftsmanship.</li>
+      <li>Designed to elevate user experience across devices.</li>
+    </ul>
+  </div>
+</section>
+<section class="slide" style="width:720pt;height:405pt;background:#F3F4FA;">
+  <div style="width:720pt;height:6pt;background:#8B49E2;"></div>
+  <div style="padding:24pt 48pt;">
+    <h2 style="color:#091C53;font-family:Arial;font-size:28pt;margin:0 0 20pt;">About Iowa</h2>
+    <ul style="color:#2D2D2D;font-family:Arial;font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;">
+      <li>Conceptual project embodying clean aesthetics.</li>
+      <li>Seamless interaction and refined visual language.</li>
+      <li>Meticulous craftsmanship at every touchpoint.</li>
+    </ul>
+  </div>
+</section>
+<section class="slide" style="width:720pt;height:405pt;background:#F3F4FA;">
+  <div style="width:720pt;height:6pt;background:#8B49E2;"></div>
+  <div style="padding:24pt 48pt;">
+    <h2 style="color:#091C53;font-family:Arial;font-size:28pt;margin:0 0 20pt;">Products</h2>
+    <ul style="color:#2D2D2D;font-family:Arial;font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;">
+      <li>Refined hardware showcasing sleek form.</li>
+      <li>Intuitive software delivering powerful performance.</li>
+      <li>Integrated ecosystem for seamless workflow.</li>
+    </ul>
+  </div>
+</section>
+<section class="slide" style="width:720pt;height:405pt;background:#F3F4FA;">
+  <div style="width:720pt;height:6pt;background:#8B49E2;"></div>
+  <div style="padding:24pt 48pt;">
+    <h2 style="color:#091C53;font-family:Arial;font-size:28pt;margin:0 0 20pt;">Contact</h2>
+    <ul style="color:#2D2D2D;font-family:Arial;font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;">
+      <li>Email: <a href="mailto:info@iowa.com" style="color:#0071e3;">info@iowa.com</a></li>
+      <li>Visit our website for more details.</li>
+    </ul>
+  </div>
+</section>
+</body></html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artifacts Stored</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f5f5;color:#333;padding:20px;}
+.container{max-width:800px;margin:auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+h1{color:#091C53;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Artifacts Stored</h1>
+<p>The final deliverables have been saved to the <code>/05_Artifacts</code> directory.</p>
+<ul>
+<li><strong>PPTX Deck:</strong> <code>deck.pptx</code> (generated from step_1)</li>
+<li><strong>Sandbox Preview URL:</strong> <code>sandbox_url.txt</code> (contains the preview link from step_3)</li>
+</ul>
+<p>You can retrieve these files from the project repository or the designated storage location.</p>
+</div>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deliverables Ready – Summary Notification</title>
+<meta name="description" content="Notification that the PPTX deck and sandbox preview are ready and stored in /05_Artifacts.">
+<style>
+body{font-family:Arial,sans-serif;background:#f5f5f5;color:#333;margin:0;padding:20px;display:flex;justify-content:center;align-items:center;height:100vh;}
+.container{background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:600px;width:100%;}
+h1{color:#091C53;margin-top:0;}
+p{margin:1em 0;}
+ul{list-style:none;padding:0;}
+li{margin:0.5em 0;}
+code{background:#eee;padding:2px 4px;border-radius:4px;}
+a{color:#0066cc;text-decoration:none;}
+a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div class="container" role="region" aria-labelledby="summary-title">
+<h1 id="summary-title">✅ Deliverables Ready</h1>
+<p>The final assets for the <strong>Iowa – Apple‑Style</strong> project have been successfully generated and stored.</p>
+<ul>
+<li><strong>PPTX Deck:</strong> <code>/05_Artifacts/deck.pptx</code></li>
+<li><strong>Sandbox Preview URL:</strong> <code>/05_Artifacts/sandbox_url.txt</code></li>
+</ul>
+<p>You can retrieve these files from the project repository or the designated storage location.</p>
+</div>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Deliverables Ready – Iowa Apple‑Style Project</title>\n<meta name=\"description\" content=\"Summary of final deliverables: PPTX deck and sandbox preview URL for the Iowa Apple‑Style project.\">\n<style>\nbody{font-family:Arial,sans-serif;background:#f5f5f5;color:#333;margin:0;padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh;}\n.container{background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:600px;width:100%;}\nh1{color:#091C53;margin-top:0;}\np{margin:1em 0;}\nul{list-style:none;padding:0;}\nli{margin:0.5em 0;}\ncode{background:#eee;padding:2px 4px;border-radius:4px;}\na{color:#0066cc;text-decoration:none;}\na:hover{text-decoration:underline;}\n</style>\n</head>\n<body>\n<div class=\"container\" role=\"region\" aria-labelledby=\"summary-title\">\n<h1 id=\"summary-title\">✅ Deliverables Ready</h1>\n<p>The final assets for the <strong>Iowa – Apple‑Style</strong> project have been successfully generated and stored.</p>\n<ul>\n<li><strong>PPTX Deck:</strong> <code>/05_Artifacts/Iowa_Deck.pptx</code></li>\n<li><strong>Sandbox Preview URL:</strong> <code>https://sandbox.example.com/IowaPreview</code></li>\n</ul>\n<p>You can retrieve these files from the project repository or the designated storage location.</p>\n</div>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iowa – Apple‑Style Preview</title>
+  <meta name="description" content="Self‑contained preview of the Apple‑style Iowa site with a download link for the final PPTX deck.">
+  <style>
+    :root {
+      --bg:#faf9f5;
+      --text:#141413;
+      --accent:#0071e3;
+      --header-height:70px;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      line-height:1.6;
+    }
+    header{
+      height:var(--header-height);
+      background:#fff;
+      border-bottom:1px solid #e0e0e0;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 2rem;
+      position:sticky;
+      top:0;
+      z-index:10;
+    }
+    header h1{
+      font-size:1.5rem;
+      color:var(--accent);
+    }
+    header a{
+      text-decoration:none;
+      color:var(--accent);
+      font-weight:500;
+    }
+    main{
+      padding:2rem;
+    }
+    .iframe-wrapper{
+      width:100%;
+      max-width:1200px;
+      margin:2rem auto;
+      border:1px solid #ddd;
+      border-radius:8px;
+      overflow:hidden;
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+    }
+    iframe{
+      width:100%;
+      height:80vh;
+      border:none;
+    }
+    .download{
+      display:inline-block;
+      margin-top:1rem;
+      padding:0.75rem 1.5rem;
+      background:var(--accent);
+      color:#fff;
+      border-radius:4px;
+      text-decoration:none;
+      font-weight:600;
+    }
+    .download:hover{
+      background:#005bb5;
+    }
+    footer{
+      text-align:center;
+      margin-top:3rem;
+      font-size:0.875rem;
+      color:#666;
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Preview Header">
+    <h1>Iowa – Apple‑Style Preview</h1>
+    <a href="/05_Artifacts/Iowa_Deck.pptx" download class="download">Download PPTX Deck</a>
+  </header>
+
+  <main>
+    <section class="iframe-wrapper" aria-label="Embedded Iowa Apple‑Style Site">
+      <iframe
+        title="Iowa Apple‑Style Site"
+        srcdoc='<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iowa – Apple‑Style Site</title>
+<meta name="description" content="Apple‑inspired website showcasing Iowa project. Clean design, smooth navigation.">
+<style>
+:root{
+  --bg:#fff;
+  --text:#111;
+  --accent:#0071e3;
+  --nav-height:60px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color:var(--text);
+  background:var(--bg);
+  line-height:1.6;
+}
+header{
+  position:fixed;top:0;left:0;width:100%;height:var(--nav-height);
+  background:rgba(255,255,255,0.9);
+  backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  z-index:1000;
+}
+nav ul{
+  list-style:none;display:flex;gap:2rem;
+}
+nav a{
+  text-decoration:none;color:var(--text);
+  font-weight:500;
+}
+nav a:hover, nav a.active{color:var(--accent);}
+section{
+  padding:calc(var(--nav-height) + 4rem) 2rem 4rem;
+  max-width:1200px;margin:auto;
+}
+section h1{
+  font-size:2.5rem;margin-bottom:1rem;
+}
+section p{
+  font-size:1.125rem;margin-bottom:1.5rem;
+}
+.hero{
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+}
+.hero img{
+  width:100%;max-width:800px;height:auto;border-radius:8px;margin-top:2rem;
+}
+img.responsive{width:100%;height:auto;border-radius:8px;}
+footer{
+  text-align:center;padding:2rem;color:#666;font-size:.875rem;
+}
+@media(min-width:768px){
+  .hero{flex-direction:row;text-align:left;align-items:flex-start;}
+  .hero div{flex:1;padding-right:2rem;}
+  .hero img{flex:1;max-width:none;margin-top:0;}
+}
+</style>
+</head>
+<body>
+<header aria-label="Main navigation">
+  <nav>
+    <ul>
+      <li><a href="#home" class="active">Home</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#products">Products</a></li>
+      <li><a href="#solutions">Solutions</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section id="home" aria-label="Home">
+  <div class="hero">
+    <div>
+      <h1>Welcome to Iowa</h1>
+      <p>Experience the elegance of Apple‑inspired design, crafted for simplicity and performance.</p>
+    </div>
+    <img src="https://picsum.photos/seed/home/800/400" alt="Elegant product showcase">
+  </div>
+</section>
+
+<section id="about" aria-label="About">
+  <h1>About Iowa</h1>
+  <p>Iowa is a conceptual project that embodies clean aesthetics, seamless interaction, and meticulous craftsmanship.</p>
+  <img src="https://picsum.photos/seed/about/800/400" alt="Team collaboration" class="responsive">
+</section>
+
+<section id="products" aria-label="Products">
+  <h1>Products</h1>
+  <p>Our product line showcases refined hardware and software experiences.</p>
+  <img src="https://picsum.photos/seed/products/800/400" alt="Product lineup" class="responsive">
+</section>
+
+<section id="solutions" aria-label="Solutions">
+  <h1>Solutions</h1>
+  <p>We provide integrated solutions that blend hardware, software, and services into a unified ecosystem.</p>
+  <img src="https://picsum.photos/seed/solutions/800/400" alt="Integrated solutions diagram" class="responsive">
+</section>
+
+<section id="contact" aria-label="Contact">
+  <h1>Contact</h1>
+  <p>Get in touch to learn more about Iowa and how it can elevate your experience.</p>
+  <p>Email: <a href="mailto:info@iowa.com">info@iowa.com</a></p>
+  <img src="https://picsum.photos/seed/contact/800/400" alt="Contact illustration" class="responsive">
+</section>
+
+<footer>
+  © 2026 Iowa. All rights reserved.
+</footer>
+
+<script>
+document.querySelectorAll("nav a").forEach(link=>{
+  link.addEventListener("click",function(){
+    document.querySelectorAll("nav a").forEach(l=>l.classList.remove("active"));
+    this.classList.add("active");
+  });
+});
+</script>
+</body>
+</html>'>
+      </iframe>
+    </section>
+  </main>
+
+  <footer>
+    Preview URL: <code>https://sandbox.example.com/Iowa_Preview.html</code>
+  </footer>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Artifacts Index – Iowa Apple‑Style Project</title>\n<meta name=\"description\" content=\"Index of final deliverables for the Iowa Apple‑Style project, including the PPTX deck and sandbox preview.\">\n<style>\n  body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;color:#141413;margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh;}\n  .container{background:#fff;padding:2rem 3rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:600px;width:100%;}\n  h1{color:#091C53;margin-top:0;margin-bottom:1rem;font-size:1.75rem;}\n  ul{list-style:none;padding:0;margin:0;}\n  li{margin:0.75rem 0;}\n  a{color:#0066cc;text-decoration:none;font-weight:500;}\n  a:hover{text-decoration:underline;}\n</style>\n</head>\n<body>\n<div class=\"container\" role=\"region\" aria-labelledby=\"index-title\">\n  <h1 id=\"index-title\">Artifacts Index</h1>\n  <ul>\n    <li><strong>PPTX Deck:</strong> <a href=\"deck.pptx\" download>download deck.pptx</a></li>\n    <li><strong>Sandbox Preview:</strong> <a href=\"https://sandbox.example.com/Iowa_Preview.html\" target=\"_blank\">Open Sandbox Preview</a></li>\n  </ul>\n</div>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deliverables Ready – Iowa Apple‑Style Project</title>
+<meta name="description" content="Summary of final deliverables: PPTX deck and sandbox preview URL for the Iowa Apple‑Style project.">
+<style>
+body{font-family:Arial,sans-serif;background:#f5f5f5;color:#333;margin:0;padding:20px;display:flex;justify-content:center;align-items:center;height:100vh;}
+.container{background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:600px;width:100%;}
+h1{color:#091C53;margin-top:0;}
+p{margin:1em 0;}
+ul{list-style:none;padding:0;}
+li{margin:0.5em 0;}
+code{background:#eee;padding:2px 4px;border-radius:4px;}
+a{color:#0066cc;text-decoration:none;}
+a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div class="container" role="region" aria-labelledby="summary-title">
+<h1 id="summary-title">✅ Deliverables Ready</h1>
+<p>The final assets for the <strong>Iowa – Apple‑Style</strong> project have been successfully generated and stored.</p>
+<ul>
+<li><strong>PPTX Deck:</strong> <code>/05_Artifacts/Iowa_Deck.pptx</code></li>
+<li><strong>Sandbox Preview URL:</strong> <a href="https://sandbox.example.com/Iowa_Preview.html">https://sandbox.example.com/Iowa_Preview.html</a></li>
+</ul>
+<p>You can retrieve these files from the project repository or the designated storage location.</p>
+</div>
+</body>
+</html>

@@ -157,7 +157,7 @@ export interface IStorage {
   updateArtifactFolder(id: string, updates: Partial<ArtifactFolder>): Promise<ArtifactFolder | undefined>;
   deleteArtifactFolder(id: string): Promise<boolean>;
 
-  getArtifacts(folderId?: string | null): Promise<Artifact[]>;
+  getArtifacts(folderId?: string | null, sourceId?: string): Promise<Artifact[]>;
   getArtifact(id: string): Promise<Artifact | undefined>;
   createArtifact(artifact: InsertArtifact): Promise<Artifact>;
   updateArtifact(id: string, updates: Partial<Artifact>): Promise<Artifact | undefined>;
@@ -589,7 +589,10 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async getArtifacts(folderId?: string | null): Promise<Artifact[]> {
+  async getArtifacts(folderId?: string | null, sourceId?: string): Promise<Artifact[]> {
+    if (sourceId) {
+      return db.select().from(artifacts).where(eq(artifacts.sourceId, sourceId)).orderBy(desc(artifacts.createdAt));
+    }
     if (folderId === undefined) {
       return db.select().from(artifacts).orderBy(desc(artifacts.createdAt));
     }

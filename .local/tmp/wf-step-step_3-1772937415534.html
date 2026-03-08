@@ -1,0 +1,1368 @@
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Apple‑Style Presentation</title>\n</head>\n<body style=\"display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0;padding:0;background:#f5f5f5;\">\n  <!-- Title Slide -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#000000;color:#ffffff;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n    <div style=\"padding:60pt 60pt;\">\n      <h1 style=\"font-size:44pt;margin:0 0 16pt;\">Product Launch</h1>\n      <p style=\"font-size:22pt;margin:0;\">Innovating the Future</p>\n    </div>\n  </section>\n\n  <!-- Overview Slide -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#ffffff;color:#000000;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Overview</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;\">\n        <li>Market Opportunity</li>\n        <li>Product Vision</li>\n        <li>Key Benefits</li>\n        <li>Go‑to‑Market Strategy</li>\n      </ul>\n    </div>\n  </section>\n\n  <!-- Content Slide 1 -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#ffffff;color:#000000;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Market Opportunity</h2>\n      <p style=\"font-size:16pt;line-height:1.6;\">The global market is projected to reach $5B by 2027, driven by increasing demand for seamless integration across devices.</p>\n      <ul style=\"font-size:16pt;margin:12pt 0 0;padding-left:24pt;line-height:1.6;\">\n        <li>+30% YoY growth</li>\n        <li>Over 200M potential users</li>\n        <li>High willingness to pay for premium experience</li>\n      </ul>\n    </div>\n  </section>\n\n  <!-- Content Slide 2 -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#ffffff;color:#000000;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Product Vision</h2>\n      <p style=\"font-size:16pt;line-height:1.6;\">A sleek, intuitive device that seamlessly syncs with the Apple ecosystem, delivering unmatched performance and elegance.</p>\n      <div style=\"display:flex;gap:24pt;margin-top:12pt;\">\n        <div style=\"flex:1;background:#f0f0f0;padding:12pt;border-radius:8pt;\">\n          <h3 style=\"font-size:20pt;margin:0 0 8pt;\">Design</h3>\n          <p style=\"font-size:14pt;margin:0;\">Minimalist aluminum chassis, edge‑to‑edge display.</p>\n        </div>\n        <div style=\"flex:1;background:#f0f0f0;padding:12pt;border-radius:8pt;\">\n          <h3 style=\"font-size:20pt;margin:0 0 8pt;\">Performance</h3>\n          <p style=\"font-size:14pt;margin:0;\">M‑series chip, 5G, AI‑accelerated workflows.</p>\n        </div>\n      </div>\n    </div>\n  </section>\n\n  <!-- Content Slide 3 -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#ffffff;color:#000000;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Go‑to‑Market Strategy</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;\">\n        <li>Launch event streamed globally</li>\n        <li>Pre‑order incentives for early adopters</li>\n        <li>Partnerships with key retailers</li>\n        <li>Targeted digital campaigns on Apple platforms</li>\n      </ul>\n    </div>\n  </section>\n\n  <!-- Closing CTA Slide -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#000000;color:#ffffff;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n    <div style=\"padding:60pt 60pt;\">\n      <h2 style=\"font-size:36pt;margin:0 0 24pt;\">Join the Revolution</h2>\n      <p style=\"font-size:20pt;margin:0 0 32pt;\">Pre‑order now and be among the first to experience the future.</p>\n      <a href=\"#\" style=\"display:inline-block;background:#007aff;color:#ffffff;padding:12pt 24pt;border-radius:8pt;text-decoration:none;font-size:18pt;\">Pre‑order Today</a>\n    </div>\n  </section>\n\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – a clean, Apple‑style 5‑page website prototype (Home, About, Features, Pricing, Contact).">
+  <title>Iowa – Apple‑style Site Prototype</title>
+  <style>
+    /* Reset & base */
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color:#222;
+      background:#fafafa;
+    }
+    a { color:inherit; text-decoration:none; }
+    img { max-width:100%; height:auto; display:block; }
+
+    /* Layout */
+    header {
+      position:sticky; top:0; background:#fff; border-bottom:1px solid #e0e0e0;
+      z-index:10;
+    }
+    .nav {
+      max-width:1200px; margin:auto; display:flex; justify-content:space-between; align-items:center;
+      padding:1rem 2rem;
+    }
+    .nav ul { display:flex; gap:2rem; list-style:none; }
+    .nav a { font-weight:500; position:relative; }
+    .nav a::after {
+      content:""; position:absolute; left:0; bottom:-4px; height:2px; width:0; background:#007aff;
+      transition:width .3s;
+    }
+    .nav a:hover::after, .nav a:focus::after { width:100%; }
+
+    main { max-width:1200px; margin:auto; padding:2rem; }
+
+    section { padding:4rem 0; }
+    .hero {
+      display:grid; place-items:center; min-height:70vh; background:#fff;
+      background-image:url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400"><rect width="800" height="400" fill="%23e0e0e0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23777777" font-size="48" font-family="Arial,Helvetica,sans-serif">Hero Image</text></svg>');
+      background-size:cover; background-position:center;
+    }
+    .hero h1 { font-size:3rem; margin-bottom:.5rem; }
+    .hero p { font-size:1.25rem; max-width:600px; text-align:center; }
+    .btn {
+      display:inline-block; padding:.75rem 1.5rem; margin-top:1rem;
+      background:#007aff; color:#fff; border-radius:8px; font-weight:600;
+      transition:transform .2s, background .2s;
+    }
+    .btn:hover, .btn:focus { background:#005fcc; transform:scale(1.03); }
+
+    .grid {
+      display:grid; gap:2rem;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+    }
+    .card {
+      background:#fff; border-radius:12px; padding:2rem; box-shadow:0 2px 8px rgba(0,0,0,0.08);
+      opacity:0; transform:translateY(20px); transition:opacity .6s ease-out, transform .6s ease-out;
+    }
+    .card.visible { opacity:1; transform:none; }
+
+    footer {
+      background:#fff; border-top:1px solid #e0e0e0; text-align:center; padding:2rem;
+      font-size:.875rem; color:#666;
+    }
+
+    /* Responsive tweaks */
+    @media (max-width:768px){
+      .hero h1{font-size:2.2rem;}
+      .nav{flex-direction:column; gap:1rem;}
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav class="nav">
+      <div class="logo"><strong>Iowa</strong></div>
+      <ul>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" class="hero" aria-label="Home">
+      <div class="hero-content" style="text-align:center;">
+        <h1>Welcome to Iowa</h1>
+        <p>Elegant, simple, and powerful. Experience the future of web design.</p>
+        <a href="#features" class="btn">Explore Features</a>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-label="About">
+      <h2 style="font-size:2.5rem; margin-bottom:1rem; text-align:center;">About Iowa</h2>
+      <p style="max-width:800px; margin:auto; text-align:center;">
+        Iowa is a design philosophy that blends generous whitespace, crisp typography, and subtle motion.
+        Built for modern browsers, it showcases how minimalism can feel rich and engaging.
+      </p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-label="Features">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Features</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Responsive Grid</h3>
+          <p>Fluid layouts that adapt gracefully to any screen size.</p>
+        </div>
+        <div class="card">
+          <h3>Micro‑Interactions</h3>
+          <p>Subtle hover and scroll animations that delight without distraction.</p>
+        </div>
+        <div class="card">
+          <h3>Accessible Design</h3>
+          <p>ARIA‑friendly markup and high‑contrast colors for inclusive experiences.</p>
+        </div>
+        <div class="card">
+          <h3>Fast Load</h3>
+          <p>Optimized assets and vanilla JavaScript keep performance top‑notch.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" aria-label="Pricing">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Pricing</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Free</h3>
+          <p>Basic access – perfect for personal projects.</p>
+          <p><strong>$0 / month</strong></p>
+          <a href="#contact" class="btn">Get Started</a>
+        </div>
+        <div class="card">
+          <h3>Pro</h3>
+          <p>Advanced features, priority support, and custom branding.</p>
+          <p><strong>$49 / month</strong></p>
+          <a href="#contact" class="btn">Upgrade</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-label="Contact">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Contact Us</h2>
+      <form id="contactForm" style="max-width:600px; margin:auto; background:#fff; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <label for="name" style="display:block; margin-bottom:.5rem;">Name</label>
+        <input type="text" id="name" name="name" required style="width:100%; padding:.75rem; margin-bottom:1rem; border:1px solid #ccc; border-radius:6px;">
+        <label for="email" style="display:block; margin-bottom:.5rem;">Email</label>
+        <input type="email" id="email" name="email" required style="width:100%; padding:.75rem; margin-bottom:1rem; border:1px solid #ccc; border-radius:6px;">
+        <label for="message" style="display:block; margin-bottom:.5rem;">Message</label>
+        <textarea id="message" name="message" rows="4" required style="width:100%; padding:.75rem; margin-bottom:1rem; border:1px solid #ccc; border-radius:6px;"></textarea>
+        <button type="submit" class="btn" style="width:100%;">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa. All rights reserved.
+  </footer>
+
+  <script>
+    // IntersectionObserver for fade‑in cards
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if(entry.isIntersecting){
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.1});
+
+    document.querySelectorAll('.card').forEach(card => observer.observe(card));
+
+    // Simple form feedback (no backend)
+    const form = document.getElementById('contactForm');
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      alert('Thank you! Your message has been received.');
+      form.reset();
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<title>Anthropic Brand PPTX</title>\n</head>\n<body style=\"display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0;padding:0;background:#faf9f5;\">\n  <!-- Title Slide -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#141413;color:#faf9f5;font-family:'Poppins',Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:60pt 60pt;\">\n      <h1 style=\"font-size:44pt;margin:0 0 16pt;\">Product Launch</h1>\n      <p style=\"font-size:22pt;margin:0;font-family:'Lora',Georgia,serif;color:#6a9bcc;\">Innovating the Future</p>\n    </div>\n  </section>\n\n  <!-- Overview Slide -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:'Poppins',Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Overview</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;font-family:'Lora',Georgia,serif;\">\n        <li>Market Opportunity</li>\n        <li>Product Vision</li>\n        <li>Key Benefits</li>\n        <li>Go‑to‑Market Strategy</li>\n      </ul>\n    </div>\n  </section>\n\n  <!-- Content Slide 1 -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:'Poppins',Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Market Opportunity</h2>\n      <p style=\"font-size:16pt;line-height:1.6;font-family:'Lora',Georgia,serif;\">The global market is projected to reach $5B by 2027, driven by increasing demand for seamless integration across devices.</p>\n      <ul style=\"font-size:16pt;margin:12pt 0 0;padding-left:24pt;line-height:1.6;font-family:'Lora',Georgia,serif;\">\n        <li>+30% YoY growth</li>\n        <li>Over 200M potential users</li>\n        <li>High willingness to pay for premium experience</li>\n      </ul>\n    </div>\n  </section>\n\n  <!-- Content Slide 2 -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:'Poppins',Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Product Vision</h2>\n      <p style=\"font-size:16pt;line-height:1.6;font-family:'Lora',Georgia,serif;\">A sleek, intuitive device that seamlessly syncs with the Apple ecosystem, delivering unmatched performance and elegance.</p>\n      <div style=\"display:flex;gap:24pt;margin-top:12pt;\">\n        <div style=\"flex:1;background:#e8e6dc;padding:12pt;border-radius:8pt;\">\n          <h3 style=\"font-size:20pt;margin:0 0 8pt;font-family:'Poppins',Arial,sans-serif;\">Design</h3>\n          <p style=\"font-size:14pt;margin:0;font-family:'Lora',Georgia,serif;\">Minimalist aluminum chassis, edge‑to‑edge display.</p>\n        </div>\n        <div style=\"flex:1;background:#e8e6dc;padding:12pt;border-radius:8pt;\">\n          <h3 style=\"font-size:20pt;margin:0 0 8pt;font-family:'Poppins',Arial,sans-serif;\">Performance</h3>\n          <p style=\"font-size:14pt;margin:0;font-family:'Lora',Georgia,serif;\">M‑series chip, 5G, AI‑accelerated workflows.</p>\n        </div>\n      </div>\n    </div>\n  </section>\n\n  <!-- Content Slide 3 -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#faf9f5;color:#141413;font-family:'Poppins',Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:24pt 48pt;\">\n      <h2 style=\"font-size:28pt;margin:0 0 20pt;\">Go‑to‑Market Strategy</h2>\n      <ul style=\"font-size:16pt;margin:0;padding-left:24pt;line-height:1.6;font-family:'Lora',Georgia,serif;\">\n        <li>Launch event streamed globally</li>\n        <li>Pre‑order incentives for early adopters</li>\n        <li>Partnerships with key retailers</li>\n        <li>Targeted digital campaigns on Apple platforms</li>\n      </ul>\n    </div>\n  </section>\n\n  <!-- Closing CTA Slide -->\n  <section class=\"slide\" style=\"width:720pt;height:405pt;background:#141413;color:#faf9f5;font-family:'Poppins',Arial,sans-serif;\">\n    <div style=\"width:720pt;height:6pt;background:#d97757;\"></div>\n    <div style=\"padding:60pt 60pt;\">\n      <h2 style=\"font-size:36pt;margin:0 0 24pt;\">Join the Revolution</h2>\n      <p style=\"font-size:20pt;margin:0 0 32pt;font-family:'Lora',Georgia,serif;color:#6a9bcc;\">Pre‑order now and be among the first to experience the future.</p>\n      <a href=\"#\" style=\"display:inline-block;background:#6a9bcc;color:#faf9f5;padding:12pt 24pt;border-radius:8pt;text-decoration:none;font-size:18pt;\">Pre‑order Today</a>\n    </div>\n  </section>\n\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta name=\"description\" content=\"Iowa – a clean, Apple‑style 5‑page website prototype (Home, About, Features, Pricing, Contact).\">\n  <title>Iowa – Apple‑style Site Prototype</title>\n  <style>\n    /* Reset & base */\n    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }\n    html { scroll-behavior: smooth; }\n    body {\n      font-family: \"Lora\", Georgia, serif;\n      line-height: 1.6;\n      color:#141413;\n      background:#faf9f5;\n    }\n    h1, h2, h3 { font-family: \"Poppins\", Arial, sans-serif; }\n    a { color:inherit; text-decoration:none; }\n    img { max-width:100%; height:auto; display:block; }\n\n    /* Layout */\n    header {\n      position:sticky; top:0; background:#e8e6dc; border-bottom:1px solid #b0aea5;\n      z-index:10;\n    }\n    .nav {\n      max-width:1200px; margin:auto; display:flex; justify-content:space-between; align-items:center;\n      padding:1rem 2rem;\n    }\n    .nav ul { display:flex; gap:2rem; list-style:none; }\n    .nav a { font-weight:500; position:relative; }\n    .nav a::after {\n      content:\"\"; position:absolute; left:0; bottom:-4px; height:2px; width:0; background:#6a9bcc;\n      transition:width .3s;\n    }\n    .nav a:hover::after, .nav a:focus::after { width:100%; }\n\n    main { max-width:1200px; margin:auto; padding:2rem; }\n\n    section { padding:4rem 0; }\n    .hero {\n      display:grid; place-items:center; min-height:70vh; background:#faf9f5;\n      background-image:url('data:image/svg+xml;charset=UTF-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"400\"><rect width=\"800\" height=\"400\" fill=\"%23e0e0e0\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%23777777\" font-size=\"48\" font-family=\"Arial,Helvetica,sans-serif\">Hero Image</text></svg>');\n      background-size:cover; background-position:center;\n    }\n    .hero h1 { font-size:3rem; margin-bottom:.5rem; }\n    .hero p { font-size:1.25rem; max-width:600px; text-align:center; }\n    .btn {\n      display:inline-block; padding:.75rem 1.5rem; margin-top:1rem;\n      background:#d97757; color:#fff; border-radius:8px; font-weight:600;\n      transition:transform .2s, background .2s;\n    }\n    .btn:hover, .btn:focus { background:#c66a4f; transform:scale(1.03); }\n\n    .grid { display:grid; gap:2rem; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); }\n    .card {\n      background:#e8e6dc; border-radius:12px; padding:2rem; box-shadow:0 2px 8px rgba(0,0,0,0.08);\n      opacity:0; transform:translateY(20px); transition:opacity .6s ease-out, transform .6s ease-out;\n    }\n    .card.visible { opacity:1; transform:none; }\n\n    footer {\n      background:#e8e6dc; border-top:1px solid #b0aea5; text-align:center; padding:2rem;\n      font-size:.875rem; color:#666;\n    }\n\n    input, textarea {\n      border:1px solid #b0aea5; border-radius:6px;\n    }\n\n    /* Responsive tweaks */\n    @media (max-width:768px){\n      .hero h1{font-size:2.2rem;}\n      .nav{flex-direction:column; gap:1rem;}\n    }\n  </style>\n</head>\n<body>\n  <header aria-label=\"Main navigation\">\n    <nav class=\"nav\">\n      <div class=\"logo\"><strong>Iowa</strong></div>\n      <ul>\n        <li><a href=\"#home\">Home</a></li>\n        <li><a href=\"#about\">About</a></li>\n        <li><a href=\"#features\">Features</a></li>\n        <li><a href=\"#pricing\">Pricing</a></li>\n        <li><a href=\"#contact\">Contact</a></li>\n      </ul>\n    </nav>\n  </header>\n\n  <main>\n    <!-- Home -->\n    <section id=\"home\" class=\"hero\" aria-label=\"Home\">\n      <div class=\"hero-content\" style=\"text-align:center;\">\n        <h1>Welcome to Iowa</h1>\n        <p>Elegant, simple, and powerful. Experience the future of web design.</p>\n        <a href=\"#features\" class=\"btn\">Explore Features</a>\n      </div>\n    </section>\n\n    <!-- About -->\n    <section id=\"about\" aria-label=\"About\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:1rem; text-align:center;\">About Iowa</h2>\n      <p style=\"max-width:800px; margin:auto; text-align:center;\">\n        Iowa is a design philosophy that blends generous whitespace, crisp typography, and subtle motion.\n        Built for modern browsers, it showcases how minimalism can feel rich and engaging.\n      </p>\n    </section>\n\n    <!-- Features -->\n    <section id=\"features\" aria-label=\"Features\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:2rem; text-align:center;\">Features</h2>\n      <div class=\"grid\">\n        <div class=\"card\"><h3>Responsive Grid</h3><p>Fluid layouts that adapt gracefully to any screen size.</p></div>\n        <div class=\"card\"><h3>Micro‑Interactions</h3><p>Subtle hover and scroll animations that delight without distraction.</p></div>\n        <div class=\"card\"><h3>Accessible Design</h3><p>ARIA‑friendly markup and high‑contrast colors for inclusive experiences.</p></div>\n        <div class=\"card\"><h3>Fast Load</h3><p>Optimized assets and vanilla JavaScript keep performance top‑notch.</p></div>\n      </div>\n    </section>\n\n    <!-- Pricing -->\n    <section id=\"pricing\" aria-label=\"Pricing\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:2rem; text-align:center;\">Pricing</h2>\n      <div class=\"grid\">\n        <div class=\"card\"><h3>Free</h3><p>Basic access – perfect for personal projects.</p><p><strong>$0 / month</strong></p><a href=\"#contact\" class=\"btn\">Get Started</a></div>\n        <div class=\"card\"><h3>Pro</h3><p>Advanced features, priority support, and custom branding.</p><p><strong>$49 / month</strong></p><a href=\"#contact\" class=\"btn\">Upgrade</a></div>\n      </div>\n    </section>\n\n    <!-- Contact -->\n    <section id=\"contact\" aria-label=\"Contact\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:2rem; text-align:center;\">Contact Us</h2>\n      <form id=\"contactForm\" style=\"max-width:600px; margin:auto; background:#fff; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n        <label for=\"name\" style=\"display:block; margin-bottom:.5rem;\">Name</label>\n        <input type=\"text\" id=\"name\" name=\"name\" required style=\"width:100%; padding:.75rem; margin-bottom:1rem;\">\n        <label for=\"email\" style=\"display:block; margin-bottom:.5rem;\">Email</label>\n        <input type=\"email\" id=\"email\" name=\"email\" required style=\"width:100%; padding:.75rem; margin-bottom:1rem;\">\n        <label for=\"message\" style=\"display:block; margin-bottom:.5rem;\">Message</label>\n        <textarea id=\"message\" name=\"message\" rows=\"4\" required style=\"width:100%; padding:.75rem; margin-bottom:1rem;\"></textarea>\n        <button type=\"submit\" class=\"btn\" style=\"width:100%;\">Send Message</button>\n      </form>\n    </section>\n  </main>\n\n  <footer aria-label=\"Site footer\">\n    © 2026 Iowa. All rights reserved.\n  </footer>\n\n  <script>\n    // IntersectionObserver for fade‑in cards\n    const observer = new IntersectionObserver((entries) => {\n      entries.forEach(entry => {\n        if(entry.isIntersecting){\n          entry.target.classList.add('visible');\n          observer.unobserve(entry.target);\n        }\n      });\n    }, {threshold:0.1});\n    document.querySelectorAll('.card').forEach(card => observer.observe(card));\n\n    // Simple form feedback (no backend)\n    const form = document.getElementById('contactForm');\n    form.addEventListener('submit', e => {\n      e.preventDefault();\n      alert('Thank you! Your message has been received.');\n      form.reset();\n    });\n  </script>\n</body>\n</html>
+
+<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta name=\"description\" content=\"Iowa – a clean, Apple‑style 5‑page website prototype (Home, About, Features, Pricing, Contact).\">\n  <title>Iowa – Apple‑style Site Prototype</title>\n  <style>\n    /* Reset & base */\n    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }\n    html { scroll-behavior: smooth; }\n    body {\n      font-family: \"Lora\", Georgia, serif;\n      line-height: 1.6;\n      color:#141413;\n      background:#faf9f5;\n    }\n    h1, h2, h3 { font-family: \"Poppins\", Arial, sans-serif; }\n    a { color:inherit; text-decoration:none; }\n    img { max-width:100%; height:auto; display:block; }\n\n    /* Layout */\n    header {\n      position:sticky; top:0; background:#e8e6dc; border-bottom:1px solid #b0aea5;\n      z-index:10;\n    }\n    .nav {\n      max-width:1200px; margin:auto; display:flex; justify-content:space-between; align-items:center;\n      padding:1rem 2rem;\n    }\n    .nav ul { display:flex; gap:2rem; list-style:none; }\n    .nav a { font-weight:500; position:relative; }\n    .nav a::after {\n      content:\"\"; position:absolute; left:0; bottom:-4px; height:2px; width:0; background:#6a9bcc;\n      transition:width .3s;\n    }\n    .nav a:hover::after, .nav a:focus::after { width:100%; }\n\n    main { max-width:1200px; margin:auto; padding:2rem; }\n\n    section { padding:4rem 0; }\n    .hero {\n      display:grid; place-items:center; min-height:70vh; background:#faf9f5;\n      background-image:url('data:image/svg+xml;charset=UTF-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"400\"><rect width=\"800\" height=\"400\" fill=\"%23e0e0e0\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%23777777\" font-size=\"48\" font-family=\"Arial,Helvetica,sans-serif\">Hero Image</text></svg>');\n      background-size:cover; background-position:center;\n    }\n    .hero h1 { font-size:3rem; margin-bottom:.5rem; }\n    .hero p { font-size:1.25rem; max-width:600px; text-align:center; }\n    .btn {\n      display:inline-block; padding:.75rem 1.5rem; margin-top:1rem;\n      background:#d97757; color:#fff; border-radius:8px; font-weight:600;\n      transition:transform .2s, background .2s;\n    }\n    .btn:hover, .btn:focus { background:#c66a4f; transform:scale(1.03); }\n\n    .grid { display:grid; gap:2rem; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); }\n    .card {\n      background:#e8e6dc; border-radius:12px; padding:2rem; box-shadow:0 2px 8px rgba(0,0,0,0.08);\n      opacity:0; transform:translateY(20px); transition:opacity .6s ease-out, transform .6s ease-out;\n    }\n    .card.visible { opacity:1; transform:none; }\n\n    footer {\n      background:#e8e6dc; border-top:1px solid #b0aea5; text-align:center; padding:2rem;\n      font-size:.875rem; color:#666;\n    }\n\n    input, textarea {\n      border:1px solid #b0aea5; border-radius:6px;\n    }\n\n    /* Responsive tweaks */\n    @media (max-width:768px){\n      .hero h1{font-size:2.2rem;}\n      .nav{flex-direction:column; gap:1rem;}\n    }\n  </style>\n</head>\n<body>\n  <header aria-label=\"Main navigation\">\n    <nav class=\"nav\">\n      <div class=\"logo\"><strong>Iowa</strong></div>\n      <ul>\n        <li><a href=\"#home\">Home</a></li>\n        <li><a href=\"#about\">About</a></li>\n        <li><a href=\"#features\">Features</a></li>\n        <li><a href=\"#pricing\">Pricing</a></li>\n        <li><a href=\"#contact\">Contact</a></li>\n      </ul>\n    </nav>\n  </header>\n\n  <main>\n    <!-- Home -->\n    <section id=\"home\" class=\"hero\" aria-label=\"Home\">\n      <div class=\"hero-content\" style=\"text-align:center;\">\n        <h1>Welcome to Iowa</h1>\n        <p>Elegant, simple, and powerful. Experience the future of web design.</p>\n        <a href=\"#features\" class=\"btn\">Explore Features</a>\n      </div>\n    </section>\n\n    <!-- About -->\n    <section id=\"about\" aria-label=\"About\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:1rem; text-align:center;\">About Iowa</h2>\n      <p style=\"max-width:800px; margin:auto; text-align:center;\">\n        Iowa is a design philosophy that blends generous whitespace, crisp typography, and subtle motion.\n        Built for modern browsers, it showcases how minimalism can feel rich and engaging.\n      </p>\n    </section>\n\n    <!-- Features -->\n    <section id=\"features\" aria-label=\"Features\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:2rem; text-align:center;\">Features</h2>\n      <div class=\"grid\">\n        <div class=\"card\"><h3>Responsive Grid</h3><p>Fluid layouts that adapt gracefully to any screen size.</p></div>\n        <div class=\"card\"><h3>Micro‑Interactions</h3><p>Subtle hover and scroll animations that delight without distraction.</p></div>\n        <div class=\"card\"><h3>Accessible Design</h3><p>ARIA‑friendly markup and high‑contrast colors for inclusive experiences.</p></div>\n        <div class=\"card\"><h3>Fast Load</h3><p>Optimized assets and vanilla JavaScript keep performance top‑notch.</p></div>\n      </div>\n    </section>\n\n    <!-- Pricing -->\n    <section id=\"pricing\" aria-label=\"Pricing\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:2rem; text-align:center;\">Pricing</h2>\n      <div class=\"grid\">\n        <div class=\"card\"><h3>Free</h3><p>Basic access – perfect for personal projects.</p><p><strong>$0 / month</strong></p><a href=\"#contact\" class=\"btn\">Get Started</a></div>\n        <div class=\"card\"><h3>Pro</h3><p>Advanced features, priority support, and custom branding.</p><p><strong>$49 / month</strong></p><a href=\"#contact\" class=\"btn\">Upgrade</a></div>\n      </div>\n    </section>\n\n    <!-- Contact -->\n    <section id=\"contact\" aria-label=\"Contact\">\n      <h2 style=\"font-size:2.5rem; margin-bottom:2rem; text-align:center;\">Contact Us</h2>\n      <form id=\"contactForm\" style=\"max-width:600px; margin:auto; background:#fff; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n        <label for=\"name\" style=\"display:block; margin-bottom:.5rem;\">Name</label>\n        <input type=\"text\" id=\"name\" name=\"name\" required style=\"width:100%; padding:.75rem; margin-bottom:1rem;\">\n        <label for=\"email\" style=\"display:block; margin-bottom:.5rem;\">Email</label>\n        <input type=\"email\" id=\"email\" name=\"email\" required style=\"width:100%; padding:.75rem; margin-bottom:1rem;\">\n        <label for=\"message\" style=\"display:block; margin-bottom:.5rem;\">Message</label>\n        <textarea id=\"message\" name=\"message\" rows=\"4\" required style=\"width:100%; padding:.75rem; margin-bottom:1rem;\"></textarea>\n        <button type=\"submit\" class=\"btn\" style=\"width:100%;\">Send Message</button>\n      </form>\n    </section>\n  </main>\n\n  <footer aria-label=\"Site footer\">\n    © 2026 Iowa. All rights reserved.\n  </footer>\n\n  <script>\n    // IntersectionObserver for fade‑in cards\n    const observer = new IntersectionObserver((entries) => {\n      entries.forEach(entry => {\n        if(entry.isIntersecting){\n          entry.target.classList.add('visible');\n          observer.unobserve(entry.target);\n        }\n      });\n    }, {threshold:0.1});\n    document.querySelectorAll('.card').forEach(card => observer.observe(card));\n\n    // Simple form feedback (no backend)\n    const form = document.getElementById('contactForm');\n    form.addEventListener('submit', e => {\n      e.preventDefault();\n      alert('Thank you! Your message has been received.');\n      form.reset();\n    });\n  </script>\n</body>\n</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – a clean, Apple‑style 5‑page website prototype (Home, About, Features, Pricing, Contact).">
+  <title>Iowa – Apple‑style Site Prototype</title>
+  <style>
+    /* Reset */
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    /* Brand variables */
+    :root {
+      --color-bg: #faf9f5;          /* Light background */
+      --color-header: #e8e6dc;      /* Header/footer background */
+      --color-primary: #6a9bcc;     /* Nav accent */
+      --color-accent: #d97757;      /* Buttons */
+      --color-text: #141413;        /* Main text */
+      --color-muted: #666666;       /* Footer text */
+      --spacing: 1rem;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "Lora", Georgia, serif;
+      line-height: 1.6;
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+
+    h1, h2, h3 { font-family: "Poppins", Arial, sans-serif; }
+
+    a { color: inherit; text-decoration: none; }
+
+    img { max-width: 100%; height: auto; display: block; }
+
+    /* Layout */
+    header {
+      position: sticky;
+      top: 0;
+      background: var(--color-header);
+      border-bottom: 1px solid #b0aea5;
+      z-index: 10;
+    }
+
+    .nav {
+      max-width: 1200px;
+      margin: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing) calc(2 * var(--spacing));
+    }
+
+    .nav ul {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav a {
+      font-weight: 500;
+      position: relative;
+    }
+
+    .nav a::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: -4px;
+      height: 2px;
+      width: 0;
+      background: var(--color-primary);
+      transition: width .3s;
+    }
+
+    .nav a:hover::after,
+    .nav a:focus::after {
+      width: 100%;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: auto;
+      padding: calc(2 * var(--spacing));
+    }
+
+    section { padding: calc(4 * var(--spacing)) 0; }
+
+    .hero {
+      display: grid;
+      place-items: center;
+      min-height: 70vh;
+      background: #faf9f5 url('https://picsum.photos/seed/hero/1200/600') center/cover no-repeat;
+      text-align: center;
+    }
+
+    .hero h1 { font-size: 3rem; margin-bottom: .5rem; }
+    .hero p  { font-size: 1.25rem; max-width: 600px; margin: auto; }
+
+    .btn {
+      display: inline-block;
+      padding: .75rem 1.5rem;
+      margin-top: 1rem;
+      background: var(--color-accent);
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: background .2s, transform .2s;
+    }
+
+    .btn:hover,
+    .btn:focus {
+      background: #c66a4f;
+      transform: scale(1.03);
+    }
+
+    .grid {
+      display: grid;
+      gap: 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .6s ease-out, transform .6s ease-out;
+    }
+
+    .card.visible { opacity: 1; transform: none; }
+
+    footer {
+      background: var(--color-header);
+      border-top: 1px solid #b0aea5;
+      text-align: center;
+      padding: 2rem;
+      font-size: .875rem;
+      color: var(--color-muted);
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: .75rem;
+      margin-bottom: 1rem;
+      border: 1px solid #b0aea5;
+      border-radius: 6px;
+      font-family: inherit;
+    }
+
+    button.btn { width: 100%; }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.2rem; }
+      .nav { flex-direction: column; gap: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav class="nav">
+      <div class="logo"><strong>Iowa</strong></div>
+      <ul>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" class="hero" aria-label="Home">
+      <div>
+        <h1>Welcome to Iowa</h1>
+        <p>Elegant, simple, and powerful. Experience the future of web design.</p>
+        <a href="#features" class="btn">Explore Features</a>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-label="About">
+      <h2 style="font-size:2.5rem; margin-bottom:1rem; text-align:center;">About Iowa</h2>
+      <p style="max-width:800px; margin:auto; text-align:center;">
+        Iowa is a design philosophy that blends generous whitespace, crisp typography, and subtle motion.
+        Built for modern browsers, it showcases how minimalism can feel rich and engaging.
+      </p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-label="Features">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Features</h2>
+      <div class="grid">
+        <div class="card"><h3>Responsive Grid</h3><p>Fluid layouts that adapt gracefully to any screen size.</p></div>
+        <div class="card"><h3>Micro‑Interactions</h3><p>Subtle hover and scroll animations that delight without distraction.</p></div>
+        <div class="card"><h3>Accessible Design</h3><p>ARIA‑friendly markup and high‑contrast colors for inclusive experiences.</p></div>
+        <div class="card"><h3>Fast Load</h3><p>Optimized assets and vanilla JavaScript keep performance top‑notch.</p></div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" aria-label="Pricing">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Pricing</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Free</h3>
+          <p>Basic access – perfect for personal projects.</p>
+          <p><strong>$0 / month</strong></p>
+          <a href="#contact" class="btn">Get Started</a>
+        </div>
+        <div class="card">
+          <h3>Pro</h3>
+          <p>Advanced features, priority support, and custom branding.</p>
+          <p><strong>$49 / month</strong></p>
+          <a href="#contact" class="btn">Upgrade</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-label="Contact">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Contact Us</h2>
+      <form id="contactForm" style="max-width:600px; margin:auto; background:#fff; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08);">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required>
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" required></textarea>
+
+        <button type="submit" class="btn">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa. All rights reserved.
+  </footer>
+
+  <script>
+    // Fade‑in cards on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.card').forEach(card => observer.observe(card));
+
+    // Simple form feedback
+    const form = document.getElementById('contactForm');
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      alert('Thank you! Your message has been received.');
+      form.reset();
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – a clean, Apple‑style 5‑page website prototype (Home, About, Features, Pricing, Contact).">
+  <title>Iowa – Apple‑style Site Prototype</title>
+  <style>
+    /* Reset */
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    /* Brand variables */
+    :root {
+      --color-bg: #faf9f5;          /* Light background */
+      --color-header: #e8e6dc;      /* Header/footer background */
+      --color-primary: #6a9bcc;     /* Nav accent */
+      --color-accent: #d97757;      /* Buttons */
+      --color-text: #141413;        /* Main text */
+      --color-muted: #666666;       /* Footer text */
+      --spacing: 1rem;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "Lora", Georgia, serif;
+      line-height: 1.6;
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+
+    h1, h2, h3 { font-family: "Poppins", Arial, sans-serif; }
+
+    a { color: inherit; text-decoration: none; }
+
+    img { max-width: 100%; height: auto; display: block; }
+
+    /* Layout */
+    header {
+      position: sticky;
+      top: 0;
+      background: var(--color-header);
+      border-bottom: 1px solid #b0aea5;
+      z-index: 10;
+    }
+
+    .nav {
+      max-width: 1200px;
+      margin: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing) calc(2 * var(--spacing));
+    }
+
+    .nav .logo { font-weight:600; font-size:1.25rem; }
+
+    .nav ul {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav a {
+      font-weight: 500;
+      position: relative;
+    }
+
+    .nav a::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: -4px;
+      height: 2px;
+      width: 0;
+      background: var(--color-primary);
+      transition: width .3s;
+    }
+
+    .nav a:hover::after,
+    .nav a:focus::after {
+      width: 100%;
+    }
+
+    /* Hamburger */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .hamburger span {
+      width: 24px;
+      height: 2px;
+      background: var(--color-text);
+      display: block;
+    }
+
+    /* Mobile nav */
+    @media (max-width:768px) {
+      .nav ul {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        background: var(--color-header);
+        border-top: 1px solid #b0aea5;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height .3s ease-out;
+      }
+
+      .nav ul.open {
+        max-height: 500px; /* enough for all items */
+        transition: max-height .4s ease-in;
+      }
+
+      .hamburger { display: flex; }
+      .nav { position: relative; }
+    }
+
+    main { max-width: 1200px; margin:auto; padding: calc(2 * var(--spacing)); }
+
+    section { padding: calc(4 * var(--spacing)) 0; }
+
+    /* Hero / Carousel */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 70vh;
+      background: var(--color-bg);
+    }
+
+    .carousel {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity .6s ease-in-out;
+    }
+
+    .slide img { width: 100%; height: 100%; object-fit: cover; }
+
+    .slide[aria-hidden="false"] { opacity: 1; }
+
+    .carousel-controls {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .carousel-controls button {
+      pointer-events: all;
+      background: rgba(0,0,0,0.4);
+      border: none;
+      color: #fff;
+      font-size: 1.5rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    .carousel-controls button:hover,
+    .carousel-controls button:focus {
+      background: rgba(0,0,0,0.6);
+    }
+
+    .hero-content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .hero-content h1 { font-size: 3rem; margin-bottom: .5rem; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
+    .hero-content p  { font-size: 1.25rem; max-width: 600px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+
+    .btn {
+      display: inline-block;
+      padding: .75rem 1.5rem;
+      margin-top: 1rem;
+      background: var(--color-accent);
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: background .2s, transform .2s;
+    }
+
+    .btn:hover,
+    .btn:focus {
+      background: #c66a4f;
+      transform: scale(1.03);
+    }
+
+    .grid {
+      display: grid;
+      gap: 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .6s ease-out, transform .6s ease-out;
+    }
+
+    .card.visible { opacity: 1; transform: none; }
+
+    footer {
+      background: var(--color-header);
+      border-top: 1px solid #b0aea5;
+      text-align: center;
+      padding: 2rem;
+      font-size: .875rem;
+      color: var(--color-muted);
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: .75rem;
+      margin-bottom: 1rem;
+      border: 1px solid #b0aea5;
+      border-radius: 6px;
+      font-family: inherit;
+    }
+
+    button.btn { width: 100%; }
+
+    @media (max-width:768px){
+      .hero-content h1{font-size:2.2rem;}
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav class="nav">
+      <div class="logo"><strong>Iowa</strong></div>
+      <button class="hamburger" aria-controls="primary-navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+        <span class="sr-only">Menu</span>
+      </button>
+      <ul id="primary-navigation">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" class="hero" aria-label="Home">
+      <div class="carousel" role="region" aria-label="Image carousel">
+        <div class="slide" aria-hidden="false">
+          <img src="https://picsum.photos/seed/hero1/1200/600" alt="Modern workspace with sleek devices">
+        </div>
+        <div class="slide" aria-hidden="true">
+          <img src="https://picsum.photos/seed/hero2/1200/600" alt="Close‑up of a high‑resolution display">
+        </div>
+        <div class="slide" aria-hidden="true">
+          <img src="https://picsum.photos/seed/hero3/1200/600" alt="Person using a tablet with fluid animations">
+        </div>
+
+        <div class="carousel-controls">
+          <button class="prev" aria-label="Previous slide">&#9664;</button>
+          <button class="next" aria-label="Next slide">&#9654;</button>
+        </div>
+      </div>
+
+      <div class="hero-content">
+        <h1>Welcome to Iowa</h1>
+        <p>Elegant, simple, and powerful. Experience the future of web design.</p>
+        <a href="#features" class="btn">Explore Features</a>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-label="About">
+      <h2 style="font-size:2.5rem; margin-bottom:1rem; text-align:center;">About Iowa</h2>
+      <p style="max-width:800px; margin:auto; text-align:center;">
+        Iowa is a design philosophy that blends generous whitespace, crisp typography, and subtle motion.
+        Built for modern browsers, it showcases how minimalism can feel rich and engaging.
+      </p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-label="Features">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Features</h2>
+      <div class="grid">
+        <div class="card"><h3>Responsive Grid</h3><p>Fluid layouts that adapt gracefully to any screen size.</p></div>
+        <div class="card"><h3>Micro‑Interactions</h3><p>Subtle hover and scroll animations that delight without distraction.</p></div>
+        <div class="card"><h3>Accessible Design</h3><p>ARIA‑friendly markup and high‑contrast colors for inclusive experiences.</p></div>
+        <div class="card"><h3>Fast Load</h3><p>Optimized assets and vanilla JavaScript keep performance top‑notch.</p></div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" aria-label="Pricing">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Pricing</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Free</h3>
+          <p>Basic access – perfect for personal projects.</p>
+          <p><strong>$0 / month</strong></p>
+          <a href="#contact" class="btn">Get Started</a>
+        </div>
+        <div class="card">
+          <h3>Pro</h3>
+          <p>Advanced features, priority support, and custom branding.</p>
+          <p><strong>$49 / month</strong></p>
+          <a href="#contact" class="btn">Upgrade</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-label="Contact">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Contact Us</h2>
+      <form id="contactForm" style="max-width:600px; margin:auto; background:#fff; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08);">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required>
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" required></textarea>
+
+        <button type="submit" class="btn">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa. All rights reserved.
+  </footer>
+
+  <script>
+    // ------- Hamburger menu -------
+    const hamburger = document.querySelector('.hamburger');
+    const navList = document.getElementById('primary-navigation');
+
+    hamburger.addEventListener('click', () => {
+      const expanded = hamburger.getAttribute('aria-expanded') === 'true' || false;
+      hamburger.setAttribute('aria-expanded', !expanded);
+      navList.classList.toggle('open');
+    });
+
+    // Ensure keyboard navigation works for the toggle button
+    hamburger.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        hamburger.click();
+      }
+    });
+
+    // ------- Carousel -------
+    const slides = document.querySelectorAll('.slide');
+    const prevBtn = document.querySelector('.prev');
+    const nextBtn = document.querySelector('.next');
+    let currentIndex = 0;
+    const total = slides.length;
+    let autoPlayInterval;
+
+    function showSlide(index) {
+      slides.forEach((slide, i) => {
+        slide.setAttribute('aria-hidden', i !== index);
+      });
+    }
+
+    function nextSlide() {
+      currentIndex = (currentIndex + 1) % total;
+      showSlide(currentIndex);
+    }
+
+    function prevSlide() {
+      currentIndex = (currentIndex - 1 + total) % total;
+      showSlide(currentIndex);
+    }
+
+    nextBtn.addEventListener('click', () => {
+      nextSlide();
+      resetAutoPlay();
+    });
+
+    prevBtn.addEventListener('click', () => {
+      prevSlide();
+      resetAutoPlay();
+    });
+
+    // Keyboard support for carousel
+    document.querySelector('.carousel').addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') {
+        nextSlide();
+        resetAutoPlay();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+        resetAutoPlay();
+      }
+    });
+
+    // Auto‑play
+    function startAutoPlay() {
+      autoPlayInterval = setInterval(nextSlide, 5000);
+    }
+
+    function resetAutoPlay() {
+      clearInterval(autoPlayInterval);
+      startAutoPlay();
+    }
+
+    // Initialize
+    showSlide(currentIndex);
+    startAutoPlay();
+
+    // ------- Fade‑in cards on scroll -------
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.card').forEach(card => observer.observe(card));
+
+    // ------- Simple form feedback -------
+    const form = document.getElementById('contactForm');
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      alert('Thank you! Your message has been received.');
+      form.reset();
+    });
+  </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Iowa – a clean, Apple‑style 5‑page responsive website prototype (Home, About, Features, Pricing, Contact).">
+  <title>Iowa – Apple‑style Site Prototype</title>
+  <style>
+    /* -------------------------------------------------
+       Brand Variables (Anthropic palette)
+       ------------------------------------------------- */
+    :root {
+      --color-bg:        #faf9f5;   /* Light background */
+      --color-header:    #e8e6dc;   /* Header / Footer background */
+      --color-primary:   #6a9bcc;   /* Nav accent */
+      --color-accent:    #d97757;   /* Buttons */
+      --color-text:      #141413;   /* Main text */
+      --color-muted:     #666666;   /* Footer text */
+      --color-border:    #b0aea5;   /* Light gray borders */
+      --spacing:         1rem;
+    }
+
+    /* -------------------------------------------------
+       Reset & Base
+       ------------------------------------------------- */
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    html { scroll-behavior:smooth; }
+    body {
+      font-family: "Lora", Georgia, serif;
+      line-height:1.6;
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+    h1, h2, h3 { font-family: "Poppins", Arial, sans-serif; }
+    a { color:inherit; text-decoration:none; }
+    img { max-width:100%; height:auto; display:block; }
+
+    /* -------------------------------------------------
+       Layout
+       ------------------------------------------------- */
+    header {
+      position:sticky;
+      top:0;
+      background:var(--color-header);
+      border-bottom:1px solid var(--color-border);
+      z-index:10;
+    }
+    .nav {
+      max-width:1200px;
+      margin:auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:var(--spacing) calc(2 * var(--spacing));
+    }
+    .nav .logo { font-weight:600; font-size:1.25rem; }
+    .nav ul {
+      display:flex;
+      gap:2rem;
+      list-style:none;
+    }
+    .nav a {
+      font-weight:500;
+      position:relative;
+    }
+    .nav a::after {
+      content:"";
+      position:absolute;
+      left:0;
+      bottom:-4px;
+      height:2px;
+      width:0;
+      background:var(--color-primary);
+      transition:width .3s;
+    }
+    .nav a:hover::after,
+    .nav a:focus::after { width:100%; }
+
+    /* Hamburger (mobile) */
+    .hamburger {
+      display:none;
+      flex-direction:column;
+      gap:4px;
+      background:none;
+      border:none;
+      cursor:pointer;
+    }
+    .hamburger span {
+      width:24px;
+      height:2px;
+      background:var(--color-text);
+      display:block;
+    }
+
+    main { max-width:1200px; margin:auto; padding:calc(2 * var(--spacing)); }
+    section { padding:calc(4 * var(--spacing)) 0; }
+
+    /* -------------------------------------------------
+       Hero / Carousel
+       ------------------------------------------------- */
+    .hero {
+      position:relative;
+      overflow:hidden;
+      min-height:70vh;
+      background:var(--color-bg);
+    }
+    .carousel {
+      position:relative;
+      width:100%;
+      height:100%;
+    }
+    .slide {
+      position:absolute;
+      inset:0;
+      opacity:0;
+      transition:opacity .6s ease-in-out;
+    }
+    .slide[aria-hidden="false"] { opacity:1; }
+    .slide img { width:100%; height:100%; object-fit:cover; }
+    .carousel-controls {
+      position:absolute;
+      inset:0;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      pointer-events:none;
+    }
+    .carousel-controls button {
+      pointer-events:all;
+      background:rgba(0,0,0,0.4);
+      border:none;
+      color:#fff;
+      font-size:1.5rem;
+      width:2.5rem;
+      height:2.5rem;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:background .2s;
+    }
+    .carousel-controls button:hover,
+    .carousel-controls button:focus { background:rgba(0,0,0,0.6); }
+
+    .hero-content {
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      color:#fff;
+      z-index:1;
+      pointer-events:none;
+    }
+    .hero-content h1 { font-size:3rem; margin-bottom:.5rem; text-shadow:0 2px 4px rgba(0,0,0,.5); }
+    .hero-content p  { font-size:1.25rem; max-width:600px; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+    .btn {
+      display:inline-block;
+      padding:.75rem 1.5rem;
+      margin-top:1rem;
+      background:var(--color-accent);
+      color:#fff;
+      border-radius:8px;
+      font-weight:600;
+      transition:background .2s, transform .2s;
+    }
+    .btn:hover,
+    .btn:focus {
+      background:#c66a4f;
+      transform:scale(1.03);
+    }
+
+    /* -------------------------------------------------
+       Grid & Cards
+       ------------------------------------------------- */
+    .grid {
+      display:grid;
+      gap:2rem;
+      grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+    }
+    .card {
+      background:#fff;
+      border-radius:12px;
+      padding:2rem;
+      box-shadow:0 2px 8px rgba(0,0,0,.08);
+      opacity:0;
+      transform:translateY(20px);
+      transition:opacity .6s ease-out, transform .6s ease-out;
+    }
+    .card.visible { opacity:1; transform:none; }
+
+    /* -------------------------------------------------
+       Footer
+       ------------------------------------------------- */
+    footer {
+      background:var(--color-header);
+      border-top:1px solid var(--color-border);
+      text-align:center;
+      padding:2rem;
+      font-size:.875rem;
+      color:var(--color-muted);
+    }
+
+    /* -------------------------------------------------
+       Forms
+       ------------------------------------------------- */
+    input, textarea {
+      width:100%;
+      padding:.75rem;
+      margin-bottom:1rem;
+      border:1px solid var(--color-border);
+      border-radius:6px;
+      font-family:inherit;
+    }
+    button.btn { width:100%; }
+
+    /* -------------------------------------------------
+       Responsive Breakpoints
+       ------------------------------------------------- */
+    /* Mobile – up to 480px */
+    @media (max-width:480px) {
+      .hero-content h1 { font-size:2rem; }
+      .hero-content p  { font-size:1rem; }
+      .nav ul {
+        position:absolute;
+        top:100%;
+        left:0;
+        right:0;
+        flex-direction:column;
+        background:var(--color-header);
+        border-top:1px solid var(--color-border);
+        max-height:0;
+        overflow:hidden;
+        transition:max-height .3s ease-out;
+      }
+      .nav ul.open { max-height:500px; transition:max-height .4s ease-in; }
+      .hamburger { display:flex; }
+      .grid { grid-template-columns:1fr; }
+    }
+
+    /* Tablet – 481px to 1024px */
+    @media (min-width:481px) and (max-width:1024px) {
+      .hero-content h1 { font-size:2.5rem; }
+      .hero-content p  { font-size:1.1rem; }
+      .grid { grid-template-columns:repeat(2,1fr); }
+    }
+
+    /* Desktop – 1025px and up */
+    @media (min-width:1025px) {
+      .hero-content h1 { font-size:3.5rem; }
+      .hero-content p  { font-size:1.4rem; }
+      .grid { grid-template-columns:repeat(4,1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header aria-label="Main navigation">
+    <nav class="nav">
+      <div class="logo"><strong>Iowa</strong></div>
+      <button class="hamburger" aria-controls="primary-navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+        <span class="sr-only">Menu</span>
+      </button>
+      <ul id="primary-navigation">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="home" class="hero" aria-label="Home">
+      <div class="carousel" role="region" aria-label="Image carousel">
+        <div class="slide" aria-hidden="false">
+          <img src="https://picsum.photos/seed/hero1/1200/600" alt="Modern workspace with sleek devices">
+        </div>
+        <div class="slide" aria-hidden="true">
+          <img src="https://picsum.photos/seed/hero2/1200/600" alt="Close‑up of a high‑resolution display">
+        </div>
+        <div class="slide" aria-hidden="true">
+          <img src="https://picsum.photos/seed/hero3/1200/600" alt="Person using a tablet with fluid animations">
+        </div>
+
+        <div class="carousel-controls">
+          <button class="prev" aria-label="Previous slide">&#9664;</button>
+          <button class="next" aria-label="Next slide">&#9654;</button>
+        </div>
+      </div>
+
+      <div class="hero-content">
+        <h1>Welcome to Iowa</h1>
+        <p>Elegant, simple, and powerful. Experience the future of web design.</p>
+        <a href="#features" class="btn">Explore Features</a>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" aria-label="About">
+      <h2 style="font-size:2.5rem; margin-bottom:1rem; text-align:center;">About Iowa</h2>
+      <p style="max-width:800px; margin:auto; text-align:center;">
+        Iowa is a design philosophy that blends generous whitespace, crisp typography, and subtle motion.
+        Built for modern browsers, it showcases how minimalism can feel rich and engaging.
+      </p>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-label="Features">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Features</h2>
+      <div class="grid">
+        <div class="card"><h3>Responsive Grid</h3><p>Fluid layouts that adapt gracefully to any screen size.</p></div>
+        <div class="card"><h3>Micro‑Interactions</h3><p>Subtle hover and scroll animations that delight without distraction.</p></div>
+        <div class="card"><h3>Accessible Design</h3><p>ARIA‑friendly markup and high‑contrast colors for inclusive experiences.</p></div>
+        <div class="card"><h3>Fast Load</h3><p>Optimized assets and vanilla JavaScript keep performance top‑notch.</p></div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" aria-label="Pricing">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Pricing</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Free</h3>
+          <p>Basic access – perfect for personal projects.</p>
+          <p><strong>$0 / month</strong></p>
+          <a href="#contact" class="btn">Get Started</a>
+        </div>
+        <div class="card">
+          <h3>Pro</h3>
+          <p>Advanced features, priority support, and custom branding.</p>
+          <p><strong>$49 / month</strong></p>
+          <a href="#contact" class="btn">Upgrade</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" aria-label="Contact">
+      <h2 style="font-size:2.5rem; margin-bottom:2rem; text-align:center;">Contact Us</h2>
+      <form id="contactForm" style="max-width:600px; margin:auto; background:#fff; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08);">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required>
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" required></textarea>
+
+        <button type="submit" class="btn">Send Message</button>
+      </form>
+    </section>
+  </main>
+
+  <footer aria-label="Site footer">
+    © 2026 Iowa. All rights reserved.
+  </footer>
+
+  <script>
+    /* -------------------------------------------------
+       Hamburger menu (mobile)
+       ------------------------------------------------- */
+    const hamburger = document.querySelector('.hamburger');
+    const navList   = document.getElementById('primary-navigation');
+
+    hamburger.addEventListener('click', () => {
+      const expanded = hamburger.getAttribute('aria-expanded') === 'true';
+      hamburger.setAttribute('aria-expanded', !expanded);
+      navList.classList.toggle('open');
+    });
+
+    /* -------------------------------------------------
+       Carousel functionality
+       ------------------------------------------------- */
+    const slides = document.querySelectorAll('.slide');
+    const prevBtn = document.querySelector('.prev');
+    const nextBtn = document.querySelector('.next');
+    let currentIndex = 0;
+    const total = slides.length;
+    let autoPlayInterval;
+
+    function showSlide(index) {
+      slides.forEach((slide, i) => {
+        slide.setAttribute('aria-hidden', i !== index);
+      });
+    }
+
+    function nextSlide() {
+      currentIndex = (currentIndex + 1) % total;
+      showSlide(currentIndex);
+    }
+
+    function prevSlide() {
+      currentIndex = (currentIndex - 1 + total) % total;
+      showSlide(currentIndex);
+    }
+
+    nextBtn.addEventListener('click', () => { nextSlide(); resetAutoPlay(); });
+    prevBtn.addEventListener('click', () => { prevSlide(); resetAutoPlay(); });
+
+    // Keyboard navigation for carousel
+    document.querySelector('.carousel').addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') { nextSlide(); resetAutoPlay(); }
+      else if (e.key === 'ArrowLeft') { prevSlide(); resetAutoPlay(); }
+    });
+
+    function startAutoPlay() {
+      autoPlayInterval = setInterval(nextSlide, 5000);
+    }
+    function resetAutoPlay() {
+      clearInterval(autoPlayInterval);
+      startAutoPlay();
+    }
+
+    // Initialise carousel
+    showSlide(currentIndex);
+    startAutoPlay();
+
+    /* -------------------------------------------------
+       Fade
+
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Iowa – a clean, Apple‑style 5‑page responsive website prototype (Home, About, Features, Pricing, Contact)."><title>Iowa – Apple‑style Site Prototype</title><style>:root{--color-bg:#faf9f5;--color-header:#e8e6dc;--color-primary:#6a9bcc;--color-accent:#d97757;--color-text:#141413;--color-muted:#666666;--color-border:#b0aea5;--spacing:1rem}*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}body{font-family:"Lora",Georgia,serif;line-height:1.6;color:var(--color-text);background:var(--color-bg)}h1,h2,h3{font-family:"Poppins",Arial,sans-serif}a{color:inherit;text-decoration:none}img{max-width:100%;height:auto;display:block}header{position:sticky;top:0;background:var(--color-header);border-bottom:1px solid var(--color-border);z-index:10}.nav{max-width:1200px;margin:auto;display:flex;justify-content:space-between;align-items:center;padding:var(--spacing)calc(2*var(--spacing))}.nav .logo{font-weight:600;font-size:1.25rem}.nav ul{display:flex;gap:2rem;list-style:none}.nav a{font-weight:500;position:relative}.nav a::after{content:"";position:absolute;left:0;bottom:-4px;height:2px;width:0;background:var(--color-primary);transition:width .3s}.nav a:hover::after,.nav a:focus::after{width:100%}.hamburger{display:none;flex-direction:column;gap:4px;background:none;border:none;cursor:pointer}.hamburger span{width:24px;height:2px;background:var(--color-text);display:block}@media (max-width:480px){.nav ul{position:absolute;top:100%;left:0;right:0;flex-direction:column;background:var(--color-header);border-top:1px solid var(--color-border);max-height:0;overflow:hidden;transition:max-height .3s ease-out}.nav ul.open{max-height:500px;transition:max-height .4s ease-in}.hamburger{display:flex}.grid{grid-template-columns:1fr}}@media (min-width:481px) and (max-width:1024px){.hero-content h1{font-size:2.5rem}.hero-content p{font-size:1.1rem}.grid{grid-template-columns:repeat(2,1fr)}}@media (min-width:1025px){.hero-content h1{font-size:3.5rem}.hero-content p{font-size:1.4rem}.grid{grid-template-columns:repeat(4,1fr)}}main{max-width:1200px;margin:auto;padding:calc(2*var(--spacing))}section{padding:calc(4*var(--spacing)) 0}.hero{position:relative;overflow:hidden;min-height:70vh;background:var(--color-bg)}.carousel{position:relative;width:100%;height:100%}.slide{position:absolute;inset:0;opacity:0;transition:opacity .6s ease-in-out}.slide[aria-hidden="false"]{opacity:1}.slide img{width:100%;height:100%;object-fit:cover}.carousel-controls{position:absolute;inset:0;display:flex;justify-content:space-between;align-items:center;pointer-events:none}.carousel-controls button{pointer-events:all;background:rgba(0,0,0,.4);border:none;color:#fff;font-size:1.5rem;width:2.5rem;height:2.5rem;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s}.carousel-controls button:hover,.carousel-controls button:focus{background:rgba(0,0,0,.6)}.hero-content{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;z-index:1;pointer-events:none}.hero-content h1{font-size:3rem;margin-bottom:.5rem;text-shadow:0 2px 4px rgba(0,0,0,.5)}.hero-content p{font-size:1.25rem;max-width:600px;text-shadow:0 1px 3px rgba(0,0,0,.5)}.btn{display:inline-block;padding:.75rem 1.5rem;margin-top:1rem;background:var(--color-accent);color:#fff;border-radius:8px;font-weight:600;transition:background .2s,transform .2s}.btn:hover,.btn:focus{background:#c66a4f;transform:scale(1.03)}.grid{display:grid;gap:2rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.card{background:#fff;border-radius:12px;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.08);opacity:0;transform:translateY(20px);transition:opacity .6s ease-out,transform .6s ease-out}.card.visible{opacity:1;transform:none}footer{background:var(--color-header);border-top:1px solid var(--color-border);text-align:center;padding:2rem;font-size:.875rem;color:var(--color-muted)}input,textarea{width:100%;padding:.75rem;margin-bottom:1rem;border:1px solid var(--color-border);border-radius:6px;font-family:inherit}button.btn{width:100%}</style></head><body><header aria-label="Main navigation"><nav class="nav"><div class="logo"><strong>Iowa</strong></div><button class="hamburger" aria-controls="primary-navigation" aria-expanded="false"><span></span><span></span><span></span><span class="sr-only">Menu</span></button><ul id="primary-navigation"><li><a href="#home">Home</a></li><li><a href="#about">About</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#contact">Contact</a></li></ul></nav></header><main><!-- Home --><section id="home" class="hero" aria-label="Home"><div class="carousel" role="region" aria-label="Image carousel"><div class="slide" aria-hidden="false"><img src="https://picsum.photos/seed/hero1/1200/600" alt="Modern workspace with sleek devices"></div><div class="slide" aria-hidden="true"><img src="https://picsum.photos/seed/hero2/1200/600" alt="Close‑up of a high‑resolution display"></div><div class="slide" aria-hidden="true"><img src="https://picsum.photos/seed/hero3/1200/600" alt="Person using a tablet with fluid animations"></div><div class="carousel-controls"><button class="prev" aria-label="Previous slide">&#9664;</button><button class="next" aria-label="Next slide">&#9654;</button></div></div><div class="hero-content"><h1>Welcome to Iowa</h1><p>Elegant, simple, and powerful. Experience the future of web design.</p><a href="#features" class="btn">Explore Features</a></div></section><!-- About --><section id="about" aria-label="About"><h2 style="font-size:2.5rem;margin-bottom:1rem;text-align:center;">About Iowa</h2><p style="max-width:800px;margin:auto;text-align:center;">Iowa is a design philosophy that blends generous whitespace, crisp typography, and subtle motion. Built for modern browsers, it showcases how minimalism can feel rich and engaging.</p></section><!-- Features --><section id="features" aria-label="Features"><h2 style="font-size:2.5rem;margin-bottom:2rem;text-align:center;">Features</h2><div class="grid"><div class="card"><h3>Responsive Grid</h3><p>Fluid layouts that adapt gracefully to any screen size.</p></div><div class="card"><h3>Micro‑Interactions</h3><p>Subtle hover and scroll animations that delight without distraction.</p></div><div class="card"><h3>Accessible Design</h3><p>ARIA‑friendly markup and high‑contrast colors for inclusive experiences.</p></div><div class="card"><h3>Fast Load</h3><p>Optimized assets and vanilla JavaScript keep performance top‑notch.</p></div></div></section><!-- Pricing --><section id="pricing" aria-label="Pricing"><h2 style="font-size:2.5rem;margin-bottom:2rem;text-align:center;">Pricing</h2><div class="grid"><div class="card"><h3>Free</h3><p>Basic access – perfect for personal projects.</p><p><strong>$0 / month</strong></p><a href="#contact" class="btn">Get Started</a></div><div class="card"><h3>Pro</h3><p>Advanced features, priority support, and custom branding.</p><p><strong>$49 / month</strong></p><a href="#contact" class="btn">Upgrade</a></div></div></section><!-- Contact --><section id="contact" aria-label="Contact"><h2 style="font-size:2.5rem;margin-bottom:2rem;text-align:center;">Contact Us</h2><form id="contactForm" style="max-width:600px;margin:auto;background:#fff;padding:

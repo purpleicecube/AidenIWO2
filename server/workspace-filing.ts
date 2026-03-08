@@ -494,7 +494,10 @@ export function buildMarkdownPreviewHtml(title: string, markdown: string): strin
 </html>`;
 }
 
-function resolveOutputFolder(deliverableType: string, deliverableContent: string | null): string {
+function resolveOutputFolder(deliverableType: string, deliverableContent: string | null, hasPostProcessedFile?: boolean): string {
+  // Post-processed binary files (e.g. .pptx, .pdf) always go to #Documents
+  if (hasPostProcessedFile) return "#Documents";
+
   if (deliverableType === "code") return "#Code_Blocks";
   if (deliverableType === "image") return "#Images";
 
@@ -618,7 +621,8 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
     let deliverableFilePath: string | null = null;
 
     if (deliverable) {
-      const outputFolderName = resolveOutputFolder(deliverableType, deliverable);
+      const postProcessedFile = tier2.output?.postProcessedFile;
+      const outputFolderName = resolveOutputFolder(deliverableType, deliverable, !!postProcessedFile);
       let outputFolder = await getRootFolder(outputFolderName);
 
       if (!outputFolder) {
@@ -661,6 +665,44 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
 
         deliverableFilePath = `${outputFolderName}/${dateStr}/${folderName}/${fileName}`;
         console.log(`  Deliverable saved to ${deliverableFilePath}`);
+
+        // Save post-processed file (e.g. .pptx, .pdf) if present
+        if (postProcessedFile?.path) {
+          try {
+            const fs = await import("fs");
+            if (fs.existsSync(postProcessedFile.path)) {
+              const fileContent = fs.readFileSync(postProcessedFile.path);
+              const fileBase64 = fileContent.toString("base64");
+              const mime = postProcessedFile.mimeType || "";
+              const ext = mime === "application/pdf" ? "pdf"
+                : mime.includes("presentationml") ? "pptx"
+                : postProcessedFile.path.split(".").pop() || "bin";
+              const formatTag = ext === "pdf" ? "pdf" : ext === "pptx" ? "pptx" : "binary";
+              const fileName = `${fileSlug}.${ext}`;
+
+              await storage.createArtifact({
+                name: fileName,
+                folderId: outOrderFolder.id,
+                type: "file",
+                mimeType: mime || "application/octet-stream",
+                content: fileBase64,
+                size: postProcessedFile.size,
+                status: "active",
+                createdBy: "aiden",
+                tags: ["auto-filed", "deliverable", formatTag, order.type, "post-processed"],
+                sourceType: "work_order",
+                sourceId: order.id,
+              });
+
+              console.log(`  ${ext.toUpperCase()} artifact saved: ${fileName} (${(postProcessedFile.size / 1024).toFixed(0)}KB)`);
+
+              // Clean up temp file
+              fs.unlinkSync(postProcessedFile.path);
+            }
+          } catch (err: any) {
+            console.error(`  Failed to save post-processed artifact: ${err.message}`);
+          }
+        }
       }
 
       let sandboxHtml: string | null = extractHtmlFromDeliverable(deliverable);
