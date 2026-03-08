@@ -1388,6 +1388,26 @@ async function handleWorkflowCompletion(
       if (completedOrder) {
         fileWorkOrderOutput(completedOrder).catch(err => console.error("Auto-filing error (workflow PM):", err.message));
       }
+    } else {
+      // Standalone workflow (no work order) — auto-publish to sandbox directly
+      const deliverable = workProduct.deliverable;
+      const isRenderable = typeof deliverable === "string" && (
+        deliverable.trimStart().startsWith("<!DOCTYPE") ||
+        deliverable.trimStart().startsWith("<html") ||
+        (workProduct.deliverableType || "").toLowerCase().includes("html")
+      );
+      if (isRenderable) {
+        storage.createSandboxSession({
+          name: `Preview: ${workProduct.deliverableTitle || template?.name || "Workflow Output"}`,
+          description: `Auto-deployed from workflow execution "${template?.name || executionId}" — score: ${execReview.score.toFixed(2)}`,
+          environment: { type: "html", sourceId: executionId, sourceType: "workflow_execution" },
+        }).then(session =>
+          storage.updateSandboxSession(session.id, {
+            status: "completed",
+            result: { html: deliverable, renderable: true, score: execReview.score, approved: true },
+          })
+        ).catch(err => console.error("Auto-sandbox error (standalone workflow):", err.message));
+      }
     }
   } else if (execReview.recommendation === "escalate_to_operator") {
     await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
