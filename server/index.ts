@@ -76,11 +76,13 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   try {
-    const { recoverOrphanedProcessingOrders } = await import("./orchestration");
+    const { recoverOrphanedProcessingOrders, startWatchdog } = await import("./orchestration");
     const recovered = await recoverOrphanedProcessingOrders();
     if (recovered > 0) {
       log(`Recovered ${recovered} orphaned work order(s) stuck in "processing"`, "recovery");
     }
+    startWatchdog();
+    log("Watchdog started — scanning for stuck work orders every 30s", "watchdog");
   } catch (err) {
     console.error("Failed to recover orphaned processing orders:", err);
   }

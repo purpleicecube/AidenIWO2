@@ -76,6 +76,18 @@ import {
   lockerKeys,
   toolAuditLogs,
   skillTemplates,
+  type ChecklistItem,
+  type InsertChecklistItem,
+  checklistItems,
+  type GammaSettings,
+  type InsertGammaSettings,
+  gammaSettings,
+  type GammaTemplateRegistryEntry,
+  type InsertGammaTemplateRegistry,
+  gammaTemplateRegistry,
+  type GammaGenerationRecord,
+  type InsertGammaGenerationRecord,
+  gammaGenerationRecords,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, asc, inArray } from "drizzle-orm";
@@ -234,6 +246,31 @@ export interface IStorage {
   createSkillTemplate(template: InsertSkillTemplate): Promise<SkillTemplate>;
   updateSkillTemplate(id: string, updates: Partial<SkillTemplate>): Promise<SkillTemplate | undefined>;
   deleteSkillTemplate(id: string): Promise<boolean>;
+
+  // Gamma Settings
+  getGammaSettings(): Promise<GammaSettings | undefined>;
+  upsertGammaSettings(settings: InsertGammaSettings): Promise<GammaSettings>;
+
+  // Gamma Template Registry
+  getGammaTemplates(): Promise<GammaTemplateRegistryEntry[]>;
+  getGammaTemplateByKey(templateKey: string): Promise<GammaTemplateRegistryEntry | undefined>;
+  createGammaTemplate(entry: InsertGammaTemplateRegistry): Promise<GammaTemplateRegistryEntry>;
+  updateGammaTemplate(id: string, updates: Partial<GammaTemplateRegistryEntry>): Promise<GammaTemplateRegistryEntry | undefined>;
+
+  // Gamma Generation Records
+  createGammaGenerationRecord(record: InsertGammaGenerationRecord): Promise<GammaGenerationRecord>;
+  getGammaGenerationRecords(workOrderId: string): Promise<GammaGenerationRecord[]>;
+  getGammaGenerationRecord(id: string): Promise<GammaGenerationRecord | undefined>;
+  getGammaCandidates(workOrderId: string): Promise<GammaGenerationRecord[]>;
+  selectGammaCandidate(workOrderId: string, recordId: string, selectedBy: string): Promise<GammaGenerationRecord | undefined>;
+  rejectGammaCandidate(workOrderId: string, recordId: string): Promise<GammaGenerationRecord | undefined>;
+  rejectAllGammaCandidates(workOrderId: string): Promise<void>;
+
+  // 2DO Checklists
+  getChecklistItems(workOrderId: string): Promise<ChecklistItem[]>;
+  getChecklistItemsByWorkflow(workflowExecutionId: string): Promise<ChecklistItem[]>;
+  createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem>;
+  updateChecklistItem(id: string, updates: Partial<ChecklistItem>): Promise<ChecklistItem | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1004,6 +1041,130 @@ export class DatabaseStorage implements IStorage {
   async deleteSkillTemplate(id: string): Promise<boolean> {
     const result = await db.delete(skillTemplates).where(eq(skillTemplates.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Gamma Settings
+  async getGammaSettings(): Promise<GammaSettings | undefined> {
+    const [settings] = await db.select().from(gammaSettings).where(eq(gammaSettings.id, "default"));
+    return settings;
+  }
+
+  async upsertGammaSettings(settings: InsertGammaSettings): Promise<GammaSettings> {
+    const existing = await this.getGammaSettings();
+    if (existing) {
+      const [updated] = await db
+        .update(gammaSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(gammaSettings.id, "default"))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(gammaSettings).values({ ...settings, id: "default" } as any).returning();
+    return created;
+  }
+
+  // Gamma Template Registry
+  async getGammaTemplates(): Promise<GammaTemplateRegistryEntry[]> {
+    return db.select().from(gammaTemplateRegistry).orderBy(gammaTemplateRegistry.name);
+  }
+
+  async getGammaTemplateByKey(templateKey: string): Promise<GammaTemplateRegistryEntry | undefined> {
+    const [entry] = await db.select().from(gammaTemplateRegistry).where(eq(gammaTemplateRegistry.templateKey, templateKey));
+    return entry;
+  }
+
+  async createGammaTemplate(entry: InsertGammaTemplateRegistry): Promise<GammaTemplateRegistryEntry> {
+    const [created] = await db.insert(gammaTemplateRegistry).values(entry).returning();
+    return created;
+  }
+
+  async updateGammaTemplate(id: string, updates: Partial<GammaTemplateRegistryEntry>): Promise<GammaTemplateRegistryEntry | undefined> {
+    const [updated] = await db
+      .update(gammaTemplateRegistry)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(gammaTemplateRegistry.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Gamma Generation Records
+  async createGammaGenerationRecord(record: InsertGammaGenerationRecord): Promise<GammaGenerationRecord> {
+    const [created] = await db.insert(gammaGenerationRecords).values(record).returning();
+    return created;
+  }
+
+  async getGammaGenerationRecords(workOrderId: string): Promise<GammaGenerationRecord[]> {
+    return db.select().from(gammaGenerationRecords).where(eq(gammaGenerationRecords.workOrderId, workOrderId)).orderBy(desc(gammaGenerationRecords.createdAt));
+  }
+
+  async getGammaGenerationRecord(id: string): Promise<GammaGenerationRecord | undefined> {
+    const [record] = await db.select().from(gammaGenerationRecords).where(eq(gammaGenerationRecords.id, id));
+    return record;
+  }
+
+  async getGammaCandidates(workOrderId: string): Promise<GammaGenerationRecord[]> {
+    return db.select().from(gammaGenerationRecords)
+      .where(and(eq(gammaGenerationRecords.workOrderId, workOrderId), eq(gammaGenerationRecords.candidateStatus, "candidate")))
+      .orderBy(asc(gammaGenerationRecords.createdAt));
+  }
+
+  async selectGammaCandidate(workOrderId: string, recordId: string, selectedBy: string): Promise<GammaGenerationRecord | undefined> {
+    // Verify record belongs to this WO
+    const [record] = await db.select().from(gammaGenerationRecords)
+      .where(and(eq(gammaGenerationRecords.id, recordId), eq(gammaGenerationRecords.workOrderId, workOrderId)));
+    if (!record) return undefined;
+
+    // Reject all other candidates for this WO
+    await db.update(gammaGenerationRecords)
+      .set({ candidateStatus: "rejected" })
+      .where(and(
+        eq(gammaGenerationRecords.workOrderId, workOrderId),
+        eq(gammaGenerationRecords.candidateStatus, "candidate"),
+      ));
+
+    // Mark this one as selected
+    const [updated] = await db.update(gammaGenerationRecords)
+      .set({ candidateStatus: "selected", selectedAt: new Date(), selectedBy })
+      .where(eq(gammaGenerationRecords.id, recordId))
+      .returning();
+    return updated;
+  }
+
+  async rejectGammaCandidate(workOrderId: string, recordId: string): Promise<GammaGenerationRecord | undefined> {
+    // Verify record belongs to this WO
+    const [updated] = await db.update(gammaGenerationRecords)
+      .set({ candidateStatus: "rejected" })
+      .where(and(eq(gammaGenerationRecords.id, recordId), eq(gammaGenerationRecords.workOrderId, workOrderId)))
+      .returning();
+    return updated;
+  }
+
+  async rejectAllGammaCandidates(workOrderId: string): Promise<void> {
+    await db.update(gammaGenerationRecords)
+      .set({ candidateStatus: "rejected" })
+      .where(and(
+        eq(gammaGenerationRecords.workOrderId, workOrderId),
+        eq(gammaGenerationRecords.candidateStatus, "candidate"),
+      ));
+  }
+
+  // 2DO Checklists
+  async getChecklistItems(workOrderId: string): Promise<ChecklistItem[]> {
+    return db.select().from(checklistItems).where(eq(checklistItems.workOrderId, workOrderId)).orderBy(asc(checklistItems.createdAt));
+  }
+
+  async getChecklistItemsByWorkflow(workflowExecutionId: string): Promise<ChecklistItem[]> {
+    return db.select().from(checklistItems).where(eq(checklistItems.workflowExecutionId, workflowExecutionId)).orderBy(asc(checklistItems.createdAt));
+  }
+
+  async createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem> {
+    const [created] = await db.insert(checklistItems).values(item).returning();
+    return created;
+  }
+
+  async updateChecklistItem(id: string, updates: Partial<ChecklistItem>): Promise<ChecklistItem | undefined> {
+    const [updated] = await db.update(checklistItems).set({ ...updates, updatedAt: new Date() }).where(eq(checklistItems.id, id)).returning();
+    return updated;
   }
 }
 

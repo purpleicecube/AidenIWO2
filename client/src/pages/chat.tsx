@@ -45,15 +45,183 @@ import {
   CheckSquare,
   X,
   FolderOutput,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  ExternalLink,
+  RotateCcw,
+  SkipForward,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useToast } from "@/hooks/use-toast";
-import type { ChatSession, ChatMessage, ChatGroup } from "@shared/schema";
+import type { ChatSession, ChatMessage, ChatGroup, WorkflowExecution, WorkflowStepRun, SubAgent } from "@shared/schema";
 import SplitPane from "@/components/split-pane";
 
 type SessionWithMessages = ChatSession & { messages: ChatMessage[] };
+
+type ExecutionDetail = WorkflowExecution & { stepRuns: WorkflowStepRun[]; template?: { name: string } };
+
+function parseWorkflowBreadcrumb(breadcrumb: string | null | undefined): { executionId: string; workOrderId: string } | null {
+  if (!breadcrumb?.startsWith("assistant_reply:workflow:")) return null;
+  try {
+    return JSON.parse(breadcrumb.slice("assistant_reply:workflow:".length));
+  } catch { return null; }
+}
+
+const stepStatusColor: Record<string, string> = {
+  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  running: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  pending: "bg-muted text-muted-foreground",
+  failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  skipped: "bg-muted text-muted-foreground",
+  awaiting_operator: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+};
+
+function StepStatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "completed": return <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />;
+    case "running": return <Loader2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin" />;
+    case "failed": return <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />;
+    case "awaiting_operator": return <AlertTriangle className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />;
+    default: return <div className="w-3.5 h-3.5 rounded-full border-2 border-muted-foreground/40" />;
+  }
+}
+
+function ChatWorkflowTracker({ executionId, workOrderId }: { executionId: string; workOrderId: string }) {
+  const { toast } = useToast();
+
+  const { data: execution } = useQuery<ExecutionDetail>({
+    queryKey: ["/api/workflow-executions", executionId],
+    refetchInterval: (query) => {
+      const d = query.state.data as ExecutionDetail | undefined;
+      return d?.status === "running" || d?.status === "pending" ? 3000 : false;
+    },
+  });
+
+  const { data: subAgents } = useQuery<SubAgent[]>({ queryKey: ["/api/sub-agents"] });
+
+  const retryMutation = useMutation({
+    mutationFn: (stepRunId: string) => apiRequest("POST", `/api/workflow-executions/${executionId}/step-runs/${stepRunId}/retry`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions", executionId] }); toast({ title: "Step retrying" }); },
+  });
+  const skipMutation = useMutation({
+    mutationFn: (stepRunId: string) => apiRequest("POST", `/api/workflow-executions/${executionId}/step-runs/${stepRunId}/skip`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions", executionId] }); toast({ title: "Step skipped" }); },
+  });
+
+  if (!execution) {
+    return (
+      <Card className="px-4 py-3 mt-2 max-w-[80%] border-dashed">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Loading workflow status...
+        </div>
+      </Card>
+    );
+  }
+
+  const steps = execution.stepRuns || [];
+  const completedSteps = steps.filter(s => s.status === "completed").length;
+  const totalSteps = steps.length;
+  const progressPct = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+  const pmAgent = subAgents?.find(a => a.id === execution.pmSubAgentId);
+  const workflowName = execution.template?.name || execution.goal || "Workflow";
+
+  const overallStatusColor: Record<string, string> = {
+    running: "text-blue-600 dark:text-blue-400",
+    completed: "text-emerald-600 dark:text-emerald-400",
+    failed: "text-red-600 dark:text-red-400",
+    blocked: "text-amber-600 dark:text-amber-400",
+    pending: "text-muted-foreground",
+  };
+
+  return (
+    <Card className="mt-2 max-w-[80%] overflow-hidden border-indigo-200 dark:border-indigo-800/50" data-testid="chat-workflow-tracker">
+      {/* Header */}
+      <div className="px-4 py-2.5 bg-indigo-50/50 dark:bg-indigo-950/20 border-b border-indigo-100 dark:border-indigo-900/30">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <GitBranch className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+            <span className="text-sm font-medium truncate">{workflowName}</span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-transparent no-default-hover-elevate no-default-active-elevate">
+              {completedSteps}/{totalSteps} steps
+            </Badge>
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border-transparent no-default-hover-elevate no-default-active-elevate ${stepStatusColor[execution.status] || ""}`}>
+              {execution.status === "running" && <Loader2 className="w-2.5 h-2.5 animate-spin mr-0.5" />}
+              {execution.status}
+            </Badge>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <Progress value={progressPct} className="h-1.5 mt-2" />
+      </div>
+
+      {/* Steps */}
+      <div className="px-4 py-2.5 space-y-1">
+        {steps.map((step) => (
+          <div key={step.id} className="flex items-center justify-between gap-2 py-1" data-testid={`chat-step-${step.stepKey}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <StepStatusIcon status={step.status} />
+              <span className={`text-xs truncate ${step.status === "completed" ? "text-muted-foreground line-through" : step.status === "running" ? "font-medium" : ""}`}>
+                {step.stepName}
+              </span>
+              {(step.revisionAttempt as number ?? 0) > 0 && (
+                <span className="text-[9px] text-amber-600 dark:text-amber-400">rev {step.revisionAttempt as number}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {step.status === "failed" && (
+                <button
+                  className="text-[10px] text-red-600 dark:text-red-400 hover:underline px-1"
+                  onClick={() => retryMutation.mutate(step.id)}
+                  disabled={retryMutation.isPending}
+                >
+                  <RotateCcw className="w-3 h-3 inline" /> Retry
+                </button>
+              )}
+              {(step.status === "failed" || step.status === "awaiting_operator") && (
+                <button
+                  className="text-[10px] text-muted-foreground hover:underline px-1"
+                  onClick={() => skipMutation.mutate(step.id)}
+                  disabled={skipMutation.isPending}
+                >
+                  <SkipForward className="w-3 h-3 inline" /> Skip
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-2 border-t flex items-center justify-between text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-2">
+          {pmAgent && (
+            <span>
+              <Badge variant="outline" className="text-[9px] px-1 py-0 border-blue-500/50 text-blue-600 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate mr-1">PM</Badge>
+              {pmAgent.name}
+            </span>
+          )}
+          {execution.executionMode && (
+            <Badge variant="outline" className="text-[9px] px-1 py-0 no-default-hover-elevate no-default-active-elevate">{execution.executionMode}</Badge>
+          )}
+        </div>
+        <a
+          href={`/work-orders/${workOrderId}`}
+          className="flex items-center gap-1 hover:text-primary transition-colors"
+          data-testid="link-view-wo-detail"
+        >
+          View Details <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+    </Card>
+  );
+}
 
 export default function ChatPage() {
   usePageTitle("Chat with Aiden");
@@ -76,6 +244,7 @@ export default function ChatPage() {
   const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const actionMapRef = useRef<Map<string, Array<{ type: string; workOrderId?: string; executionId?: string }>>>(new Map());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -180,20 +349,27 @@ export default function ChatPage() {
       if (!activeSessionId && data.sessionId) setActiveSessionId(data.sessionId);
       invalidateSessions();
       if (data.actions && data.actions.length > 0) {
+        // Store action metadata keyed by messageId for inline tracker rendering
+        if (data.messageId) {
+          actionMapRef.current.set(data.messageId, data.actions);
+        }
         queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
         queryClient.invalidateQueries({ queryKey: ["/api/work-orders?includeArchived=true"] });
         queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
         queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions"] });
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
           queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
           queryClient.invalidateQueries({ queryKey: ["/api/work-orders/recent"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions"] });
         }, 15000);
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
           queryClient.invalidateQueries({ queryKey: ["/api/work-orders/stats"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions"] });
         }, 30000);
       }
     },
@@ -905,51 +1081,67 @@ export default function ChatPage() {
             </div>
           ) : (
             <div className="space-y-4 max-w-3xl mx-auto">
-              {messages.map((msg, i) => (
-                <div
-                  key={msg.id}
-                  className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                  data-testid={`message-${msg.role}-${i}`}
-                >
-                  {msg.role === "assistant" && (
-                    <div className="flex-shrink-0 flex items-start pt-1">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
-                        <Bot className="w-4 h-4 text-primary-foreground" />
-                      </div>
-                    </div>
-                  )}
-                  <Card
-                    className={`px-4 py-3 max-w-[80%] ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : ""
-                    }`}
-                  >
+              {messages.map((msg, i) => {
+                // Resolve workflow tracker data from mutation ref or persisted breadcrumb
+                const wfMeta = msg.role === "assistant"
+                  ? (actionMapRef.current.get(msg.id)?.find(a => a.type === "EXECUTE_WORKFLOW") || parseWorkflowBreadcrumb(msg.gccBreadcrumb))
+                  : null;
+
+                return (
+                  <div key={msg.id}>
                     <div
-                      className={`text-sm whitespace-pre-wrap break-words ${
-                        msg.role === "user" ? "" : "prose prose-sm dark:prose-invert max-w-none"
-                      }`}
-                      data-testid={`text-message-content-${i}`}
+                      className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                      data-testid={`message-${msg.role}-${i}`}
                     >
-                      {msg.content}
+                      {msg.role === "assistant" && (
+                        <div className="flex-shrink-0 flex items-start pt-1">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
+                            <Bot className="w-4 h-4 text-primary-foreground" />
+                          </div>
+                        </div>
+                      )}
+                      <Card
+                        className={`px-4 py-3 max-w-[80%] ${
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : ""
+                        }`}
+                      >
+                        <div
+                          className={`text-sm whitespace-pre-wrap break-words ${
+                            msg.role === "user" ? "" : "prose prose-sm dark:prose-invert max-w-none"
+                          }`}
+                          data-testid={`text-message-content-${i}`}
+                        >
+                          {msg.content}
+                        </div>
+                        <div
+                          className={`text-xs mt-2 ${
+                            msg.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                          }`}
+                        >
+                          {new Date(msg.createdAt).toLocaleTimeString()}
+                        </div>
+                      </Card>
+                      {msg.role === "user" && (
+                        <div className="flex-shrink-0 flex items-start pt-1">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div
-                      className={`text-xs mt-2 ${
-                        msg.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
-                      }`}
-                    >
-                      {new Date(msg.createdAt).toLocaleTimeString()}
-                    </div>
-                  </Card>
-                  {msg.role === "user" && (
-                    <div className="flex-shrink-0 flex items-start pt-1">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted">
-                        <User className="w-4 h-4 text-muted-foreground" />
+                    {wfMeta && (
+                      <div className="flex gap-3 justify-start ml-11">
+                        <ChatWorkflowTracker
+                          executionId={(wfMeta as any).executionId || (wfMeta as any).workOrderId}
+                          workOrderId={(wfMeta as any).workOrderId || ""}
+                        />
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
               {chatMutation.isPending && (
                 <div className="flex gap-3 justify-start" data-testid="message-loading">
                   <div className="flex-shrink-0 flex items-start pt-1">

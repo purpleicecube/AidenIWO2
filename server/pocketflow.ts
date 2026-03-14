@@ -1,12 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { storage } from "./storage";
-import type { WorkOrder, LlmSettings } from "@shared/schema";
+import type { WorkOrder, LlmSettings, InsertChecklistItem } from "@shared/schema";
 import type { Tier1Result, Tier2Result, EffectiveLlmConfig } from "./llm-client";
 import {
   llmPlanSteps,
@@ -16,6 +17,8 @@ import {
   effectiveConfigToSettings,
 } from "./llm-client";
 import { executeTool, getAvailableToolsForAgent, type ToolExecResult, type AvailableTool } from "./tool-executor";
+import { autoImportSkillsForDescription } from "./skill-auto-import";
+import { generateWithGamma } from "./gamma-client";
 
 function shouldBlockFallback(order: WorkOrder): { blocked: boolean; reason: string | null } {
   if (order.type === "incident" && order.priority === "critical") {
@@ -116,6 +119,17 @@ export interface SharedDict {
   postProcessedFile: { path: string; mimeType: string; size: number } | null;
 
   revisionContext?: string;
+  designContext?: string;
+  gammaPolicy?: {
+    templateKey: string;
+    resolvedGammaId: string;
+    mode: string;
+    outputFormat: string;
+    contentContract: string | null;
+    fallbackAllowed: boolean;
+  } | null;
+  gammaDeliveryPolicy?: string; // "auto_revise" | "candidate_review" — carried from workflow template
+  _candidateGroup?: string; // shared UUID across candidates in same revision cycle
   availableTools: AvailableTool[];
   toolResults: ToolExecResult[];
   logs: Array<{ node: string; message: string; metadata?: any }>;
@@ -288,7 +302,8 @@ async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
       isRefinement ? existingOutputs : {},
       apiKey,
       dict.availableTools,
-      dict.revisionContext
+      dict.revisionContext,
+      dict.designContext
     );
 
     if (isRefinement) {
@@ -417,6 +432,14 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
       parallel: readySteps.length > 1,
       availableTools: dict.availableTools.map(t => t.slug),
     });
+    storage.createChecklistItem({
+      workOrderId: dict.workOrder.id,
+      phase: "tier2_exec",
+      summary: `Step started: ${step.name}`,
+      addedBy: "system",
+      status: "in_progress",
+      iteration: dict.iteration,
+    }).catch(() => {});
 
     try {
       if (!settings) {
@@ -430,7 +453,8 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
           dict.accumulatedOutputs,
           apiKey,
           dict.availableTools,
-          dict.revisionContext
+          dict.revisionContext,
+          dict.designContext
         );
 
         if (result.blocked) {
@@ -474,7 +498,7 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
               });
 
               const toolOutputSection = `\n\n---\n### Tool Result: ${toolResult.toolName}\n${toolResult.output}`;
-              const combinedOutput = (step.output || "") + toolOutputSection;
+              const combinedOutput: string = (step.output || "") + toolOutputSection;
 
               if (settings) {
                 try {
@@ -524,6 +548,14 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
         outputLength: (step.output || "").length,
         toolsUsed: dict.toolResults.filter(r => r.success).map(r => r.toolSlug),
       });
+      storage.createChecklistItem({
+        workOrderId: dict.workOrder.id,
+        phase: "tier2_exec",
+        summary: `Step completed: ${step.name}`,
+        addedBy: "system",
+        status: "done",
+        iteration: dict.iteration,
+      }).catch(() => {});
     } catch (err: any) {
       step.status = "failed";
       step.error = err.message;
@@ -644,8 +676,25 @@ async function nodeEvaluate(dict: SharedDict): Promise<NodeResult> {
     );
 
     if (evalResult.score >= dict.convergenceThreshold && evalResult.meetsCriteria) {
+      storage.createChecklistItem({
+        workOrderId: dict.workOrder.id,
+        phase: "tier2_exec",
+        summary: `Evaluation converged (score: ${evalResult.score.toFixed(2)}, iteration ${dict.iteration + 1})`,
+        addedBy: "system",
+        status: "done",
+        iteration: dict.iteration,
+      }).catch(() => {});
       return { action: "converged" };
     }
+
+    storage.createChecklistItem({
+      workOrderId: dict.workOrder.id,
+      phase: "tier2_exec",
+      summary: `Refinement triggered (score: ${evalResult.score.toFixed(2)}, gaps: ${evalResult.gaps.length})`,
+      addedBy: "system",
+      status: "done",
+      iteration: dict.iteration,
+    }).catch(() => {});
 
     if (dict.iteration >= dict.maxIterations - 1) {
       await emitNodeLog(dict, "Evaluate", `Max iterations (${dict.maxIterations}) reached — delivering best effort`, {
@@ -972,147 +1021,394 @@ function injectPdfStyles(html: string, title: string): string {
  * Post-process the deliverable: convert markdown to the required output format.
  * Currently supports markdown → .pptx conversion via python-pptx.
  */
+/** Hard ceiling for any single Gamma API call (poll loop + download). */
+const GAMMA_HARD_TIMEOUT_MS = 150_000; // 2.5 minutes
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 async function nodePostProcess(dict: SharedDict): Promise<void> {
   const format = detectRequiredFormat(dict);
   if (!format) return;
 
   if (format === "pptx") {
-    try {
-      // Detect whether the sub-agent produced HTML slides or markdown
-      const deliverable = dict.finalDeliverable;
-      const isHtmlSlides = /<section[^>]*class=["'][^"']*slide[^"']*["']/i.test(deliverable.slice(0, 1000)) ||
-        (/<!DOCTYPE html|<html/i.test(deliverable.slice(0, 200)) && /<section/i.test(deliverable));
+    const tmpDir = path.resolve(".local/tmp");
+    fs.mkdirSync(tmpDir, { recursive: true });
+    let gammaUsed = false;
 
-      const scriptPath = isHtmlSlides
-        ? path.resolve(process.cwd(), "server/scripts/html-to-pptx.cjs")
-        : path.resolve(process.cwd(), "server/scripts/md-to-pptx.py");
+    // ── Gamma path (policy resolved early in pocketflowExecute) ─────────
+    const gp = dict.gammaPolicy;
+    if (gp) {
+      try {
+        const mode = gp.resolvedGammaId ? "from_template" : "generate";
 
-      if (!fs.existsSync(scriptPath)) {
-        await emitNodeLog(dict, "PostProcess", "PPTX conversion script not found — skipping", { scriptPath });
-        return;
-      }
-
-      // Write deliverable to temp file
-      const tmpDir = path.resolve(".local/tmp");
-      fs.mkdirSync(tmpDir, { recursive: true });
-      const ext = isHtmlSlides ? "html" : "md";
-      const inputPath = path.join(tmpDir, `${dict.workOrder.id}.${ext}`);
-      const outputPath = path.join(tmpDir, `${dict.workOrder.id}.pptx`);
-      fs.writeFileSync(inputPath, dict.finalDeliverable, "utf-8");
-
-      // Run conversion (html2pptx needs more time — Playwright launches a browser per slide)
-      const title = dict.deliverableTitle || dict.workOrder.title;
-      const cmd = isHtmlSlides
-        ? `node "${scriptPath}" --input "${inputPath}" --output "${outputPath}"`
-        : `python3 "${scriptPath}" --input "${inputPath}" --output "${outputPath}" --title "${title.replace(/"/g, '\\"')}"`;
-
-      await emitNodeLog(dict, "PostProcess", `Converting deliverable to PPTX via ${isHtmlSlides ? "html2pptx" : "md-to-pptx"}`, { isHtmlSlides });
-
-      const result = execSync(cmd, { timeout: isHtmlSlides ? 90000 : 30000, encoding: "utf-8" });
-
-      const parsed = JSON.parse(result.trim());
-      if (parsed.success && fs.existsSync(outputPath)) {
-        const stats = fs.statSync(outputPath);
-        dict.postProcessedFile = {
-          path: outputPath,
-          mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-          size: stats.size,
-        };
-
-        // Update the deliverable message to note the file was generated
-        dict.finalMessage += ` A .pptx file (${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB) has been generated.`;
-
-        await emitNodeLog(dict, "PostProcess", `PPTX generated: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB`, {
-          format: "pptx",
-          slideCount: parsed.slideCount,
-          fileSize: stats.size,
-          path: outputPath,
+        await emitNodeLog(dict, "PostProcess", `Attempting PPTX via Gamma API (${mode}, template: ${gp.templateKey})`, {
+          mode, templateKey: gp.templateKey, gammaId: gp.resolvedGammaId, fallbackAllowed: gp.fallbackAllowed,
         });
-      }
 
-      // Clean up input temp file
-      fs.unlinkSync(inputPath);
-    } catch (err: any) {
-      await emitNodeLog(dict, "PostProcess", `PPTX conversion failed: ${err.message}`, { error: err.message });
+        const gammaResult = await withTimeout(generateWithGamma({
+          inputText: dict.finalDeliverable,
+          mode: mode as "generate" | "from_template",
+          gammaId: gp.resolvedGammaId,
+          exportAs: "pptx",
+          title: dict.deliverableTitle || dict.workOrder.title,
+        }, tmpDir), GAMMA_HARD_TIMEOUT_MS, "Gamma PPTX generation");
+
+        if (gammaResult.success && gammaResult.filePath) {
+          const stats = fs.statSync(gammaResult.filePath);
+          dict.postProcessedFile = {
+            path: gammaResult.filePath,
+            mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            size: stats.size,
+          };
+          dict.finalMessage += ` A .pptx file (${(stats.size / 1024).toFixed(0)}KB) has been generated via Gamma.`;
+
+          await emitNodeLog(dict, "PostProcess", `Gamma PPTX generated: ${(stats.size / 1024).toFixed(0)}KB`, {
+            format: "pptx", engine: "gamma", templateKey: gp.templateKey,
+            generationId: gammaResult.generationId,
+            gammaUrl: gammaResult.gammaUrl,
+            fileSize: stats.size,
+            creditsDeducted: gammaResult.creditsDeducted,
+            creditsRemaining: gammaResult.creditsRemaining,
+          });
+          storage.createChecklistItem({
+            workOrderId: dict.workOrder.id,
+            phase: "filing",
+            summary: `PPTX generated via Gamma [${gp.templateKey}] (${(stats.size / 1024).toFixed(0)}KB, ${gammaResult.creditsDeducted ?? "?"} credits)`,
+            addedBy: "system",
+            status: "done",
+          }).catch(() => {});
+
+          // Write generation record (with candidate persistence if candidate_review)
+          const isCandidateReview = dict.gammaDeliveryPolicy === "candidate_review";
+          let candidateFiledPath: string | undefined;
+          if (isCandidateReview && gammaResult.filePath) {
+            const candidatesDir = path.resolve(".local/gamma_candidates", dict.workOrder.id);
+            fs.mkdirSync(candidatesDir, { recursive: true });
+            const candidateFileName = `${crypto.randomUUID()}.pptx`;
+            candidateFiledPath = path.join(candidatesDir, candidateFileName);
+            fs.copyFileSync(gammaResult.filePath, candidateFiledPath);
+            console.log(`[pocketflow] Candidate PPTX persisted: ${candidateFiledPath}`);
+          }
+
+          storage.createGammaGenerationRecord({
+            workOrderId: dict.workOrder.id,
+            workflowExecutionId: dict.workOrder.workflowExecutionId || undefined,
+            templateKey: gp.templateKey,
+            gammaId: gp.resolvedGammaId,
+            generationId: gammaResult.generationId || undefined,
+            exportFormat: "pptx",
+            status: "completed",
+            gammaUrl: gammaResult.gammaUrl || undefined,
+            fileSize: gammaResult.fileSize || stats.size,
+            creditsDeducted: gammaResult.creditsDeducted ?? undefined,
+            creditsRemaining: gammaResult.creditsRemaining ?? undefined,
+            candidateStatus: isCandidateReview ? "candidate" : undefined,
+            candidateGroup: isCandidateReview ? (dict._candidateGroup || (dict._candidateGroup = crypto.randomUUID())) : undefined,
+            artifactFiledPath: candidateFiledPath,
+          }).catch((err) => console.error("[pocketflow] Failed to write generation record:", err.message));
+
+          gammaUsed = true;
+        } else {
+          // Write failed generation record
+          storage.createGammaGenerationRecord({
+            workOrderId: dict.workOrder.id,
+            workflowExecutionId: dict.workOrder.workflowExecutionId || undefined,
+            templateKey: gp.templateKey,
+            gammaId: gp.resolvedGammaId,
+            exportFormat: "pptx",
+            status: "failed",
+            metadata: { error: gammaResult.error },
+          }).catch(() => {});
+
+          if (gp.mode === "template_locked" && !gp.fallbackAllowed) {
+            await emitNodeLog(dict, "PostProcess",
+              `Gamma failed: ${gammaResult.error}. Template "${gp.templateKey}" is locked — no fallback allowed. PPTX skipped.`,
+              { error: gammaResult.error, templateKey: gp.templateKey });
+            return;
+          }
+          await emitNodeLog(dict, "PostProcess",
+            `Gamma failed: ${gammaResult.error}. Falling back to local pipeline.`,
+            { error: gammaResult.error, fallback: true });
+        }
+      } catch (err: any) {
+        await emitNodeLog(dict, "PostProcess", `Gamma error: ${err.message} — ${gp.fallbackAllowed ? "falling back to local" : "no fallback"}`, { error: err.message });
+        if (!gp.fallbackAllowed) return;
+      }
+    }
+
+    // ── Local fallback (or primary if Gamma not enabled for this WO) ────
+    if (!gammaUsed) {
+      try {
+        const deliverable = dict.finalDeliverable;
+        const isHtmlSlides = /<section[^>]*class=["'][^"']*slide[^"']*["']/i.test(deliverable.slice(0, 1000)) ||
+          (/<!DOCTYPE html|<html/i.test(deliverable.slice(0, 200)) && /<section/i.test(deliverable));
+
+        const scriptPath = isHtmlSlides
+          ? path.resolve(process.cwd(), "server/scripts/html-to-pptx.cjs")
+          : path.resolve(process.cwd(), "server/scripts/md-to-pptx.py");
+
+        if (!fs.existsSync(scriptPath)) {
+          await emitNodeLog(dict, "PostProcess", "PPTX conversion script not found — skipping", { scriptPath });
+          return;
+        }
+
+        const ext = isHtmlSlides ? "html" : "md";
+        const inputPath = path.join(tmpDir, `${dict.workOrder.id}.${ext}`);
+        const outputPath = path.join(tmpDir, `${dict.workOrder.id}.pptx`);
+        fs.writeFileSync(inputPath, dict.finalDeliverable, "utf-8");
+
+        const title = dict.deliverableTitle || dict.workOrder.title;
+        const cmd = isHtmlSlides
+          ? `node "${scriptPath}" --input "${inputPath}" --output "${outputPath}"`
+          : `python3 "${scriptPath}" --input "${inputPath}" --output "${outputPath}" --title "${title.replace(/"/g, '\\"')}"`;
+
+        await emitNodeLog(dict, "PostProcess", `Converting deliverable to PPTX via ${isHtmlSlides ? "html2pptx" : "md-to-pptx"}`, { isHtmlSlides });
+
+        const result = execSync(cmd, { timeout: isHtmlSlides ? 90000 : 30000, encoding: "utf-8" });
+
+        const parsed = JSON.parse(result.trim());
+        if (parsed.success && fs.existsSync(outputPath)) {
+          const stats = fs.statSync(outputPath);
+          dict.postProcessedFile = {
+            path: outputPath,
+            mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            size: stats.size,
+          };
+          dict.finalMessage += ` A .pptx file (${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB) has been generated.`;
+
+          await emitNodeLog(dict, "PostProcess", `PPTX generated: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB`, {
+            format: "pptx", engine: "local",
+            slideCount: parsed.slideCount, fileSize: stats.size, path: outputPath,
+          });
+          storage.createChecklistItem({
+            workOrderId: dict.workOrder.id,
+            phase: "filing",
+            summary: `PPTX generated: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB`,
+            addedBy: "system",
+            status: "done",
+          }).catch(() => {});
+        }
+
+        fs.unlinkSync(inputPath);
+      } catch (err: any) {
+        await emitNodeLog(dict, "PostProcess", `PPTX conversion failed: ${err.message}`, { error: err.message });
+      }
     }
   }
 
   if (format === "pdf") {
-    try {
-      const tmpDir = path.resolve(".local/tmp");
-      fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpDir = path.resolve(".local/tmp");
+    fs.mkdirSync(tmpDir, { recursive: true });
+    let gammaUsedPdf = false;
 
-      const title = (dict.deliverableTitle || dict.workOrder.title).replace(/"/g, '\\"');
-      const mdPath = path.join(tmpDir, `${dict.workOrder.id}.md`);
-      const htmlPath = path.join(tmpDir, `${dict.workOrder.id}.html`);
-      const pdfPath = path.join(tmpDir, `${dict.workOrder.id}.pdf`);
+    // ── Gamma path (policy resolved early in pocketflowExecute) ─────────
+    const gp = dict.gammaPolicy;
+    if (gp) {
+      try {
+        const mode = gp.resolvedGammaId ? "from_template" : "generate";
 
-      fs.writeFileSync(mdPath, dict.finalDeliverable, "utf-8");
+        await emitNodeLog(dict, "PostProcess", `Attempting PDF via Gamma API (${mode}, template: ${gp.templateKey})`, {
+          mode, templateKey: gp.templateKey, gammaId: gp.resolvedGammaId, fallbackAllowed: gp.fallbackAllowed,
+        });
 
-      await emitNodeLog(dict, "PostProcess", "Converting deliverable to PDF via pandoc + Playwright Chromium");
+        const gammaResult = await withTimeout(generateWithGamma({
+          inputText: dict.finalDeliverable,
+          mode: mode as "generate" | "from_template",
+          gammaId: gp.resolvedGammaId,
+          exportAs: "pdf",
+          title: dict.deliverableTitle || dict.workOrder.title,
+          format: "presentation",
+        }, tmpDir), GAMMA_HARD_TIMEOUT_MS, "Gamma PDF generation");
 
-      // Step 1: markdown → standalone HTML (pandoc handles markdown reliably)
-      execSync(
-        `pandoc "${mdPath}" -t html5 --standalone --metadata title="${title}" -o "${htmlPath}"`,
-        { timeout: 30000, encoding: "utf-8" }
-      );
+        if (gammaResult.success && gammaResult.filePath) {
+          // Move to artifacts directory
+          const safeTitle = (dict.deliverableTitle || dict.workOrder.title)
+            .replace(/[^a-z0-9_\-\s]/gi, "")
+            .trim()
+            .replace(/\s+/g, "_")
+            .slice(0, 60);
+          const artifactDir = path.resolve(".local/workspace/05_Artifacts");
+          fs.mkdirSync(artifactDir, { recursive: true });
+          const finalPdfPath = path.join(artifactDir, `${safeTitle}.pdf`);
+          fs.copyFileSync(gammaResult.filePath, finalPdfPath);
 
-      if (!fs.existsSync(htmlPath)) {
-        throw new Error("pandoc failed to produce HTML intermediate file");
+          const fileSize = gammaResult.fileSize || fs.statSync(finalPdfPath).size;
+          dict.postProcessedFile = {
+            path: finalPdfPath,
+            mimeType: "application/pdf",
+            size: fileSize,
+          };
+
+          const sizeKB = (fileSize / 1024).toFixed(0);
+          dict.finalMessage += ` A PDF (${sizeKB}KB) has been generated via Gamma.`;
+
+          await emitNodeLog(dict, "PostProcess", `Gamma PDF generated: ${sizeKB}KB`, {
+            format: "pdf", engine: "gamma", templateKey: gp.templateKey,
+            generationId: gammaResult.generationId,
+            gammaUrl: gammaResult.gammaUrl,
+            fileSize,
+            creditsDeducted: gammaResult.creditsDeducted,
+            creditsRemaining: gammaResult.creditsRemaining,
+          });
+          storage.createChecklistItem({
+            workOrderId: dict.workOrder.id,
+            phase: "filing",
+            summary: `PDF generated via Gamma [${gp.templateKey}] (${sizeKB}KB, ${gammaResult.creditsDeducted ?? "?"} credits)`,
+            addedBy: "system",
+            status: "done",
+          }).catch(() => {});
+
+          // Write generation record (with candidate persistence if candidate_review)
+          const isCandidateReviewPdf = dict.gammaDeliveryPolicy === "candidate_review";
+          let candidateFiledPathPdf: string | undefined;
+          if (isCandidateReviewPdf && finalPdfPath) {
+            const candidatesDir = path.resolve(".local/gamma_candidates", dict.workOrder.id);
+            fs.mkdirSync(candidatesDir, { recursive: true });
+            const candidateFileName = `${crypto.randomUUID()}.pdf`;
+            candidateFiledPathPdf = path.join(candidatesDir, candidateFileName);
+            fs.copyFileSync(finalPdfPath, candidateFiledPathPdf);
+            console.log(`[pocketflow] Candidate PDF persisted: ${candidateFiledPathPdf}`);
+          }
+
+          storage.createGammaGenerationRecord({
+            workOrderId: dict.workOrder.id,
+            workflowExecutionId: dict.workOrder.workflowExecutionId || undefined,
+            templateKey: gp.templateKey,
+            gammaId: gp.resolvedGammaId,
+            generationId: gammaResult.generationId || undefined,
+            exportFormat: "pdf",
+            status: "completed",
+            gammaUrl: gammaResult.gammaUrl || undefined,
+            fileSize: fileSize,
+            creditsDeducted: gammaResult.creditsDeducted ?? undefined,
+            creditsRemaining: gammaResult.creditsRemaining ?? undefined,
+            candidateStatus: isCandidateReviewPdf ? "candidate" : undefined,
+            candidateGroup: isCandidateReviewPdf ? (dict._candidateGroup || (dict._candidateGroup = crypto.randomUUID())) : undefined,
+            artifactFiledPath: candidateFiledPathPdf,
+          }).catch((err) => console.error("[pocketflow] Failed to write PDF generation record:", err.message));
+
+          gammaUsedPdf = true;
+
+          // Clean up temp download (but not candidate copy)
+          try { fs.unlinkSync(gammaResult.filePath); } catch {}
+        } else {
+          // Write failed generation record
+          storage.createGammaGenerationRecord({
+            workOrderId: dict.workOrder.id,
+            workflowExecutionId: dict.workOrder.workflowExecutionId || undefined,
+            templateKey: gp.templateKey,
+            gammaId: gp.resolvedGammaId,
+            exportFormat: "pdf",
+            status: "failed",
+            metadata: { error: gammaResult.error },
+          }).catch(() => {});
+
+          if (gp.mode === "template_locked" && !gp.fallbackAllowed) {
+            await emitNodeLog(dict, "PostProcess",
+              `Gamma failed: ${gammaResult.error}. Template "${gp.templateKey}" is locked — no fallback allowed. PDF skipped.`,
+              { error: gammaResult.error, templateKey: gp.templateKey });
+            return;
+          }
+          await emitNodeLog(dict, "PostProcess",
+            `Gamma PDF failed: ${gammaResult.error}. Falling back to local pipeline.`,
+            { error: gammaResult.error, fallback: true });
+        }
+      } catch (err: any) {
+        await emitNodeLog(dict, "PostProcess", `Gamma PDF error: ${err.message} — ${gp.fallbackAllowed ? "falling back to local" : "no fallback"}`, { error: err.message });
+        if (!gp.fallbackAllowed) return;
       }
+    }
 
-      // Step 1b: Inject professional CSS + header/footer layout
-      const rawHtml = fs.readFileSync(htmlPath, "utf-8");
-      const styledHtml = injectPdfStyles(rawHtml, dict.deliverableTitle || dict.workOrder.title);
-      fs.writeFileSync(htmlPath, styledHtml, "utf-8");
+    // ── Local PDF fallback (pandoc + Playwright) ───────────────────────
+    if (!gammaUsedPdf) {
+      try {
+        const title = (dict.deliverableTitle || dict.workOrder.title).replace(/"/g, '\\"');
+        const mdPath = path.join(tmpDir, `${dict.workOrder.id}.md`);
+        const htmlPath = path.join(tmpDir, `${dict.workOrder.id}.html`);
+        const pdfPath = path.join(tmpDir, `${dict.workOrder.id}.pdf`);
 
-      // Step 2: HTML → PDF via Playwright Chromium (full CSS support: position:fixed, @page, full-bleed)
-      const pdfScriptPath = path.resolve(process.cwd(), "server/scripts/html-to-pdf.cjs");
-      const pdfResult = execSync(
-        `node "${pdfScriptPath}" --input "${htmlPath}" --output "${pdfPath}"`,
-        { timeout: 60000, encoding: "utf-8" }
-      );
+        fs.writeFileSync(mdPath, dict.finalDeliverable, "utf-8");
 
-      let pdfScriptOutput: any = {};
-      try { pdfScriptOutput = JSON.parse(pdfResult.trim()); } catch { /* non-JSON stderr mixed in */ }
+        await emitNodeLog(dict, "PostProcess", "Converting deliverable to PDF via pandoc + Playwright Chromium");
 
-      if (!fs.existsSync(pdfPath) || !pdfScriptOutput.success) {
-        throw new Error(`Playwright PDF conversion failed: ${pdfScriptOutput.error || "no output file"}`);
+        // Step 1: markdown → standalone HTML (pandoc handles markdown reliably)
+        execSync(
+          `pandoc "${mdPath}" -t html5 --standalone --metadata title="${title}" -o "${htmlPath}"`,
+          { timeout: 30000, encoding: "utf-8" }
+        );
+
+        if (!fs.existsSync(htmlPath)) {
+          throw new Error("pandoc failed to produce HTML intermediate file");
+        }
+
+        // Step 1b: Inject professional CSS + header/footer layout
+        const rawHtml = fs.readFileSync(htmlPath, "utf-8");
+        const styledHtml = injectPdfStyles(rawHtml, dict.deliverableTitle || dict.workOrder.title);
+        fs.writeFileSync(htmlPath, styledHtml, "utf-8");
+
+        // Step 2: HTML → PDF via Playwright Chromium (full CSS support: position:fixed, @page, full-bleed)
+        const pdfScriptPath = path.resolve(process.cwd(), "server/scripts/html-to-pdf.cjs");
+        const pdfResult = execSync(
+          `node "${pdfScriptPath}" --input "${htmlPath}" --output "${pdfPath}"`,
+          { timeout: 60000, encoding: "utf-8" }
+        );
+
+        let pdfScriptOutput: any = {};
+        try { pdfScriptOutput = JSON.parse(pdfResult.trim()); } catch { /* non-JSON stderr mixed in */ }
+
+        if (!fs.existsSync(pdfPath) || !pdfScriptOutput.success) {
+          throw new Error(`Playwright PDF conversion failed: ${pdfScriptOutput.error || "no output file"}`);
+        }
+
+        const stats = fs.statSync(pdfPath);
+
+        // Move PDF to workspace artifacts directory
+        const safeTitle = (dict.deliverableTitle || dict.workOrder.title)
+          .replace(/[^a-z0-9_\-\s]/gi, "")
+          .trim()
+          .replace(/\s+/g, "_")
+          .slice(0, 60);
+        const artifactDir = path.resolve(".local/workspace/05_Artifacts");
+        fs.mkdirSync(artifactDir, { recursive: true });
+        const finalPdfPath = path.join(artifactDir, `${safeTitle}.pdf`);
+        fs.copyFileSync(pdfPath, finalPdfPath);
+
+        dict.postProcessedFile = {
+          path: finalPdfPath,
+          mimeType: "application/pdf",
+          size: stats.size,
+        };
+
+        dict.finalMessage += ` A PDF document (${(stats.size / 1024).toFixed(0)}KB) has been generated.`;
+
+        await emitNodeLog(dict, "PostProcess", `PDF generated: ${(stats.size / 1024).toFixed(0)}KB`, {
+          format: "pdf",
+          fileSize: stats.size,
+          path: finalPdfPath,
+        });
+        storage.createChecklistItem({
+          workOrderId: dict.workOrder.id,
+          phase: "filing",
+          summary: `PDF generated: ${(stats.size / 1024).toFixed(0)}KB`,
+          addedBy: "system",
+          status: "done",
+        }).catch(() => {});
+
+        // Clean up temp files
+        fs.unlinkSync(mdPath);
+        fs.unlinkSync(htmlPath);
+        fs.unlinkSync(pdfPath);
+      } catch (err: any) {
+        await emitNodeLog(dict, "PostProcess", `PDF conversion failed: ${err.message}`, { error: err.message });
       }
-
-      const stats = fs.statSync(pdfPath);
-
-      // Move PDF to workspace artifacts directory
-      const safeTitle = (dict.deliverableTitle || dict.workOrder.title)
-        .replace(/[^a-z0-9_\-\s]/gi, "")
-        .trim()
-        .replace(/\s+/g, "_")
-        .slice(0, 60);
-      const artifactDir = path.resolve(".local/workspace/05_Artifacts");
-      fs.mkdirSync(artifactDir, { recursive: true });
-      const finalPdfPath = path.join(artifactDir, `${safeTitle}.pdf`);
-      fs.copyFileSync(pdfPath, finalPdfPath);
-
-      dict.postProcessedFile = {
-        path: finalPdfPath,
-        mimeType: "application/pdf",
-        size: stats.size,
-      };
-
-      dict.finalMessage += ` A PDF document (${(stats.size / 1024).toFixed(0)}KB) has been generated.`;
-
-      await emitNodeLog(dict, "PostProcess", `PDF generated: ${(stats.size / 1024).toFixed(0)}KB`, {
-        format: "pdf",
-        fileSize: stats.size,
-        path: finalPdfPath,
-      });
-
-      // Clean up temp files
-      fs.unlinkSync(mdPath);
-      fs.unlinkSync(htmlPath);
-      fs.unlinkSync(pdfPath);
-    } catch (err: any) {
-      await emitNodeLog(dict, "PostProcess", `PDF conversion failed: ${err.message}`, { error: err.message });
     }
   }
 }
@@ -1235,10 +1531,127 @@ export async function pocketflowExecute(
   }
 
   try {
+    // Auto-import skills matching work order keywords (same as workflow path)
+    const description = `${order.title} ${order.description || ""}`;
+    const autoImportedIds = await autoImportSkillsForDescription(description);
+    if (autoImportedIds.length > 0) {
+      console.log(`[pocketflow] Auto-imported ${autoImportedIds.length} skill(s) for "${order.title}": ${autoImportedIds.join(", ")}`);
+    }
+
     const tools = await getAvailableToolsForAgent(order.assignedSubAgentId || undefined);
     dict.availableTools = tools;
   } catch (err: any) {
     console.error("Failed to load available tools:", err.message);
+  }
+
+  // ── Resolve Gamma template policy early (before planning/execution) ──
+  try {
+    const expectedFormat = detectRequiredFormat(dict);
+    let templateKey: string | null = null;
+
+    // Priority 1: WO-level override
+    if (order.gammaTemplateKey) {
+      templateKey = order.gammaTemplateKey;
+      console.log(`[pocketflow] Using WO-level templateKey override: "${templateKey}"`);
+    }
+
+    // Priority 2: Workflow template default
+    if (!templateKey && order.workflowExecutionId) {
+      const execution = await storage.getWorkflowExecution(order.workflowExecutionId);
+      if (execution) {
+        const template = await storage.getWorkflowTemplate(execution.templateId);
+        if (template?.gammaTemplateKey) {
+          templateKey = template.gammaTemplateKey;
+        } else if (template?.pptxEngine === "local") {
+          // Explicit local override — skip registry
+          dict.gammaPolicy = null;
+        }
+        // Carry delivery policy for orchestration layer
+        if (template?.gammaDeliveryPolicy) {
+          dict.gammaDeliveryPolicy = template.gammaDeliveryPolicy;
+        }
+      }
+    }
+
+    // Priority 3: Global default
+    if (!templateKey && dict.gammaPolicy === undefined) {
+      const gammaSettings = await storage.getGammaSettings();
+      if (gammaSettings?.templateKey) {
+        templateKey = gammaSettings.templateKey;
+      } else if (gammaSettings?.enabled && gammaSettings?.gammaId) {
+        // Legacy: raw gammaId without registry — create inline policy
+        dict.gammaPolicy = {
+          templateKey: "_legacy",
+          resolvedGammaId: gammaSettings.gammaId,
+          mode: "flexible",
+          outputFormat: expectedFormat || "pptx",
+          contentContract: null,
+          fallbackAllowed: gammaSettings.fallbackToLocal !== false,
+        };
+      }
+    }
+
+    // Resolve templateKey through registry (format-aware)
+    if (templateKey) {
+      let registryEntry = await storage.getGammaTemplateByKey(templateKey);
+
+      // If the entry's outputFormat doesn't match the expected format, search for an alternative
+      if (registryEntry && registryEntry.status === "approved" && expectedFormat && registryEntry.outputFormat !== expectedFormat) {
+        console.log(`[pocketflow] Template "${templateKey}" is ${registryEntry.outputFormat} but WO needs ${expectedFormat} — searching for format-matched entry`);
+        const allTemplates = await storage.getGammaTemplates();
+        const formatMatch = allTemplates.find(t => t.status === "approved" && t.outputFormat === expectedFormat);
+        if (formatMatch) {
+          registryEntry = formatMatch;
+          console.log(`[pocketflow] Found format-matched template "${formatMatch.templateKey}" (${expectedFormat})`);
+        }
+      }
+
+      if (registryEntry && registryEntry.status === "approved") {
+        dict.gammaPolicy = {
+          templateKey: registryEntry.templateKey,
+          resolvedGammaId: registryEntry.gammaId,
+          mode: registryEntry.mode,
+          outputFormat: registryEntry.outputFormat,
+          contentContract: registryEntry.contentContract,
+          fallbackAllowed: registryEntry.mode !== "template_locked",
+        };
+        if (registryEntry.contentContract) {
+          dict.designContext = registryEntry.contentContract;
+        }
+        console.log(`[pocketflow] Resolved templateKey "${registryEntry.templateKey}" → gammaId "${registryEntry.gammaId}" (${registryEntry.mode}, ${registryEntry.outputFormat})`);
+      } else if (registryEntry && registryEntry.status !== "approved") {
+        console.warn(`[pocketflow] Template "${templateKey}" status is "${registryEntry.status}" — not approved`);
+        dict.gammaPolicy = null;
+      } else {
+        // No entry found by key — try searching by format
+        if (expectedFormat) {
+          const allTemplates = await storage.getGammaTemplates();
+          const formatMatch = allTemplates.find(t => t.status === "approved" && t.outputFormat === expectedFormat);
+          if (formatMatch) {
+            dict.gammaPolicy = {
+              templateKey: formatMatch.templateKey,
+              resolvedGammaId: formatMatch.gammaId,
+              mode: formatMatch.mode,
+              outputFormat: formatMatch.outputFormat,
+              contentContract: formatMatch.contentContract,
+              fallbackAllowed: formatMatch.mode !== "template_locked",
+            };
+            if (formatMatch.contentContract) {
+              dict.designContext = formatMatch.contentContract;
+            }
+            console.log(`[pocketflow] Template "${templateKey}" not found, but found format-matched "${formatMatch.templateKey}" → gammaId "${formatMatch.gammaId}"`);
+          } else {
+            console.warn(`[pocketflow] Template "${templateKey}" not found in registry, no ${expectedFormat} fallback`);
+            dict.gammaPolicy = null;
+          }
+        } else {
+          console.warn(`[pocketflow] Template "${templateKey}" not found in registry`);
+          dict.gammaPolicy = null;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error("[pocketflow] Failed to resolve Gamma policy:", err.message);
   }
 
   await emitNodeLog(dict, "PocketFlow", `Starting iterative execution for "${order.title}"`, {
@@ -1358,5 +1771,6 @@ function buildSuccessResult(dict: SharedDict): Tier2Result {
       refinementHistory: dict.refinementHistory,
       toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
     },
+    gammaDeliveryPolicy: dict.gammaDeliveryPolicy,
   };
 }

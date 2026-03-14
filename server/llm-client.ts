@@ -166,8 +166,10 @@ const tier2ResponseSchema = z.object({
       gaps: z.array(z.string()),
       deltaSteps: z.array(z.string()),
     })).optional(),
+    toolsUsed: z.array(z.any()).optional(),
     bdmMarker: z.any().optional(),
   }).optional(),
+  gammaDeliveryPolicy: z.string().optional(), // "auto_revise" | "candidate_review" — passed through from pocketflow
 });
 
 export type Tier1Result = z.infer<typeof tier1ResponseSchema>;
@@ -265,6 +267,8 @@ async function callOpenAICompatible(
   const client = new OpenAI({
     apiKey,
     baseURL: config.baseURL,
+    timeout: 45000,
+    maxRetries: 1,
   });
 
   const useJsonMode = options?.jsonMode !== false;
@@ -291,6 +295,8 @@ export async function callAnthropic(
 
   const client = new Anthropic({
     apiKey,
+    timeout: 45000,
+    maxRetries: 1,
   });
 
   const response = await client.messages.create({
@@ -392,11 +398,26 @@ If possible, append a machine-readable action block at the very end of your resp
 <!-- AIDEN_ACTION:CREATE_WORK_ORDER:{"title":"...","description":"...","type":"...","priority":"...","submittedBy":"aiden","autoProcess":true,"preferredAgent":"exact_sub_agent_name_if_specified"} -->
 This helps the system process faster, but is optional — the system will detect your intent either way.
 
-CRITICAL ROUTING RULE: If the operator explicitly names or requests a specific sub-agent (e.g. "use A012", "assign to Deploy Worker Alpha", "have B06 handle this"), you MUST include the "preferredAgent" field with the exact sub-agent name in the action block. Never ignore an explicit sub-agent assignment from the operator.`;
+CRITICAL ROUTING RULE: If the operator explicitly names or requests a specific sub-agent (e.g. "use A012", "assign to Deploy Worker Alpha", "have B06 handle this"), you MUST include the "preferredAgent" field with the exact sub-agent name in the action block. Never ignore an explicit sub-agent assignment from the operator.
+
+## EXECUTING WORKFLOWS
+When the operator asks for a multi-step deliverable (e.g. a presentation, a website, a document, a campaign), you SHOULD use a workflow instead of a simple work order. Workflows provide PM oversight, step-by-step execution, and quality review.
+
+Check the WORKFLOW TEMPLATES section in your system context. If a matching template exists (e.g. "General Purpose Presentation PPTX" for slide decks), tell the operator you are spinning up that workflow and append this action block:
+<!-- AIDEN_ACTION:EXECUTE_WORKFLOW:{"name":"workflow name","goal":"what the workflow should produce","category":"general","steps":[{"stepKey":"step_1","name":"Step Name","description":"What this step does","order":1,"assignTo":"sub_agent_name"},{"stepKey":"step_2","name":"Step Name","description":"What this step does","order":2,"assignTo":"sub_agent_name"}]} -->
+
+Guidelines for workflow creation:
+- The "assignTo" field MUST use the EXACT sub-agent name from the SUB-AGENTS section above (e.g. "Mark", "Tom", "Paul"). Do NOT use generic labels like "content agent" or "deploy agent"
+- ROUTING RULE: Only assign a step to a deployment agent (e.g. Paul/Polaris) for the FINAL deployment/publishing step. All creative, research, drafting, and content steps must go to content/marketing agents (e.g. Mark, Tom)
+- For PPTX/presentation requests: research + slide drafting steps → content/deck agent; final deploy step → deployment agent
+- For website/HTML requests: design + content steps → content agent; final deploy step → deployment agent
+- Keep steps to 3-5 for most workflows
+- Always include a clear goal that describes the expected deliverable`;
+
 
   if (settings.provider === "anthropic") {
     const apiKey = getApiKey("ANTHROPIC_API_KEY");
-    const client = new Anthropic({ apiKey });
+    const client = new Anthropic({ apiKey, timeout: 45000, maxRetries: 1 });
     const messages = [
       ...conversationHistory.map(m => ({
         role: m.role as "user" | "assistant",
@@ -762,7 +783,8 @@ export async function llmPlanSteps(
   existingOutputs: Record<string, string>,
   apiKeyOverride?: string,
   availableTools?: Array<{ slug: string; name: string; type: string; description: string }>,
-  revisionContext?: string
+  revisionContext?: string,
+  designContext?: string
 ): Promise<Array<{ id: string; name: string; description: string; dependencies: string[] }>> {
   const isRefinement = existingGaps.length > 0;
   const existingContext = Object.entries(existingOutputs).length > 0
@@ -790,6 +812,7 @@ When planning steps, if a step would benefit from using a tool (e.g., web search
     : "";
 
   const revisionGuidance = revisionContext ? `\n${revisionContext}` : "";
+  const contentContractGuidance = designContext ? `\n=== CONTENT CONTRACT ===\nYou MUST follow these structural rules for the content you produce:\n${designContext}\n` : "";
 
   const planOrderText = `${order.title} ${order.description}`;
   const planWantsHtml = /\b(html\s*page|html\s*file|web\s*page|html5|single.file.*html|self.contained.*html|html\s*document|landing\s*page|homepage|website|web\s*app|ui\s*mockup|dashboard\s*page|interactive\s*page)\b/i.test(planOrderText);
@@ -802,7 +825,7 @@ When planning steps, if a step would benefit from using a tool (e.g., web search
   }
 
   const prompt = `You are executing a work order as a Tier 2 sub-agent. Break the work order into concrete execution steps.
-${gapsContext}${sandboxGuidance}${toolsContext}${revisionGuidance}${planFormatNote}
+${gapsContext}${sandboxGuidance}${toolsContext}${revisionGuidance}${contentContractGuidance}${planFormatNote}
 Each step should be a discrete unit of work. Steps can declare dependencies on other steps by ID.
 Independent steps (no dependencies) will be executed in PARALLEL for efficiency.
 
@@ -837,7 +860,8 @@ export async function llmExecStep(
   previousOutputs: Record<string, string>,
   apiKeyOverride?: string,
   availableTools?: Array<{ slug: string; name: string; type: string; description: string }>,
-  revisionContext?: string
+  revisionContext?: string,
+  designContext?: string
 ): Promise<{ blocked: boolean; reason?: string | null; output?: string; toolCalls?: Array<{ toolSlug: string; input: string }> }> {
   const contextEntries = Object.entries(previousOutputs);
   const prevContext = contextEntries.length > 0
@@ -869,6 +893,7 @@ The tool results will be provided back to you for synthesis. You can include bot
     : "";
 
   const revisionGuidance = revisionContext ? `\n${revisionContext}` : "";
+  const execContentContract = designContext ? `\n=== CONTENT CONTRACT ===\nYou MUST follow these structural rules for the content you produce:\n${designContext}\n` : "";
 
   const combinedText = `${order.title} ${order.description} ${step.description}`;
   const wantsHtml = /\b(html\s*page|html\s*file|web\s*page|html5|single.file.*html|self.contained.*html|html\s*document|landing\s*page|homepage|website|web\s*app|ui\s*mockup|dashboard\s*page|interactive\s*page)\b/i.test(combinedText);
@@ -903,7 +928,7 @@ FORMAT REQUIREMENT: The work order requires a document/report. Your "output" fie
 
 Step description: ${step.description}
 ${prevContext}
-${reopenContext}${gccContext}${sandboxExecGuidance}${toolsSection}${revisionGuidance}
+${reopenContext}${gccContext}${sandboxExecGuidance}${toolsSection}${revisionGuidance}${execContentContract}
 Work Order Context:
 - Title: ${order.title}
 - Description: ${order.description}

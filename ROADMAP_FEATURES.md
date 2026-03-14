@@ -1,7 +1,7 @@
 # AIDEN IWO — Features Inventory & Roadmap
 
-> **Version:** 1.7
-> **Last Updated:** 2026-03-07
+> **Version:** 1.9
+> **Last Updated:** 2026-03-13
 > **Maintainer:** Darrel Vaughn
 
 ---
@@ -29,7 +29,7 @@ Both AIDEN_IWO and AIDEN_TIB derive from the base **AIDEN_ALPHAv3** prompt speci
 | Product | Description | Status |
 | --- | --- | --- |
 | **AIDEN_ALPHAv3** | Base agent prompt spec (v1.x through v3.0.x) | Foundation |
-| **AIDEN_IWO** | Full-stack runtime platform (this repo) — the broader, more versatile project | App v0.8.0 / Platform spec v0.3.8 (alpha) |
+| **AIDEN_IWO** | Full-stack runtime platform (this repo) — the broader, more versatile project | App v0.9.5 / Prompt spec v0.4.1 (alpha) |
 | **AIDEN_TIB** | Spec-level agent architecture (sub-agent definitions, BDM routing, delegation protocols) | Will become a specialized branch of a future IWO version |
 
 TIB is not a separate product line — it will be absorbed into IWO as a specialized branch/mode in a future release.
@@ -154,6 +154,7 @@ Operator → Submit Work Order
 | Image uploads with placeholder IDs | `[SHIPPED]` |
 | Re-filing support after work order revision | `[SHIPPED]` |
 | **Workspace Context Documents** — Operator-created project folders with designated reference documents. On work order submission, the system pulls designated docs from a folder and injects them into the work order context for Tier 2 execution. Includes constraints: max doc count per order, max file size per doc, total context budget, supported formats (.md, .docx, .pdf, .txt, .xlsx). UI: folder picker in submit-order form, document selector with preview, context size indicator. | `[PLANNED]` |
+| **Desktop File Upload to Workspace** — Operator can upload files from their local desktop directly into a designated workspace folder. Backend: `POST /api/workspace/upload` accepts JSON `{name, mimeType, data, folderId}`; stores text files as UTF-8, binaries as base64; 10MB max. Supported formats: .md, .txt, .html, .css, .js, .ts, .json, .pdf, .docx, .pptx, .xlsx, images (PNG/JPEG/GIF/WebP/SVG). UI: "Upload File" item in the New dropdown (file picker) + drag-from-desktop drop zone overlay on the file grid, scoped to the currently open folder. Supports multi-file drop. | `[RECENT]` |
 
 ### G. Skills System
 
@@ -379,7 +380,7 @@ Operator → Submit Work Order
 | Tier 2 PocketFlow | 7 | 2 | 1 | 0 | 0 | 10 |
 | Sub-Agent System | 7 | 0 | 0 | 0 | 0 | 7 |
 | GCC Memory | 7 | 0 | 0 | 0 | 0 | 7 |
-| Workspace & Artifacts | 5 | 5 | 0 | 1 | 0 | 11 |
+| Workspace & Artifacts | 5 | 6 | 0 | 1 | 0 | 12 |
 | Skills System | 4 | 1 | 0 | 0 | 1 | 6 |
 | Workflows | 5 | 0 | 1 | 1 | 0 | 7 |
 | Tools & Locker | 6 | 0 | 1 | 0 | 2 | 9 |
@@ -390,7 +391,7 @@ Operator → Submit Work Order
 | Operational Settings | 5 | 0 | 0 | 0 | 0 | 5 |
 | Monitoring | 5 | 0 | 0 | 0 | 2 | 7 |
 | UI Pages | 14 | 0 | 1 | 0 | 0 | 15 |
-| **Totals** | **89** | **13** | **9** | **4** | **10** | **125** |
+| **Totals** | **89** | **14** | **9** | **4** | **10** | **126** |
 
 ---
 
@@ -407,3 +408,6 @@ Operator → Submit Work Order
 | 2026-03-06 | 1.6 | Added Memory Advisor abstraction boundary to P1 tech debt backlog. `MemoryAdvisor` interface + no-op default + two orchestration hook points + feature flag — 2-3 hours of P1 work that makes MuninnDB a clean drop-in at P2.3 without retrofitting hardened orchestration code. Updated Roadmap Impact Register for MuninnDB accordingly. Fixed MD040 (code block language) and MD034 (bare email address) lint warnings. |
 | 2026-03-07 | 1.7 | App version v0.8.0. System prompt v0.4.0 uplift (proper progression order, Tier 1.5 PM, Memory Advisor spec, PPTX routing, rate limits, CHAT ACTION PROTOCOL). Added CHAT ACTION PROTOCOL features (CREATE_WORK_ORDER, EXECUTE_WORKFLOW, JSON sanitization). Skill auto-discovery shipped (skill-auto-import.ts, keyword match → Tool Locker import → step toolIds). BUG-014 through BUG-017 resolved. |
 | 2026-03-07 | 1.8 | BUG-021 + BUG-022 resolved in Session 7. PDF pipeline now end-to-end: real binary generation + professional layout. Switched HTML→PDF renderer from LibreOffice headless to Playwright Chromium (`server/scripts/html-to-pdf.cjs`) — full CSS support, no blank-page/narrow-column issues. `injectPdfStyles` reworked: zero page margins, pandoc body override, fixed-position footer, pandoc title-block stripping. Updated Tech Stack to reflect Playwright Chromium. 126 total features. |
+| 2026-03-13 | 1.9 | Desktop File Upload to Workspace shipped [RECENT]. `POST /api/workspace/upload` (JSON, base64 binary, 10MB max). UI: Upload File in New dropdown + drag-from-desktop drop zone overlay on file grid. Multi-file drop supported. 126 total features. |
+| 2026-03-13 | 2.0 | **App v0.9.2.** PPTX workflow readiness: replaced generic PPTX skill with IWO2-native md-to-pptx pipeline spec, updated TOM/PM Alpha/Mark/Paul system prompts for workflow orchestration. 2DO Checklist feature shipped: `checklist_items` table, 4 API endpoints, 11 lifecycle hooks (orchestration + pocketflow), collapsible UI panel with phase badges and progress tracking. Contract drift fix (CODEX 5.4): reconciled workflow PM completion path with `tier2Result` model, fixed synthetic WorkOrder/Tier1Result shapes, added `toolsUsed` to Tier2Result schema, fixed 17 TS errors. All 50 tests pass. |
+| 2026-03-14 | 2.1 | **App v0.9.5.** Gamma Template Registry shipped: `gamma_template_registry` + `gamma_generation_records` tables, three-layer model (Gamma template → content contract → LLM prompt), format-aware early resolution, `gammaPolicy` on SharedDict, content contract injection via `designContext`. HITL Candidate Review: `gammaDeliveryPolicy` on workflow templates (candidate_review mode), WO-level `gammaTemplateKey` override, three-level template precedence (WO > workflow > global), candidate persistence in `.local/gamma_candidates/`, 6 candidate API endpoints. 21st.dev Magic MCP integration for Mark/Tom. Dashboard/detail WO status sync fix. Auto-publish standalone workflow output to Sandbox. Version bump across all governance docs + app code. `.local/tmp/` added to .gitignore. |

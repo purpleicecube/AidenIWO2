@@ -57,6 +57,10 @@ export const workOrders = pgTable("work_orders", {
   archivedBy: text("archived_by"),
   archivedReason: text("archived_reason"),
   submittedBy: text("submitted_by").default("system"),
+  gammaTemplateKey: text("gamma_template_key"),     // WO-level override: takes precedence over workflow default and global default
+  processingAttemptId: varchar("processing_attempt_id"),    // UUID: current processing attempt token (watchdog ownership)
+  heartbeatAt: timestamp("heartbeat_at"),                   // last heartbeat from active processing
+  processingStartedAt: timestamp("processing_started_at"),  // when current processing attempt began
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -137,7 +141,6 @@ export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
   workflowExecutionId: true,
   tier1Result: true,
   tier2Result: true,
-  gccMemory: true,
   bdmMarker: true,
   effectiveMode: true,
   impactScore: true,
@@ -410,6 +413,11 @@ export const workflowTemplates = pgTable("workflow_templates", {
   preferredPmId: varchar("preferred_pm_id"),
   executionMode: text("execution_mode").notNull().default("autonomous"),
   llmMode: text("llm_mode").notNull().default("inherited"),
+  pptxEngine: text("pptx_engine"),           // "local" | "gamma" | null (falls back to global default)
+  gammaThemeId: text("gamma_theme_id"),       // Gamma theme ID for this template
+  gammaTemplateId: text("gamma_template_id"), // Gamma gammaId for from-template mode (legacy)
+  gammaTemplateKey: text("gamma_template_key"), // Registry templateKey (preferred over raw gammaTemplateId)
+  gammaDeliveryPolicy: text("gamma_delivery_policy"), // "auto_revise" (default) | "candidate_review" (HITL selection for public deliverables)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -505,6 +513,7 @@ export const workflowStepRuns = pgTable("workflow_step_runs", {
   revisionAttempt: integer("revision_attempt").notNull().default(0),
   pocketflowResult: jsonb("pocketflow_result"),
   error: text("error"),
+  heartbeatAt: timestamp("heartbeat_at"),           // last heartbeat from active step execution (watchdog)
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -924,5 +933,113 @@ export const insertUploadedImageSchema = createInsertSchema(uploadedImages).omit
 
 export type InsertUploadedImage = z.infer<typeof insertUploadedImageSchema>;
 export type UploadedImage = typeof uploadedImages.$inferSelect;
+
+// ==================== Gamma Settings ====================
+
+export const gammaSettings = pgTable("gamma_settings", {
+  id: varchar("id").primaryKey().default(sql`'default'`),
+  enabled: boolean("enabled").notNull().default(false),
+  mode: text("mode").notNull().default("generate"), // "generate" | "from_template"
+  themeId: text("theme_id"),
+  gammaId: text("gamma_id"),                  // raw Gamma ID (legacy)
+  templateKey: text("template_key"),           // Registry templateKey (preferred over raw gammaId)
+  fallbackToLocal: boolean("fallback_to_local").notNull().default(true),
+  numCards: integer("num_cards"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: text("updated_by").default("system"),
+});
+
+export const insertGammaSettingsSchema = createInsertSchema(gammaSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertGammaSettings = z.infer<typeof insertGammaSettingsSchema>;
+export type GammaSettings = typeof gammaSettings.$inferSelect;
+
+// ==================== Gamma Template Registry ====================
+
+export const gammaTemplateRegistry = pgTable("gamma_template_registry", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateKey: text("template_key").notNull().unique(),
+  gammaId: text("gamma_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  outputFormat: text("output_format").notNull().default("pptx"),
+  contentContract: text("content_contract"),
+  mode: text("mode").notNull().default("template_locked"),
+  status: text("status").notNull().default("approved"),
+  owner: text("owner"),
+  allowedWoTypes: jsonb("allowed_wo_types"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGammaTemplateRegistrySchema = createInsertSchema(gammaTemplateRegistry).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertGammaTemplateRegistry = z.infer<typeof insertGammaTemplateRegistrySchema>;
+export type GammaTemplateRegistryEntry = typeof gammaTemplateRegistry.$inferSelect;
+
+// ==================== Gamma Generation Records ====================
+
+export const gammaGenerationRecords = pgTable("gamma_generation_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workOrderId: varchar("work_order_id").notNull(),
+  workflowExecutionId: varchar("workflow_execution_id"),
+  templateKey: text("template_key").notNull(),
+  gammaId: text("gamma_id").notNull(),
+  generationId: text("generation_id"),
+  exportFormat: text("export_format").notNull(),
+  status: text("status").notNull(),
+  gammaUrl: text("gamma_url"),
+  artifactId: varchar("artifact_id"),
+  fileSize: integer("file_size"),
+  creditsDeducted: integer("credits_deducted"),
+  creditsRemaining: integer("credits_remaining"),
+  metadata: jsonb("metadata"),
+  candidateStatus: text("candidate_status"),           // "candidate" | "selected" | "rejected" — null for non-candidate runs
+  candidateGroup: text("candidate_group"),              // UUID grouping candidates from same revision cycle
+  artifactFiledPath: text("artifact_filed_path"),       // durable path in gamma_candidates/ dir
+  selectedAt: timestamp("selected_at"),
+  selectedBy: text("selected_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGammaGenerationRecordSchema = createInsertSchema(gammaGenerationRecords).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertGammaGenerationRecord = z.infer<typeof insertGammaGenerationRecordSchema>;
+export type GammaGenerationRecord = typeof gammaGenerationRecords.$inferSelect;
+
+// ==================== 2DO Checklists ====================
+
+export const checklistItems = pgTable("checklist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workOrderId: varchar("work_order_id").notNull(),
+  workflowExecutionId: varchar("workflow_execution_id"),
+  stepRunId: varchar("step_run_id"),
+  phase: text("phase").notNull().default("tier2_exec"),
+  summary: text("summary").notNull(),
+  status: text("status").notNull().default("pending"),
+  addedBy: text("added_by").notNull().default("system"),
+  iteration: integer("iteration").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
+export type ChecklistItem = typeof checklistItems.$inferSelect;
 
 export * from "./models/auth";

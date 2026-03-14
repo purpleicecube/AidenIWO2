@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -55,6 +55,7 @@ import {
   FileArchive,
   Presentation,
   Globe,
+  Upload,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
 import { ExpandablePanel } from "@/components/expandable-panel";
@@ -153,6 +154,8 @@ export default function WorkspacePage() {
   const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
   const [isDraggingOverParent, setIsDraggingOverParent] = useState(false);
+  const [isDraggingDesktopFile, setIsDraggingDesktopFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const folderQueryKey = currentFolderId
     ? ["/api/artifact-folders", { parentId: currentFolderId }]
@@ -264,6 +267,50 @@ export default function WorkspacePage() {
       toast({ title: "Failed to move file", variant: "destructive" });
     },
   });
+
+  const uploadFileMutation = useMutation({
+    mutationFn: (data: { name: string; mimeType: string; data: string; folderId: string | null }) =>
+      apiRequest("POST", "/api/workspace/upload", data),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ["/api/artifacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/artifacts"] });
+      toast({ title: "File uploaded" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const MIME_FROM_EXT: Record<string, string> = {
+    md: "text/markdown", txt: "text/plain", html: "text/html", htm: "text/html",
+    css: "text/css", js: "text/javascript", ts: "text/typescript", json: "application/json",
+    pdf: "application/pdf",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+    webp: "image/webp", svg: "image/svg+xml",
+  };
+
+  const handleFileUpload = useCallback((file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const mimeType = file.type || MIME_FROM_EXT[ext] || "application/octet-stream";
+    const isText = mimeType.startsWith("text/") || mimeType === "application/json";
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = e.target?.result;
+      if (!raw) return;
+      const data = isText
+        ? (raw as string)
+        : (raw as string).replace(/^data:[^;]+;base64,/, "");
+      uploadFileMutation.mutate({ name: file.name, mimeType, data, folderId: currentFolderId });
+    };
+    if (isText) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
+  }, [currentFolderId, uploadFileMutation]);
 
   const handleDragStart = (e: React.DragEvent, fileId: string) => {
     e.dataTransfer.setData("text/plain", fileId);
@@ -466,8 +513,27 @@ export default function WorkspacePage() {
                     <FilePlus className="w-4 h-4 mr-2" />
                     New File
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="menu-upload-file"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload File
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".md,.txt,.html,.htm,.css,.js,.ts,.json,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.svg"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file);
+                  e.target.value = "";
+                }}
+                data-testid="input-upload-file"
+              />
               {isEmpty && currentFolderId === null && (
                 <Button
                   size="sm"
@@ -484,7 +550,36 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
+        <div
+          className="flex-1 overflow-auto p-4 relative"
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes("Files")) {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingDesktopFile(true);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+              setIsDraggingDesktopFile(false);
+            }
+          }}
+          onDrop={(e) => {
+            if (e.dataTransfer.types.includes("Files")) {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingDesktopFile(false);
+              const files = Array.from(e.dataTransfer.files);
+              files.forEach(handleFileUpload);
+            }
+          }}
+        >
+          {isDraggingDesktopFile && (
+            <div className="absolute inset-2 z-20 rounded-lg border-2 border-dashed border-primary bg-primary/10 flex flex-col items-center justify-center gap-2 pointer-events-none">
+              <Upload className="w-10 h-10 text-primary" />
+              <p className="text-sm font-medium text-primary">Drop to upload</p>
+            </div>
+          )}
           {isLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (

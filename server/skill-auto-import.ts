@@ -18,6 +18,7 @@ const SKILL_KEYWORD_MAP: Record<string, string[]> = {
   "internal-comms":        ["email", "slack", "announcement", "internal", "memo", "comms", "communication"],
   "mcp-builder":           ["mcp", "tool builder", "protocol", "integration", "connector"],
   "pdf":                   ["pdf", "portable document"],
+  "klearai-pptx":          ["klear", "klear.ai", "klearai", "workforce intelligence", "staffing deck", "staffing presentation"],
   "pptx":                  ["pptx", "powerpoint", "presentation", "slide", "deck"],
   "skill-creator":         ["skill", "agent skill", "capability"],
   "slack-gif-creator":     ["gif", "slack gif", "animated"],

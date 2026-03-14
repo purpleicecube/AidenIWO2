@@ -55,9 +55,43 @@ function containsHtmlDocument(content: string): boolean {
 }
 
 export function extractHtmlFromDeliverable(content: string): string | null {
-  const htmlBlockMatch = content.match(/```html?\s*\n([\s\S]*?)```/i);
-  if (htmlBlockMatch) return htmlBlockMatch[1].trim();
+  // Collect all fenced HTML blocks and CSS blocks
+  const htmlBlocks: string[] = [];
+  const cssBlocks: string[] = [];
+  const blockRegex = /```(html?|css)\s*\n([\s\S]*?)```/gi;
+  let m;
+  while ((m = blockRegex.exec(content)) !== null) {
+    const lang = m[1].toLowerCase();
+    if (lang === "html" || lang === "htm") {
+      htmlBlocks.push(m[2].trim());
+    } else if (lang === "css") {
+      cssBlocks.push(m[2].trim());
+    }
+  }
 
+  // If we have HTML block(s), assemble a self-contained document
+  if (htmlBlocks.length > 0) {
+    // Use the first HTML block that looks like a full document (has <html or <!DOCTYPE)
+    let primary = htmlBlocks.find(b => /<!DOCTYPE\s+html|<html[\s>]/i.test(b)) || htmlBlocks[0];
+
+    // If there are separate CSS blocks, inline them and remove external stylesheet links
+    if (cssBlocks.length > 0) {
+      const inlineStyle = `<style>\n${cssBlocks.join("\n\n")}\n</style>`;
+      // Remove <link rel="stylesheet" href="..."> tags pointing to local files (now inlined)
+      primary = primary.replace(/<link\s+[^>]*rel=["']stylesheet["'][^>]*href=["'][^"']*\.css["'][^>]*\/?>/gi, "<!-- stylesheet inlined -->");
+      if (primary.includes("</head>")) {
+        primary = primary.replace("</head>", `${inlineStyle}\n</head>`);
+      } else if (primary.includes("<body")) {
+        primary = primary.replace(/<body/i, `${inlineStyle}\n<body`);
+      } else {
+        primary = inlineStyle + "\n" + primary;
+      }
+    }
+
+    return primary;
+  }
+
+  // Fallback: unfenced HTML document in raw content
   if (containsHtmlDocument(content)) {
     const startIdx = content.search(/<!DOCTYPE\s+html|<html[\s>]/i);
     if (startIdx >= 0) {
@@ -665,6 +699,41 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
 
         deliverableFilePath = `${outputFolderName}/${dateStr}/${folderName}/${fileName}`;
         console.log(`  Deliverable saved to ${deliverableFilePath}`);
+
+        // For HTML/website deliverables: save .html artifact + backfill postProcessedFile so UI shows download icon
+        if (!postProcessedFile && containsHtmlDocument(deliverable)) {
+          const htmlContent = extractHtmlFromDeliverable(deliverable) || deliverable;
+          const htmlFileName = `${fileSlug}.html`;
+          const htmlArtifact = await storage.createArtifact({
+            name: htmlFileName,
+            folderId: outOrderFolder.id,
+            type: "file",
+            mimeType: "text/html",
+            content: htmlContent,
+            size: htmlContent.length,
+            status: "active",
+            createdBy: "aiden",
+            tags: ["auto-filed", "deliverable", "html", "website", order.type, "post-processed"],
+            sourceType: "work_order",
+            sourceId: order.id,
+          });
+          console.log(`  HTML artifact saved: ${htmlFileName} (${(htmlContent.length / 1024).toFixed(0)}KB)`);
+
+          // Backfill postProcessedFile into tier2_result so the UI download icon appears
+          const updatedTier2 = {
+            ...tier2,
+            output: {
+              ...tier2.output,
+              postProcessedFile: {
+                artifactId: htmlArtifact.id,
+                mimeType: "text/html",
+                size: htmlContent.length,
+                path: null,
+              },
+            },
+          };
+          await storage.updateWorkOrder(order.id, { tier2Result: updatedTier2 } as any);
+        }
 
         // Save post-processed file (e.g. .pptx, .pdf) if present
         if (postProcessedFile?.path) {

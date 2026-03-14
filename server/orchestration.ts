@@ -1,8 +1,95 @@
 import { storage } from "./storage";
-import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun } from "@shared/schema";
+import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun, InsertChecklistItem } from "@shared/schema";
 import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, runAidenQualityReview, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
 import { pocketflowExecute } from "./pocketflow";
+import crypto from "crypto";
+
+// ─── Watchdog: Heartbeat + Attempt Ownership ─────────────────────────────────
+
+const HEARTBEAT_INTERVAL_MS = 15_000;      // heartbeat every 15s
+const WATCHDOG_INTERVAL_MS = 30_000;       // sweep every 30s
+const HEARTBEAT_STALE_MS = 60_000;         // 60s without heartbeat = stuck
+const MAX_PROCESSING_DURATION_MS = 10 * 60 * 1000; // 10 min hard ceiling
+
+/**
+ * Checks whether the given attemptId still owns the work order.
+ * If not, the caller is a zombie and must silently exit.
+ */
+async function isAttemptStillOwner(orderId: string, attemptId: string): Promise<boolean> {
+  const current = await storage.getWorkOrder(orderId);
+  return !!current && (current as any).processingAttemptId === attemptId;
+}
+
+/**
+ * Emits periodic heartbeats for an in-flight work order.
+ * Self-cancels when it detects its attemptId has been invalidated by the watchdog.
+ */
+class HeartbeatEmitter {
+  private intervalHandle: NodeJS.Timeout | null = null;
+  private stopped = false;
+
+  constructor(
+    private workOrderId: string,
+    private attemptId: string,
+    private intervalMs: number = HEARTBEAT_INTERVAL_MS,
+  ) {}
+
+  start(): void {
+    this.intervalHandle = setInterval(async () => {
+      if (this.stopped) return;
+      try {
+        if (!(await isAttemptStillOwner(this.workOrderId, this.attemptId))) {
+          console.warn(`[heartbeat] Attempt ${this.attemptId.slice(0, 8)} superseded for WO ${this.workOrderId} — stopping`);
+          this.stop();
+          return;
+        }
+        await storage.updateWorkOrder(this.workOrderId, { heartbeatAt: new Date() });
+      } catch (err) {
+        console.warn(`[heartbeat] Failed for WO ${this.workOrderId}:`, err);
+      }
+    }, this.intervalMs);
+  }
+
+  stop(): void {
+    this.stopped = true;
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
+  }
+}
+
+/**
+ * Structural helper: completes a work order AND triggers filing in one call.
+ * Every code path that sets a WO to "completed" MUST go through this function
+ * so filing + sandbox deploy can never be forgotten.
+ *
+ * If attemptId is provided, checks ownership first — zombie callers are silently rejected.
+ */
+async function completeAndFileWorkOrder(
+  workOrderId: string,
+  updates: Record<string, any>,
+  label: string,
+  attemptId?: string,
+): Promise<WorkOrder | undefined> {
+  if (attemptId && !(await isAttemptStillOwner(workOrderId, attemptId))) {
+    console.warn(`[completeAndFile] Attempt ${attemptId.slice(0, 8)} no longer owns WO ${workOrderId} — skipping (${label})`);
+    return undefined;
+  }
+  const completedOrder = await storage.updateWorkOrder(workOrderId, {
+    ...updates,
+    status: "completed",
+    heartbeatAt: null,
+    processingStartedAt: null,
+  });
+  if (completedOrder) {
+    fileWorkOrderOutput(completedOrder).catch(err =>
+      console.error(`Auto-filing error (${label}):`, err.message)
+    );
+  }
+  return completedOrder;
+}
 import { getAvailableToolsForAgent } from "./tool-executor";
 import { autoImportSkillsForDescription } from "./skill-auto-import";
 import { createMemoryAdvisor, type WorkOrderEvent } from "./memory-advisor";
@@ -12,6 +99,27 @@ import {
   pmAssembleWorkProduct, pmEscalateToAiden, aidenExecutiveReview,
   type PmReviewResult,
 } from "./workflow-pm";
+
+// ─── 2DO Checklist Helper ────────────────────────────────────────────────────
+
+type ChecklistPhase = "tier1_gate" | "tier2_exec" | "quality_review" | "filing" | "deployment";
+
+function addChecklistItem(
+  workOrderId: string,
+  phase: ChecklistPhase,
+  summary: string,
+  addedBy: string = "system",
+  extras?: { workflowExecutionId?: string; stepRunId?: string; iteration?: number },
+): void {
+  storage.createChecklistItem({
+    workOrderId,
+    phase,
+    summary,
+    addedBy,
+    status: "done",
+    ...extras,
+  }).catch(err => console.error("[2DO] Failed to add checklist item:", err.message));
+}
 
 // ─── GCC Authority Model ──────────────────────────────────────────────────────
 // Per AIDEN IWO Tier 1 spec (AIDEN_IWOv0.1.0.md):
@@ -97,7 +205,12 @@ export async function recoverOrphanedProcessingOrders(): Promise<number> {
   );
 
   for (const order of staleOrders) {
-    await storage.updateWorkOrder(order.id, { status: "failed" });
+    await storage.updateWorkOrder(order.id, {
+      status: "failed",
+      processingAttemptId: null,
+      heartbeatAt: null,
+      processingStartedAt: null,
+    });
     await storage.createExecutionLog({
       workOrderId: order.id,
       tier: 1,
@@ -117,34 +230,195 @@ export function isStaleProcessing(order: { status: string; updatedAt: Date | str
   return elapsed > 10 * 60 * 1000;
 }
 
-export async function processWorkOrderSafe(orderId: string): Promise<void> {
+// ─── Watchdog: Runtime Sweep ─────────────────────────────────────────────────
+
+let lastWatchdogSweep: Date | null = null;
+
+/**
+ * Starts the runtime watchdog. Returns a cleanup function.
+ * Scans for stuck WOs every 30s using heartbeat staleness, not just elapsed time.
+ */
+export function startWatchdog(): () => void {
+  const handle = setInterval(async () => {
+    try {
+      await watchdogSweep();
+    } catch (err) {
+      console.error("[watchdog] Sweep error:", err);
+    }
+  }, WATCHDOG_INTERVAL_MS);
+  console.log("[watchdog] Started — scanning every 30s for stuck work orders");
+  return () => clearInterval(handle);
+}
+
+export async function watchdogSweep(): Promise<number> {
+  lastWatchdogSweep = new Date();
+  const allOrders = await storage.getWorkOrders();
+  const processingOrders = allOrders.filter(o => o.status === "processing");
+  let recovered = 0;
+
+  for (const order of processingOrders) {
+    const now = Date.now();
+    const wo = order as any;
+
+    // Determine heartbeat age: use heartbeatAt if available, fall back to updatedAt
+    const heartbeatTs = wo.heartbeatAt ? new Date(wo.heartbeatAt).getTime() : null;
+    const updatedTs = order.updatedAt ? new Date(order.updatedAt).getTime() : now;
+    const lastActivity = heartbeatTs || updatedTs;
+    const heartbeatAge = now - lastActivity;
+
+    // Total processing duration
+    const processingStart = wo.processingStartedAt
+      ? new Date(wo.processingStartedAt).getTime()
+      : updatedTs;
+    const totalDuration = now - processingStart;
+
+    const heartbeatStale = heartbeatAge > HEARTBEAT_STALE_MS;
+    const exceededHardCeiling = totalDuration > MAX_PROCESSING_DURATION_MS;
+
+    if (!heartbeatStale && !exceededHardCeiling) continue;
+
+    const reason = heartbeatStale
+      ? `No heartbeat for ${Math.round(heartbeatAge / 1000)}s`
+      : `Processing exceeded ${MAX_PROCESSING_DURATION_MS / 60000} min hard ceiling`;
+
+    console.warn(`[watchdog] WO ${order.id} ("${order.title}") stuck: ${reason}`);
+
+    // Invalidate the current attempt so zombie async work can't finalize
+    const invalidationId = crypto.randomUUID();
+    await storage.updateWorkOrder(order.id, {
+      status: "failed",
+      processingAttemptId: invalidationId,
+      heartbeatAt: null,
+      processingStartedAt: null,
+    });
+
+    await storage.createExecutionLog({
+      workOrderId: order.id,
+      tier: 1,
+      action: "Watchdog: Stuck Detection",
+      message: `Watchdog detected stuck work order: ${reason}. Status set to "failed". Previous processing attempt invalidated — zombie work will be silently discarded.`,
+      metadata: {
+        reason,
+        heartbeatAgeSeconds: Math.round(heartbeatAge / 1000),
+        totalDurationSeconds: Math.round(totalDuration / 1000),
+        previousAttemptId: wo.processingAttemptId,
+        invalidationId,
+        recoveredAt: new Date().toISOString(),
+      },
+    });
+
+    // Recover any stuck workflow step runs
+    await recoverStuckStepRuns(order);
+    recovered++;
+  }
+
+  return recovered;
+}
+
+/**
+ * Fails any running step runs + their parent execution when a WO is recovered.
+ */
+export async function recoverStuckStepRuns(order: WorkOrder): Promise<void> {
+  const wo = order as any;
+  const executionId = wo.workflowExecutionId || order.workflowExecutionId;
+  if (!executionId) return;
+
   try {
-    await processWorkOrder(orderId);
+    const stepRuns = await storage.getWorkflowStepRuns(executionId);
+    const stuckRuns = stepRuns.filter((r: any) => r.status === "running");
+
+    for (const run of stuckRuns) {
+      await storage.updateWorkflowStepRun(run.id, {
+        status: "failed",
+        completedAt: new Date(),
+        error: "Watchdog: step was running when work order was declared stuck",
+      });
+      console.log(`[watchdog] Recovered stuck step run ${run.id} (${run.stepName}) for WO ${order.id}`);
+    }
+
+    if (stuckRuns.length > 0) {
+      await storage.updateWorkflowExecution(executionId, {
+        status: "failed",
+        completedAt: new Date(),
+      });
+    }
+  } catch (err) {
+    console.error(`[watchdog] Failed to recover step runs for WO ${order.id}:`, err);
+  }
+}
+
+/** Returns watchdog status for the ops health endpoint. */
+export function getWatchdogStatus() {
+  return {
+    active: true,
+    intervalMs: WATCHDOG_INTERVAL_MS,
+    heartbeatStaleMs: HEARTBEAT_STALE_MS,
+    maxProcessingMs: MAX_PROCESSING_DURATION_MS,
+    lastSweep: lastWatchdogSweep?.toISOString() || null,
+  };
+}
+
+function isRetriableError(err: any): boolean {
+  const msg = (err?.message || "").toLowerCase();
+  const status = err?.status || err?.statusCode || 0;
+  // 429 rate limit, 502/503/504 gateway errors, timeouts
+  if ([429, 502, 503, 504].includes(status)) return true;
+  if (msg.includes("timeout") || msg.includes("timed out") || msg.includes("etimedout")) return true;
+  if (msg.includes("rate limit") || msg.includes("too many requests")) return true;
+  if (msg.includes("econnreset") || msg.includes("econnrefused") || msg.includes("socket hang up")) return true;
+  return false;
+}
+
+export async function processWorkOrderSafe(orderId: string): Promise<void> {
+  const attemptId = crypto.randomUUID();
+  const heartbeat = new HeartbeatEmitter(orderId, attemptId);
+  heartbeat.start();
+  try {
+    await processWorkOrder(orderId, attemptId);
   } catch (err: any) {
-    console.error(`[orchestration] processWorkOrder crashed for ${orderId}:`, err);
+    const retriable = isRetriableError(err);
+    console.error(`[orchestration] processWorkOrder crashed for ${orderId} (retriable: ${retriable}):`, err);
     try {
       const current = await storage.getWorkOrder(orderId);
-      if (current && current.status === "processing") {
-        await storage.updateWorkOrder(orderId, { status: "failed" });
+      // Only recover if we still own this attempt
+      if (current && current.status === "processing" && (current as any).processingAttemptId === attemptId) {
+        const newStatus = retriable ? "pending" : "failed";
+        await storage.updateWorkOrder(orderId, {
+          status: newStatus,
+          heartbeatAt: null,
+          processingStartedAt: null,
+        });
         await storage.createExecutionLog({
           workOrderId: orderId,
           tier: 1,
-          action: "System: Processing Failed",
-          message: `Background processing crashed: ${err?.message || "Unknown error"}. Status set to "failed" — you can retry.`,
-          metadata: { error: err?.message, stack: err?.stack?.substring(0, 500), failedAt: new Date().toISOString() },
+          action: retriable ? "System: Retriable Error" : "System: Processing Failed",
+          message: retriable
+            ? `Processing hit a transient error (${err?.message || "Unknown"}). Status reset to "pending" — will retry automatically or you can resubmit.`
+            : `Background processing crashed: ${err?.message || "Unknown error"}. Status set to "failed" — you can retry.`,
+          metadata: { error: err?.message, stack: err?.stack?.substring(0, 500), failedAt: new Date().toISOString(), retriable, attemptId },
         });
+      } else if (current && (current as any).processingAttemptId !== attemptId) {
+        console.warn(`[orchestration] Attempt ${attemptId.slice(0, 8)} superseded for WO ${orderId} — skipping error recovery`);
       }
     } catch (recoveryErr) {
       console.error(`[orchestration] Failed to recover crashed WO ${orderId}:`, recoveryErr);
     }
+  } finally {
+    heartbeat.stop();
   }
 }
 
-export async function processWorkOrder(orderId: string): Promise<WorkOrder | undefined> {
+export async function processWorkOrder(orderId: string, attemptId?: string): Promise<WorkOrder | undefined> {
   const order = await storage.getWorkOrder(orderId);
   if (!order) return undefined;
 
-  await storage.updateWorkOrder(orderId, { status: "processing" });
+  await storage.updateWorkOrder(orderId, {
+    status: "processing",
+    processingAttemptId: attemptId || null,
+    heartbeatAt: new Date(),
+    processingStartedAt: new Date(),
+  });
+  addChecklistItem(orderId, "tier1_gate", "Work order submitted — awaiting Tier 1 gate");
 
   const settings = await storage.getLlmSettings();
   const useLLM = settings?.enabled === true;
@@ -209,6 +483,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       metadata: bdmMarker,
     });
 
+    addChecklistItem(orderId, "tier1_gate", `Tier 1 blocked: ${tier1Result.reason}`, "aiden");
     return storage.updateWorkOrder(orderId, {
       status: "blocked",
       tier1Result,
@@ -220,6 +495,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
   }
 
   const targetSubAgent = findSubAgent(activeSubAgents, tier1Result.handler);
+  addChecklistItem(orderId, "tier1_gate", `Tier 1 approved — routing to ${tier1Result.handler || "default agent"}`, "aiden");
 
   await storage.updateWorkOrder(orderId, {
     tier1Result,
@@ -409,6 +685,7 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
       },
     });
 
+    addChecklistItem(orderId, "quality_review", `Quality review blocked (score: ${qualityReview.score.toFixed(2)}) — ${qualityReview.summary}`, "aiden");
     return storage.updateWorkOrder(orderId, {
       status: "blocked",
       tier2Result,
@@ -562,6 +839,41 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     }
   }
 
+  // ── HITL Candidate Review Gate ──────────────────────────────────────────────
+  // If gammaDeliveryPolicy is "candidate_review", route to awaiting_operator
+  // for candidate selection instead of auto-completing. The revision loop above
+  // has already produced N candidates (each persisted with candidateStatus: "candidate"
+  // in gamma_generation_records). The operator will select the best one via API.
+  const deliveryPolicy = tier2Result.gammaDeliveryPolicy;
+  if (deliveryPolicy === "candidate_review") {
+    const candidates = await storage.getGammaCandidates(orderId);
+    await storage.createExecutionLog({
+      workOrderId: orderId,
+      tier: 1,
+      action: "Aiden: Candidate Review Required",
+      message: `${candidates.length} Gamma candidate(s) generated for operator review. Quality score: ${qualityReview.score.toFixed(2)}. Awaiting operator selection before final release.`,
+      metadata: {
+        finalStatus: "awaiting_operator",
+        candidateCount: candidates.length,
+        candidateIds: candidates.map(c => c.id),
+        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues, summary: qualityReview.summary },
+      },
+    });
+
+    addChecklistItem(orderId, "quality_review", `${candidates.length} Gamma candidate(s) ready for operator review`, "aiden");
+    return storage.updateWorkOrder(orderId, {
+      status: "awaiting_operator",
+      tier2Result,
+      gccMemory: updateWorkOrderGcc(order.gccMemory as object, "candidate_review", ["tier1_policy_pass", "pocketflow_execution_complete", "aiden_quality_review", "gamma_candidate_review"], {
+        correlationId: order.correlationId, status: "awaiting_operator",
+        candidateCount: candidates.length,
+        resolutionReason: "candidate_review",
+        pocketflow: tier2Result.pocketflow,
+        qualityReview: { score: qualityReview.score, recommendation: qualityReview.recommendation, issues: qualityReview.issues },
+      }),
+    });
+  }
+
   await storage.createExecutionLog({
     workOrderId: orderId,
     tier: 1,
@@ -583,8 +895,8 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
     },
   });
 
-  const completedOrder = await storage.updateWorkOrder(orderId, {
-    status: "completed",
+  addChecklistItem(orderId, "quality_review", `Quality review passed (score: ${qualityReview.score.toFixed(2)})`, "aiden");
+  const completedOrder = await completeAndFileWorkOrder(orderId, {
     tier2Result,
     gccMemory: updateWorkOrderGcc(order.gccMemory as object, "completed", ["tier1_policy_pass", "pocketflow_validated", "pocketflow_execution_complete", "aiden_quality_review", "aiden_approved", "aiden_resolution"], {
       correlationId: order.correlationId, status: "completed",
@@ -595,12 +907,10 @@ export async function processWorkOrder(orderId: string): Promise<WorkOrder | und
         issues: qualityReview.issues,
       },
     }),
-  });
+  }, "quality-approved", attemptId);
 
   if (completedOrder) {
-    fileWorkOrderOutput(completedOrder).catch(err =>
-      console.error("Auto-filing error:", err.message)
-    );
+    addChecklistItem(orderId, "filing", "Completed — filing deliverable to workspace");
     // P1.4: Memory Advisor — Hook 2 (post-completion store)
     advisor.store({
       orderId: completedOrder.id,
@@ -785,7 +1095,8 @@ export async function startWorkflowExecution(
   workOrderId: string | null,
   goal: string | null,
   context: Record<string, any> = {},
-  pmSubAgentIdOverride?: string
+  pmSubAgentIdOverride?: string,
+  options?: { skipAdvance?: boolean }
 ) {
   const template = await storage.getWorkflowTemplate(templateId);
   if (!template) throw new Error("Workflow template not found");
@@ -871,11 +1182,14 @@ export async function startWorkflowExecution(
     }
   }
 
+  if (options?.skipAdvance) {
+    return execution;
+  }
   const result = await advanceWorkflowExecution(execution.id);
   return result;
 }
 
-export async function advanceWorkflowExecution(executionId: string) {
+export async function advanceWorkflowExecution(executionId: string, attemptId?: string) {
   const execution = await storage.getWorkflowExecution(executionId);
   if (!execution) throw new Error("Workflow execution not found");
 
@@ -923,28 +1237,22 @@ export async function advanceWorkflowExecution(executionId: string) {
       }
     } else if (allCompleted) {
       if (hasPm && pmLlmConfig) {
-        await handleWorkflowCompletion(execution, template, steps, stepRuns, settings, pmLlmConfig);
+        await handleWorkflowCompletion(execution, template, steps, stepRuns, settings, pmLlmConfig, attemptId);
       } else {
         await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
         if (execution.workOrderId) {
           const woForGcc = await storage.getWorkOrder(execution.workOrderId);
-          const completedOrder = await storage.updateWorkOrder(execution.workOrderId, {
-            status: "completed",
-            gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
-              workflowExecutionId: executionId, status: "completed",
-            }),
-          });
           await storage.createExecutionLog({
             workOrderId: execution.workOrderId, tier: 1,
             action: "Aiden: Workflow Completed",
             message: `All ${steps.length} workflow steps completed successfully.`,
             metadata: { executionId },
           });
-          if (completedOrder) {
-            fileWorkOrderOutput(completedOrder).catch(err =>
-              console.error("Auto-filing error (workflow):", err.message)
-            );
-          }
+          await completeAndFileWorkOrder(execution.workOrderId, {
+            gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
+              workflowExecutionId: executionId, status: "completed",
+            }),
+          }, "workflow-no-pm", attemptId);
         }
       }
     }
@@ -957,7 +1265,7 @@ export async function advanceWorkflowExecution(executionId: string) {
 
   if (!evaluateConditions(stepDef, stepRuns)) {
     await storage.updateWorkflowStepRun(nextStepRun.id, { status: "skipped", completedAt: new Date() });
-    return advanceWorkflowExecution(executionId);
+    return advanceWorkflowExecution(executionId, attemptId);
   }
 
   const previousResults = collectPreviousResults(stepRuns);
@@ -1002,14 +1310,26 @@ export async function advanceWorkflowExecution(executionId: string) {
     return storage.getWorkflowExecution(executionId);
   }
 
+  // Step-level heartbeat: keeps heartbeatAt fresh during long step execution (LLM + Gamma)
+  const stepHeartbeatHandle = setInterval(async () => {
+    try {
+      await storage.updateWorkflowStepRun(nextStepRun.id, { heartbeatAt: new Date() });
+      if (execution.workOrderId) {
+        await storage.updateWorkOrder(execution.workOrderId, { heartbeatAt: new Date() });
+      }
+    } catch {}
+  }, HEARTBEAT_INTERVAL_MS);
+
   try {
     let stepResult: { output: any; toolsUsed: string[]; decision: any; pocketflowResult?: any };
 
     if (useLLM && subAgent && settings) {
-      stepResult = await executeWorkflowStepWithPocketFlow(stepDef, subAgent, previousResults, execution.goal || "", settings, toolsList);
+      stepResult = await executeWorkflowStepWithPocketFlow(stepDef, subAgent, previousResults, execution.goal || "", settings, toolsList, executionId);
     } else {
       stepResult = await executeWorkflowStep(stepDef, previousResults, execution.goal || "", toolNames, useLLM, settings);
     }
+
+    clearInterval(stepHeartbeatHandle);
 
     // Check for "Tool Needed" signal BEFORE marking step complete
     const opSettingsForTN = await storage.getOperationalSettings();
@@ -1018,7 +1338,7 @@ export async function advanceWorkflowExecution(executionId: string) {
       stepResult.output, stepDef, platformMode, execution, nextStepRun, executionId
     );
     if (toolNeededResult?.hitlBlocked) return storage.getWorkflowExecution(executionId);
-    if (toolNeededResult?.retryQueued) return advanceWorkflowExecution(executionId);
+    if (toolNeededResult?.retryQueued) return advanceWorkflowExecution(executionId, attemptId);
 
     await storage.updateWorkflowStepRun(nextStepRun.id, {
       status: "completed", completedAt: new Date(),
@@ -1069,7 +1389,7 @@ export async function advanceWorkflowExecution(executionId: string) {
             completedAt: null, startedAt: null,
             input: { previousResults, goal: execution.goal, context: execution.context, revisionGuidance: guidance },
           });
-          return advanceWorkflowExecution(executionId);
+          return advanceWorkflowExecution(executionId, attemptId);
         }
       } else if (review.recommendation === "escalate") {
         const escalation = await pmEscalateToAiden(settings, execution.executionMode || "autonomous",
@@ -1104,8 +1424,9 @@ export async function advanceWorkflowExecution(executionId: string) {
       }
     }
 
-    return advanceWorkflowExecution(executionId);
+    return advanceWorkflowExecution(executionId, attemptId);
   } catch (err: any) {
+    clearInterval(stepHeartbeatHandle);
     await storage.updateWorkflowStepRun(nextStepRun.id, {
       status: "failed", completedAt: new Date(),
       error: err.message || "Step execution failed",
@@ -1118,7 +1439,7 @@ export async function advanceWorkflowExecution(executionId: string) {
       );
       if (escalation.action === "skip") {
         await storage.updateWorkflowStepRun(nextStepRun.id, { status: "skipped" });
-        return advanceWorkflowExecution(executionId);
+        return advanceWorkflowExecution(executionId, attemptId);
       } else if (escalation.action === "hitl") {
         await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
         if (execution.workOrderId) {
@@ -1189,10 +1510,47 @@ function collectPreviousResults(stepRuns: WorkflowStepRun[]): Record<string, any
 
 async function findSubAgentForStep(step: WorkflowStep): Promise<SubAgent | undefined> {
   const activeAgents = await storage.getActiveSubAgents();
+  if (activeAgents.length === 0) return undefined;
+
+  // 1. Exact agentType match
   if (step.agentType) {
-    return activeAgents.find((a) => a.type === step.agentType) || activeAgents[0];
+    const byType = activeAgents.find((a) => a.type === step.agentType);
+    if (byType) return byType;
   }
-  return activeAgents[0];
+
+  // 2. Score each agent against step name + description keywords
+  const stepText = `${step.name || ""} ${step.description || ""}`.toLowerCase();
+  const scored = activeAgents.map(agent => {
+    const agentText = `${agent.name || ""} ${agent.description || ""} ${agent.type || ""}`.toLowerCase();
+    let score = 0;
+    // Check if step text mentions agent name
+    const agentFirstWord = (agent.name || "").toLowerCase().split(/\s+/)[0];
+    if (agentFirstWord && stepText.includes(agentFirstWord)) score += 10;
+    // Keyword overlap between step description and agent description
+    const stepWords = stepText.split(/\W+/).filter(w => w.length > 3);
+    for (const word of stepWords) {
+      if (agentText.includes(word)) score += 1;
+    }
+    // Penalize deployment agents for creative/content steps
+    const isDeployAgent = agentText.includes("deploy") || agentText.includes("polaris");
+    const isCreativeStep = /content|draft|research|design|write|slide|deck|present|market|brand/i.test(stepText);
+    if (isDeployAgent && isCreativeStep) score -= 5;
+    // Boost content/marketing agents for creative steps
+    const isContentAgent = agentText.includes("market") || agentText.includes("content") || agentText.includes("writer") || agentText.includes("deck");
+    if (isContentAgent && isCreativeStep) score += 5;
+    return { agent, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+  if (best.score > 0) {
+    console.log(`[orchestration] findSubAgentForStep: "${step.name}" → "${best.agent.name}" (score: ${best.score})`);
+    return best.agent;
+  }
+
+  // 3. Last resort: first non-deployment agent, then any agent
+  const nonDeploy = activeAgents.find(a => !(a.type || "").includes("deploy") && !(a.description || "").toLowerCase().includes("deploy"));
+  return nonDeploy || activeAgents[0];
 }
 
 /**
@@ -1306,7 +1664,7 @@ async function getToolsForStep(step: WorkflowStep, subAgentId: string | null) {
 
 async function handleWorkflowCompletion(
   execution: any, template: any, steps: WorkflowStep[], stepRuns: WorkflowStepRun[],
-  settings: any, pmLlmConfig: any
+  settings: any, pmLlmConfig: any, attemptId?: string
 ) {
   const executionId = execution.id;
   const completedStepResults = stepRuns
@@ -1368,26 +1726,38 @@ async function handleWorkflowCompletion(
   if (execReview.recommendation === "approve" || execReview.approved) {
     await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
     if (execution.workOrderId) {
+      // Scan step runs for any post-processed file (PPTX, PDF, etc.) generated during execution
+      const stepPostProcessedFile = stepRuns
+        .filter(r => r.status === "completed" && r.pocketflowResult)
+        .map(r => (r.pocketflowResult as any)?.postProcessedFile)
+        .find(f => f && f.path);
+
       const woForGcc = await storage.getWorkOrder(execution.workOrderId);
-      const completedOrder = await storage.updateWorkOrder(execution.workOrderId, {
-        status: "completed",
-        result: workProduct.deliverable,
-        deliverableType: workProduct.deliverableType || "markdown",
-        deliverableTitle: workProduct.deliverableTitle || template?.name || "Workflow Output",
-        gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed_with_executive_review", ["workflow_steps_complete", "pm_work_product_assembled", "aiden_executive_review_passed", "workflow_completed"], {
-          workflowExecutionId: executionId, status: "completed", executiveScore: execReview.score,
-          pmWorkProduct: workProduct.summary, executiveReview: execReview.feedback,
-        }),
-      });
       await storage.createExecutionLog({
         workOrderId: execution.workOrderId, tier: 1,
         action: "Aiden: Workflow Completed",
         message: `All ${steps.length} steps complete. PM assembled work product approved by Aiden (score: ${execReview.score.toFixed(2)}).`,
         metadata: { executionId },
       });
-      if (completedOrder) {
-        fileWorkOrderOutput(completedOrder).catch(err => console.error("Auto-filing error (workflow PM):", err.message));
-      }
+      await completeAndFileWorkOrder(execution.workOrderId, {
+        tier2Result: {
+          blocked: false,
+          reason: null,
+          executionId,
+          handler: null,
+          output: {
+            message: workProduct.summary || `Workflow completed: ${template?.name || "Workflow Output"}`,
+            deliverable: workProduct.deliverable,
+            deliverableType: workProduct.deliverableType || "markdown",
+            deliverableTitle: workProduct.deliverableTitle || template?.name || "Workflow Output",
+            ...(stepPostProcessedFile ? { postProcessedFile: stepPostProcessedFile } : {}),
+          },
+        },
+        gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed_with_executive_review", ["workflow_steps_complete", "pm_work_product_assembled", "aiden_executive_review_passed", "workflow_completed"], {
+          workflowExecutionId: executionId, status: "completed", executiveScore: execReview.score,
+          pmWorkProduct: workProduct.summary, executiveReview: execReview.feedback,
+        }),
+      }, "workflow-exec-approved", attemptId);
     } else {
       // Standalone workflow (no work order) — auto-publish to sandbox directly
       const deliverable = workProduct.deliverable;
@@ -1421,25 +1791,34 @@ async function handleWorkflowCompletion(
       });
     }
   } else {
+    // Executive review returned "revise" but revisions exhausted — complete with best effort
     await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
     if (execution.workOrderId) {
       const woForGcc = await storage.getWorkOrder(execution.workOrderId);
-      await storage.updateWorkOrder(execution.workOrderId, {
-        status: "completed",
-        result: workProduct.deliverable,
-        deliverableType: workProduct.deliverableType || "markdown",
-        deliverableTitle: workProduct.deliverableTitle || template?.name || "Workflow Output",
+      await completeAndFileWorkOrder(execution.workOrderId, {
+        tier2Result: {
+          blocked: false,
+          reason: null,
+          executionId,
+          handler: null,
+          output: {
+            message: workProduct.summary || `Workflow completed: ${template?.name || "Workflow Output"}`,
+            deliverable: workProduct.deliverable,
+            deliverableType: workProduct.deliverableType || "markdown",
+            deliverableTitle: workProduct.deliverableTitle || template?.name || "Workflow Output",
+          },
+        },
         gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
           workflowExecutionId: executionId, status: "completed",
         }),
-      });
+      }, "workflow-revise-fallback", attemptId);
     }
   }
 }
 
 async function executeWorkflowStepWithPocketFlow(
   step: WorkflowStep, subAgent: SubAgent, previousResults: Record<string, any>,
-  goal: string, settings: any, tools: any[]
+  goal: string, settings: any, tools: any[], executionId?: string
 ): Promise<{ output: any; toolsUsed: string[]; decision: any; pocketflowResult?: any }> {
   const llmConfig = resolveSubAgentLlmConfig(subAgent, settings);
   const toolNames = tools.map(t => t.name);
@@ -1458,7 +1837,7 @@ async function executeWorkflowStepWithPocketFlow(
     toolNames.length > 0 ? `\nAvailable Tools: ${toolNames.join(", ")}` : "",
   ].filter(Boolean).join("\n");
 
-  const syntheticOrder: WorkOrder = {
+  const syntheticOrder = {
     id: `wf-step-${step.stepKey}-${Date.now()}`,
     title: step.name,
     description: stepPrompt,
@@ -1467,34 +1846,36 @@ async function executeWorkflowStepWithPocketFlow(
     status: "processing",
     createdAt: new Date(),
     updatedAt: new Date(),
-    createdBy: null,
     assignedSubAgentId: subAgent.id,
-    result: null,
-    deliverableType: null,
-    deliverableTitle: null,
     gccMemory: { workflowGoal: goal, stepKey: step.stepKey, previousResults },
-    aidenDecision: null,
-    bdmMarkers: null,
-    workflowExecutionId: null,
-    metadata: null,
+    workflowExecutionId: executionId || null,
+    correlationId: `wf-step-${step.stepKey}-${Date.now()}`,
+    executionMode: null,
+    tier1Result: null,
+    tier2Result: null,
+    bdmMarker: null,
+    effectiveMode: null,
+    impactScore: null,
+    approvalStatus: null,
+    deferredUntil: null,
+    deferredReason: null,
+    tags: [],
+    isArchived: false,
     archivedAt: null,
     archivedBy: null,
-    deferredUntil: null,
-    deferReason: null,
-    reopenedAt: null,
-    reopenedBy: null,
-    reopenReason: null,
-  };
+    archivedReason: null,
+    submittedBy: "system",
+    gammaTemplateKey: null,
+    processingAttemptId: null,
+    heartbeatAt: null,
+    processingStartedAt: null,
+  } satisfies WorkOrder;
 
-  const tier1Result = {
-    decision: "execute" as const,
-    reasoning: `Workflow step "${step.name}" directed by PM`,
-    selectedSubAgentId: subAgent.id,
-    selectedSubAgentName: subAgent.name,
-    tools: toolNames,
-    policyFlags: [],
-    bdmMarkers: [],
-    priority: "medium" as const,
+  const tier1Result: Tier1Result = {
+    approved: true,
+    reason: `Workflow step "${step.name}" directed by PM`,
+    mode: "autonomous",
+    handler: subAgent.name,
   };
 
   try {
@@ -1527,6 +1908,7 @@ async function executeWorkflowStepWithPocketFlow(
         iterations: pfMeta?.iterations,
         deliverableType: pfOutput?.deliverableType,
         deliverableTitle: pfOutput?.deliverableTitle,
+        postProcessedFile: pfOutput?.postProcessedFile || null,
         toolsUsed: pfToolsUsed,
         stepResults: pfMeta?.stepResults,
       },

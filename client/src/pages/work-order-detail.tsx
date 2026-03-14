@@ -52,6 +52,12 @@ import {
   FolderOpen,
   FileText,
   Presentation,
+  ListChecks,
+  Circle,
+  CircleDot,
+  CircleCheck,
+  CircleX,
+  CircleMinus,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun, SubAgent } from "@shared/schema";
 import { useState } from "react";
@@ -59,6 +65,202 @@ import { useAuth } from "@/hooks/use-auth";
 import { ExpandablePanel } from "@/components/expandable-panel";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+
+function CandidateReviewPanel({ order }: { order: WorkOrder }) {
+  const { toast } = useToast();
+  const gcc = (order.gccMemory || {}) as Record<string, any>;
+  const isCandidateReview = gcc["gcc.state_label"] === "candidate_review" || gcc["gcc.metadata"]?.resolutionReason === "candidate_review";
+
+  // Only show for candidate_review awaiting_operator
+  if (order.status !== "awaiting_operator" || !isCandidateReview) return null;
+
+  const { data: candidateData, isLoading } = useQuery({
+    queryKey: ["/api/work-orders", order.id, "candidates"],
+    queryFn: () => fetch(`/api/work-orders/${order.id}/candidates`, { credentials: "include" }).then(r => r.json()),
+    refetchInterval: 5000,
+  });
+
+  const selectMutation = useMutation({
+    mutationFn: (recordId: string) =>
+      apiRequest("POST", `/api/work-orders/${order.id}/candidates/${recordId}/select`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      toast({ title: "Candidate selected", description: "Filing in progress — deliverable will appear shortly." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Selection failed", description: err.message || "Could not select candidate.", variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (recordId: string) =>
+      apiRequest("POST", `/api/work-orders/${order.id}/candidates/${recordId}/reject`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", order.id, "candidates"] });
+      toast({ title: "Candidate rejected" });
+    },
+  });
+
+  const requestMoreMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${order.id}/candidates/request-more`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      toast({ title: "Requesting more candidates", description: "Work order re-queued for generation." });
+    },
+  });
+
+  const rejectAllMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${order.id}/candidates/reject-all`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders", order.id, "candidates"] });
+      toast({ title: "All candidates rejected" });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/work-orders/${order.id}/candidates/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
+      toast({ title: "Work order cancelled", description: "No deliverable was selected." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Cancel failed", description: err.message || "Could not cancel work order.", variant: "destructive" });
+    },
+  });
+
+  const candidates = candidateData?.candidates || [];
+  const groups = candidateData?.groups || {};
+  const activeCandidates = candidateData?.activeCandidates || 0;
+
+  return (
+    <div className="rounded-md border border-purple-200 dark:border-purple-800/40 overflow-hidden" data-testid="candidate-review-panel">
+      <div className="flex items-start gap-3 p-4 bg-purple-50 dark:bg-purple-900/10">
+        <Presentation className="w-5 h-5 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
+        <div className="space-y-1 min-w-0 flex-1">
+          <p className="text-sm font-medium text-purple-700 dark:text-purple-400">
+            Gamma Candidate Review — {activeCandidates} candidate{activeCandidates !== 1 ? "s" : ""} awaiting selection
+          </p>
+          <p className="text-xs text-purple-600 dark:text-purple-300">
+            Select the best version to use as the final deliverable, or request more variations.
+          </p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="p-4"><Skeleton className="h-20 w-full" /></div>
+      ) : candidates.length === 0 ? (
+        <div className="p-4 text-sm text-muted-foreground">No candidates found.</div>
+      ) : (
+        <div className="divide-y">
+          {Object.entries(groups).map(([groupId, groupCandidates]: [string, any]) => (
+            <div key={groupId} className="p-4 space-y-3">
+              {Object.keys(groups).length > 1 && (
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Round {Object.keys(groups).indexOf(groupId) + 1}
+                </p>
+              )}
+              {(groupCandidates as any[]).map((c: any) => (
+                <div
+                  key={c.id}
+                  className={`flex items-center gap-3 p-3 rounded-md border ${
+                    c.candidateStatus === "selected" ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/10" :
+                    c.candidateStatus === "rejected" ? "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/10 opacity-50" :
+                    "border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={c.candidateStatus === "selected" ? "default" : c.candidateStatus === "rejected" ? "secondary" : "outline"}>
+                        {c.candidateStatus === "selected" ? "Selected" : c.candidateStatus === "rejected" ? "Rejected" : "Candidate"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {c.exportFormat?.toUpperCase()} — {c.fileSize ? `${(c.fileSize / 1024).toFixed(0)}KB` : "?"} — {c.templateKey}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(c.createdAt).toLocaleString()}
+                      {c.creditsDeducted != null && ` — ${c.creditsDeducted} credit${c.creditsDeducted !== 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {c.candidateStatus === "candidate" && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => selectMutation.mutate(c.id)}
+                          disabled={selectMutation.isPending}
+                        >
+                          {selectMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3 mr-1" />}
+                          Select
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => rejectMutation.mutate(c.id)}
+                          disabled={rejectMutation.isPending}
+                        >
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    <a
+                      href={`/api/work-orders/${order.id}/candidates/${c.id}/download`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button size="sm" variant="ghost">
+                        <FileDown className="w-3 h-3 mr-1" />
+                        Download
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 p-3 border-t bg-muted/30">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => requestMoreMutation.mutate()}
+          disabled={requestMoreMutation.isPending}
+        >
+          {requestMoreMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+          Request More Candidates
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-destructive"
+          onClick={() => rejectAllMutation.mutate()}
+          disabled={rejectAllMutation.isPending || activeCandidates === 0}
+        >
+          <XCircle className="w-3 h-3 mr-1" />
+          Reject All
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-destructive"
+          onClick={() => cancelMutation.mutate()}
+          disabled={cancelMutation.isPending}
+        >
+          <CircleMinus className="w-3 h-3 mr-1" />
+          Cancel Work Order
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function DetailSkeleton() {
   return (
@@ -145,7 +347,7 @@ function TimelineItem({
         <p className="text-xs text-muted-foreground mt-1.5">
           {new Date(log.createdAt).toLocaleString()}
         </p>
-        {log.metadata && (
+        {!!log.metadata && (
           <pre className="mt-2 p-3 rounded-md bg-muted/50 text-xs font-mono overflow-x-auto">
             {JSON.stringify(log.metadata, null, 2)}
           </pre>
@@ -299,6 +501,16 @@ export default function WorkOrderDetail() {
     staleTime: 3000,
     refetchOnMount: "always",
     refetchInterval: order?.status === "processing" ? 5000 : 15000,
+  });
+
+  const { data: checklistItems } = useQuery<Array<{
+    id: string; phase: string; summary: string; status: string;
+    addedBy: string; iteration: number; createdAt: string;
+  }>>({
+    queryKey: ["/api/work-orders", params.id, "checklist"],
+    staleTime: 5000,
+    refetchOnMount: "always",
+    refetchInterval: order?.status === "processing" ? 5000 : 30000,
   });
 
   usePageTitle(order?.title || "Work Order");
@@ -747,7 +959,10 @@ export default function WorkOrderDetail() {
                   </Button>
                 </>
               )}
-              {order.status === "awaiting_operator" && (
+              {order.status === "awaiting_operator" && !(() => {
+                const gcc = (order.gccMemory || {}) as Record<string, any>;
+                return gcc["gcc.state_label"] === "candidate_review" || gcc["gcc.metadata"]?.resolutionReason === "candidate_review";
+              })() && (
                 <>
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
@@ -1198,7 +1413,9 @@ export default function WorkOrderDetail() {
                 <QualityReviewSummary order={order} />
               )}
 
-              {order.status === "blocked" && order.bdmMarker && !(order.bdmMarker as Record<string, any>).type?.includes("quality") && (
+              <CandidateReviewPanel order={order} />
+
+              {order.status === "blocked" && !!order.bdmMarker && !(order.bdmMarker as Record<string, any>).type?.includes("quality") && (
                 <BlockedSummary order={order} />
               )}
 
@@ -1236,7 +1453,7 @@ export default function WorkOrderDetail() {
                 </div>
               )}
 
-              {order.status !== "blocked" && order.status !== "deferred" && order.bdmMarker && (
+              {order.status !== "blocked" && order.status !== "deferred" && !!order.bdmMarker && (
                 <div className="p-3 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/10 dark:border-amber-800/30">
                   <div className="flex items-center gap-2 mb-1">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -1248,7 +1465,7 @@ export default function WorkOrderDetail() {
                 </div>
               )}
 
-              {order.gccMemory && Object.keys(order.gccMemory as object).length > 0 && (
+              {!!order.gccMemory && Object.keys(order.gccMemory as object).length > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">GCC Memory</p>
                   <pre className="p-3 rounded-md bg-muted/50 text-xs font-mono overflow-x-auto">
@@ -1258,6 +1475,47 @@ export default function WorkOrderDetail() {
               )}
             </CardContent>
           </Card>
+
+          {checklistItems && checklistItems.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-base font-medium">2DO Checklist</CardTitle>
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {checklistItems.filter(i => i.status === "done").length}/{checklistItems.length}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1.5">
+                  {checklistItems.map((item) => {
+                    const icon = item.status === "done" ? <CircleCheck className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                      : item.status === "in_progress" ? <CircleDot className="h-3.5 w-3.5 text-blue-500 flex-shrink-0 animate-pulse" />
+                      : item.status === "failed" ? <CircleX className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                      : item.status === "skipped" ? <CircleMinus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      : <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />;
+                    const phaseColors: Record<string, string> = {
+                      tier1_gate: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300",
+                      tier2_exec: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                      quality_review: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+                      filing: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+                      deployment: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
+                    };
+                    return (
+                      <div key={item.id} className="flex items-start gap-2 py-1">
+                        {icon}
+                        <span className="text-sm leading-tight flex-1">{item.summary}</span>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${phaseColors[item.phase] || ""}`}>
+                          {item.phase.replace("_", " ")}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-3">
@@ -1420,13 +1678,13 @@ export default function WorkOrderDetail() {
 
           <DeliverableCard orderId={order.id} tier2Result={order.tier2Result as any} />
 
-          {(order.tier1Result || order.tier2Result) && (
+          {(!!order.tier1Result || !!order.tier2Result) && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-medium">Results</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {order.tier1Result && (
+                {!!order.tier1Result && (
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Aiden (Tier 1) Decision</p>
                     <pre className="p-2 rounded-md bg-muted/50 text-xs font-mono overflow-x-auto">
@@ -1434,7 +1692,7 @@ export default function WorkOrderDetail() {
                     </pre>
                   </div>
                 )}
-                {order.tier2Result && (
+                {!!order.tier2Result && (
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Sub-Agent (Tier 2) Result</p>
                     <pre className="p-2 rounded-md bg-muted/50 text-xs font-mono overflow-x-auto">
@@ -1458,9 +1716,10 @@ function DeliverableCard({ orderId, tier2Result }: { orderId: string; tier2Resul
     enabled: !!orderId,
   });
 
-  // Binary deliverables: pdf, pptx, docx, xlsx, zip, etc.
+  // Binary deliverables: pdf, pptx, docx, xlsx, zip, html, etc.
   const binaryArtifacts = (artifacts || []).filter(a =>
-    a.type === "file" && a.mimeType && !a.mimeType.startsWith("text/")
+    a.type === "file" && a.mimeType &&
+    (!a.mimeType.startsWith("text/") || a.mimeType === "text/html")
   );
 
   // In-flight postProcessedFile (available before filing, e.g. awaiting_operator)
@@ -1477,6 +1736,7 @@ function DeliverableCard({ orderId, tier2Result }: { orderId: string; tier2Resul
   function mimeIcon(mime: string) {
     if (mime === "application/pdf") return <FileText className="w-4 h-4 text-red-500" />;
     if (mime.includes("presentationml") || mime.includes("pptx")) return <Presentation className="w-4 h-4 text-orange-500" />;
+    if (mime === "text/html") return <FileDown className="w-4 h-4 text-emerald-500" />;
     return <FileDown className="w-4 h-4 text-muted-foreground" />;
   }
 
@@ -1485,6 +1745,7 @@ function DeliverableCard({ orderId, tier2Result }: { orderId: string; tier2Resul
     if (mime.includes("presentationml")) return "PPTX";
     if (mime.includes("wordprocessingml")) return "DOCX";
     if (mime.includes("spreadsheetml")) return "XLSX";
+    if (mime === "text/html") return "HTML";
     return mime.split("/").pop()?.toUpperCase() ?? "FILE";
   }
 

@@ -1,4 +1,4 @@
-# AIDEN_IWO v0.8.0 - Intelligent Work Order Orchestration
+# AIDEN_IWO v0.9.5 - Intelligent Work Order Orchestration
 
 ## Overview
 AIDEN_IWO is a two-tier work order orchestration platform designed to streamline and automate complex operational workflows. It intelligently routes and manages work orders using AI-powered policy evaluation, human-in-the-loop (HITL) intervention, and specialized sub-agents. The platform aims to reduce manual effort, improve efficiency, and provide comprehensive visibility into work order lifecycles.

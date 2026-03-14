@@ -15,6 +15,7 @@ vi.mock("../storage.js", () => ({
     getLlmSettings: vi.fn(),
     getOperationalSettings: vi.fn().mockResolvedValue({ memoryAdvisor: "none", currentMode: "autonomous" }),
     getActiveSubAgents: vi.fn().mockResolvedValue([]),
+    createChecklistItem: vi.fn().mockResolvedValue({}),
   },
 }));
 

@@ -1,8 +1,8 @@
-// P1-3: Reliability Tests — Stale/Orphan Recovery
-// Covers recoverOrphanedProcessingOrders() and isStaleProcessing()
+// P1-3: Reliability Tests — Stale/Orphan Recovery + Watchdog
+// Covers recoverOrphanedProcessingOrders(), isStaleProcessing(), watchdogSweep()
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { recoverOrphanedProcessingOrders, isStaleProcessing } from "../orchestration.js";
+import { recoverOrphanedProcessingOrders, isStaleProcessing, watchdogSweep } from "../orchestration.js";
 
 // ── Mock storage ──────────────────────────────────────────────────────────────
 vi.mock("../storage.js", () => ({
@@ -68,7 +68,7 @@ describe("recoverOrphanedProcessingOrders()", () => {
     const count = await recoverOrphanedProcessingOrders();
 
     expect(count).toBe(1);
-    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-stale", { status: "failed" });
+    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-stale", expect.objectContaining({ status: "failed", processingAttemptId: null, heartbeatAt: null, processingStartedAt: null }));
     expect(storage.createExecutionLog).toHaveBeenCalledWith(
       expect.objectContaining({ workOrderId: "wo-stale", action: "System: Orphan Recovery" })
     );
@@ -94,12 +94,100 @@ describe("recoverOrphanedProcessingOrders()", () => {
 
     expect(count).toBe(1);
     expect(storage.updateWorkOrder).toHaveBeenCalledTimes(1);
-    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-stale", { status: "failed" });
+    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-stale", expect.objectContaining({ status: "failed" }));
   });
 
   it("returns 0 when no orders exist", async () => {
     vi.mocked(storage.getWorkOrders).mockResolvedValue([]);
     const count = await recoverOrphanedProcessingOrders();
     expect(count).toBe(0);
+  });
+});
+
+// ── watchdogSweep ─────────────────────────────────────────────────────────────
+
+describe("watchdogSweep()", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("recovers WO with stale heartbeat (>60s since last heartbeat)", async () => {
+    const staleWO = makeOrder({
+      id: "wo-stale-hb",
+      heartbeatAt: new Date(Date.now() - 90_000).toISOString(), // 90s ago
+      processingStartedAt: new Date(Date.now() - 120_000).toISOString(),
+      processingAttemptId: "old-attempt-123",
+    });
+    vi.mocked(storage.getWorkOrders).mockResolvedValue([staleWO] as any);
+
+    const count = await watchdogSweep();
+
+    expect(count).toBe(1);
+    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-stale-hb", expect.objectContaining({
+      status: "failed",
+      heartbeatAt: null,
+      processingStartedAt: null,
+    }));
+    // Verify attemptId was changed (invalidated)
+    const updateCall = vi.mocked(storage.updateWorkOrder).mock.calls[0];
+    expect(updateCall[1].processingAttemptId).not.toBe("old-attempt-123");
+    expect(storage.createExecutionLog).toHaveBeenCalledWith(
+      expect.objectContaining({ workOrderId: "wo-stale-hb", action: "Watchdog: Stuck Detection" })
+    );
+  });
+
+  it("does NOT recover WO with fresh heartbeat", async () => {
+    const freshWO = makeOrder({
+      id: "wo-fresh-hb",
+      heartbeatAt: new Date(Date.now() - 10_000).toISOString(), // 10s ago — fresh
+      processingStartedAt: new Date(Date.now() - 300_000).toISOString(), // 5min total but heartbeat is fresh
+      processingAttemptId: "active-attempt",
+    });
+    vi.mocked(storage.getWorkOrders).mockResolvedValue([freshWO] as any);
+
+    const count = await watchdogSweep();
+
+    expect(count).toBe(0);
+    expect(storage.updateWorkOrder).not.toHaveBeenCalled();
+  });
+
+  it("recovers WO that exceeds hard ceiling even with recent heartbeat", async () => {
+    const longRunning = makeOrder({
+      id: "wo-too-long",
+      heartbeatAt: new Date(Date.now() - 5_000).toISOString(), // 5s ago — fresh heartbeat
+      processingStartedAt: new Date(Date.now() - 11 * 60 * 1000).toISOString(), // 11min — exceeds 10min ceiling
+      processingAttemptId: "long-attempt",
+    });
+    vi.mocked(storage.getWorkOrders).mockResolvedValue([longRunning] as any);
+
+    const count = await watchdogSweep();
+
+    expect(count).toBe(1);
+    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-too-long", expect.objectContaining({ status: "failed" }));
+  });
+
+  it("skips non-processing orders", async () => {
+    const completed = makeOrder({ id: "wo-done", status: "completed" });
+    const pending = makeOrder({ id: "wo-pending", status: "pending" });
+    vi.mocked(storage.getWorkOrders).mockResolvedValue([completed, pending] as any);
+
+    const count = await watchdogSweep();
+
+    expect(count).toBe(0);
+    expect(storage.updateWorkOrder).not.toHaveBeenCalled();
+  });
+
+  it("falls back to updatedAt when heartbeatAt is null (pre-migration WO)", async () => {
+    const preMigration = makeOrder({
+      id: "wo-pre-migration",
+      heartbeatAt: null,
+      processingAttemptId: null,
+      // updatedAt is 11 min ago (from makeOrder default = STALE_MS)
+    });
+    vi.mocked(storage.getWorkOrders).mockResolvedValue([preMigration] as any);
+
+    const count = await watchdogSweep();
+
+    // Should be recovered because updatedAt > 60s threshold
+    expect(count).toBe(1);
+    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-pre-migration", expect.objectContaining({ status: "failed" }));
   });
 });

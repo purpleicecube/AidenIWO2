@@ -208,6 +208,15 @@ export default function AttributionsPage() {
 
             <Separator />
 
+            <div className="rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 p-4">
+              <h4 className="text-sm font-semibold mb-1.5">License Notice</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                The Aiden Zephyr concept and TIB (The Internal Brain) framework are attributed to Thomas C. Appling III and the Freedom Forge AI (FF.AI) as creative and collaborative contributions. These are acknowledged as inspirational and collaborative inputs, not code-level dependencies. No open-source license applies. Attribution is granted in recognition of creative influence and collaborative development of agent identity, persona design, and cognitive architecture framing within the PDOE ecosystem.
+              </p>
+            </div>
+
+            <Separator />
+
             <div>
               <h4 className="text-sm font-semibold mb-2">Contributor &amp; Source</h4>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -240,15 +249,6 @@ export default function AttributionsPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
                 The Aiden Zephyr identity and FF.AI / TIB concepts were introduced subsequent to Vaughn&rsquo;s foundational orchestration work and were integrated into the already-established multi-agent architecture as creative and conceptual enhancements.
-              </p>
-            </div>
-
-            <Separator />
-
-            <div className="rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 p-4">
-              <h4 className="text-sm font-semibold mb-1.5">License Notice</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                The Aiden Zephyr concept and TIB (The Internal Brain) framework are attributed to Thomas C. Appling III and the Freedom Forge AI (FF.AI) as creative and collaborative contributions. These are acknowledged as inspirational and collaborative inputs, not code-level dependencies. No open-source license applies. Attribution is granted in recognition of creative influence and collaborative development of agent identity, persona design, and cognitive architecture framing within the PDOE ecosystem.
               </p>
             </div>
 
@@ -401,7 +401,7 @@ export default function AttributionsPage() {
         </Card>
 
         <footer className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-muted-foreground space-y-1">
-          <p>AIDEN_IWO2 v0.8.0 — Intelligent Work Orchestration</p>
+          <p>AIDEN_IWO2 v0.9.5 — Intelligent Work Orchestration</p>
           <p className="text-xs">Lead Developer &amp; Principal Technical Architect: Darrel Vaughn | LuaAzullaB</p>
         </footer>
       </div>

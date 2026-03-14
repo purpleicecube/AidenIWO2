@@ -25,9 +25,10 @@ import {
   insertLockerKeySchema,
   insertToolAuditLogSchema,
   insertSkillTemplateSchema,
+  insertGammaSettingsSchema,
 } from "@shared/schema";
 import type { LlmSettings } from "@shared/schema";
-import { processWorkOrder, processWorkOrderSafe, isStaleProcessing, startWorkflowExecution, advanceWorkflowExecution } from "./orchestration";
+import { processWorkOrder, processWorkOrderSafe, isStaleProcessing, startWorkflowExecution, advanceWorkflowExecution, recoverStuckStepRuns, getWatchdogStatus } from "./orchestration";
 import { autoImportSkillsForDescription } from "./skill-auto-import";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig, extractWorkOrderFromChat } from "./llm-client";
 import * as fs from "fs";
@@ -133,7 +134,7 @@ export async function registerRoutes(
       res.json({
         status: "ok",
         timestamp: new Date().toISOString(),
-        version: "0.8.0",
+        version: "0.9.5",
         uptime,
         services: {
           database: dbHealthy ? "healthy" : "unhealthy",
@@ -496,6 +497,7 @@ export async function registerRoutes(
         },
       });
 
+      const reopenIteration = ((gcc["gcc.metadata"]?.reopenCount || 0) + 1);
       await storage.updateWorkOrder(req.params.id, {
         status: "reopened",
         bdmMarker: null,
@@ -505,6 +507,14 @@ export async function registerRoutes(
         executionMode: null,
         gccMemory,
       });
+      storage.createChecklistItem({
+        workOrderId: req.params.id,
+        phase: "tier1_gate",
+        summary: `Reopened (iteration ${reopenIteration}) — ${parsed.data.reason}`,
+        addedBy: "operator",
+        status: "done",
+        iteration: reopenIteration,
+      }).catch(err => console.error("[2DO] reopen hook error:", err.message));
 
       const updated = await storage.getWorkOrder(req.params.id);
       res.json(updated);
@@ -910,6 +920,207 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Kill work order error:", err);
       res.status(500).json({ message: "Failed to kill work order" });
+    }
+  });
+
+  // ==================== Admin Repair Route =====================
+
+  app.post("/api/work-orders/:id/repair", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = z.object({
+        action: z.enum(["retry", "complete", "fail"]),
+        reason: z.string().min(1).max(500),
+        deliverable: z.string().optional(),
+        deliverableType: z.string().optional(),
+        deliverableTitle: z.string().optional(),
+      }).safeParse(req.body);
+
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten().fieldErrors });
+
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+
+      const actor = getActor(req);
+      const { action, reason } = parsed.data;
+      const crypto = await import("crypto");
+      const invalidationId = crypto.randomUUID();
+
+      if (action === "fail") {
+        await storage.updateWorkOrder(req.params.id, {
+          status: "failed",
+          processingAttemptId: invalidationId,
+          heartbeatAt: null,
+          processingStartedAt: null,
+        });
+        await recoverStuckStepRuns(order);
+        await storage.createExecutionLog({
+          workOrderId: req.params.id, tier: 1,
+          action: "Admin: Repair (fail)",
+          message: `Admin ${actor.actorName} forced work order to failed: ${reason}`,
+          metadata: { actor, reason, invalidationId },
+        });
+        return res.json(await storage.getWorkOrder(req.params.id));
+      }
+
+      if (action === "retry") {
+        await storage.updateWorkOrder(req.params.id, {
+          status: "pending",
+          processingAttemptId: invalidationId,
+          heartbeatAt: null,
+          processingStartedAt: null,
+          bdmMarker: null,
+          tier1Result: null,
+          tier2Result: null,
+        });
+        await recoverStuckStepRuns(order);
+        await storage.createExecutionLog({
+          workOrderId: req.params.id, tier: 1,
+          action: "Admin: Repair (retry)",
+          message: `Admin ${actor.actorName} initiated repair retry: ${reason}`,
+          metadata: { actor, reason, invalidationId },
+        });
+        // Actually re-trigger processing
+        processWorkOrderSafe(req.params.id);
+        return res.json({ message: "Repair retry initiated", workOrderId: req.params.id });
+      }
+
+      if (action === "complete") {
+        if (!parsed.data.deliverable) return res.status(400).json({ message: "deliverable required for complete action" });
+        const { fileWorkOrderOutput } = await import("./workspace-filing");
+        const completedOrder = await storage.updateWorkOrder(req.params.id, {
+          status: "completed",
+          processingAttemptId: invalidationId,
+          heartbeatAt: null,
+          processingStartedAt: null,
+          tier2Result: {
+            blocked: false, reason: null, handler: null,
+            output: {
+              message: `Admin repair: ${reason}`,
+              deliverable: parsed.data.deliverable,
+              deliverableType: parsed.data.deliverableType || "markdown",
+              deliverableTitle: parsed.data.deliverableTitle || order.title,
+            },
+          },
+        });
+        if (completedOrder) {
+          fileWorkOrderOutput(completedOrder).catch(err =>
+            console.error("Auto-filing error (admin-repair):", err.message)
+          );
+        }
+        await storage.createExecutionLog({
+          workOrderId: req.params.id, tier: 1,
+          action: "Admin: Repair (complete)",
+          message: `Admin ${actor.actorName} force-completed with deliverable: ${reason}`,
+          metadata: { actor, reason, invalidationId },
+        });
+        return res.json(await storage.getWorkOrder(req.params.id));
+      }
+    } catch (err: any) {
+      console.error("Repair error:", err);
+      res.status(500).json({ message: `Repair failed: ${err.message}` });
+    }
+  });
+
+  // ==================== Ops Health Route ======================
+
+  app.get("/api/ops/health", isAuth, requireRole("admin"), async (_req, res) => {
+    try {
+      const allOrders = await storage.getWorkOrders();
+      const processingOrders = allOrders.filter(o => o.status === "processing");
+      const now = Date.now();
+
+      const stuckWorkOrders = processingOrders.map(o => {
+        const wo = o as any;
+        const heartbeatTs = wo.heartbeatAt ? new Date(wo.heartbeatAt).getTime() : null;
+        const updatedTs = o.updatedAt ? new Date(o.updatedAt).getTime() : now;
+        const lastActivity = heartbeatTs || updatedTs;
+        const elapsedSeconds = Math.round((now - lastActivity) / 1000);
+        return {
+          id: o.id,
+          title: o.title,
+          status: o.status,
+          attemptId: wo.processingAttemptId,
+          lastHeartbeat: wo.heartbeatAt,
+          processingStartedAt: wo.processingStartedAt,
+          elapsedSeconds,
+          likelyStuck: elapsedSeconds > 60,
+        };
+      });
+
+      res.json({
+        watchdog: getWatchdogStatus(),
+        processingWorkOrders: stuckWorkOrders,
+        totalProcessing: processingOrders.length,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: `Ops health check failed: ${err.message}` });
+    }
+  });
+
+  // ==================== 2DO Checklist Routes ====================
+
+  app.get("/api/work-orders/:id/checklist", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      const items = await storage.getChecklistItems(req.params.id);
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch checklist" });
+    }
+  });
+
+  app.post("/api/work-orders/:id/checklist", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      const parsed = z.object({
+        summary: z.string().min(1).max(500),
+        phase: z.enum(["tier1_gate", "tier2_exec", "quality_review", "filing", "deployment"]).optional(),
+        status: z.enum(["pending", "in_progress", "done", "failed", "skipped"]).optional(),
+      }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid checklist item", errors: parsed.error.flatten().fieldErrors });
+      }
+      const item = await storage.createChecklistItem({
+        workOrderId: req.params.id,
+        workflowExecutionId: order.workflowExecutionId || undefined,
+        summary: parsed.data.summary,
+        phase: parsed.data.phase || "tier2_exec",
+        status: parsed.data.status || "pending",
+        addedBy: "operator",
+      });
+      res.status(201).json(item);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create checklist item" });
+    }
+  });
+
+  app.patch("/api/checklist-items/:id", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const parsed = z.object({
+        status: z.enum(["pending", "in_progress", "done", "failed", "skipped"]).optional(),
+        summary: z.string().min(1).max(500).optional(),
+      }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid update", errors: parsed.error.flatten().fieldErrors });
+      }
+      const updated = await storage.updateChecklistItem(req.params.id, parsed.data);
+      if (!updated) return res.status(404).json({ message: "Checklist item not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update checklist item" });
+    }
+  });
+
+  app.get("/api/workflow-executions/:id/checklist", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Workflow execution not found" });
+      const items = await storage.getChecklistItemsByWorkflow(req.params.id);
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch workflow checklist" });
     }
   });
 
@@ -2459,6 +2670,57 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Workspace File Upload ====================
+
+  app.post("/api/workspace/upload", isAuth, requireRole("operator"), async (req: Request, res: Response) => {
+    try {
+      const { name, mimeType, data, folderId } = req.body;
+
+      if (!name || !mimeType || !data) {
+        return res.status(400).json({ message: "Missing required fields: name, mimeType, data" });
+      }
+
+      const allowedTypes = [
+        "text/markdown", "text/plain", "text/html", "text/css", "text/javascript", "text/typescript",
+        "application/json",
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
+        "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml",
+      ];
+      if (!allowedTypes.includes(mimeType)) {
+        return res.status(400).json({ message: `Unsupported file type: ${mimeType}` });
+      }
+
+      const isTextType = mimeType.startsWith("text/") || mimeType === "application/json";
+      const sizeBytes = isTextType
+        ? Buffer.byteLength(data, "utf8")
+        : Math.ceil(data.length * 0.75);
+
+      const maxSize = 10 * 1024 * 1024;
+      if (sizeBytes > maxSize) {
+        return res.status(400).json({ message: "File too large (max 10MB)" });
+      }
+
+      const actor = getActor(req);
+      const artifact = await storage.createArtifact({
+        name,
+        folderId: folderId || null,
+        type: "file",
+        mimeType,
+        content: data,
+        size: sizeBytes,
+        createdBy: actor.actorId,
+      });
+
+      res.status(201).json(artifact);
+    } catch (err) {
+      res.status(500).json({ message: "Upload failed" });
+    }
+  });
+
   // ==================== Sandbox Session Routes ====================
 
   app.get("/api/sandbox-sessions", isAuth, requireRole("viewer"), async (_req, res) => {
@@ -2594,7 +2856,7 @@ export async function registerRoutes(
       }
 
       const tier2 = (order.tier2Result as any) || {};
-      const deliverable = (order.deliverable as string) || tier2.output?.deliverable || null;
+      const deliverable = tier2.output?.deliverable || null;
       if (!deliverable) {
         return res.status(400).json({ message: "Work order has no deliverable content" });
       }
@@ -2837,91 +3099,65 @@ export async function registerRoutes(
   });
 
   async function buildSystemContext(settings: any) {
-    const [workOrders, subAgents, stats, workflows, workflowExecutions, toolsList, rootFolders, rootArtifacts, sandboxSessionsList] = await Promise.all([
-      storage.getWorkOrders(),
+    // Lean context: only load what chat routing actually needs
+    const [subAgents, stats, workflows, toolsList, gammaConfig, gammaRegistryEntries] = await Promise.all([
       storage.getSubAgents(),
       storage.getWorkOrderStats(),
       storage.getWorkflowTemplates(),
-      storage.getWorkflowExecutions(),
       storage.getTools(),
-      storage.getArtifactFolders(null),
-      storage.getArtifacts(null),
-      storage.getSandboxSessions(),
+      storage.getGammaSettings(),
+      storage.getGammaTemplates(),
     ]);
 
-    const recentOrders = workOrders.slice(0, 25);
-    const activeExecutions = workflowExecutions.filter(e => e.status === "running" || e.status === "pending");
-    const recentExecutions = workflowExecutions.slice(0, 10);
+    // Only show active/blocked work orders (not the full history)
+    const allOrders = await storage.getWorkOrders();
+    const activeOrders = allOrders.filter(o =>
+      o.status === "pending" || o.status === "processing" || o.status === "blocked" || o.status === "reopened"
+    ).slice(0, 10);
 
-    const subAgentToolDetails = await Promise.all(
-      subAgents.map(async (a) => {
-        const agentTools = await storage.getSubAgentTools(a.id);
-        return { agent: a, tools: agentTools };
-      })
-    );
+    return `== AIDEN ENVIRONMENT BRIEFING ==
 
-    return `== AIDEN GLOBAL ENVIRONMENT BRIEFING ==
+=== WORK ORDER STATUS ===
+Total: ${stats.total} | Pending: ${stats.pending} | Processing: ${stats.processing} | Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed}
+${activeOrders.length > 0 ? `\nActive Orders (${activeOrders.length}):\n${activeOrders.map(o =>
+      `- [${o.status.toUpperCase()}] "${o.title}" (${o.type}, ${o.priority}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""})`
+    ).join("\n")}` : "No active orders."}
 
-=== WORK ORDER OVERVIEW ===
-Statistics:
-- Total: ${stats.total} | Pending: ${stats.pending} | Processing: ${stats.processing}
-- Completed: ${stats.completed} | Blocked: ${stats.blocked} | Failed: ${stats.failed} | Reopened: ${stats.reopened} | Deferred: ${stats.deferred}
-
-All Work Orders (${workOrders.length} total):
-${recentOrders.map(o => {
-      const gcc = (o.gccMemory || {}) as Record<string, any>;
-      const gccAction = gcc["gcc.last_action"] || gcc.lastAction;
-      const gccInfo = gccAction
-        ? ` | GCC: ${gccAction} (${gcc["gcc.context_commit_count"] || 0} commits, branch: ${gcc["gcc.branch"] || "main"})`
-        : "";
-      return `- [${o.status.toUpperCase()}] "${o.title}" (type: ${o.type}, priority: ${o.priority}, submitted: ${o.submittedBy || "system"}, id: ${o.id}${o.assignedSubAgentId ? `, assigned: ${o.assignedSubAgentId}` : ""}${o.bdmMarker ? `, BDM: ${o.bdmMarker}` : ""}${gccInfo})`;
-    }).join("\n") || "No work orders"}
-${workOrders.length > 25 ? `... and ${workOrders.length - 25} more work orders` : ""}
-
-=== SUB-AGENTS (TIER 2 WORKERS) ===
-${subAgentToolDetails.map(({ agent: a, tools: t }) => {
-      const llmInfo = a.llmEnabled
-        ? `, LLM: INDEPENDENT — provider: ${a.llmProvider || "not set"}, model: ${a.llmModel || "not set"}`
-        : `, LLM: inherits Aiden global (${settings.provider}/${settings.model})`;
-      return `- "${a.name}" (type: ${a.type}, mode: ${a.controlMode}, status: ${a.status}${a.assignedTo ? `, operator: ${a.assignedTo}` : ""}${llmInfo}${a.description ? `, desc: ${a.description}` : ""})${t.length > 0 ? `\n  Tools: ${t.map(at => at.tool.name).join(", ")}` : ""}`;
+=== SUB-AGENTS ===
+${subAgents.map(a => {
+      const llm = a.llmEnabled
+        ? `${a.llmProvider || "?"}/${a.llmModel || "?"}`
+        : `inherits ${settings.provider}/${settings.model}`;
+      return `- "${a.name}" (${a.controlMode}, ${a.status}, LLM: ${llm}${a.description ? ` — ${a.description.slice(0, 120)}` : ""})`;
     }).join("\n") || "No sub-agents configured"}
 
-=== WORKFLOW TEMPLATES ===
-${workflows.map(w => `- "${w.name}" (status: ${w.status}, category: ${w.category}${w.description ? `, desc: ${w.description}` : ""}${w.goal ? `, goal: ${w.goal}` : ""})`).join("\n") || "No workflow templates"}
+=== WORKFLOWS ===
+${workflows.map(w => `- "${w.name}" (${w.status}, ${w.category})`).join("\n") || "No workflow templates"}
 
-=== WORKFLOW EXECUTIONS ===
-Active: ${activeExecutions.length}
-${recentExecutions.map(e => `- [${e.status.toUpperCase()}] template: ${e.templateId}, work order: ${e.workOrderId || "none"}, started: ${e.startedAt || "not started"}${e.completedAt ? `, completed: ${e.completedAt}` : ""}`).join("\n") || "No executions"}
-${workflowExecutions.length > 10 ? `... and ${workflowExecutions.length - 10} more executions` : ""}
+=== TOOLS ===
+${toolsList.map(t => `- "${t.name}" (${t.type}${t.description ? ` — ${t.description.slice(0, 80)}` : ""})`).join("\n") || "No tools registered"}
 
-=== TOOLS PLATFORM ===
-${toolsList.map(t => `- "${t.name}" (type: ${t.type}, status: ${t.status}, version: ${t.version}${t.description ? `, desc: ${t.description}` : ""})`).join("\n") || "No tools registered"}
+=== GAMMA ENGINE (PPTX + PDF) ===
+${(() => {
+      const gammaKeySet = !!process.env.GAMMA_API_KEY;
+      if (!gammaConfig || !gammaConfig.enabled) {
+        return `Status: DISABLED (using local pipelines for PPTX and PDF)${gammaKeySet ? "\nGamma API key: configured in .env" : "\nGamma API key: NOT configured"}`;
+      }
+      const registryLines = gammaRegistryEntries.length > 0
+        ? `\nRegistered Templates:\n${gammaRegistryEntries.map((t: any) => `- "${t.name}" (${t.templateKey}) — ${t.outputFormat.toUpperCase()}, ${t.mode}, ${t.status}`).join("\n")}`
+        : "\nNo registered templates (using legacy gammaId routing)";
+      return `Status: ENABLED | Mode: ${gammaConfig.mode} | Fallback to local: ${gammaConfig.fallbackToLocal ? "yes" : "no"}
+API key: ${gammaKeySet ? "configured" : "NOT configured"}${registryLines}
+Supported formats: PPTX and PDF (both routed through Gamma when enabled)
+Routing: templateKey resolved via registry → format-matched → gammaId sent to Gamma API. Locked templates block fallback on failure.
+Both PPTX and PDF work orders route through Gamma when enabled. Gamma produces Klear.ai-themed, professionally designed output.
+Users configure via Settings > Gamma or API (GET/PUT /api/gamma-settings). Registry: GET/POST /api/gamma-templates.
+Candidate Review: Workflow templates with gammaDeliveryPolicy="candidate_review" produce multiple Gamma candidates. Operator selects preferred version via /api/work-orders/:id/candidates/:recordId/select.
+Template Precedence: WO-level gammaTemplateKey > workflow template default > global default.`;
+    })()}
 
-=== WORKSPACE (FILE SYSTEM) ===
-Root Folders:
-${rootFolders.map(f => `- /${f.name}${f.description ? ` — ${f.description}` : ""}`).join("\n") || "No folders"}
-Root Files:
-${rootArtifacts.map(a => `- ${a.name} (${a.mimeType}, ${a.size} bytes, status: ${a.status})`).join("\n") || "No root files"}
-
-=== SANDBOX SESSIONS ===
-${sandboxSessionsList.map(s => `- "${s.name}" (status: ${s.status}, created: ${s.createdAt}${s.description ? `, desc: ${s.description}` : ""})`).join("\n") || "No sandbox sessions"}
-
-=== LLM CONFIGURATION ===
-- Provider: ${settings.provider}
-- Model: ${settings.model}
-- Status: Enabled
-- Timestamp: ${new Date().toISOString()}
-
-=== PLATFORM IDENTITY & ATTRIBUTIONS ===
-Platform: AIDEN_IWO v0.8.0 — Intelligent Work Orchestration
-Lead Developer & Principal Technical Architect: Darrel Vaughn (LuaAzullaB / 10Touros)
-Architecture: IWO/PDOE two-tier orchestration (Aiden Tier 1 + Sub-Agent Tier 2)
-Four foundational lineages:
-1. AgentGoPro/AgentGoFlow (Proprietary) — Original LLM agent orchestration framework by Darrel Vaughn / 10Touros / LuaAzullaB. Originally named "Agent Commander" in Replit. Foundational precursor to PDOE. Mid-2024 – Aug 2025. All rights reserved.
-2. Aiden Zephyr & TIB (Creative Attribution) — Thomas C. Appling III / Freedom Forge AI (FF.AI). Creative inspiration for the Aiden agent identity and The Internal Brain (TIB) cognitive architecture. AIDEN_IWO supports the TIB framework but is by design — not limited to it.
-3. GCC Memory (CC BY 4.0 / MIT) — Git Context Controller by Junde Wu (arXiv:2508.00031). Git-style COMMIT/BRANCH/MERGE/CONTEXT commands for persistent agent memory.
-4. PocketFlow (MIT) — 100-line LLM framework by Zachary Huang / The-Pocket. Graph-based execution substrate for PDOE two-tier orchestration.
-Attributions page: /attributions (accessible authenticated and unauthenticated)`;
+=== LLM ===
+Provider: ${settings.provider} | Model: ${settings.model} | ${new Date().toISOString()}`;
   }
 
   app.post("/api/chat/sessions/:id/messages", isAuth, requireRole("viewer"), async (req, res) => {
@@ -2966,7 +3202,7 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
 
       let reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext, gcc);
 
-      const actionResults: Array<{ type: string; workOrderId?: string; correlationId?: string; autoProcessed?: boolean }> = [];
+      const actionResults: Array<{ type: string; workOrderId?: string; executionId?: string; correlationId?: string; autoProcessed?: boolean }> = [];
       const actor = getActor(req);
       const userRole = (req as any).appUser?.role || "viewer";
       const canCreateOrders = userRole === "admin" || userRole === "operator";
@@ -3026,24 +3262,31 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
         }
       }
 
-      if (actionLines.length === 0 && canCreateOrders && workOrderIntentDetected) {
-        console.log("[Chat Action T3 LLM] Intent detected but T1/T2 missed, running extraction call...");
-        try {
-          const extracted = await extractWorkOrderFromChat(settings, message, reply);
-          if (extracted && extracted.shouldCreate) {
-            actionLines.push(JSON.stringify({
-              ...extracted,
-              submittedBy: "aiden",
-              autoProcess: true,
-            }));
-            extractionMethod = "llm_extraction";
-            console.log("[Chat Action T3 LLM] Extracted work order:", extracted.title);
-          } else {
-            console.log("[Chat Action T3 LLM] Extraction returned shouldCreate=false, skipping.");
+      // T3 LLM extraction: only run when NO workflow action is queued (to avoid duplicate WOs)
+      // When a workflow IS present, keep any T1 action-block WOs (they were explicit), but skip T3
+      if (workflowActionLines.length === 0) {
+        if (actionLines.length === 0 && canCreateOrders && workOrderIntentDetected) {
+          console.log("[Chat Action T3 LLM] Intent detected but T1/T2 missed, running extraction call...");
+          try {
+            const extracted = await extractWorkOrderFromChat(settings, message, reply);
+            if (extracted && extracted.shouldCreate) {
+              actionLines.push(JSON.stringify({
+                ...extracted,
+                submittedBy: "aiden",
+                autoProcess: true,
+              }));
+              extractionMethod = "llm_extraction";
+              console.log("[Chat Action T3 LLM] Extracted work order:", extracted.title);
+            } else {
+              console.log("[Chat Action T3 LLM] Extraction returned shouldCreate=false, skipping.");
+            }
+          } catch (extractErr) {
+            console.error("[Chat Action T3 LLM] Extraction call failed:", extractErr);
           }
-        } catch (extractErr) {
-          console.error("[Chat Action T3 LLM] Extraction call failed:", extractErr);
         }
+      } else {
+        // Workflow action present — skip T3 extraction but keep any T1-detected WO action lines
+        console.log(`[Chat Action] Workflow action present — skipping T3 extraction (${actionLines.length} T1 WO action(s) preserved)`);
       }
 
       if (actionLines.length > 0 && canCreateOrders) {
@@ -3165,10 +3408,21 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
               let assignedSubAgentId: string | null = null;
               if (assignTo) {
                 const lower = assignTo.toLowerCase();
-                const matched = activeSubAgents.find(a =>
+                // 1. Exact name substring match (both directions)
+                let matched = activeSubAgents.find(a =>
                   a.name.toLowerCase().includes(lower) ||
                   lower.includes(a.name.toLowerCase().split(" ")[0])
                 );
+                // 2. If no name match, try matching against agent descriptions
+                if (!matched) {
+                  matched = activeSubAgents.find(a =>
+                    (a.description || "").toLowerCase().includes(lower) ||
+                    lower.split(/\s+/).some(w => w.length > 3 && (a.description || "").toLowerCase().includes(w))
+                  );
+                }
+                if (matched) {
+                  console.log(`[Chat Workflow] Step "${step.name}" assignTo "${assignTo}" → matched agent "${matched.name}"`);
+                }
                 assignedSubAgentId = matched?.id || null;
               }
               const stepDesc = String(step.description || "");
@@ -3192,11 +3446,53 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
               });
             }
 
+            // ── Create parent Work Order to track this workflow ──
+            // Check if a WO was already created from a T1 action block in the same response
+            const existingWoAction = actionResults.find(a => a.type === "CREATE_WORK_ORDER");
+            let parentWorkOrderId: string;
+            let parentCorrelationId: string;
+
+            if (existingWoAction?.workOrderId) {
+              parentWorkOrderId = existingWoAction.workOrderId;
+              parentCorrelationId = existingWoAction.correlationId || existingWoAction.workOrderId;
+              console.log(`[Chat Workflow] Linking to existing WO ${parentWorkOrderId}`);
+            } else {
+              // Auto-create a tracking Work Order for this workflow
+              const { gccMemory: woGcc, commitId: woCommitId } = buildGccCommit(
+                {}, "new", "created_for_workflow",
+                `Tracking WO for workflow "${templateName}"`,
+                `Auto-created work order to track chat-triggered workflow in session ${sessionId}`,
+                { submittedBy: { ...actor, source: "aiden_chat_workflow" }, chatSessionId: sessionId },
+              );
+              const trackingWo = await storage.createWorkOrder({
+                title: `WF: ${templateName}`.slice(0, 200),
+                description: templateGoal || `Workflow: ${templateName}`,
+                type: "operations",
+                priority: "medium",
+                submittedBy: actor.actorName || "aiden",
+              });
+              await storage.updateWorkOrder(trackingWo.id, { gccMemory: woGcc });
+              parentWorkOrderId = trackingWo.id;
+              parentCorrelationId = trackingWo.correlationId;
+              console.log(`[Chat Workflow] Created tracking WO ${parentWorkOrderId} for workflow "${templateName}"`);
+
+              actionResults.push({
+                type: "CREATE_WORK_ORDER",
+                workOrderId: parentWorkOrderId,
+                correlationId: parentCorrelationId,
+                autoProcessed: true,
+              });
+            }
+
+            // Start workflow with full setup (PM selection, WO linking, execution logs)
+            // but skipAdvance so the chat response returns immediately.
             const execution = await startWorkflowExecution(
               template.id,
-              null,
+              parentWorkOrderId,
               templateGoal,
-              { source: "chat", sessionId, actor: actor.actorName }
+              { source: "chat", sessionId, actor: actor.actorName },
+              undefined,
+              { skipAdvance: true }
             );
 
             if (!execution) {
@@ -3204,6 +3500,7 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
               continue;
             }
 
+            // Advance the first step asynchronously so the HTTP response returns fast
             setImmediate(async () => {
               try {
                 await advanceWorkflowExecution(execution.id);
@@ -3214,17 +3511,25 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
 
             actionResults.push({
               type: "EXECUTE_WORKFLOW",
-              workOrderId: execution.id,
-              correlationId: execution.id,
+              workOrderId: parentWorkOrderId,
+              executionId: execution.id,
+              correlationId: parentCorrelationId,
               autoProcessed: true,
             });
 
             reply = reply.replaceAll("{{WORKFLOW_EXECUTION_ID}}", execution.id);
             reply = reply.replaceAll("{{WORKFLOW_ID}}", execution.id);
+            reply = reply.replaceAll("{{WORK_ORDER_ID}}", parentWorkOrderId);
 
-            // execution_logs.work_order_id is NOT NULL — skip log for chat-originated workflows
-            // (workflow execution already tracked via workflow_executions table)
-            console.log(`[Chat Workflow] Workflow "${templateName}" created. Execution ID: ${execution.id}. Steps: ${steps.length}.`);
+            await storage.createExecutionLog({
+              workOrderId: parentWorkOrderId,
+              tier: 1,
+              action: "Workflow Started via Chat",
+              message: `Workflow "${templateName}" (${steps.length} steps) started from chat session ${sessionId}`,
+              metadata: { source: "aiden_chat", chatSessionId: sessionId, executionId: execution.id, templateId: template.id },
+            });
+
+            console.log(`[Chat Workflow] Workflow "${templateName}" created. Execution ID: ${execution.id}. Parent WO: ${parentWorkOrderId}. Steps: ${steps.length}.`);
 
           } catch (wfErr: any) {
             console.error("[Chat Workflow] Failed to create/start workflow:", wfErr);
@@ -3235,11 +3540,17 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
 
       reply = reply.trimEnd();
 
+      // Encode action metadata into breadcrumb so frontend can restore trackers on page refresh
+      const workflowAction = actionResults.find(a => a.type === "EXECUTE_WORKFLOW");
+      const breadcrumbValue = workflowAction
+        ? `assistant_reply:workflow:${JSON.stringify({ executionId: workflowAction.executionId || workflowAction.workOrderId, workOrderId: workflowAction.workOrderId })}`
+        : "assistant_reply";
+
       const assistantMsg = await storage.addChatMessage({
         sessionId,
         role: "assistant",
         content: reply,
-        gccBreadcrumb: "assistant_reply",
+        gccBreadcrumb: breadcrumbValue,
       });
 
       const now = new Date().toISOString();
@@ -3449,6 +3760,300 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
     }
   });
 
+  // ==================== Gamma Settings ====================
+
+  app.get("/api/gamma-settings", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const settings = await storage.getGammaSettings();
+      if (!settings) {
+        return res.json({
+          settings: {
+            id: "default",
+            enabled: false,
+            mode: "generate",
+            themeId: null,
+            gammaId: null,
+            fallbackToLocal: true,
+            numCards: null,
+            updatedAt: new Date().toISOString(),
+            updatedBy: "system",
+          },
+          apiKeyConfigured: !!process.env.GAMMA_API_KEY,
+        });
+      }
+      res.json({ settings, apiKeyConfigured: !!process.env.GAMMA_API_KEY });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch Gamma settings" });
+    }
+  });
+
+  app.put("/api/gamma-settings", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const actor = getActor(req);
+      const parsed = insertGammaSettingsSchema.safeParse({ ...req.body, updatedBy: actor.actorName });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid settings", errors: parsed.error.errors });
+      }
+      const settings = await storage.upsertGammaSettings(parsed.data);
+      res.json({ settings, apiKeyConfigured: !!process.env.GAMMA_API_KEY });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update Gamma settings" });
+    }
+  });
+
+  app.post("/api/gamma-settings/test", isAuth, requireRole("admin"), async (_req, res) => {
+    try {
+      const { testGammaConnection } = await import("./gamma-client");
+      const result = await testGammaConnection();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // ==================== Gamma Template Registry ====================
+
+  app.get("/api/gamma-templates", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const templates = await storage.getGammaTemplates();
+      res.json(templates);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch Gamma templates" });
+    }
+  });
+
+  app.get("/api/gamma-templates/:key", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const entry = await storage.getGammaTemplateByKey(req.params.key);
+      if (!entry) return res.status(404).json({ message: "Template not found" });
+      res.json(entry);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch Gamma template" });
+    }
+  });
+
+  app.post("/api/gamma-templates", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { templateKey, gammaId, name, description, outputFormat, contentContract, mode, status, owner, allowedWoTypes } = req.body;
+      if (!templateKey || !gammaId || !name) {
+        return res.status(400).json({ message: "templateKey, gammaId, and name are required" });
+      }
+      const entry = await storage.createGammaTemplate({
+        templateKey, gammaId, name,
+        description: description || null,
+        outputFormat: outputFormat || "pptx",
+        contentContract: contentContract || null,
+        mode: mode || "template_locked",
+        status: status || "approved",
+        owner: owner || null,
+        allowedWoTypes: allowedWoTypes || null,
+      });
+      res.status(201).json(entry);
+    } catch (err: any) {
+      if (err.message?.includes("unique") || err.code === "23505") {
+        return res.status(409).json({ message: `Template key "${req.body.templateKey}" already exists` });
+      }
+      res.status(500).json({ message: "Failed to create Gamma template" });
+    }
+  });
+
+  app.put("/api/gamma-templates/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const updated = await storage.updateGammaTemplate(req.params.id, req.body);
+      if (!updated) return res.status(404).json({ message: "Template not found" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to update Gamma template" });
+    }
+  });
+
+  // ==================== Gamma Generation Records ====================
+
+  app.get("/api/gamma-generations", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const workOrderId = req.query.workOrderId as string;
+      if (!workOrderId) return res.status(400).json({ message: "workOrderId query parameter is required" });
+      const records = await storage.getGammaGenerationRecords(workOrderId);
+      res.json(records);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch generation records" });
+    }
+  });
+
+  // ==================== Gamma Candidate Review ====================
+
+  // List candidates for a work order (all statuses, grouped by candidateGroup)
+  app.get("/api/work-orders/:id/candidates", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const allRecords = await storage.getGammaGenerationRecords(req.params.id);
+      const candidates = allRecords.filter(r => r.candidateStatus != null);
+
+      // Group by candidateGroup for batch display
+      const groups: Record<string, typeof candidates> = {};
+      for (const c of candidates) {
+        const group = c.candidateGroup || "_ungrouped";
+        if (!groups[group]) groups[group] = [];
+        groups[group].push(c);
+      }
+
+      res.json({ candidates, groups, activeCandidates: candidates.filter(c => c.candidateStatus === "candidate").length });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch candidates" });
+    }
+  });
+
+  // Select a candidate — marks it as selected, rejects others, resumes WO completion
+  app.post("/api/work-orders/:id/candidates/:recordId/select", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const workOrderId = req.params.id;
+      const order = await storage.getWorkOrder(workOrderId);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      if (order.status !== "awaiting_operator") return res.status(400).json({ message: "Work order is not awaiting operator review" });
+
+      // Pre-flight: verify candidate exists and file is present BEFORE mutating state
+      const fs = await import("fs");
+      const path = await import("path");
+      const candidateRecord = await storage.getGammaGenerationRecord(req.params.recordId);
+      if (!candidateRecord || candidateRecord.workOrderId !== workOrderId) {
+        return res.status(404).json({ message: "Candidate not found or does not belong to this work order" });
+      }
+      if (!candidateRecord.artifactFiledPath || !fs.existsSync(candidateRecord.artifactFiledPath)) {
+        return res.status(409).json({ message: "Candidate file no longer exists on disk. Selection aborted — work order remains in awaiting_operator." });
+      }
+
+      const selectedBy = (req as any).user?.username || "operator";
+      const selected = await storage.selectGammaCandidate(workOrderId, req.params.recordId, selectedBy);
+      if (!selected) return res.status(404).json({ message: "Candidate selection failed" });
+
+      // Copy selected candidate to a temp path for filing (so filing deletes the copy, not the durable original)
+      // artifactFiledPath was validated in pre-flight above
+      const artifactPath = selected.artifactFiledPath!;
+      const ext = selected.exportFormat === "pdf" ? "pdf" : "pptx";
+      const tmpCopy = path.join(path.dirname(artifactPath), `selected_${selected.id.slice(0, 8)}.${ext}`);
+      fs.copyFileSync(artifactPath, tmpCopy);
+
+      const tier2 = order.tier2Result as any;
+      if (tier2?.output) {
+        const mime = selected.exportFormat === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        tier2.output.postProcessedFile = {
+          path: tmpCopy, // filing deletes this copy, original stays for download
+          mimeType: mime,
+          size: selected.fileSize || fs.statSync(tmpCopy).size,
+        };
+      }
+      await storage.updateWorkOrder(workOrderId, { tier2Result: tier2 });
+
+      await storage.createExecutionLog({
+        workOrderId,
+        tier: 1,
+        action: "Operator: Candidate Selected",
+        message: `Operator selected candidate ${selected.id} (${selected.exportFormat}, ${selected.templateKey}). Resuming completion flow.`,
+        metadata: { selectedRecordId: selected.id, selectedBy, exportFormat: selected.exportFormat, templateKey: selected.templateKey },
+      });
+
+      // Resume completion: set status to completed and trigger filing
+      const completedOrder = await storage.updateWorkOrder(workOrderId, { status: "completed" });
+      if (completedOrder) {
+        const { fileWorkOrderOutput } = await import("./workspace-filing");
+        fileWorkOrderOutput(completedOrder).catch(err => console.error("Filing error after candidate selection:", err.message));
+      }
+
+      res.json({ message: "Candidate selected", selected, workOrder: completedOrder });
+    } catch (err: any) {
+      res.status(500).json({ message: `Failed to select candidate: ${err.message}` });
+    }
+  });
+
+  // Reject a single candidate
+  app.post("/api/work-orders/:id/candidates/:recordId/reject", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      // Ownership-validated: rejectGammaCandidate checks recordId belongs to this workOrderId
+      const rejected = await storage.rejectGammaCandidate(req.params.id, req.params.recordId);
+      if (!rejected) return res.status(404).json({ message: "Candidate not found or does not belong to this work order" });
+      res.json({ message: "Candidate rejected", rejected });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to reject candidate" });
+    }
+  });
+
+  // Reject all candidates
+  app.post("/api/work-orders/:id/candidates/reject-all", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      await storage.rejectAllGammaCandidates(req.params.id);
+      res.json({ message: "All candidates rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to reject candidates" });
+    }
+  });
+
+  // Cancel a candidate-review work order (escape hatch when all candidates rejected)
+  app.post("/api/work-orders/:id/candidates/cancel", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      if (order.status !== "awaiting_operator") return res.status(400).json({ message: "Work order is not awaiting operator review" });
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Operator: Candidate Review Cancelled",
+        message: "Operator cancelled work order during candidate review. No deliverable selected.",
+        metadata: { cancelledBy: (req as any).user?.username || "operator" },
+      });
+
+      const updated = await storage.updateWorkOrder(req.params.id, { status: "cancelled" as any });
+      res.json({ message: "Work order cancelled", workOrder: updated });
+    } catch (err: any) {
+      res.status(500).json({ message: `Failed to cancel work order: ${err.message}` });
+    }
+  });
+
+  // Request more candidates — re-runs PocketFlow for another generation cycle
+  app.post("/api/work-orders/:id/candidates/request-more", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+      if (order.status !== "awaiting_operator") return res.status(400).json({ message: "Work order is not awaiting operator review" });
+
+      await storage.createExecutionLog({
+        workOrderId: req.params.id,
+        tier: 1,
+        action: "Operator: Request More Candidates",
+        message: "Operator requested additional Gamma candidate generation. Re-processing work order.",
+        metadata: {},
+      });
+
+      // Set back to pending so processWorkOrder picks it up again
+      await storage.updateWorkOrder(req.params.id, { status: "pending" });
+      const { processWorkOrder } = await import("./orchestration");
+      processWorkOrder(req.params.id).catch(err => console.error("Re-process error:", err.message));
+
+      res.json({ message: "Requesting more candidates — work order re-queued for processing" });
+    } catch (err: any) {
+      res.status(500).json({ message: `Failed to request more candidates: ${err.message}` });
+    }
+  });
+
+  // Download/preview a candidate file (ownership-scoped to work order)
+  app.get("/api/work-orders/:id/candidates/:recordId/download", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const record = await storage.getGammaGenerationRecord(req.params.recordId);
+      if (!record || record.workOrderId !== req.params.id) return res.status(404).json({ message: "Candidate not found or does not belong to this work order" });
+      if (!record.artifactFiledPath) return res.status(404).json({ message: "Candidate file path not recorded" });
+
+      const fs = await import("fs");
+      if (!fs.existsSync(record.artifactFiledPath)) return res.status(404).json({ message: "Candidate file no longer exists on disk" });
+
+      const mime = record.exportFormat === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+      const ext = record.exportFormat === "pdf" ? "pdf" : "pptx";
+      res.setHeader("Content-Type", mime);
+      res.setHeader("Content-Disposition", `attachment; filename="candidate_${record.id.slice(0, 8)}.${ext}"`);
+      fs.createReadStream(record.artifactFiledPath).pipe(res);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to download candidate" });
+    }
+  });
+
   // ==================== Approvals ====================
 
   app.get("/api/approvals", isAuth, requireRole("viewer"), async (req, res) => {
@@ -3521,6 +4126,19 @@ Attributions page: /attributions (accessible authenticated and unauthenticated)`
         message: `Approval granted by ${actor.actorName}: ${rationale}`,
         metadata: { approvalId: approval.id, actor, decision: "approved", commitId },
       });
+
+      // If the work order is already completed, trigger workspace filing now
+      if (workOrder.status === "completed") {
+        try {
+          const refreshed = await storage.getWorkOrder(approval.workOrderId);
+          if (refreshed) {
+            const { fileWorkOrderOutput } = await import("./workspace-filing");
+            await fileWorkOrderOutput(refreshed);
+          }
+        } catch (fileErr: any) {
+          console.error("Workspace filing after approval failed:", fileErr.message);
+        }
+      }
 
       res.json(updated);
     } catch (err) {

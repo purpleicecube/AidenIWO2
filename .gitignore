@@ -6,3 +6,7 @@ vite.config.ts.*
 *.tar.gz
 .env
 backups/
+
+# Generated workflow artifacts and Gamma candidates
+.local/tmp/
+.local/gamma_candidates/
