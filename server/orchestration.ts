@@ -1667,18 +1667,37 @@ async function handleWorkflowCompletion(
   settings: any, pmLlmConfig: any, attemptId?: string
 ) {
   const executionId = execution.id;
-  const completedStepResults = stepRuns
-    .filter(r => r.status === "completed" && r.output)
-    .map(r => ({ stepKey: r.stepKey, stepName: r.stepName, output: r.output }));
+
+  // Enrich step results with sub-agent role so PM assembly can distinguish
+  // content-producing steps from metadata-only steps (e.g. deployment reports)
+  const completedRuns = stepRuns.filter(r => r.status === "completed" && r.output);
+  const subAgentIds = Array.from(new Set(completedRuns.map(r => r.assignedSubAgentId).filter(Boolean))) as string[];
+  const subAgentMap = new Map<string, { type: string; name: string }>();
+  for (const id of subAgentIds) {
+    try {
+      const agent = await storage.getSubAgent(id);
+      if (agent) subAgentMap.set(id, { type: agent.type, name: agent.name });
+    } catch { /* agent may have been deleted */ }
+  }
+  const completedStepResults = completedRuns.map(r => {
+    const agentInfo = r.assignedSubAgentId ? subAgentMap.get(r.assignedSubAgentId) : null;
+    return {
+      stepKey: r.stepKey,
+      stepName: r.stepName,
+      output: r.output,
+      role: agentInfo?.type === "deployment" ? "metadata" as const : "content" as const,
+    };
+  });
 
   let workProduct = null;
   try {
     workProduct = await pmAssembleWorkProduct(pmLlmConfig, execution.goal || "", completedStepResults, template?.name || "Workflow");
   } catch (err: any) {
     console.error("PM work product assembly failed:", err.message);
+    const contentResults = completedStepResults.filter(r => r.role !== "metadata");
     workProduct = {
-      summary: `PM assembled ${completedStepResults.length} step outputs`,
-      deliverable: completedStepResults.map(r => `## ${r.stepName}\n${typeof r.output === "string" ? r.output : JSON.stringify(r.output, null, 2)}`).join("\n\n"),
+      summary: `PM assembled ${contentResults.length} content step outputs`,
+      deliverable: contentResults.map(r => `## ${r.stepName}\n${typeof r.output === "string" ? r.output : JSON.stringify(r.output, null, 2)}`).join("\n\n"),
       deliverableType: "markdown",
       deliverableTitle: template?.name || "Workflow Output",
       stepContributions: Object.fromEntries(completedStepResults.map(r => [r.stepKey, r.stepName])),

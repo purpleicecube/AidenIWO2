@@ -278,27 +278,44 @@ Respond with ONLY a JSON object:
 export async function pmAssembleWorkProduct(
   pmLlmConfig: EffectiveLlmConfig,
   workflowGoal: string,
-  allStepResults: { stepKey: string; stepName: string; output: any }[],
+  allStepResults: { stepKey: string; stepName: string; output: any; role?: "content" | "metadata" }[],
   templateName: string
 ): Promise<WorkProductResult> {
-  const stepSummaries = allStepResults.map(s => {
+  const contentSteps = allStepResults.filter(s => s.role !== "metadata");
+  const metadataSteps = allStepResults.filter(s => s.role === "metadata");
+
+  const stepSummaries = contentSteps.map(s => {
     const outputStr = typeof s.output === "string" ? s.output : JSON.stringify(s.output, null, 2);
-    return `### Step: ${s.stepName} (${s.stepKey})\n${outputStr.slice(0, 2000)}`;
+    return `### Step: ${s.stepName} (${s.stepKey}) [CONTENT]\n${outputStr.slice(0, 3000)}`;
   }).join("\n\n");
+
+  const metadataSummaries = metadataSteps.length > 0
+    ? "\n\nMETADATA-ONLY STEPS (deployment reports — do NOT include in deliverable body):\n" +
+      metadataSteps.map(s => {
+        const outputStr = typeof s.output === "string" ? s.output : JSON.stringify(s.output, null, 2);
+        return `### Step: ${s.stepName} (${s.stepKey}) [METADATA]\n${outputStr.slice(0, 500)}`;
+      }).join("\n\n")
+    : "";
 
   const prompt = `You are the Project Manager assembling the final work product for workflow "${templateName}".
 
 WORKFLOW GOAL: ${workflowGoal}
 
-COMPLETED STEP OUTPUTS:
+CONTENT STEP OUTPUTS (use these to build the deliverable):
 ${stepSummaries.slice(0, 8000)}
+${metadataSummaries}
 
-Your job is to synthesize all step outputs into a cohesive, polished final deliverable that meets the workflow's goal. Do not simply concatenate — integrate and organize the outputs into a unified result.
+ASSEMBLY RULES:
+- The deliverable MUST contain the actual content from the CONTENT steps above.
+- METADATA steps (deployment reports, status tables) are informational only — do NOT blend them into the deliverable body.
+- If the content steps produced HTML, return the HTML as-is in the deliverable field — do not convert it to markdown or strip tags.
+- If the content steps produced markdown, integrate and organize into a unified document.
+- Do not simply concatenate — integrate and organize the content outputs into a unified result.
 
 Respond with ONLY a JSON object:
 {
   "summary": "executive summary of what was accomplished",
-  "deliverable": "the complete assembled work product (full content)",
+  "deliverable": "the complete assembled work product (full content from CONTENT steps)",
   "deliverableType": "document" | "code" | "report" | "mixed",
   "deliverableTitle": "title for the work product"
 }`;
@@ -330,7 +347,10 @@ Respond with ONLY a JSON object:
   for (const s of allStepResults) {
     const outStr = typeof s.output === "string" ? s.output : JSON.stringify(s.output);
     contributions[s.stepKey] = outStr.slice(0, 500);
-    parts.push(`## ${s.stepName}\n${outStr}`);
+    // Only include content steps in the deliverable; skip deployment reports
+    if (s.role !== "metadata") {
+      parts.push(`## ${s.stepName}\n${outStr}`);
+    }
   }
   return {
     summary: `Workflow "${templateName}" completed with ${allStepResults.length} steps.`,
