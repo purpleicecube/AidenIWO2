@@ -7,6 +7,8 @@ vite.config.ts.*
 .env
 backups/
 
-# Generated workflow artifacts and Gamma candidates
+# Generated workflow artifacts, Gamma candidates, and runtime output
 .local/tmp/
 .local/gamma_candidates/
+.local/iowa-site/
+.local/workspace/
