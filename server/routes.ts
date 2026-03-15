@@ -3506,6 +3506,19 @@ Provider: ${settings.provider} | Model: ${settings.model} | ${new Date().toISOSt
                 await advanceWorkflowExecution(execution.id);
               } catch (advErr) {
                 console.error("[Chat Workflow] Failed to advance first step:", advErr);
+                // Sync tracking WO status so the UI reflects the failure
+                try {
+                  await storage.updateWorkOrder(parentWorkOrderId, { status: "failed" });
+                  await storage.createExecutionLog({
+                    workOrderId: parentWorkOrderId,
+                    tier: 1,
+                    action: "Workflow Advance Failed",
+                    message: `Failed to start first step of workflow "${templateName}": ${advErr instanceof Error ? advErr.message : String(advErr)}`,
+                    metadata: { executionId: execution.id, error: String(advErr) },
+                  });
+                } catch (syncErr) {
+                  console.error("[Chat Workflow] Failed to sync WO status after advance error:", syncErr);
+                }
               }
             });
 

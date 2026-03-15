@@ -806,7 +806,7 @@ function selectBestHtmlOutput(outputs: Record<string, string>): string | null {
       bestKey = key;
     }
   }
-  return bestKey && bestScore >= 80 ? outputs[bestKey] : null;
+  return bestKey && bestScore >= 40 ? outputs[bestKey] : null;
 }
 
 function cleanDeliverable(raw: string): string {
