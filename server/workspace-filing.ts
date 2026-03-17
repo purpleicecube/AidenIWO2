@@ -777,6 +777,12 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       let sandboxHtml: string | null = extractHtmlFromDeliverable(deliverable);
       let sandboxType = "html_preview";
 
+      // BUG-038: Detect PPTX/PDF work orders where sandbox shows source content, not final output
+      const ppfMime = (order.tier2Result as any)?.output?.postProcessedFile?.mimeType || "";
+      const isPptxSource = ppfMime.includes("presentation") || ppfMime.includes("pptx");
+      const isPdfSource = ppfMime.includes("pdf");
+      const isBinaryDeliverable = isPptxSource || isPdfSource;
+
       if (!sandboxHtml) {
         const codeBlocks = extractCodeBlocksFromDeliverable(deliverable);
         if (codeBlocks.length > 0) {
@@ -795,7 +801,8 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
 
       if (!sandboxHtml && deliverable.length > 50) {
         sandboxHtml = buildMarkdownPreviewHtml(deliverableTitle, deliverable);
-        sandboxType = "document_preview";
+        // BUG-038: Distinguish source preview from final artifact preview
+        sandboxType = isBinaryDeliverable ? "source_preview" : "document_preview";
       }
 
       if (sandboxHtml) {
@@ -810,7 +817,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
             timestamp: new Date().toISOString(),
             command: "deploy-preview",
             input: { workOrderId: order.id, title: order.title },
-            output: { message: `${sandboxType === "code_preview" ? "Code preview" : sandboxType === "document_preview" ? "Document preview" : "HTML preview"} deployed for "${order.title}"`, status: "success" },
+            output: { message: `${sandboxType === "code_preview" ? "Code preview" : sandboxType === "source_preview" ? "Source content preview (final artifact is " + (isPptxSource ? "PPTX" : "PDF") + ")" : sandboxType === "document_preview" ? "Document preview" : "HTML preview"} deployed for "${order.title}"`, status: "success" },
           };
 
           if (existingSession) {
@@ -831,8 +838,8 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
             console.log(`  Sandbox ${sandboxType} updated: session ${existingSession.id}`);
           } else {
             const sandboxSession = await storage.createSandboxSession({
-              name: `Preview: ${order.title}`,
-              description: `Auto-deployed from work order "${order.title}" — ${sandboxType === "code_preview" ? "code execution preview" : sandboxType === "document_preview" ? "document preview" : "renderable HTML preview"}.`,
+              name: `${isBinaryDeliverable ? "Source Preview" : "Preview"}: ${order.title}`,
+              description: `Auto-deployed from work order "${order.title}" — ${sandboxType === "code_preview" ? "code execution preview" : sandboxType === "source_preview" ? `source content preview (final deliverable is a ${isPptxSource ? ".pptx" : ".pdf"} file)` : sandboxType === "document_preview" ? "document preview" : "renderable HTML preview"}.`,
               environment: {
                 sourceType: "work_order",
                 sourceId: order.id,

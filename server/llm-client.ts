@@ -383,9 +383,17 @@ export async function chatWithAiden(
 ${systemContext}
 ${gccContext}
 
-You are Aiden, the intelligent Tier 1 orchestration manager for the AIDEN_IWO platform — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are having a direct conversation with your operator. Answer questions about work orders, sub-agents, workflows, system status, and operations. Be helpful, concise, and informative. Use the system context provided to give accurate, data-driven answers. If you don't have enough information to answer, say so clearly.
+You are Aiden, the Tier 1 Orchestrator on IOWA (Intelligent Work Orchestration) — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are having a direct conversation with your operator. Answer questions about work orders, sub-agents, workflows, system status, and operations. Be helpful, concise, and informative. Use the system context provided to give accurate, data-driven answers. If you don't have enough information to answer, say so clearly.
 
 Respond in natural language (not JSON). Use markdown formatting when helpful for readability.
+
+## MANAGER REPORTING TRUTHFULNESS
+When asked operational questions (daily counts, blocked/failed reasons, status summaries):
+- Use ONLY the OPERATIONAL REPORT data injected into your context. Do NOT infer counts from snapshot stats or environment briefing totals.
+- If the OPERATIONAL REPORT section is missing or incomplete, respond: "I don't have that information at this time."
+- NEVER guess daily counts from all-time totals. Lifecycle counts (what happened today) are different from snapshot counts (what exists now).
+- If you cannot answer accurately, say so first, then offer the closest confirmed information available.
+- Truthfulness comes before helpfulness.
 
 ## CREATING WORK ORDERS
 When the operator asks you to create, open, or submit a work order:
@@ -408,9 +416,10 @@ Check the WORKFLOW TEMPLATES section in your system context. If a matching templ
 
 Guidelines for workflow creation:
 - The "assignTo" field MUST use the EXACT sub-agent name from the SUB-AGENTS section above (e.g. "Mark", "Tom", "Paul"). Do NOT use generic labels like "content agent" or "deploy agent"
-- ROUTING RULE: Only assign a step to a deployment agent (e.g. Paul/Polaris) for the FINAL deployment/publishing step. All creative, research, drafting, and content steps must go to content/marketing agents (e.g. Mark, Tom)
-- For PPTX/presentation requests: research + slide drafting steps → content/deck agent; final deploy step → deployment agent
-- For website/HTML requests: design + content steps → content agent; final deploy step → deployment agent
+- ROUTING RULE: Only assign a step to a deployment agent (e.g. Paul/Polaris) for the FINAL deployment/publishing step. All creative, research, drafting, and content steps must go to the appropriate specialist agent.
+- For PPTX/presentation requests: research/brief steps → Mark (content strategist); slide drafting steps → Tom (deck builder); final deploy step → Paul (deployment)
+- For website/HTML/landing-page/web-app requests: content brief steps → Mark; HTML/CSS/JS build steps → Hank (web builder); final deploy step → Paul (deployment). Hank is the ONLY agent that builds web pages — never assign web build steps to Mark or Tom.
+- For PDF/document requests: content steps → Mark; final deploy step → Paul
 - Keep steps to 3-5 for most workflows
 - Always include a clear goal that describes the expected deliverable`;
 
@@ -538,15 +547,30 @@ function buildReopenContext(gcc: Record<string, any>): string {
 
   if (!reopenReason) return "";
 
+  // Detect format from the previousDeliverable metadata
+  const formatMatch = previousDeliverable?.match(/\[Format:\s*(html|code|document|mixed)\]/i);
+  const deliverableFormat = formatMatch ? formatMatch[1].toLowerCase() : null;
+  const isHtml = deliverableFormat === "html" ||
+    (previousDeliverable && /<!DOCTYPE\s+html|<html[\s>]/i.test(previousDeliverable));
+
   let context = `\n=== REOPEN CONTEXT (Revision #${reopenCount}) ===\n`;
   context += `Reason for reopening: ${reopenReason}\n`;
   if (previousDeliverable && previousDeliverable !== "no_previous_output") {
-    context += `\nPrevious deliverable reference:\n${previousDeliverable}\n`;
+    context += `\nPrevious deliverable (COMPLETE — use as your starting point):\n${previousDeliverable}\n`;
   }
   if (lastCommit?.detail) {
     context += `\nAudit trail: ${lastCommit.detail}\n`;
   }
-  context += `\nINSTRUCTION: This work order was previously completed and has been reopened for revision. The user expects a DIFFERENT and IMPROVED output that directly addresses the reopen reason stated above. Do NOT simply repeat the previous output.\n`;
+
+  // Format-aware edit instructions
+  if (isHtml) {
+    context += `\nEDIT MODE — HTML: The complete previous HTML is provided above. Make SURGICAL edits to address the reopen reason. Do NOT rebuild from scratch. Start from the previous HTML and modify only what the reopen reason asks for (e.g. rebrand = find/replace brand names, colors, copy; layout change = adjust specific sections). Return the COMPLETE modified HTML file.\n`;
+  } else if (deliverableFormat === "code") {
+    context += `\nEDIT MODE — CODE: The complete previous code is provided above. Make targeted changes to address the reopen reason. Do NOT rewrite from scratch. Modify only the relevant parts and return the COMPLETE modified source.\n`;
+  } else {
+    context += `\nEDIT MODE — DOCUMENT: The complete previous deliverable is provided above. Revise it to address the reopen reason. Preserve the structure and content that was already good — only change what the reopen reason asks for. Return the COMPLETE revised deliverable.\n`;
+  }
+
   context += `=== END REOPEN CONTEXT ===\n`;
 
   return context;
@@ -621,12 +645,15 @@ Work Order:
       };
     }
 
-    // Apply defaults for missing fields to handle partial LLM responses
+    // Apply defaults for missing fields to handle partial LLM responses.
+    // Some models return the 5-phase format (decision/assigned_agent/reasoning)
+    // instead of the routing format (approved/handler/reason). Handle both.
+    const decisionToApproved = parsed.decision === "delegate" || parsed.decision === "approve";
     const withDefaults = {
-      approved: typeof parsed.approved === "boolean" ? parsed.approved : false,
-      reason: parsed.reason || parsed.explanation || parsed.message || "No reason provided by LLM",
-      mode: parsed.mode || (parsed.approved ? "auto" : "manual_review"),
-      handler: parsed.handler || parsed.sub_agent || parsed.agent || null,
+      approved: typeof parsed.approved === "boolean" ? parsed.approved : (parsed.decision ? decisionToApproved : false),
+      reason: parsed.reason || parsed.reasoning || parsed.explanation || parsed.message || "No reason provided by LLM",
+      mode: parsed.mode || (parsed.approved || decisionToApproved ? "auto" : "manual_review"),
+      handler: parsed.handler || parsed.sub_agent || parsed.agent || parsed.assigned_agent || null,
     };
 
     return tier1ResponseSchema.parse(withDefaults);
@@ -848,7 +875,12 @@ Work Order:
   const raw = await callLLM(settings, systemPrompt, prompt, apiKeyOverride);
   const jsonMatch = raw.match(/\[[\s\S]*\]/);
   const jsonStr = jsonMatch ? jsonMatch[0] : raw;
-  const parsed = safeJsonParse(jsonStr);
+  let parsed = safeJsonParse(jsonStr);
+  // Some models (e.g. Qwen) wrap the array in an object like {"steps": [...]} or {"plan": [...]}
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const arrValue = Object.values(parsed).find(v => Array.isArray(v));
+    if (arrValue) parsed = arrValue;
+  }
   return planStepsSchema.parse(parsed);
 }
 
@@ -1210,7 +1242,8 @@ export async function runAidenQualityReview(
   stepCount: number,
   executorName: string,
   hadSearchTools?: boolean,
-  postProcessedFile?: { path: string; mimeType: string; size: number } | null
+  postProcessedFile?: { path: string; mimeType: string; size: number } | null,
+  pptxQualitySupplement?: string | null,
 ): Promise<AidenQualityReview> {
   const structuralCheck = runStructuralPreCheck(order, deliverable);
   if (!structuralCheck.pass && structuralCheck.severity === "hard") {
@@ -1277,7 +1310,7 @@ Execution Metadata:
 - Steps Completed: ${stepCount}
 
 Deliverable:
-${deliverablePreview}${structuralWarnings}`;
+${deliverablePreview}${structuralWarnings}${pptxQualitySupplement || ""}`;
 
   try {
     const raw = await callLLM(settings, settings.systemPrompt || "You are Aiden, the Tier 1 orchestration manager.", prompt);

@@ -787,14 +787,14 @@ export default function WorkOrderDetail() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="space-y-3">
+        <div className="flex items-start gap-3">
           <Link href="/work-orders">
-            <Button variant="ghost" size="icon" data-testid="button-back">
+            <Button variant="ghost" size="icon" className="mt-1 shrink-0" data-testid="button-back">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             {editing ? (
               <Input
                 value={editTitle}
@@ -803,7 +803,7 @@ export default function WorkOrderDetail() {
                 data-testid="input-edit-title"
               />
             ) : (
-              <h1 className="text-xl font-semibold tracking-tight" data-testid="text-order-title">
+              <h1 className="text-xl font-semibold tracking-tight break-words" data-testid="text-order-title">
                 {order.title}
               </h1>
             )}
@@ -819,7 +819,7 @@ export default function WorkOrderDetail() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {editing ? (
             <>
               <Button

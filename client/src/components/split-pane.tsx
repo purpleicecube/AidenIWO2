@@ -15,7 +15,7 @@ interface SplitPaneProps {
   collapseMobileAt?: number;
 }
 
-const GUTTER_SIZE = 6;
+const GUTTER_SIZE = 8;
 
 function loadSizes(key: string, count: number): number[] | null {
   try {
@@ -211,7 +211,7 @@ export default function SplitPane({
         return (
           <div key={i} className="contents">
             <div
-              className="overflow-hidden min-w-0 min-h-0 flex flex-col"
+              className="overflow-auto min-w-0 min-h-0 flex flex-col"
               style={{
                 [isHorizontal ? "width" : "height"]: `calc(${pct}% - ${gutterShare}px)`,
                 flexShrink: 0,
@@ -244,7 +244,7 @@ export default function SplitPane({
                   className={`
                     rounded-full bg-muted-foreground/40 group-hover:bg-primary/60 group-active:bg-primary
                     transition-colors duration-150
-                    ${isHorizontal ? "w-[3px] h-8" : "h-[3px] w-8"}
+                    ${isHorizontal ? "w-[4px] h-10" : "h-[4px] w-10"}
                   `}
                 />
               </div>

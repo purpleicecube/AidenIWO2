@@ -45,12 +45,13 @@ export async function setupAuth(app: Express) {
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  // GET /api/login — dev-only auto-login (no password). BLOCKED in production.
-  // P0-A: B+ Hardening. Will be removed entirely post-P1-C once bootstrap CLI exists.
+  // GET /api/login — dev-only auto-login (no password). ALLOWED only in explicit development mode.
+  // Blocked in production AND any non-development environment (staging, tester, published).
   app.get("/api/login", async (req, res) => {
-    if (process.env.NODE_ENV === "production") {
-      console.warn("[auth] GET /api/login blocked — not available in production");
-      return res.status(403).json({ message: "Auto-login is not available in production. Use POST /api/login with credentials." });
+    const isDev = process.env.NODE_ENV === "development" || (!process.env.NODE_ENV && !process.env.REPL_SLUG);
+    if (!isDev) {
+      console.warn("[auth] GET /api/login blocked — only available in NODE_ENV=development");
+      return res.status(403).json({ message: "Auto-login is only available in development mode. Use POST /api/login with credentials." });
     }
 
     try {

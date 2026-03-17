@@ -1,7 +1,7 @@
 # AIDEN IWO — Features Inventory & Roadmap
 
-> **Version:** 1.9
-> **Last Updated:** 2026-03-13
+> **Version:** 2.2
+> **Last Updated:** 2026-03-15
 > **Maintainer:** Darrel Vaughn
 
 ---
@@ -108,6 +108,15 @@ Operator → Submit Work Order
 | PPTX post-processing pipeline (md-to-pptx.py via python-pptx) | `[RECENT]` |
 | PDF post-processing pipeline — pandoc (md→HTML) + **Playwright Chromium** (HTML→PDF). Full CSS support: `@page { margin: 0 }`, `position: fixed`, full-bleed header/footer. Keyword detection ("pdf") takes priority over skill-based routing. PDF stored in `.local/workspace/05_Artifacts/`, registered in DB as artifact on work order completion. Professional layout: edge-to-edge dark navy header + pinned footer, typography overrides defeating pandoc's default narrow body. | `[RECENT]` |
 | ESM-compatible __dirname polyfill for script execution | `[RECENT]` |
+| **Done Contract** — deterministic closeout evaluator with 4 artifact tracks (Static Web Page, Software Artifact, Document, PPTX). Governed HITL "Wrap It Up" override. Gate in `completeAndFileWorkOrder()`. | `[RECENT]` |
+| **PPTX preflight validator** — blocks empty, JSON, placeholder, unsegmented content before Gamma. Contract parser extracts slide range + required sections. | `[RECENT]` |
+| **PPTX slide source shaper** — restructures flat LLM output into clean slide-segmented markdown before Gamma. Deduplication, bullet trimming, slide cap. | `[RECENT]` |
+| **Post-Gamma compliance checker** — verifies file existence, size, MIME, estimated slide count vs contract. | `[RECENT]` |
+| **PPTX review supplement** — injects preflight/compliance/contract evidence into Aiden quality review so LLM can reject weak slide-source even when binary exists. | `[RECENT]` |
+| **Workflow PPTX post-processing** — safety net runs Gamma/local conversion on PM-assembled work product when no step produced a binary. | `[RECENT]` |
+| **Local PPTX fallback reclassified** — explicitly labeled "draft quality — not Gamma-branded" in logs, checklist, and finalMessage. | `[RECENT]` |
+| **Gamma heartbeat** — `onHeartbeat` callback in polling loop prevents watchdog from killing active Gamma generation (60-150s). | `[RECENT]` |
+| **Machine-local path portability** — scripts use `SKILLS_DIR`/`PLAYWRIGHT_PATH` env vars with local fallback. | `[RECENT]` |
 | Tool executor integration with PocketFlow steps | `[IN DEV]` |
 
 ### D. Sub-Agent System
@@ -178,6 +187,7 @@ Operator → Submit Work Order
 | Step operations (advance, skip, retry, resolve) | `[SHIPPED]` |
 | Workflow PM sub-agent orchestration (review, revise, assemble, escalate) | `[IN DEV]` |
 | **2DO Workflow Checklist** — Meta-checklist managed by Aiden (Tier 1) or the assigned PM sub-agent as appropriate. Aggregates the status of each constituent Work Order's 2DO list as input. Operates at workflow scope — each workflow step's WO 2DO feeds into the Workflow 2DO, giving an at-a-glance roll-up of multi-step progress. Persists across workflow restarts and step retries. No duplication — the Workflow 2DO reads from WO-level 2DOs rather than maintaining its own parallel tracking. | `[PLANNED]` |
+| **Child Linked Work Orders for Workflow Steps** — Optional enterprise workflow model where selected workflow steps become first-class child Work Orders under a parent workflow or parent Work Order, instead of remaining internal `workflow_step_runs` only. Benefits: independent ownership, SLA and approval state, queueing, retry/reopen per child step, stronger departmental handoffs, and direct reuse of WO-level audit trail, 2DO, and filing logic. Tradeoff: materially higher state, UI, and synchronization complexity, so this should remain an opt-in architecture for complex enterprise workflows rather than the default workflow model. | `[ROADMAP]` |
 
 ### I. Tools & Locker System
 
@@ -257,11 +267,16 @@ Operator → Submit Work Order
 
 | Feature | Status |
 | --- | --- |
-| System health endpoint (/api/health) | `[SHIPPED]` |
+| System health endpoint (/api/health) — truthful DB/LLM/Gamma/session checks | `[RECENT]` |
 | Execution logging with tier, action, message, metadata | `[SHIPPED]` |
-| System health UI page (service status, uptime, DB health) | `[SHIPPED]` |
+| System health UI page (service status, uptime, DB health, Gamma, LLM, session) | `[RECENT]` |
 | GCC commit history per work order | `[SHIPPED]` |
 | Tool audit logs with timestamps and actor tracking | `[SHIPPED]` |
+| Unified version/build identity from package.json (no hardcoded versions) | `[RECENT]` |
+| Startup env validation — hard-blocks on missing critical env vars | `[RECENT]` |
+| Execution logs include LLM provider/model metadata at all agent-referencing call sites | `[RECENT]` |
+| GCC metadata records executor + LLM config at routing and completion commits | `[RECENT]` |
+| 2DO checklist enriched with agent names, model config, output size, tool usage | `[RECENT]` |
 | Audit dashboard (visual log explorer) | `[ROADMAP]` |
 | WebSocket real-time notifications | `[ROADMAP]` |
 
@@ -411,3 +426,5 @@ Operator → Submit Work Order
 | 2026-03-13 | 1.9 | Desktop File Upload to Workspace shipped [RECENT]. `POST /api/workspace/upload` (JSON, base64 binary, 10MB max). UI: Upload File in New dropdown + drag-from-desktop drop zone overlay on file grid. Multi-file drop supported. 126 total features. |
 | 2026-03-13 | 2.0 | **App v0.9.2.** PPTX workflow readiness: replaced generic PPTX skill with IWO2-native md-to-pptx pipeline spec, updated TOM/PM Alpha/Mark/Paul system prompts for workflow orchestration. 2DO Checklist feature shipped: `checklist_items` table, 4 API endpoints, 11 lifecycle hooks (orchestration + pocketflow), collapsible UI panel with phase badges and progress tracking. Contract drift fix (CODEX 5.4): reconciled workflow PM completion path with `tier2Result` model, fixed synthetic WorkOrder/Tier1Result shapes, added `toolsUsed` to Tier2Result schema, fixed 17 TS errors. All 50 tests pass. |
 | 2026-03-14 | 2.1 | **App v0.9.5.** Gamma Template Registry shipped: `gamma_template_registry` + `gamma_generation_records` tables, three-layer model (Gamma template → content contract → LLM prompt), format-aware early resolution, `gammaPolicy` on SharedDict, content contract injection via `designContext`. HITL Candidate Review: `gammaDeliveryPolicy` on workflow templates (candidate_review mode), WO-level `gammaTemplateKey` override, three-level template precedence (WO > workflow > global), candidate persistence in `.local/gamma_candidates/`, 6 candidate API endpoints. 21st.dev Magic MCP integration for Mark/Tom. Dashboard/detail WO status sync fix. Auto-publish standalone workflow output to Sandbox. Version bump across all governance docs + app code. `.local/tmp/` added to .gitignore. |
+| 2026-03-15 | 2.2 | Added roadmap note for an optional child-linked Work Order workflow architecture. Clarified this as an enterprise-grade alternative for workflows that need independent ownership, approvals, SLAs, queueing, and WO-level audit/checklist reuse, while keeping `workflow_step_runs` as the default model for simpler flows. |
+| 2026-03-15 | 2.3 | **Session 11 — Done Contract + Gamma PPTX Remediation + Pre-Replit Stabilization.** 15+ features shipped: Done Contract (4 artifact tracks + Wrap It Up HITL override), PPTX preflight validator, slide source shaper, post-Gamma compliance, PPTX review supplement, workflow PPTX post-processing safety net, local fallback reclassification, Gamma heartbeat, unified version identity, startup env validation, published-mode auth hardening, truthful /api/health, Gamma status in System Health UI, machine-local path portability, execution log + checklist + GCC metadata enrichment with model config. 4 bugs fixed (BUG-038 through BUG-041). UI fixes: WO header layout, chat three-dot menu, SplitPane gutter. Branding: FreedomForge.AI → Klear.ai / IOWA. |

@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,8 @@ const templateFormSchema = z.object({
   preferredPmId: z.string().nullable().optional(),
   executionMode: z.string().default("autonomous"),
   llmMode: z.string().default("inherited"),
+  gammaTemplateKey: z.string().nullable().optional(),
+  gammaDeliveryPolicy: z.string().nullable().optional(),
 });
 
 type TemplateForm = z.infer<typeof templateFormSchema>;
@@ -234,6 +237,7 @@ function RunWorkflowDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const form = useForm<RunForm>({
     resolver: zodResolver(runFormSchema),
     defaultValues: { goal: template?.goal || "", executionMode: "semi_autonomous" },
@@ -246,17 +250,25 @@ function RunWorkflowDialog({
   void executionMode; // used via watch
 
   const runMutation = useMutation({
-    mutationFn: (values: RunForm) =>
-      apiRequest("POST", "/api/workflow-executions", {
+    mutationFn: async (values: RunForm) => {
+      const res = await apiRequest("POST", "/api/workflow-executions", {
         templateId: template?.id,
         goal: values.goal,
         executionMode: values.executionMode,
-      }),
-    onSuccess: () => {
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions"] });
-      toast({ title: "Workflow started" });
+      queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
       onOpenChange(false);
       formReset({ goal: "", executionMode: "semi_autonomous" });
+      if (data?.workOrderId) {
+        toast({ title: "Workflow started", description: "Navigating to work order..." });
+        navigate(`/work-orders/${data.workOrderId}`);
+      } else {
+        toast({ title: "Workflow started", description: "Check Work Orders for progress." });
+      }
     },
     onError: (err: any) => {
       toast({ title: "Failed to start workflow", description: err.message, variant: "destructive" });
@@ -830,6 +842,10 @@ export default function WorkflowsPage() {
     queryKey: ["/api/sub-agents"],
   });
 
+  const { data: gammaTemplates } = useQuery<any[]>({
+    queryKey: ["/api/gamma-templates"],
+  });
+
   const pmAgents = (subAgents || []).filter((a) => a.type === "project_manager" && a.status === "active");
 
   const { data: executions, isLoading: executionsLoading } = useQuery<
@@ -952,15 +968,23 @@ export default function WorkflowsPage() {
       preferredPmId: template.preferredPmId || null,
       executionMode: template.executionMode || "autonomous",
       llmMode: template.llmMode || "inherited",
+      gammaTemplateKey: (template as any).gammaTemplateKey || null,
+      gammaDeliveryPolicy: (template as any).gammaDeliveryPolicy || null,
     });
     setDialogOpen(true);
   }
 
   function onSubmit(values: TemplateForm) {
+    // Convert empty strings to null for optional fields
+    const cleaned = {
+      ...values,
+      gammaTemplateKey: values.gammaTemplateKey || null,
+      gammaDeliveryPolicy: values.gammaDeliveryPolicy || null,
+    };
     if (editingTemplate) {
-      updateMutation.mutate(values);
+      updateMutation.mutate(cleaned);
     } else {
-      createMutation.mutate(values);
+      createMutation.mutate(cleaned);
     }
   }
 
@@ -1320,6 +1344,56 @@ export default function WorkflowsPage() {
                           <SelectItem value="inherited">Inherited (Auto)</SelectItem>
                           <SelectItem value="shared_with_aiden">Shared with Aiden</SelectItem>
                           <SelectItem value="own_llm">PM's Own LLM</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="gammaTemplateKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gamma Template (Brand)</FormLabel>
+                      <Select onValueChange={(v) => field.onChange(v === "__default__" ? null : v)} value={field.value || "__default__"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-gamma-template">
+                            <SelectValue placeholder="Global default" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__default__">Global default</SelectItem>
+                          {(gammaTemplates || []).map((t: any) => (
+                            <SelectItem key={t.templateKey} value={t.templateKey}>
+                              {t.name} ({t.outputFormat.toUpperCase()}, {t.mode})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="gammaDeliveryPolicy"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Delivery Policy</FormLabel>
+                      <Select onValueChange={(v) => field.onChange(v === "__default__" ? null : v)} value={field.value || "__default__"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-delivery-policy">
+                            <SelectValue placeholder="Auto revise (default)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__default__">Auto revise (default)</SelectItem>
+                          <SelectItem value="auto_revise">Auto revise</SelectItem>
+                          <SelectItem value="candidate_review">Candidate review (HITL)</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

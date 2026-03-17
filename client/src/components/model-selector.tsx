@@ -55,9 +55,10 @@ export function ModelSelector({
   const keyConfigured = modelsData?.keyConfigured ?? false;
 
   const filteredModels = useMemo(() => {
-    if (!searchFilter) return models;
+    const sorted = [...models].sort((a, b) => a.id.localeCompare(b.id));
+    if (!searchFilter) return sorted;
     const lower = searchFilter.toLowerCase();
-    return models.filter(m =>
+    return sorted.filter(m =>
       m.id.toLowerCase().includes(lower) ||
       m.name.toLowerCase().includes(lower) ||
       (m.owned_by && m.owned_by.toLowerCase().includes(lower))

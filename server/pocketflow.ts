@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 import { storage } from "./storage";
 import type { WorkOrder, LlmSettings, InsertChecklistItem } from "@shared/schema";
 import type { Tier1Result, Tier2Result, EffectiveLlmConfig } from "./llm-client";
+import { validatePptxPreflight, parseContentContract, checkGammaCompliance, shapeSlideSource } from "./pptx-quality";
 import {
   llmPlanSteps,
   llmExecStep,
@@ -324,6 +325,18 @@ async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
         ...s,
         dependencies: s.dependencies.filter(depId => stepIds.has(depId)),
       }));
+      // Guard: if LLM returned an empty plan, create a single execution step so the
+      // work order actually gets processed instead of silently "completing" with no output.
+      if (dict.planSteps.length === 0) {
+        dict.planSteps = [{
+          id: "step_1",
+          name: "Execute Work Order",
+          description: `Produce the deliverable for "${dict.workOrder.title}" — ${dict.workOrder.description}`,
+          dependencies: [],
+          status: "pending" as const,
+        }];
+        await emitNodeLog(dict, "PlanSteps", `LLM returned empty plan — injecting single execution step`, { recovered: true });
+      }
       dict.currentStepIndex = 0;
     }
 
@@ -435,7 +448,7 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
     storage.createChecklistItem({
       workOrderId: dict.workOrder.id,
       phase: "tier2_exec",
-      summary: `Step started: ${step.name}`,
+      summary: `Step started: ${step.name}${dict.llmConfig ? ` (${dict.llmConfig.provider}/${dict.llmConfig.model})` : ""}${dict.availableTools.length > 0 ? ` — ${dict.availableTools.length} tools` : ""}`,
       addedBy: "system",
       status: "in_progress",
       iteration: dict.iteration,
@@ -551,7 +564,7 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
       storage.createChecklistItem({
         workOrderId: dict.workOrder.id,
         phase: "tier2_exec",
-        summary: `Step completed: ${step.name}`,
+        summary: `Step completed: ${step.name} (${((step.output || "").length / 1024).toFixed(1)}KB output${dict.toolResults.filter(r => r.success).length > 0 ? ", tools: " + dict.toolResults.filter(r => r.success).map(r => r.toolSlug).join(", ") : ""})`,
         addedBy: "system",
         status: "done",
         iteration: dict.iteration,
@@ -1035,6 +1048,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 async function nodePostProcess(dict: SharedDict): Promise<void> {
+  // If the deliverable is HTML (e.g. from Hank/WebBuilder), skip binary post-processing entirely.
+  // HTML deliverables go straight to Sandbox via Paul — no PPTX/PDF conversion needed.
+  const trimmed = dict.finalDeliverable?.trim() || "";
+  if (/^<!DOCTYPE\s+html|^<html[\s>]/i.test(trimmed)) {
+    await emitNodeLog(dict, "PostProcess", "Deliverable is HTML — skipping PPTX/PDF post-processing.", {});
+    return;
+  }
+
   const format = detectRequiredFormat(dict);
   if (!format) return;
 
@@ -1043,15 +1064,70 @@ async function nodePostProcess(dict: SharedDict): Promise<void> {
     fs.mkdirSync(tmpDir, { recursive: true });
     let gammaUsed = false;
 
+    // ── Slide source shaping — restructure flat content into clean slides ──
+    const shapingContract = parseContentContract(
+      dict.gammaPolicy?.contentContract || dict.designContext || null
+    );
+    const shaped = shapeSlideSource(dict.finalDeliverable, shapingContract);
+    if (shaped.actions.length > 0 && shaped.slideCount > 0) {
+      const originalLen = dict.finalDeliverable.length;
+      dict.finalDeliverable = shaped.shaped;
+      await emitNodeLog(dict, "PostProcess",
+        `Slide source shaped: ${shaped.slideCount} slides (${originalLen} → ${shaped.shaped.length} chars). Actions: ${shaped.actions.join("; ")}`,
+        { slideCount: shaped.slideCount, actions: shaped.actions, originalLength: originalLen, shapedLength: shaped.shaped.length }
+      );
+    }
+    // ── End shaping ───────────────────────────────────────────────────────
+
     // ── Gamma path (policy resolved early in pocketflowExecute) ─────────
     const gp = dict.gammaPolicy;
     if (gp) {
       try {
-        const mode = gp.resolvedGammaId ? "from_template" : "generate";
+        const mode = (gp.resolvedGammaId && gp.resolvedGammaId !== "generate_mode") ? "from_template" : "generate";
 
+        // ── BUG-038: Preflight validation before Gamma ────────────────────
+        const parsedContract = parseContentContract(gp.contentContract || dict.designContext);
+        const preflight = validatePptxPreflight(dict.finalDeliverable, parsedContract);
+        (dict as any)._pptxPreflight = preflight;
+        (dict as any)._pptxContract = parsedContract;
+
+        await emitNodeLog(dict, "PostProcess", `PPTX preflight: ${preflight.summary}`, {
+          ok: preflight.ok,
+          derivedSlideCount: preflight.derivedSlideCount,
+          hardFailures: preflight.hardFailures,
+          softWarnings: preflight.softWarnings,
+        });
+
+        if (!preflight.ok) {
+          await emitNodeLog(dict, "PostProcess",
+            `Preflight REJECTED — not sending to Gamma. Issues: ${preflight.hardFailures.join("; ")}`,
+            { preflightFailures: preflight.hardFailures });
+          storage.createChecklistItem({
+            workOrderId: dict.workOrder.id,
+            phase: "quality_review",
+            summary: `PPTX preflight failed: ${preflight.hardFailures[0]}`,
+            addedBy: "system",
+            status: "done",
+          }).catch(() => {});
+          // Fall through to local fallback path (gammaUsed stays false)
+          if (!gp.fallbackAllowed) {
+            await emitNodeLog(dict, "PostProcess",
+              `Template "${gp.templateKey}" is locked and preflight failed — no PPTX generated.`,
+              { preflightFailures: preflight.hardFailures, templateKey: gp.templateKey });
+            return;
+          }
+        }
+        // ── End preflight ─────────────────────────────────────────────────
+
+        if (preflight.ok) {
         await emitNodeLog(dict, "PostProcess", `Attempting PPTX via Gamma API (${mode}, template: ${gp.templateKey})`, {
           mode, templateKey: gp.templateKey, gammaId: gp.resolvedGammaId, fallbackAllowed: gp.fallbackAllowed,
         });
+
+        // BUG-041: Heartbeat callback keeps watchdog alive during Gamma polling
+        const heartbeatFn = () => {
+          storage.updateWorkOrder(dict.workOrder.id, { heartbeatAt: new Date() }).catch(() => {});
+        };
 
         const gammaResult = await withTimeout(generateWithGamma({
           inputText: dict.finalDeliverable,
@@ -1059,7 +1135,7 @@ async function nodePostProcess(dict: SharedDict): Promise<void> {
           gammaId: gp.resolvedGammaId,
           exportAs: "pptx",
           title: dict.deliverableTitle || dict.workOrder.title,
-        }, tmpDir), GAMMA_HARD_TIMEOUT_MS, "Gamma PPTX generation");
+        }, tmpDir, heartbeatFn), GAMMA_HARD_TIMEOUT_MS, "Gamma PPTX generation");
 
         if (gammaResult.success && gammaResult.filePath) {
           const stats = fs.statSync(gammaResult.filePath);
@@ -1115,6 +1191,35 @@ async function nodePostProcess(dict: SharedDict): Promise<void> {
             artifactFiledPath: candidateFiledPath,
           }).catch((err) => console.error("[pocketflow] Failed to write generation record:", err.message));
 
+          // ── BUG-038: Post-Gamma compliance check ──────────────────────
+          const compliance = checkGammaCompliance(
+            gammaResult.filePath!,
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            parsedContract,
+            preflight.derivedSlideCount,
+          );
+          (dict as any)._pptxCompliance = compliance;
+
+          await emitNodeLog(dict, "PostProcess", `Gamma compliance: ${compliance.summary}`, {
+            ok: compliance.ok,
+            fileSizeBytes: compliance.fileSizeBytes,
+            estimatedSlideCount: compliance.estimatedSlideCount,
+            slideCountCompliant: compliance.slideCountCompliant,
+            hardFailures: compliance.hardFailures,
+            softWarnings: compliance.softWarnings,
+          });
+
+          if (!compliance.ok) {
+            storage.createChecklistItem({
+              workOrderId: dict.workOrder.id,
+              phase: "quality_review",
+              summary: `Gamma compliance warning: ${compliance.hardFailures[0]}`,
+              addedBy: "system",
+              status: "done",
+            }).catch(() => {});
+          }
+          // ── End compliance check ────────────────────────────────────────
+
           gammaUsed = true;
         } else {
           // Write failed generation record
@@ -1138,6 +1243,7 @@ async function nodePostProcess(dict: SharedDict): Promise<void> {
             `Gamma failed: ${gammaResult.error}. Falling back to local pipeline.`,
             { error: gammaResult.error, fallback: true });
         }
+        } // end if (preflight.ok)
       } catch (err: any) {
         await emitNodeLog(dict, "PostProcess", `Gamma error: ${err.message} — ${gp.fallbackAllowed ? "falling back to local" : "no fallback"}`, { error: err.message });
         if (!gp.fallbackAllowed) return;
@@ -1182,16 +1288,17 @@ async function nodePostProcess(dict: SharedDict): Promise<void> {
             mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             size: stats.size,
           };
-          dict.finalMessage += ` A .pptx file (${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB) has been generated.`;
+          dict.finalMessage += ` A .pptx file (${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB) has been generated via local fallback (draft quality — not Gamma-branded).`;
 
-          await emitNodeLog(dict, "PostProcess", `PPTX generated: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB`, {
-            format: "pptx", engine: "local",
+          await emitNodeLog(dict, "PostProcess", `LOCAL FALLBACK PPTX: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB — draft quality, not Gamma-branded`, {
+            format: "pptx", engine: "local_fallback",
             slideCount: parsed.slideCount, fileSize: stats.size, path: outputPath,
+            quality: "draft",
           });
           storage.createChecklistItem({
             workOrderId: dict.workOrder.id,
             phase: "filing",
-            summary: `PPTX generated: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB`,
+            summary: `PPTX (local fallback, draft quality): ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB — not Gamma-branded`,
             addedBy: "system",
             status: "done",
           }).catch(() => {});
@@ -1213,11 +1320,16 @@ async function nodePostProcess(dict: SharedDict): Promise<void> {
     const gp = dict.gammaPolicy;
     if (gp) {
       try {
-        const mode = gp.resolvedGammaId ? "from_template" : "generate";
+        const mode = (gp.resolvedGammaId && gp.resolvedGammaId !== "generate_mode") ? "from_template" : "generate";
 
         await emitNodeLog(dict, "PostProcess", `Attempting PDF via Gamma API (${mode}, template: ${gp.templateKey})`, {
           mode, templateKey: gp.templateKey, gammaId: gp.resolvedGammaId, fallbackAllowed: gp.fallbackAllowed,
         });
+
+        // BUG-041: Heartbeat callback keeps watchdog alive during Gamma polling
+        const pdfHeartbeatFn = () => {
+          storage.updateWorkOrder(dict.workOrder.id, { heartbeatAt: new Date() }).catch(() => {});
+        };
 
         const gammaResult = await withTimeout(generateWithGamma({
           inputText: dict.finalDeliverable,
@@ -1226,7 +1338,7 @@ async function nodePostProcess(dict: SharedDict): Promise<void> {
           exportAs: "pdf",
           title: dict.deliverableTitle || dict.workOrder.title,
           format: "presentation",
-        }, tmpDir), GAMMA_HARD_TIMEOUT_MS, "Gamma PDF generation");
+        }, tmpDir, pdfHeartbeatFn), GAMMA_HARD_TIMEOUT_MS, "Gamma PDF generation");
 
         if (gammaResult.success && gammaResult.filePath) {
           // Move to artifacts directory
@@ -1421,7 +1533,7 @@ async function nodeBuildResponse(dict: SharedDict): Promise<NodeResult> {
   const requiresPptx = detectedFormat === "pptx";
   const requiresPdf = detectedFormat === "pdf";
   const expectsHtml = !requiresPptx && !requiresPdf && (
-    /\b(html|web\s*page|landing\s*page|homepage|website|web\s*app|dashboard\s*page|interactive\s*page)\b/i.test(orderText) ||
+    /\b(html|web\s*page|landing\s*page|homepage|website|web\s*app|mini[\s-]*site|dashboard\s*page|interactive\s*(page|demo)|single[\s-]*page)\b/i.test(orderText) ||
     (/sandbox/i.test(orderText))
   );
 
@@ -1770,7 +1882,178 @@ function buildSuccessResult(dict: SharedDict): Tier2Result {
       stepResults: dict.stepResults,
       refinementHistory: dict.refinementHistory,
       toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
+      // BUG-038: PPTX quality evidence for review + Done Contract
+      _pptxPreflight: (dict as any)._pptxPreflight || undefined,
+      _pptxCompliance: (dict as any)._pptxCompliance || undefined,
+      _pptxContract: (dict as any)._pptxContract || undefined,
     },
     gammaDeliveryPolicy: dict.gammaDeliveryPolicy,
   };
+}
+
+// ─── Workflow Post-Processing ────────────────────────────────────────────────
+// BUG-038: When no workflow step produced a postProcessedFile, run format
+// conversion on the assembled work product so PPTX/PDF workflows still
+// generate their binary artifact. Called from handleWorkflowCompletion().
+
+/**
+ * Detect required format from WO title+description (standalone, no SharedDict).
+ */
+export function detectRequiredFormatFromText(title: string, description: string): "pptx" | "pdf" | null {
+  const text = `${title} ${description}`.toLowerCase();
+  if (/\b(pdf|portable\s*document)\b/.test(text)) return "pdf";
+  if (/\b(pptx|powerpoint|slide\s*deck|presentation|pitch\s*deck|slides)\b/.test(text)) return "pptx";
+  return null;
+}
+
+/**
+ * Run PPTX/PDF post-processing on a deliverable string outside of PocketFlow.
+ * Uses Gamma policy from the WO's workflow template settings if available,
+ * otherwise falls back to local conversion.
+ *
+ * Returns { postProcessedFile, pptxPreflight, pptxCompliance, pptxContract } or null.
+ */
+export async function postProcessWorkflowDeliverable(
+  deliverable: string,
+  format: "pptx" | "pdf",
+  workOrderId: string,
+  title: string,
+  gammaPolicy?: {
+    templateKey: string;
+    resolvedGammaId: string;
+    mode: string;
+    contentContract: string | null;
+    fallbackAllowed: boolean;
+  } | null,
+): Promise<{ path: string; mimeType: string; size: number } | null> {
+  const tmpDir = path.resolve(".local/tmp");
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  if (format === "pptx") {
+    // Run preflight
+    const contract = parseContentContract(gammaPolicy?.contentContract || null);
+    const preflight = validatePptxPreflight(deliverable, contract);
+
+    if (!preflight.ok) {
+      console.warn(`[workflow-postprocess] PPTX preflight failed for WO ${workOrderId}: ${preflight.summary}`);
+      storage.createChecklistItem({
+        workOrderId,
+        phase: "quality_review",
+        summary: `Workflow PPTX preflight failed: ${preflight.hardFailures[0]}`,
+        addedBy: "system",
+        status: "done",
+      }).catch(() => {});
+
+      // If preflight fails and no Gamma fallback, try local anyway
+      // (local pipeline is more tolerant of imperfect markdown)
+    }
+
+    // Try Gamma if policy exists and preflight passed
+    if (gammaPolicy && preflight.ok) {
+      try {
+        // BUG-041: Heartbeat callback for workflow post-process Gamma call
+        const wfHeartbeatFn = () => {
+          storage.updateWorkOrder(workOrderId, { heartbeatAt: new Date() }).catch(() => {});
+        };
+        const mode = (gammaPolicy.resolvedGammaId && gammaPolicy.resolvedGammaId !== "generate_mode") ? "from_template" : "generate";
+        const gammaResult = await withTimeout(generateWithGamma({
+          inputText: deliverable,
+          mode: mode as "generate" | "from_template",
+          gammaId: gammaPolicy.resolvedGammaId,
+          exportAs: "pptx",
+          title,
+        }, tmpDir, wfHeartbeatFn), GAMMA_HARD_TIMEOUT_MS, "Gamma PPTX (workflow post-process)");
+
+        if (gammaResult.success && gammaResult.filePath) {
+          const stats = fs.statSync(gammaResult.filePath);
+          console.log(`[workflow-postprocess] Gamma PPTX generated: ${(stats.size / 1024).toFixed(0)}KB`);
+          return {
+            path: gammaResult.filePath,
+            mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            size: stats.size,
+          };
+        }
+        console.warn(`[workflow-postprocess] Gamma failed: ${gammaResult.error} — trying local`);
+      } catch (err: any) {
+        console.warn(`[workflow-postprocess] Gamma error: ${err.message} — trying local`);
+      }
+    }
+
+    // Local fallback
+    try {
+      const isHtmlSlides = /<section[^>]*class=["'][^"']*slide[^"']*["']/i.test(deliverable.slice(0, 1000)) ||
+        (/<!DOCTYPE html|<html/i.test(deliverable.slice(0, 200)) && /<section/i.test(deliverable));
+
+      const scriptPath = isHtmlSlides
+        ? path.resolve(process.cwd(), "server/scripts/html-to-pptx.cjs")
+        : path.resolve(process.cwd(), "server/scripts/md-to-pptx.py");
+
+      if (!fs.existsSync(scriptPath)) {
+        console.warn(`[workflow-postprocess] PPTX script not found: ${scriptPath}`);
+        return null;
+      }
+
+      const ext = isHtmlSlides ? "html" : "md";
+      const inputPath = path.join(tmpDir, `wf-${workOrderId}.${ext}`);
+      const outputPath = path.join(tmpDir, `wf-${workOrderId}.pptx`);
+      fs.writeFileSync(inputPath, deliverable, "utf-8");
+
+      const safeTitle = title.replace(/"/g, '\\"');
+      const cmd = isHtmlSlides
+        ? `node "${scriptPath}" --input "${inputPath}" --output "${outputPath}"`
+        : `python3 "${scriptPath}" --input "${inputPath}" --output "${outputPath}" --title "${safeTitle}"`;
+
+      console.log(`[workflow-postprocess] Converting to PPTX via ${isHtmlSlides ? "html2pptx" : "md-to-pptx"}`);
+      const result = execSync(cmd, { timeout: 30000, encoding: "utf-8" });
+      const parsed = JSON.parse(result.trim());
+
+      if (parsed.success && fs.existsSync(outputPath)) {
+        const stats = fs.statSync(outputPath);
+        console.log(`[workflow-postprocess] Local PPTX generated: ${parsed.slideCount} slides, ${(stats.size / 1024).toFixed(0)}KB`);
+        fs.unlinkSync(inputPath);
+        return {
+          path: outputPath,
+          mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          size: stats.size,
+        };
+      }
+      fs.unlinkSync(inputPath);
+    } catch (err: any) {
+      console.warn(`[workflow-postprocess] Local PPTX failed: ${err.message}`);
+    }
+  }
+
+  if (format === "pdf") {
+    // PDF local conversion via html-to-pdf
+    try {
+      const pdfScript = path.resolve(process.cwd(), "server/scripts/html-to-pdf.cjs");
+      if (!fs.existsSync(pdfScript)) {
+        console.warn(`[workflow-postprocess] PDF script not found: ${pdfScript}`);
+        return null;
+      }
+
+      const inputPath = path.join(tmpDir, `wf-${workOrderId}.html`);
+      const outputPath = path.join(tmpDir, `wf-${workOrderId}.pdf`);
+
+      // If deliverable is markdown, wrap in basic HTML
+      const isHtml = /<!DOCTYPE html|<html/i.test(deliverable.slice(0, 200));
+      const htmlContent = isHtml ? deliverable : `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title></head><body>${deliverable}</body></html>`;
+      fs.writeFileSync(inputPath, htmlContent, "utf-8");
+
+      const cmd = `node "${pdfScript}" --input "${inputPath}" --output "${outputPath}"`;
+      execSync(cmd, { timeout: 60000, encoding: "utf-8" });
+
+      if (fs.existsSync(outputPath)) {
+        const stats = fs.statSync(outputPath);
+        console.log(`[workflow-postprocess] PDF generated: ${(stats.size / 1024).toFixed(0)}KB`);
+        fs.unlinkSync(inputPath);
+        return { path: outputPath, mimeType: "application/pdf", size: stats.size };
+      }
+      fs.unlinkSync(inputPath);
+    } catch (err: any) {
+      console.warn(`[workflow-postprocess] PDF conversion failed: ${err.message}`);
+    }
+  }
+
+  return null;
 }

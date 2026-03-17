@@ -2,8 +2,10 @@ import { storage } from "./storage";
 import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun, InsertChecklistItem } from "@shared/schema";
 import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, runAidenQualityReview, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
-import { pocketflowExecute } from "./pocketflow";
+import { pocketflowExecute, detectRequiredFormatFromText, postProcessWorkflowDeliverable } from "./pocketflow";
 import crypto from "crypto";
+import { evaluateDoneContract, buildWorkOrderCloseoutContext, type DoneDecision } from "./done-contract";
+import { buildPptxReviewSupplement, type PreflightResult, type GammaComplianceResult, type ParsedContract } from "./pptx-quality";
 
 // ─── Watchdog: Heartbeat + Attempt Ownership ─────────────────────────────────
 
@@ -77,6 +79,100 @@ async function completeAndFileWorkOrder(
     console.warn(`[completeAndFile] Attempt ${attemptId.slice(0, 8)} no longer owns WO ${workOrderId} — skipping (${label})`);
     return undefined;
   }
+
+  // ─── Done Contract Gate ────────────────────────────────────────────────────
+  // Evaluate closeout contract before writing terminal status.
+  // If the contract rejects completion, redirect to the appropriate state.
+  const currentOrder = await storage.getWorkOrder(workOrderId);
+  if (currentOrder) {
+    const tier2 = updates.tier2Result || currentOrder.tier2Result;
+    const artifacts = await storage.getArtifacts(undefined, workOrderId);
+    const candidates = await storage.getGammaGenerationRecords(workOrderId);
+    const pendingCandidates = candidates?.filter((c: any) => c.candidateStatus === "candidate") || [];
+
+    // Filing is always resolved at this point because completeAndFileWorkOrder
+    // triggers fileWorkOrderOutput() immediately after setting completed status.
+    // The artifact count is used only to compensate for prose-only deliverables.
+    const artifactCount = artifacts?.length || 0;
+
+    // Derive Gamma state from candidate records + tier2Result
+    const selectedCandidates = candidates?.filter((c: any) => c.candidateStatus === "selected") || [];
+    const hasGammaRecords = candidates && candidates.length > 0;
+    let gammaState: "none" | "success" | "candidate_review" | "failed" = "none";
+    if (hasGammaRecords) {
+      if (selectedCandidates.length > 0) gammaState = "success";
+      else if (pendingCandidates.length > 0) gammaState = "candidate_review";
+      else if (tier2?.gammaDeliveryPolicy) gammaState = "failed";
+    }
+
+    // BUG-042: Extract quality/exec review score for Done Contract
+    const recentLogs = await storage.getExecutionLogs(workOrderId);
+    const qualityLog = [...recentLogs].reverse().find((l: any) =>
+      l.action?.includes("Quality") || l.action?.includes("Executive Review")
+    );
+    const qualityScore = (qualityLog?.metadata as any)?.qualityScore
+      ?? (qualityLog?.metadata as any)?.execReview?.score
+      ?? (qualityLog?.metadata as any)?.score
+      ?? undefined;
+
+    const closeoutCtx = buildWorkOrderCloseoutContext(
+      {
+        title: currentOrder.title,
+        description: currentOrder.description || "",
+        tier2Result: tier2,
+        status: currentOrder.status,
+      },
+      {
+        filedArtifactCount: artifactCount,
+        candidateReviewPending: pendingCandidates.length > 0,
+        previewResult: null,
+        filingWillResolve: true, // filing is about to happen via fileWorkOrderOutput()
+        gammaState,
+        gammaFallbackBlocked: false, // if we reached completeAndFileWorkOrder, fallback wasn't blocked
+        qualityScore,
+        // BUG-038: Pass Gamma compliance evidence into Done Contract
+        gammaComplianceOk: (tier2?.pocketflow?._pptxCompliance as any)?.ok,
+        gammaComplianceFailures: (tier2?.pocketflow?._pptxCompliance as any)?.hardFailures,
+      }
+    );
+
+    const decision = evaluateDoneContract(closeoutCtx);
+
+    // Log the closeout decision
+    await storage.createExecutionLog({
+      workOrderId,
+      tier: 1,
+      action: `Done Contract: ${decision.terminalState}`,
+      message: decision.closeoutReason,
+      metadata: {
+        artifactClass: decision.artifactClass,
+        validationTier: decision.validationTier,
+        hardFailures: decision.hardFailures,
+        softWarnings: decision.softWarnings,
+        evidence: decision.evidence,
+        label,
+      },
+    });
+
+    addChecklistItem(workOrderId, "quality_review",
+      `Done Contract: ${decision.done ? "passed" : "blocked"} (${decision.artifactClass}/${decision.validationTier})`,
+      "system"
+    );
+
+    if (!decision.done) {
+      // Redirect to the contract-determined terminal state instead of "completed"
+      const redirected = await storage.updateWorkOrder(workOrderId, {
+        ...updates,
+        status: decision.terminalState,
+        heartbeatAt: null,
+        processingStartedAt: null,
+      });
+      console.warn(`[done-contract] WO ${workOrderId} redirected from completed → ${decision.terminalState} (${label}): ${decision.closeoutReason}`);
+      return redirected || undefined;
+    }
+  }
+  // ─── End Done Contract Gate ────────────────────────────────────────────────
+
   const completedOrder = await storage.updateWorkOrder(workOrderId, {
     ...updates,
     status: "completed",
@@ -418,7 +514,7 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
     heartbeatAt: new Date(),
     processingStartedAt: new Date(),
   });
-  addChecklistItem(orderId, "tier1_gate", "Work order submitted — awaiting Tier 1 gate");
+  addChecklistItem(orderId, "tier1_gate", `Work order submitted: "${order.title}" (${order.type}, ${order.priority}) — awaiting Tier 1 gate`);
 
   const settings = await storage.getLlmSettings();
   const useLLM = settings?.enabled === true;
@@ -437,8 +533,8 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
     workOrderId: orderId,
     tier: 1,
     action: "Aiden: Policy Gate",
-    message: `Aiden (Tier 1) received work order "${order.title}" — evaluating policy rules${useLLM ? " via LLM" : ""}.`,
-    metadata: { type: order.type, priority: order.priority, aiEnabled: useLLM, subAgentCount: activeSubAgents.length },
+    message: `Aiden (Tier 1) received work order "${order.title}" — evaluating policy rules${useLLM ? ` via LLM (${settings?.provider}/${settings?.model})` : ""}.`,
+    metadata: { type: order.type, priority: order.priority, aiEnabled: useLLM, subAgentCount: activeSubAgents.length, llmProvider: settings?.provider, llmModel: settings?.model },
   });
 
   const tier1Result: Tier1Result = useLLM && settings
@@ -462,9 +558,9 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
     tier: 1,
     action: "Aiden: Policy Decision",
     message: tier1Result.approved
-      ? `Aiden approved — routing to sub-agent: ${tier1Result.handler}${useLLM ? " (LLM)" : ""}${preferredAgent ? " (operator-directed)" : ""}.`
+      ? `Aiden approved — routing to sub-agent: ${tier1Result.handler}${useLLM ? ` (LLM: ${settings?.provider}/${settings?.model})` : ""}${preferredAgent ? " (operator-directed)" : ""}.`
       : `Aiden blocked: ${tier1Result.reason}`,
-    metadata: { ...tier1Result, ...(preferredAgent ? { operatorDirected: true, preferredAgent } : {}) },
+    metadata: { ...tier1Result, llmProvider: settings?.provider, llmModel: settings?.model, ...(preferredAgent ? { operatorDirected: true, preferredAgent } : {}) },
   });
 
   if (!tier1Result.approved) {
@@ -495,7 +591,11 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
   }
 
   const targetSubAgent = findSubAgent(activeSubAgents, tier1Result.handler);
-  addChecklistItem(orderId, "tier1_gate", `Tier 1 approved — routing to ${tier1Result.handler || "default agent"}`, "aiden");
+  addChecklistItem(orderId, "tier1_gate", `Tier 1 approved — routing to ${targetSubAgent?.name || tier1Result.handler || "default agent"} (${targetSubAgent?.controlMode || "aiden"} mode)`, "aiden");
+
+  // Resolve LLM config early so we can include it in logs and GCC
+  const preDispatchLlmConfig = resolveSubAgentLlmConfig(targetSubAgent, settings);
+  const preDispatchLlmLabel = preDispatchLlmConfig ? `${preDispatchLlmConfig.provider}/${preDispatchLlmConfig.model}` : "none";
 
   await storage.updateWorkOrder(orderId, {
     tier1Result,
@@ -505,6 +605,7 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
       correlationId: order.correlationId, status: "routing",
       handler: tier1Result.handler, mode: tier1Result.mode,
       subAgentId: targetSubAgent?.id, subAgentName: targetSubAgent?.name, controlMode: targetSubAgent?.controlMode,
+      llmProvider: preDispatchLlmConfig?.provider, llmModel: preDispatchLlmConfig?.model, llmSource: preDispatchLlmConfig?.source,
     }),
   });
 
@@ -513,13 +614,16 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
     tier: 1,
     action: "Aiden: Dispatch to Sub-Agent",
     message: targetSubAgent
-      ? `Aiden routing to sub-agent "${targetSubAgent.name}" (${targetSubAgent.controlMode} mode)`
+      ? `Aiden routing to sub-agent "${targetSubAgent.name}" (${targetSubAgent.controlMode} mode, LLM: ${preDispatchLlmLabel})`
       : `Aiden routing to handler: ${tier1Result.handler}`,
     metadata: {
       handler: tier1Result.handler,
       subAgentId: targetSubAgent?.id,
       subAgentName: targetSubAgent?.name,
       controlMode: targetSubAgent?.controlMode,
+      llmProvider: preDispatchLlmConfig?.provider,
+      llmModel: preDispatchLlmConfig?.model,
+      llmSource: preDispatchLlmConfig?.source,
     },
   });
 
@@ -636,6 +740,14 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
       metadata: { deliverableLength: deliverable.length, convergenceScore, iterations, stepCount },
     });
 
+    // BUG-038: Build PPTX quality supplement from preflight/compliance evidence
+    const pptxPreflight = tier2Result.pocketflow?._pptxPreflight as PreflightResult | undefined;
+    const pptxCompliance = tier2Result.pocketflow?._pptxCompliance as GammaComplianceResult | undefined;
+    const pptxContract = tier2Result.pocketflow?._pptxContract as ParsedContract | undefined;
+    const pptxSupplement = (pptxPreflight || pptxCompliance)
+      ? buildPptxReviewSupplement(pptxPreflight || null, pptxCompliance || null, pptxContract || null)
+      : null;
+
     qualityReview = await runAidenQualityReview(
       settings,
       order,
@@ -645,7 +757,8 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
       stepCount,
       executorLabel,
       hadSearchTools,
-      tier2Result.output?.postProcessedFile ?? null
+      tier2Result.output?.postProcessedFile ?? null,
+      pptxSupplement,
     );
 
     await storage.createExecutionLog({
@@ -659,6 +772,9 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
         issues: qualityReview.issues,
         summary: qualityReview.summary,
         approved: qualityReview.approved,
+        executor: targetSubAgent?.name,
+        llmProvider: effectiveLlmConfig?.provider,
+        llmModel: effectiveLlmConfig?.model,
       },
     });
   } else {
@@ -724,6 +840,8 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
             controlMode,
             executedBy: llmSource,
             executorName: targetSubAgent?.name,
+            llmProvider: effectiveLlmConfig?.provider,
+            llmModel: effectiveLlmConfig?.model,
             qualityReview: { score: currentQR.score, recommendation: currentQR.recommendation, issues: currentQR.issues, summary: currentQR.summary },
           },
         });
@@ -763,7 +881,7 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
           tier: 2,
           action: `${targetSubAgent?.name || "Sub-Agent"}: Revision ${revisionsDone} Complete`,
           message: `${executorLabel} completed revision attempt ${revisionsDone} — score: ${revisionResult.pocketflow?.convergenceScore?.toFixed(2) || "N/A"}.`,
-          metadata: { revisionAttempt: revisionsDone, ...revisionResult },
+          metadata: { revisionAttempt: revisionsDone, llmProvider: effectiveLlmConfig?.provider, llmModel: effectiveLlmConfig?.model, ...revisionResult },
         });
 
         const revDeliverable = revisionResult.output?.deliverable || "";
@@ -895,11 +1013,12 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
     },
   });
 
-  addChecklistItem(orderId, "quality_review", `Quality review passed (score: ${qualityReview.score.toFixed(2)})`, "aiden");
+  addChecklistItem(orderId, "quality_review", `Quality review passed (score: ${qualityReview.score.toFixed(2)}) — executor: ${executorLabel}`, "aiden");
   const completedOrder = await completeAndFileWorkOrder(orderId, {
     tier2Result,
     gccMemory: updateWorkOrderGcc(order.gccMemory as object, "completed", ["tier1_policy_pass", "pocketflow_validated", "pocketflow_execution_complete", "aiden_quality_review", "aiden_approved", "aiden_resolution"], {
       correlationId: order.correlationId, status: "completed",
+      executor: targetSubAgent?.name, llmProvider: effectiveLlmConfig?.provider, llmModel: effectiveLlmConfig?.model,
       pocketflow: tier2Result.pocketflow,
       qualityReview: {
         score: qualityReview.score,
@@ -910,7 +1029,7 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
   }, "quality-approved", attemptId);
 
   if (completedOrder) {
-    addChecklistItem(orderId, "filing", "Completed — filing deliverable to workspace");
+    addChecklistItem(orderId, "filing", `Completed — filing deliverable to workspace (${tier2Result.output?.deliverableType || "document"}${tier2Result.output?.postProcessedFile ? ", " + tier2Result.output.postProcessedFile.mimeType?.split("/").pop() + " " + ((tier2Result.output.postProcessedFile.size || 0) / 1024).toFixed(0) + "KB" : ""})`);
     // P1.4: Memory Advisor — Hook 2 (post-completion store)
     advisor.store({
       orderId: completedOrder.id,
@@ -963,8 +1082,8 @@ function findSubAgent(agents: SubAgent[], handler: string | null): SubAgent | un
       let bestMatch: SubAgent | undefined;
       let bestScore = 0;
       for (const agent of agents) {
-        const nameWords = agent.name.toLowerCase().split(/[\s_-]+/);
-        const descWords = (agent.description || "").toLowerCase().split(/[\s_-]+/);
+        const nameWords = agent.name.toLowerCase().split(/[\s_-]+/).filter(w => w.length > 0);
+        const descWords = (agent.description || "").toLowerCase().split(/[\s_-]+/).filter(w => w.length > 0);
         const allWords = [...nameWords, ...descWords];
         const matchCount = hWords.filter(w => allWords.some(aw => aw.includes(w) || w.includes(aw))).length;
         const score = matchCount / hWords.length;
@@ -1280,8 +1399,8 @@ export async function advanceWorkflowExecution(executionId: string, attemptId?: 
     await storage.createExecutionLog({
       workOrderId: execution.workOrderId, tier: hasPm ? 2 : 1,
       action: `${actor}: Step "${stepDef.name}"`,
-      message: `${actor} executing workflow step: ${stepDef.name}${stepDef.description ? ` — ${stepDef.description}` : ""}`,
-      metadata: { stepKey: stepDef.stepKey, order: stepDef.order, hasPm },
+      message: `${actor}${hasPm && pmLlmConfig ? ` (LLM: ${pmLlmConfig.provider}/${pmLlmConfig.model})` : ""} executing workflow step: ${stepDef.name}${stepDef.description ? ` — ${stepDef.description}` : ""}`,
+      metadata: { stepKey: stepDef.stepKey, order: stepDef.order, hasPm, llmProvider: pmLlmConfig?.provider, llmModel: pmLlmConfig?.model },
     });
   }
 
@@ -1349,12 +1468,14 @@ export async function advanceWorkflowExecution(executionId: string, attemptId?: 
       assignedSubAgentId: subAgent?.id || null,
     });
 
+    const stepLlmConfig = subAgent ? resolveSubAgentLlmConfig(subAgent, settings) : null;
+
     if (execution.workOrderId) {
       await storage.createExecutionLog({
         workOrderId: execution.workOrderId, tier: 2,
         action: `Sub-Agent: ${stepDef.name} Complete`,
-        message: `Step "${stepDef.name}" completed${subAgent ? ` by "${subAgent.name}"` : ""}.`,
-        metadata: { stepKey: stepDef.stepKey, tools: stepResult.toolsUsed },
+        message: `Step "${stepDef.name}" completed${subAgent ? ` by "${subAgent.name}"` : ""}${stepLlmConfig ? ` (LLM: ${stepLlmConfig.provider}/${stepLlmConfig.model})` : ""}.`,
+        metadata: { stepKey: stepDef.stepKey, tools: stepResult.toolsUsed, subAgentName: subAgent?.name, llmProvider: stepLlmConfig?.provider, llmModel: stepLlmConfig?.model },
       });
     }
 
@@ -1366,8 +1487,8 @@ export async function advanceWorkflowExecution(executionId: string, attemptId?: 
         await storage.createExecutionLog({
           workOrderId: execution.workOrderId, tier: 1,
           action: `PM: Step Review`,
-          message: `PM reviewed "${stepDef.name}" — Score: ${review.score.toFixed(2)}, Recommendation: ${review.recommendation}. ${review.feedback}`,
-          metadata: { stepKey: stepDef.stepKey, review },
+          message: `PM (LLM: ${pmLlmConfig.provider}/${pmLlmConfig.model}) reviewed "${stepDef.name}" — Score: ${review.score.toFixed(2)}, Recommendation: ${review.recommendation}. ${review.feedback}`,
+          metadata: { stepKey: stepDef.stepKey, review, llmProvider: pmLlmConfig.provider, llmModel: pmLlmConfig.model },
         });
       }
 
@@ -1380,8 +1501,8 @@ export async function advanceWorkflowExecution(executionId: string, attemptId?: 
             await storage.createExecutionLog({
               workOrderId: execution.workOrderId, tier: 1,
               action: `PM: Revision Request`,
-              message: `PM requesting revision ${currentAttempt + 1} for "${stepDef.name}": ${guidance.revisionInstructions.slice(0, 200)}`,
-              metadata: { stepKey: stepDef.stepKey, revisionAttempt: currentAttempt + 1, guidance },
+              message: `PM (LLM: ${pmLlmConfig.provider}/${pmLlmConfig.model}) requesting revision ${currentAttempt + 1} for "${stepDef.name}": ${guidance.revisionInstructions.slice(0, 200)}`,
+              metadata: { stepKey: stepDef.stepKey, revisionAttempt: currentAttempt + 1, guidance, llmProvider: pmLlmConfig.provider, llmModel: pmLlmConfig.model },
             });
           }
           await storage.updateWorkflowStepRun(nextStepRun.id, {
@@ -1400,8 +1521,8 @@ export async function advanceWorkflowExecution(executionId: string, attemptId?: 
           await storage.createExecutionLog({
             workOrderId: execution.workOrderId, tier: 1,
             action: `PM: Escalation → ${escalation.action === "hitl" ? "HITL" : "Aiden"}`,
-            message: `PM escalated step "${stepDef.name}": ${escalation.reason}. Action: ${escalation.action}`,
-            metadata: { stepKey: stepDef.stepKey, escalation },
+            message: `PM (LLM: ${pmLlmConfig.provider}/${pmLlmConfig.model}) escalated step "${stepDef.name}": ${escalation.reason}. Action: ${escalation.action}`,
+            metadata: { stepKey: stepDef.stepKey, escalation, llmProvider: pmLlmConfig.provider, llmModel: pmLlmConfig.model },
           });
         }
         if (escalation.action === "hitl") {
@@ -1710,8 +1831,8 @@ async function handleWorkflowCompletion(
     await storage.createExecutionLog({
       workOrderId: execution.workOrderId, tier: 1,
       action: "PM: Work Product Assembled",
-      message: `PM assembled final work product: "${workProduct.deliverableTitle}" (${workProduct.deliverableType}) from ${completedStepResults.length} steps.`,
-      metadata: { workProduct: { summary: workProduct.summary, type: workProduct.deliverableType, title: workProduct.deliverableTitle } },
+      message: `PM (LLM: ${pmLlmConfig.provider}/${pmLlmConfig.model}) assembled final work product: "${workProduct.deliverableTitle}" (${workProduct.deliverableType}) from ${completedStepResults.length} steps.`,
+      metadata: { workProduct: { summary: workProduct.summary, type: workProduct.deliverableType, title: workProduct.deliverableTitle }, llmProvider: pmLlmConfig.provider, llmModel: pmLlmConfig.model },
     });
   }
 
@@ -1746,10 +1867,50 @@ async function handleWorkflowCompletion(
     await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
     if (execution.workOrderId) {
       // Scan step runs for any post-processed file (PPTX, PDF, etc.) generated during execution
-      const stepPostProcessedFile = stepRuns
+      let stepPostProcessedFile = stepRuns
         .filter(r => r.status === "completed" && r.pocketflowResult)
         .map(r => (r.pocketflowResult as any)?.postProcessedFile)
-        .find(f => f && f.path);
+        .find(f => f && f.path) || null;
+
+      // BUG-038 universal fix: If no step produced a binary but the parent WO
+      // requires PPTX/PDF, run post-processing on the assembled work product now.
+      if (!stepPostProcessedFile && execution.workOrderId) {
+        const parentWo = await storage.getWorkOrder(execution.workOrderId);
+        if (parentWo) {
+          const requiredFormat = detectRequiredFormatFromText(parentWo.title, parentWo.description || "");
+          if (requiredFormat && workProduct?.deliverable) {
+            await storage.createExecutionLog({
+              workOrderId: execution.workOrderId, tier: 1,
+              action: `Aiden: Workflow Post-Process (${requiredFormat.toUpperCase()})`,
+              message: `No step produced a ${requiredFormat.toUpperCase()} binary. Running post-processing on assembled work product.`,
+              metadata: { requiredFormat, deliverableLength: workProduct.deliverable.length },
+            });
+
+            try {
+              stepPostProcessedFile = await postProcessWorkflowDeliverable(
+                workProduct.deliverable,
+                requiredFormat,
+                execution.workOrderId,
+                parentWo.title,
+              );
+              if (stepPostProcessedFile) {
+                addChecklistItem(execution.workOrderId, "filing",
+                  `Workflow post-processed: ${requiredFormat.toUpperCase()} binary generated from assembled work product`,
+                  "system"
+                );
+              }
+            } catch (ppErr: any) {
+              console.error(`[workflow-postprocess] Error: ${ppErr.message}`);
+              await storage.createExecutionLog({
+                workOrderId: execution.workOrderId, tier: 1,
+                action: "Aiden: Workflow Post-Process Failed",
+                message: `Post-processing failed: ${ppErr.message}`,
+                metadata: { error: ppErr.message, requiredFormat },
+              });
+            }
+          }
+        }
+      }
 
       const woForGcc = await storage.getWorkOrder(execution.workOrderId);
       await storage.createExecutionLog({
@@ -1810,10 +1971,47 @@ async function handleWorkflowCompletion(
       });
     }
   } else {
-    // Executive review returned "revise" but revisions exhausted — complete with best effort
+    // Executive review returned "revise" but revisions exhausted.
+    // BUG-042: If score is below 0.50, do NOT auto-complete — route to awaiting_operator instead.
+    const MIN_BEST_EFFORT_SCORE = 0.50;
+    if (execReview.score < MIN_BEST_EFFORT_SCORE) {
+      await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
+      if (execution.workOrderId) {
+        await storage.updateWorkOrder(execution.workOrderId, { status: "awaiting_operator" });
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId, tier: 1,
+          action: "Aiden: Low-Quality Escalation",
+          message: `Executive review score ${execReview.score.toFixed(2)} is below ${MIN_BEST_EFFORT_SCORE} threshold — escalating to operator instead of best-effort completion. Issues: ${execReview.issues?.join("; ") || execReview.feedback}`,
+          metadata: { execReview, threshold: MIN_BEST_EFFORT_SCORE },
+        });
+        addChecklistItem(execution.workOrderId, "quality_review",
+          `Escalated to operator: exec review score ${execReview.score.toFixed(2)} < ${MIN_BEST_EFFORT_SCORE} threshold — deliverable does not meet requirements`,
+          "aiden"
+        );
+      }
+      return;
+    }
+
+    // Score >= 0.50: complete with best effort
     await storage.updateWorkflowExecution(executionId, { status: "completed", completedAt: new Date() });
     if (execution.workOrderId) {
-      const woForGcc = await storage.getWorkOrder(execution.workOrderId);
+      // BUG-038: Try to produce binary if the WO requires it
+      let fallbackPostProcessedFile: { path: string; mimeType: string; size: number } | null = null;
+      const parentWo = await storage.getWorkOrder(execution.workOrderId);
+      if (parentWo && workProduct?.deliverable) {
+        const requiredFormat = detectRequiredFormatFromText(parentWo.title, parentWo.description || "");
+        if (requiredFormat) {
+          try {
+            fallbackPostProcessedFile = await postProcessWorkflowDeliverable(
+              workProduct.deliverable, requiredFormat, execution.workOrderId, parentWo.title,
+            );
+          } catch (ppErr: any) {
+            console.warn(`[workflow-postprocess] Fallback post-process failed: ${ppErr.message}`);
+          }
+        }
+      }
+
+      const woForGcc = parentWo || await storage.getWorkOrder(execution.workOrderId);
       await completeAndFileWorkOrder(execution.workOrderId, {
         tier2Result: {
           blocked: false,
@@ -1825,9 +2023,10 @@ async function handleWorkflowCompletion(
             deliverable: workProduct.deliverable,
             deliverableType: workProduct.deliverableType || "markdown",
             deliverableTitle: workProduct.deliverableTitle || template?.name || "Workflow Output",
+            ...(fallbackPostProcessedFile ? { postProcessedFile: fallbackPostProcessedFile } : {}),
           },
         },
-        gccMemory: updateWorkOrderGcc(woForGcc?.gccMemory as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
+        gccMemory: updateWorkOrderGcc((woForGcc?.gccMemory || {}) as object, "workflow_completed", ["workflow_steps_complete", "workflow_completed"], {
           workflowExecutionId: executionId, status: "completed",
         }),
       }, "workflow-revise-fallback", attemptId);

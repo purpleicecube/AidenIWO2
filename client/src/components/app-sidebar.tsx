@@ -1,5 +1,6 @@
 import { LayoutDashboard, ClipboardList, Plus, Activity, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical, MessageSquare, Users, LogOut, Shield } from "lucide-react";
 import { useLocation, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,10 @@ export function AppSidebar() {
   const { user } = useAuth();
   const userRole = (user as any)?.role || "viewer";
   const userLevel = ROLE_LEVEL[userRole] || 1;
+  const { data: healthData } = useQuery<{ version: string }>({
+    queryKey: ["/api/health"],
+    staleTime: 300_000, // 5 min
+  });
 
   const canSee = (minRole: string) => userLevel >= (ROLE_LEVEL[minRole] || 1);
 
@@ -163,7 +168,7 @@ export function AppSidebar() {
           </div>
         )}
         <div className="text-xs text-muted-foreground">
-          AIDEN_IWO2 v0.9.5
+          AIDEN_IWO2 v{healthData?.version || "..."}
         </div>
       </SidebarFooter>
     </Sidebar>

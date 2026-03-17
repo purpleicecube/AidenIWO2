@@ -11,9 +11,11 @@
 "use strict";
 
 const path = require("path");
-const { chromium } = require(path.join(
-  "/home/virgina/claude-office-skills/node_modules/playwright"
-));
+// Playwright sourced from PLAYWRIGHT_PATH env var, or claude-office-skills fallback.
+// On Replit/staging, set PLAYWRIGHT_PATH to the correct node_modules/playwright location.
+const playwrightPath = process.env.PLAYWRIGHT_PATH
+  || path.join(process.env.SKILLS_DIR || "/home/virgina/claude-office-skills", "node_modules/playwright");
+const { chromium } = require(playwrightPath);
 
 const args = process.argv.slice(2);
 const getArg = (flag) => {

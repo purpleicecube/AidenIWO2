@@ -293,8 +293,9 @@ export default function SystemHealth() {
                   {[
                     { label: "API Endpoint", key: "api" as const },
                     { label: "Database Connection", key: "database" as const },
-                    { label: "Orchestration Pipeline", key: "orchestration" as const },
-                    { label: "Schema Validation", key: "schemaValidation" as const },
+                    { label: "LLM Provider", key: "llm" as const },
+                    { label: "Gamma API", key: "gamma" as const },
+                    { label: "Session / Auth", key: "session" as const },
                   ].map((check) => (
                     <div key={check.key} className="flex items-center justify-between">
                       <span className="text-sm">{check.label}</span>

@@ -69,11 +69,16 @@ interface PollResult {
   raw: Record<string, any>;
 }
 
-async function pollGeneration(generationId: string): Promise<PollResult> {
+async function pollGeneration(generationId: string, onHeartbeat?: () => void): Promise<PollResult> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < POLL_TIMEOUT_MS) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+    // BUG-041: Emit heartbeat on each poll so watchdog knows we're alive
+    if (onHeartbeat) {
+      try { onHeartbeat(); } catch { /* best-effort */ }
+    }
 
     const res = await gammaFetch(`/generations/${generationId}`);
     if (!res.ok) {
@@ -157,6 +162,7 @@ async function downloadFile(url: string, outputPath: string): Promise<number> {
 export async function generateWithGamma(
   options: GammaGenerateOptions,
   outputDir: string,
+  onHeartbeat?: () => void,
 ): Promise<GammaResult> {
   try {
     // 1. Kick off generation
@@ -202,8 +208,8 @@ export async function generateWithGamma(
 
     console.log(`[gamma] Generation created: ${generationId} — polling...`);
 
-    // 2. Poll for completion
-    const pollResult = await pollGeneration(generationId);
+    // 2. Poll for completion (BUG-041: pass heartbeat to keep watchdog alive)
+    const pollResult = await pollGeneration(generationId, onHeartbeat);
 
     // 3. Download the exported file
     fs.mkdirSync(outputDir, { recursive: true });

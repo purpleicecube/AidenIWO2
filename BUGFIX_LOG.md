@@ -12,6 +12,7 @@ App version: rest-express 1.0.0
 3. Code Review Findings
 4. Performance Analysis
 5. Infrastructure Changes
+6. Session 11 — Gamma PPTX Remediation + Workflow Post-Processing (2026-03-15)
 
 ---
 
@@ -636,6 +637,214 @@ Assembly rule: build a map keyed by `artifact_key`, traverse step results in exe
 
 ---
 
+## Session 8 — IWO2 Hardened Init (2026-03-08)
+
+App version: v0.8.0 → IWO2 init (commit `348af40`, `6592929`)
+
+### BUG-026: Unguarded `/api/images` routes — authentication bypass
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Critical** (P0 security) |
+| Component | `server/routes.ts` — image upload/retrieval endpoints |
+| Root Cause | `GET /api/images/:placeholderId` and `GET /api/images/:placeholderId/meta` routes were registered without the `isAuth` middleware, allowing unauthenticated access to any uploaded image by guessing the placeholder ID. |
+| Fix | Added `isAuth` middleware to both routes. Commit `6592929`. |
+| Verification | `security.test.ts` — P0 gate test confirms auth-protected image endpoints. |
+
+---
+
+## Session 9 — v0.9.2 / v0.9.5 Release (2026-03-13 / 2026-03-14)
+
+App version: v0.9.2, then v0.9.5 (commits `d56957a`, `4c40fe2`, `817b76b`)
+
+### BUG-027: Dashboard/detail work order status out-of-sync
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Component | `client/src/pages/work-order-detail.tsx` |
+| Root Cause | The work order detail view used `staleTime: Infinity` (inherited from global React Query config) and polling that stopped on any non-processing status. The dashboard page overrode `staleTime: 5000` explicitly. After a WO completed, the detail page showed stale "processing" status while the dashboard showed "completed". |
+| Fix | Set `staleTime: 3000` on both order and logs queries. Added `refetchOnMount: "always"` so navigating in always fetches fresh data. Added fallback `refetchInterval` of 10s (order) / 15s (logs) for non-processing states so completed/blocked orders self-correct without manual refresh. Commit `4c40fe2`. |
+
+### BUG-028: Standalone workflow output silently dropped — never reached Sandbox
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Component | `server/orchestration.ts` — `handleWorkflowCompletion()` |
+| Root Cause | `fileWorkOrderOutput()` was gated behind `if (execution.workOrderId)` with no `else` branch. When a workflow execution had no parent work order (`workOrderId: null`), the completed deliverable was silently dropped — never reaching the Sandbox for preview/download. |
+| Fix | Added a create→update two-step that fires after executive review approval for any HTML/code deliverable, regardless of whether a work order is attached. Commit `817b76b`. |
+
+### BUG-029: Contract drift — workflow PM completion writes to wrong fields
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Component | `server/orchestration.ts`, `server/workflow-pm.ts`, `shared/schema.ts`, `server/llm-client.ts` |
+| Root Cause | After the schema was refactored to use `tier2Result` (a structured JSON object), the workflow PM completion path still wrote to legacy `result` and `deliverableType` fields that no longer existed on the schema. Additionally, synthetic `WorkOrder` and `Tier1Result` objects passed to helper functions did not match the actual schema shape — missing required fields, wrong types. This caused 17 TypeScript compilation errors. |
+| Fix | (1) Workflow PM completion now writes to `tier2Result` with proper structure. (2) Synthetic WorkOrder shapes aligned to actual schema (all required fields present). (3) Synthetic Tier1Result aligned to actual Zod schema. (4) `toolsUsed` added to `Tier2Result` type definition. (5) `gccMemory` exposed in work order insert schema so operators can set GCC on creation. All 17 TS errors resolved, 50/50 tests pass. Embedded in release commit `d56957a`. |
+| Related | CODEX review 5.4 identified this contract drift. |
+
+### BUG-030: EXECUTE_WORKFLOW chat action JSON sanitization
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Medium** |
+| Component | `server/routes.ts` — chat action EXECUTE_WORKFLOW handler |
+| Root Cause | When Aiden emitted an `<!-- AIDEN_ACTION:EXECUTE_WORKFLOW:{...} -->` block in chat, the LLM sometimes hallucinated trailing `}}` instead of `}` at the end of the JSON payload, causing `JSON.parse()` to fail silently. The workflow was never created but no error was surfaced to the operator. |
+| Fix | Added JSON sanitization loop: strips trailing `}` characters while the string is invalid JSON (using `isValidJson()` helper). The action block is also always stripped from the visible reply, even if workflow creation fails. Embedded in release commit `d56957a`. |
+
+### BUG-031: `toolsUsed` missing from Tier2Result type
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Medium** |
+| Component | `server/llm-client.ts` — `tier2ResponseSchema` |
+| Root Cause | PocketFlow populated `toolsUsed` on the Tier 2 result, but the Zod schema defining `Tier2Result` did not include `toolsUsed`. This caused TypeScript errors when accessing the field and meant the data was silently stripped during validation. |
+| Fix | Added `toolsUsed: z.array(z.any()).optional()` to `tier2ResponseSchema`. Embedded in release commit `d56957a`. |
+
+### BUG-032: `gccMemory` blocked on work order insert schema
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Low** |
+| Component | `shared/schema.ts` — `insertWorkOrderSchema` |
+| Root Cause | The insert schema for work orders omitted `gccMemory` via `.omit()`, preventing operators from setting initial GCC context when creating a work order through the API. This blocked the reopen flow from carrying forward accumulated GCC state. |
+| Fix | Removed `gccMemory` from the `.omit()` list in `insertWorkOrderSchema`. Embedded in release commit `d56957a`. |
+
+### BUG-033: LLM client — no timeout or retry configured
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Component | `server/llm-client.ts` — `callOpenAICompatible()`, `callAnthropic()`, `chatWithAiden()` |
+| Root Cause | Both the OpenAI and Anthropic SDK clients were instantiated without timeout or retry settings. A hung LLM call (e.g., during PocketFlow quality review) would block the work order indefinitely — the step would stay "running" with output present but the PM review never completed. This was the root cause of the known issue documented in CLAUDE.md ("PocketFlow quality review LLM call can hang mid-step"). |
+| Fix | Added `timeout: 45000` (45s) and `maxRetries: 1` to all three client instantiation points (OpenAI-compatible, Anthropic, and chat-with-Aiden Anthropic). Embedded in release commit `d56957a`. |
+
+### BUG-034: Orphan recovery — incomplete field cleanup
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Medium** |
+| Component | `server/orchestration.ts` — `recoverOrphanedProcessingOrders()` |
+| Root Cause | When the startup orphan recovery detected stale "processing" orders (>10 min), it set `status: "failed"` but did not clear the new watchdog fields (`processingAttemptId`, `heartbeatAt`, `processingStartedAt`). This left ghost ownership data on the recovered order, potentially confusing the runtime watchdog when it started its sweep cycle. |
+| Fix | Added `processingAttemptId: null`, `heartbeatAt: null`, `processingStartedAt: null` to the recovery update. Embedded in release commit `d56957a`. |
+
+---
+
+## Session 10 — v0.9.5 Hotfixes (2026-03-14)
+
+App version: v0.9.5 (commits `e1f082c`, `2824869`)
+
+### BUG-035: HTML output threshold too strict — valid HTML rejected
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Component | `server/pocketflow.ts` — `selectBestHtmlOutput()` (line ~809) |
+| Root Cause | `selectBestHtmlOutput()` used a score threshold of 80 to determine whether a step output was "real HTML." However, valid HTML documents with proper `<head>` and `<body>` structure scored only ~60 (presence of both tags + basic structure = 60 points, with bonus points for `<!DOCTYPE>`, `<style>`, etc.). This caused the function to return `null` for valid HTML, falling through to raw text assembly which produced broken output. |
+| Fix | Lowered threshold from 80 to 40. A score of 40+ reliably indicates real HTML content (any document with `<html>`, `<head>`, or `<body>` tags). Commit `e1f082c`. |
+| Trigger | Observed after v0.9.5 release: workflow-produced HTML pages were being delivered as raw markdown/text instead of rendered HTML. |
+
+### BUG-036: Chat workflow silent failure — advanceWorkflowExecution error lost
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Component | `server/routes.ts` — EXECUTE_WORKFLOW chat action handler (line ~3504) |
+| Root Cause | After creating the workflow template, steps, execution, and parent work order, the handler called `advanceWorkflowExecution()` inside a `setImmediate()` callback. If the advance failed (e.g., sub-agent LLM misconfigured, step assignment error), the error was caught by `console.error` only — the parent work order remained in "processing" status indefinitely, and the operator saw no indication of failure. |
+| Fix | Wrapped the `setImmediate` callback with try/catch that: (1) syncs the parent work order status to "failed", (2) writes an execution log entry with the error details, (3) catches and logs any secondary errors during status sync. Commit `e1f082c`. |
+
+### BUG-037: Deployment-type steps overwrite content deliverable in PM assembly
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Critical** |
+| Component | `server/orchestration.ts` — `handleWorkflowCompletion()`, `server/workflow-pm.ts` — `pmAssembleWorkProduct()` |
+| Root Cause | When a multi-step workflow completed, `pmAssembleWorkProduct()` received all step outputs equally. Deployment sub-agents (e.g., Paul/Polaris) produce operational reports ("Deployed to Sandbox, URL: ...") as their step output. Because the PM treated all steps as content, the deployment report was blended into — or even replaced — the actual content deliverable (e.g., a presentation deck's content was replaced by Paul's deployment confirmation). This was visible in Gamma-produced PPTX where the slides contained deployment metadata instead of the requested content. |
+| Fix | Three-part fix across two files: (1) In `handleWorkflowCompletion()`, look up each completed step's sub-agent type via `storage.getSubAgent()`, tag deployment-type agents as `role: "metadata"` and all others as `role: "content"`. (2) In `pmAssembleWorkProduct()`, updated function signature to accept role-annotated step results. Content steps go to the PM for assembly; metadata steps are passed as informational context only, with explicit instructions NOT to blend them into the deliverable body. (3) Updated all three assembly paths (LLM assembly, LLM fallback, error fallback) to filter `role !== "metadata"` from content concatenation. Commit `2824869`. |
+| Trigger | Gamma PPTX generated from a workflow showed Paul's deployment report in the slides instead of Mark's researched content. |
+
+---
+
+## Session 11 — Gamma PPTX Remediation + Workflow Post-Processing (2026-03-15)
+
+App version: v0.9.5
+
+### BUG-038: Gamma PPTX generation accepts weak slide content and closes without deck-quality safeguards
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Status | **Fixed** (2026-03-15) |
+| Components | `server/pptx-quality.ts` (new), `server/pocketflow.ts`, `server/llm-client.ts`, `server/done-contract.ts`, `server/workspace-filing.ts`, `server/orchestration.ts` |
+| Symptom | Gamma-backed PPTX work orders can complete with technically valid `.pptx` output that is visibly poor: overlapping text, weak slide pacing, sparse or collision-prone layouts, and confusing operator preview behavior in Sandbox. |
+| Root Cause | Four upstream/downstream weaknesses unrelated to the Done Contract: (1) No preflight validation — any markdown, including prose blobs, empty shells, and raw JSON, was sent directly to Gamma. (2) No post-Gamma structural verification — "file exists" was the only success check. (3) Aiden quality review was biased toward content text and could not evaluate slide-presentation fitness. (4) Sandbox preview showed markdown deliverable labeled as "Document preview" for PPTX work orders, confusing operators. |
+| Fix | Six-part remediation per `AIDEN_IWO2_GAMMA_PPTX_REMEDIATION_EXECUTION_PLAN_v0.1.0.md`: (1) **Preflight validator** (`server/pptx-quality.ts:validatePptxPreflight`) — rejects empty, too-short, JSON, placeholder, unsegmented prose, and escaped-newline content before Gamma; checks contract slide range and required sections. (2) **Contract parser** (`parseContentContract`) — extracts `minSlides`, `maxSlides`, `requiredSections`, `maxBulletsPerSlide` from contentContract text. (3) **Post-Gamma compliance** (`checkGammaCompliance`) — verifies file existence, size, MIME consistency, estimates slide count vs contract range. (4) **PPTX review supplement** (`buildPptxReviewSupplement`) — injects preflight/compliance/contract evidence into Aiden quality review prompt so LLM can reject weak presentation-quality source even when a binary exists. (5) **Done Contract compliance gate** — Gamma compliance hard failures block `completed` status. (6) **Preview labeling** — PPTX/PDF work orders now show "Source Preview" sandbox label with description noting final deliverable is a .pptx/.pdf file. |
+| Files Changed | `server/pptx-quality.ts` (new, 310 lines), `server/pocketflow.ts` (preflight gate + compliance check + result propagation), `server/llm-client.ts` (PPTX supplement parameter), `server/orchestration.ts` (supplement construction + compliance evidence passthrough), `server/done-contract.ts` (gammaComplianceOk gate), `server/workspace-filing.ts` (source_preview type + PPTX labeling), `server/__tests__/pptx-quality.test.ts` (new, 28 tests) |
+| Verification | 208 tests pass across 8 test files. Preflight rejects: empty, short, JSON, TODO/placeholder, prose blob, escaped newlines, below-contract slide count, missing required sections. Compliance rejects: missing file, suspiciously small file. Done Contract blocks PPTX completion on Gamma compliance hard failures. Candidate review still blocks even with good compliance. Sandbox labels distinguish source preview from final artifact. |
+| Residual Risk | (1) Post-Gamma slide count is estimated from source markdown, not parsed from the binary PPTX — real slide count may differ from Gamma's auto-layout decisions. Phase 2 could add lightweight PPTX binary parsing via python-pptx. (2) Rendered visual quality (overlapping text, layout collisions) is not directly measurable without screenshot-based scoring — preflight catches the source-quality root cause but cannot guarantee Gamma's layout engine renders well. (3) Content contract parsing is heuristic and tolerant — malformed contracts fall back to generous defaults. |
+| Execution Doc | `AIDEN_IWO2_GAMMA_PPTX_REMEDIATION_EXECUTION_PLAN_v0.1.0.md` |
+| Notes | Preserves existing fallback behavior, `candidate_review`, and Done Contract architecture. No DB/schema changes. No pipeline redesign. |
+
+### BUG-039: Workflow-assembled PPTX/PDF work orders never produce a binary when no step generates one
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Critical** |
+| Status | **Fixed** (2026-03-15) |
+| Components | `server/orchestration.ts`, `server/pocketflow.ts` |
+| Symptom | A PPTX workflow ("WF: Klear.ai EWC Intro Deck") completed all 4 steps, PM assembled the work product, but no `.pptx` binary was generated. The Done Contract correctly blocked completion ("PPTX binary missing"), operator had to HITL override, and the artifact was filed as HTML/markdown only — no PPTX on the platform or in Gamma. |
+| Root Cause | `handleWorkflowCompletion()` scanned step runs for a `postProcessedFile` (line 1843), but when no step produced one (TOM's PocketFlow ran with LLM disabled and produced a prose report instead of slide markdown), the assembled work product was sent to `completeAndFileWorkOrder()` with no binary. There was **no fallback mechanism** to run PPTX/PDF post-processing on the PM-assembled deliverable. The gap: individual step PocketFlow runs call `nodePostProcess()` for format conversion, but the PM work product assembly has no equivalent post-processing step. |
+| Fix | Added `postProcessWorkflowDeliverable()` — an exported function in `server/pocketflow.ts` that runs Gamma or local md-to-pptx/html-to-pdf conversion on a deliverable string, outside PocketFlow's SharedDict context. Wired into **both** workflow completion paths in `server/orchestration.ts`: (1) exec-approved path (PM assembly → Aiden approval → completion) and (2) revise-fallback path (revisions exhausted → best-effort completion). The function activates only when: (a) no step already produced a `postProcessedFile`, (b) the parent WO title/description requires PPTX or PDF (via `detectRequiredFormatFromText()`), and (c) the assembled work product has content. Also added `detectRequiredFormatFromText()` as an exported standalone format detector that works without a PocketFlow SharedDict. |
+| Files Changed | `server/pocketflow.ts` (`postProcessWorkflowDeliverable()`, `detectRequiredFormatFromText()` — ~130 lines), `server/orchestration.ts` (workflow post-process safety net in both completion paths, import wiring) |
+| Verification | 208 tests pass across 8 test files. Execution logs for the test WO confirm: Done Contract blocked the WO before the fix ("PPTX binary missing"), and the new code path would produce a log entry "No step produced a PPTX binary. Running post-processing on assembled work product." followed by local md-to-pptx or Gamma conversion. |
+| Residual Risk | (1) The workflow post-processing fallback does not have access to per-workflow Gamma template keys — it uses global settings or no Gamma. Full workflow-template Gamma resolution would require reading the workflow template's `gammaTemplateKey` in the fallback path (not done in this pass to keep the fix minimal). (2) If the assembled work product is poor-quality markdown (e.g., TOM produced a prose report), the local md-to-pptx conversion will produce a low-quality deck — the BUG-038 preflight validator mitigates this by rejecting obviously bad input before Gamma, but the local fallback is more tolerant. |
+| Notes | Preserves all existing behavior — this is a pure safety net. If any step already produced a binary, it's used as before. No DB/schema changes. |
+
+### BUG-040: Tier 1 sub-agent routing matches wrong agent due to empty-string fuzzy match
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Status | **Fixed** (2026-03-15) |
+| Components | `server/orchestration.ts` (`findSubAgent()`) |
+| Symptom | Aiden correctly decided `handler: "B04_MKTG"` (Mark, the marketing agent) but dispatched to `A016_Polaris` (Paul, the deployment agent). Paul then blocked the WO because he's a deployment specialist, not a content creator. Repeated overrides all routed to Paul. |
+| Root Cause | `findSubAgent()` fuzzy matching split agent names by `/[\s_-]+/` which produced empty strings from trailing spaces in agent names (e.g., `"A016_Polaris ( PAUL PERSONA ) "` has trailing space → split produces `""`). In JavaScript, `"anything".includes("")` returns `true`, so the empty string acted as a **universal match** — every handler word matched every agent. Paul appeared before Mark in the iteration order, so Paul won the tie at score 1.0. |
+| Fix | Added `.filter(w => w.length > 0)` to both `nameWords` and `descWords` splits in `findSubAgent()` to remove empty strings before fuzzy scoring. One-line change. |
+| Files Changed | `server/orchestration.ts` (line 1060-1061) |
+| Verification | 208 tests pass. Manual trace confirms: with the fix, `findSubAgent("B04_MKTG")` returns Mark (score 1.0, both `"b04"` and `"mktg"` match) while Paul scores 0.0 (no matches). |
+
+### BUG-041: Watchdog kills active Gamma PPTX generation due to heartbeat starvation
+
+| Field | Detail |
+| --- | --- |
+| Severity | **High** |
+| Status | **Fixed** (2026-03-15) |
+| Components | `server/gamma-client.ts`, `server/pocketflow.ts` |
+| Symptom | PPTX workflow WOs fail with "Watchdog: Stuck Detection — No heartbeat for 63s" while Gamma is still actively generating. The WO is killed and set to `failed` even though execution is progressing normally. |
+| Root Cause | `HEARTBEAT_STALE_MS` is 60s but Gamma generation can take 60-150s. During the `await generateWithGamma()` call, no heartbeats are emitted because the polling loop inside `gamma-client.ts` doesn't update the WO heartbeat. The watchdog sees 60s of silence and kills the WO. |
+| Fix | Added `onHeartbeat` callback parameter to `pollGeneration()` and `generateWithGamma()` in `gamma-client.ts`. Each 5s poll iteration now calls the callback, which updates `heartbeatAt` on the WO via storage. Wired into all three Gamma call sites in `pocketflow.ts`: PPTX nodePostProcess, PDF nodePostProcess, and workflow post-process helper. Keeps the 60s stale threshold for truly stuck WOs while allowing Gamma's full 150s generation window. |
+| Files Changed | `server/gamma-client.ts` (onHeartbeat callback in pollGeneration + generateWithGamma), `server/pocketflow.ts` (heartbeat functions at 3 Gamma call sites) |
+| Verification | 220 tests pass. Gamma generation >60s will now emit heartbeats every 5s during polling, preventing watchdog false kills. |
+| Residual Risk | If Gamma's API itself hangs (no poll HTTP response for >60s), heartbeats will still starve — but that's correct behavior (truly stuck external dependency). |
+
+### BUG-042: Low-quality workflow deliverables auto-complete without operator review
+
+| Field | Detail |
+| --- | --- |
+| Severity | **Critical** |
+| Status | **Fixed** (2026-03-15) |
+| Components | `server/orchestration.ts`, `server/done-contract.ts` |
+| Symptom | A workflow WO ("WF: Klear.ai Upsell Program Site Creation") completed with status `completed` despite: PM reviewing steps at 0.20 (twice), Aiden executive review scoring 0.40 with recommendation `revise` and identifying "deliverable contains only step metadata, not the final artifact." The operator received a garbage deliverable marked as completed. |
+| Root Cause | Two gaps: (1) The revise-fallback path in `handleWorkflowCompletion()` auto-completes with "best effort" when exec review returns `revise` but revisions are exhausted — regardless of how low the score is. A 0.40 score (below any reasonable acceptance threshold) was treated the same as a 0.70 score. (2) The Done Contract's `"other"` artifact class only checked for deliverable presence and filing — it had no score-based quality gate, so any deliverable that existed would pass closeout. |
+| Fix | **Defense in depth — two independent gates:** (1) In `handleWorkflowCompletion()` revise-fallback path: if exec review score is below 0.50, route to `awaiting_operator` instead of auto-completing. Logs the escalation with score and issues. (2) In Done Contract `evaluateDoneContract()`: new shared hard-failure check — if `qualityScore` is below 0.50, blocks completion with `"Quality score X.XX is below minimum 0.50 for completion"`. Score is extracted from the most recent quality/exec review execution log for the WO. Both gates produce `awaiting_operator` terminal state so the operator can review and decide. |
+| Files Changed | `server/orchestration.ts` (revise-fallback score gate + quality score extraction for Done Contract), `server/done-contract.ts` (qualityScore field on CloseoutContext + shared hard-failure check + terminal state mapping) |
+| Verification | The Upsell Program WO (exec review 0.40) would now: (a) be caught by Option 1 in handleWorkflowCompletion and routed to awaiting_operator, and (b) even if it somehow reached completeAndFileWorkOrder, be caught by Option 2 in Done Contract and blocked. |
+| Residual Risk | The 0.50 threshold is a constant — not operator-configurable in this pass. Borderline cases (0.48 vs 0.52) are judgment calls. A future enhancement could make this threshold configurable in operational settings. |
+
+---
+
 ## Summary
 
 | Category | Count | Critical | High | Medium | Low |
@@ -646,7 +855,11 @@ Assembly rule: build a map keyed by `artifact_key`, traverse step results in exe
 | Bugs fixed (Session 4) | 3 | 1 | 1 | 1 | 0 |
 | Bugs fixed (Session 5) | 4 | 0 | 3 | 1 | 0 |
 | Bugs fixed (Session 7) | 5 | 0 | 5 | 0 | 0 |
-| **Total bugs fixed** | **25** | **4** | **15** | **6** | **0** |
+| Bugs fixed (Session 8) | 1 | 1 | 0 | 0 | 0 |
+| Bugs fixed (Session 9) | 8 | 0 | 4 | 3 | 1 |
+| Bugs fixed (Session 10) | 3 | 1 | 2 | 0 | 0 |
+| Bugs fixed (Session 11) | 5 | 2 | 3 | 0 | 0 |
+| **Total bugs fixed** | **42** | **8** | **20** | **10** | **1** |
 | Feature implementations (Session 6) | 3 | — | — | — | — |
 | Code review findings | 6 | 0 | 0 | 1 | 5 |
 | Performance findings | 1 | — | — | — | — |

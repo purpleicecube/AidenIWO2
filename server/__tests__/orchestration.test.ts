@@ -16,6 +16,9 @@ vi.mock("../storage.js", () => ({
     getOperationalSettings: vi.fn().mockResolvedValue({ memoryAdvisor: "none", currentMode: "autonomous" }),
     getActiveSubAgents: vi.fn().mockResolvedValue([]),
     createChecklistItem: vi.fn().mockResolvedValue({}),
+    getArtifacts: vi.fn().mockResolvedValue([]),
+    getGammaGenerationRecords: vi.fn().mockResolvedValue([]),
+    getExecutionLogs: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -52,8 +55,8 @@ function makeOrder(overrides: Record<string, any> = {}) {
   return {
     id: "wo-001",
     title: "Test Work Order",
-    description: "Write a report on Q1 sales",
-    type: "document",
+    description: "Analyze Q1 sales data and summarize findings",
+    type: "standard",
     priority: "medium",
     status: "pending",
     correlationId: "corr-001",

@@ -61,6 +61,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // ── Pre-flight env validation ──────────────────────────────────────────
+  const { enforceEnvOrDie } = await import("./env-check");
+  enforceEnvOrDie();
+
   // Push database schema and seed
   try {
     const { seedDatabase } = await import("./seed");

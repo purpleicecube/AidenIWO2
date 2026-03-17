@@ -1031,6 +1031,10 @@ export default function SubAgentsPage() {
                             setTestingLlm(true);
                             setTestResult(null);
                             try {
+                              // Save current form values first so test uses the updated config
+                              const currentValues = form.getValues();
+                              await apiRequest("PUT", `/api/sub-agents/${editingAgent.id}`, currentValues);
+                              queryClient.invalidateQueries({ queryKey: ["/api/sub-agents"] });
                               const res = await apiRequest("POST", `/api/sub-agents/${editingAgent.id}/test-llm`);
                               const result = await res.json();
                               setTestResult(result);

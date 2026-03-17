@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
+import { APP_VERSION, BUILD_ID } from "./version";
 import { sendInviteEmail } from "./sendgrid";
 import { isAuthenticated as _isAuthenticated } from "./replit_integrations/auth";
 const isAuth: any = _isAuthenticated;
@@ -125,29 +126,48 @@ export async function registerRoutes(
   app.get("/api/health", async (_req, res) => {
     try {
       const uptime = Math.floor((Date.now() - startTime) / 1000);
+
+      // DB check — actually query the database
       let dbHealthy = false;
       try {
         await storage.getWorkOrderStats();
         dbHealthy = true;
       } catch {}
 
+      // LLM check — are provider keys configured?
+      const llmSettings = await storage.getLlmSettings().catch(() => null);
+      const llmEnabled = llmSettings?.enabled === true;
+      const hasGroq = !!process.env.GROQ_API_KEY;
+      const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
+      const llmAvailable = llmEnabled && (hasGroq || hasOpenRouter);
+
+      // Gamma check — is the API key set?
+      const gammaConfigured = !!process.env.GAMMA_API_KEY;
+
+      // Session check — is SESSION_SECRET set?
+      const sessionConfigured = !!process.env.SESSION_SECRET;
+
+      const allHealthy = dbHealthy && llmAvailable && sessionConfigured;
+
       res.json({
-        status: "ok",
+        status: allHealthy ? "ok" : "degraded",
         timestamp: new Date().toISOString(),
-        version: "0.9.5",
+        version: APP_VERSION,
         uptime,
         services: {
           database: dbHealthy ? "healthy" : "unhealthy",
-          tier1: "active",
-          tier1_5: "active",
-          tier2: "active",
+          tier1: llmAvailable ? "active" : "unavailable",
+          tier1_5: llmAvailable ? "active" : "unavailable",
+          tier2: llmAvailable ? "active" : "unavailable",
           gccMemory: "active",
+          gamma: gammaConfigured ? "active" : "not configured",
         },
         checks: {
           api: true,
           database: dbHealthy,
-          orchestration: true,
-          schemaValidation: true,
+          llm: llmAvailable,
+          gamma: gammaConfigured,
+          session: sessionConfigured,
         },
       });
     } catch (err) {
@@ -455,8 +475,12 @@ export async function registerRoutes(
 
       const previousResult = order.tier2Result as Record<string, any> | null;
       const previousOutput = previousResult?.output;
+      const fullDeliverable = previousOutput?.deliverable || "";
+      const deliverableType = previousOutput?.deliverableType || "document";
+      const isHtml = /^<!DOCTYPE\s+html|^<html[\s>]/i.test(fullDeliverable.trim());
+      const deliverableFormat = isHtml ? "html" : deliverableType;
       const previousDeliverableSummary = previousOutput
-        ? `[Previous output message: "${previousOutput.message || "N/A"}"] [Previous deliverable title: "${previousOutput.deliverableTitle || "N/A"}"] [Previous deliverable type: "${previousOutput.deliverableType || "N/A"}"] [Previous deliverable (first 2000 chars): ${(previousOutput.deliverable || "").slice(0, 2000)}]`
+        ? `[Previous output message: "${previousOutput.message || "N/A"}"] [Previous deliverable title: "${previousOutput.deliverableTitle || "N/A"}"] [Previous deliverable type: "${previousOutput.deliverableType || "N/A"}"] [Format: ${deliverableFormat}] [Previous deliverable — COMPLETE]:\n${fullDeliverable}`
         : null;
 
       const gccMemory: Record<string, any> = {
@@ -505,8 +529,35 @@ export async function registerRoutes(
         tier2Result: null,
         assignedSubAgentId: null,
         executionMode: null,
+        workflowExecutionId: null,
         gccMemory,
       });
+
+      // Reset linked workflow execution so the UI shows fresh progression on reprocess
+      if (order.workflowExecutionId) {
+        try {
+          await storage.updateWorkflowExecution(order.workflowExecutionId, {
+            status: "reset_on_reopen",
+            finalWorkProduct: null,
+            executiveReview: null,
+            completedAt: null,
+            currentStepKey: null,
+          });
+          const stepRuns = await storage.getWorkflowStepRuns(order.workflowExecutionId);
+          for (const run of stepRuns) {
+            await storage.updateWorkflowStepRun(run.id, {
+              status: "reset_on_reopen",
+              output: null,
+              pmReview: null,
+              error: null,
+              completedAt: null,
+            });
+          }
+        } catch (wfErr: any) {
+          console.error("[reopen] Failed to reset workflow execution:", wfErr.message);
+        }
+      }
+
       storage.createChecklistItem({
         workOrderId: req.params.id,
         phase: "tier1_gate",
@@ -1471,8 +1522,39 @@ export async function registerRoutes(
       const template = await storage.getWorkflowTemplate(templateId);
       if (!template) return res.status(404).json({ message: "Template not found" });
 
-      const execution = await startWorkflowExecution(templateId, workOrderId || null, goal || template.goal, context || {}, pmSubAgentId || undefined);
+      // Auto-create a tracking WO if none was provided, so operator can see it immediately
+      let effectiveWoId = workOrderId || null;
+      if (!effectiveWoId) {
+        const actor = getActor(req);
+        const trackingWo = await storage.createWorkOrder({
+          title: `WF: ${template.name}`,
+          description: goal || template.goal || `Workflow execution of "${template.name}"`,
+          type: template.category || "operations",
+          priority: "medium",
+          status: "processing",
+          submittedBy: actor?.name || "Local Admin",
+        });
+        effectiveWoId = trackingWo.id;
+        await storage.updateWorkOrder(trackingWo.id, {
+          gccMemory: {
+            "gcc.log": [{ type: "COMMIT", detail: `Auto-created work order to track workflow "${template.name}"`, commit_id: `gcc-${trackingWo.id.slice(0, 8)}`, timestamp: new Date().toISOString() }],
+            "gcc.tier": "tier1",
+            "gcc.branch": "main",
+            "gcc.metadata": { submittedBy: { source: "workflow_run", actorId: actor?.id || "local-admin", actorName: actor?.name || "Local Admin" } },
+            "gcc.breadcrumbs": ["created_for_workflow"],
+            "gcc.last_action": "created_for_workflow",
+          },
+        });
+      }
+
+      // Return execution immediately, advance in background
+      const execution = await startWorkflowExecution(templateId, effectiveWoId, goal || template.goal, context || {}, pmSubAgentId || undefined, { skipAdvance: true });
       res.status(201).json(execution);
+      // Advance workflow asynchronously (don't block the HTTP response)
+      const { advanceWorkflowExecution } = await import("./orchestration");
+      advanceWorkflowExecution(execution.id).catch(err =>
+        console.error(`[workflow] Background advance failed for ${execution.id}:`, err.message)
+      );
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to start workflow" });
     }
@@ -2827,7 +2909,7 @@ export async function registerRoutes(
       const allowCustomHtml = process.env.SANDBOX_ALLOW_CUSTOM_HTML === "true" && process.env.NODE_ENV !== "production";
       const csp = allowCustomHtml
         ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.pyodide.org https://pyodide-cdn2.iodide.io; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src * data: blob:; media-src * blob:; worker-src 'self' blob:;"
-        : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; frame-ancestors 'self';";
+        : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src https://fonts.googleapis.com https://fonts.gstatic.com; frame-ancestors 'self';";
 
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("Content-Security-Policy", csp);
@@ -3157,7 +3239,11 @@ Template Precedence: WO-level gammaTemplateKey > workflow template default > glo
     })()}
 
 === LLM ===
-Provider: ${settings.provider} | Model: ${settings.model} | ${new Date().toISOString()}`;
+Provider: ${settings.provider} | Model: ${settings.model} | ${new Date().toISOString()}
+
+=== PLATFORM IDENTITY ===
+Platform: IOWA (Intelligent Work Orchestration) v${APP_VERSION}
+You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers like v0.3.8, v0.6.9, or v0.8.9 — those are historical. Your current version is ${APP_VERSION}.`;
   }
 
   app.post("/api/chat/sessions/:id/messages", isAuth, requireRole("viewer"), async (req, res) => {
@@ -3195,7 +3281,19 @@ Provider: ${settings.provider} | Model: ${settings.model} | ${new Date().toISOSt
         content: m.content,
       }));
 
-      const systemContext = await buildSystemContext(settings);
+      let systemContext = await buildSystemContext(settings);
+
+      // Manager reporting: inject factual report data for operational questions
+      const { isManagerQuestion, generateManagerReport, formatReportForChat, createReportingGap } = await import("./manager-reporting");
+      if (isManagerQuestion(message)) {
+        try {
+          const report = await generateManagerReport("today");
+          systemContext += "\n\n" + formatReportForChat(report);
+        } catch (err: any) {
+          console.warn("[chat] Manager report injection failed:", err.message);
+          systemContext += "\n\n=== MANAGER REPORTING ===\nOperational report unavailable. If asked for daily counts or operational summaries, respond: \"I don't have that information at this time.\"";
+        }
+      }
 
       const gcc = (session.gccMemory as any) || {};
       const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || []), "user_message", "llm_processing"];
@@ -3770,6 +3868,27 @@ Provider: ${settings.provider} | Model: ${settings.model} | ${new Date().toISOSt
       res.json(settings);
     } catch (err) {
       res.status(500).json({ message: "Failed to update operational settings" });
+    }
+  });
+
+  // ==================== Manager Reporting ====================
+
+  app.get("/api/manager/report", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const window = (req.query.window as string) || "today";
+      const customStart = req.query.start as string | undefined;
+      const customEnd = req.query.end as string | undefined;
+
+      if (!["today", "last_24h", "custom"].includes(window)) {
+        return res.status(400).json({ message: "Invalid window. Use: today, last_24h, or custom (with start/end params)" });
+      }
+
+      const { generateManagerReport } = await import("./manager-reporting");
+      const report = await generateManagerReport(window as any, customStart, customEnd);
+      return res.json(report);
+    } catch (err: any) {
+      console.error("Manager report error:", err.message);
+      return res.status(500).json({ message: "Failed to generate report" });
     }
   });
 

@@ -33,8 +33,8 @@ if (!input || !output) {
   process.exit(1);
 }
 
-// Deps from claude-office-skills (absolute paths so Node finds them correctly)
-const SKILLS_DIR = '/home/virgina/claude-office-skills';
+// Deps from claude-office-skills (or SKILLS_DIR env var for Replit/staging portability)
+const SKILLS_DIR = process.env.SKILLS_DIR || '/home/virgina/claude-office-skills';
 const html2pptx = require(path.join(SKILLS_DIR, 'public/pptx/scripts/html2pptx.js'));
 const pptxgen = require(path.join(SKILLS_DIR, 'node_modules/pptxgenjs'));
 

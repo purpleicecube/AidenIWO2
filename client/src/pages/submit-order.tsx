@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,10 +33,11 @@ import { Link } from "wouter";
 
 const submitOrderSchema = insertWorkOrderSchema.extend({
   title: z.string().min(3, "Title must be at least 3 characters").max(200),
-  description: z.string().min(10, "Description must be at least 10 characters").max(2000),
+  description: z.string().min(10, "Description must be at least 10 characters").max(8000),
   type: z.string().min(1, "Type is required"),
   priority: z.string().min(1, "Priority is required"),
   submittedBy: z.string().optional(),
+  gammaTemplateKey: z.string().nullable().optional(),
 });
 
 type SubmitOrderForm = z.infer<typeof submitOrderSchema>;
@@ -51,6 +52,10 @@ export default function SubmitOrder() {
     navigate("/");
     return null;
   }
+
+  const { data: gammaTemplates } = useQuery<any[]>({
+    queryKey: ["/api/gamma-templates"],
+  });
 
   const form = useForm<SubmitOrderForm>({
     resolver: zodResolver(submitOrderSchema),
@@ -87,7 +92,10 @@ export default function SubmitOrder() {
   });
 
   const onSubmit = (data: SubmitOrderForm) => {
-    submitMutation.mutate(data);
+    submitMutation.mutate({
+      ...data,
+      gammaTemplateKey: data.gammaTemplateKey || null,
+    });
   };
 
   return (
@@ -202,6 +210,34 @@ export default function SubmitOrder() {
                   )}
                 />
               </div>
+
+              {gammaTemplates && gammaTemplates.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="gammaTemplateKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Output Template (Brand)</FormLabel>
+                      <Select onValueChange={(v) => field.onChange(v === "__default__" ? null : v)} value={field.value || "__default__"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-gamma-template">
+                            <SelectValue placeholder="Default (global setting)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__default__">Default (global setting)</SelectItem>
+                          {gammaTemplates.map((t: any) => (
+                            <SelectItem key={t.templateKey} value={t.templateKey}>
+                              {t.name} ({t.outputFormat.toUpperCase()}, {t.mode})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
