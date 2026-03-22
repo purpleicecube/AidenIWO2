@@ -414,15 +414,25 @@ export async function registerRoutes(
         bdmMarker: null,
         tier1Result: null,
         tier2Result: null,
+        workflowExecutionId: null,
         gccMemory,
       });
+
+      // Reset linked workflow execution so stale linkage doesn't contaminate the fresh run
+      if (order.workflowExecutionId) {
+        try {
+          await storage.updateWorkflowExecution(order.workflowExecutionId, {
+            status: "superseded_by_retry",
+          });
+        } catch (_) { /* audit-only — don't block retry */ }
+      }
 
       await storage.createExecutionLog({
         workOrderId: req.params.id,
         tier: 1,
         action: "Retry Initiated",
         message: `Work order reset and resubmitted by ${actor.actorName}`,
-        metadata: { previousStatus: order.status, actor, commitId },
+        metadata: { previousStatus: order.status, actor, commitId, previousWorkflowExecutionId: order.workflowExecutionId || null },
       });
 
       await storage.updateWorkOrder(req.params.id, { status: "processing" });
@@ -682,7 +692,19 @@ export async function registerRoutes(
         metadata: { bdmMarkerCleared: bdmSnapshot, reprocess, commitId, actor },
       });
 
-      if (reprocess) {
+      // BUG-043: If the WO was escalated due to low exec review score (quality gate),
+      // do NOT allow completion without reprocessing. Force reprocess to ensure the
+      // deliverable is revised before it can be marked complete.
+      const wasQualityEscalation = (gcc["gcc.breadcrumbs"] || []).includes("hitl_reissue_from_awaiting_operator")
+        || (order.gccMemory as any)?.["gcc.last_action"] === "hitl_resolved"
+        || ((order.tier2Result as any)?.pocketflow?.convergenceScore < 0.5);
+      const execLogs = await storage.getExecutionLogs(req.params.id);
+      const qualityEscalationLog = execLogs.find((l: any) =>
+        l.action?.includes("Low-Quality Escalation") || l.action?.includes("Escalated to Operator")
+      );
+      const forceReprocess = !reprocess && !!qualityEscalationLog;
+
+      if (reprocess || forceReprocess) {
         await storage.updateWorkOrder(req.params.id, {
           status: "pending",
           bdmMarker: null,
@@ -695,12 +717,14 @@ export async function registerRoutes(
         await storage.createExecutionLog({
           workOrderId: req.params.id,
           tier: 1,
-          action: "Re-process after HITL Unblock",
-          message: "Work order re-submitted for Tier 2 execution after human intervention.",
-          metadata: { commitId },
+          action: forceReprocess ? "Re-process (Quality Gate)" : "Re-process after HITL Unblock",
+          message: forceReprocess
+            ? "Work order was escalated due to low quality score. Reprocessing is required — direct completion is not allowed for quality-escalated deliverables."
+            : "Work order re-submitted for Tier 2 execution after human intervention.",
+          metadata: { commitId, forceReprocess },
         });
 
-        res.json({ message: "Re-processing started after HITL unblock", status: "processing", workOrderId: req.params.id, unblocked: true, reprocessed: true });
+        res.json({ message: forceReprocess ? "Quality-escalated WO must be reprocessed" : "Re-processing started after HITL unblock", status: "processing", workOrderId: req.params.id, unblocked: true, reprocessed: true, forceReprocess });
         processWorkOrderSafe(req.params.id);
       } else {
         gccMemory["gcc.last_action"] = "hitl_resolved";
@@ -1014,6 +1038,14 @@ export async function registerRoutes(
       }
 
       if (action === "retry") {
+        // Reset workflow linkage so fresh run starts clean
+        if (order.workflowExecutionId) {
+          try {
+            await storage.updateWorkflowExecution(order.workflowExecutionId, {
+              status: "superseded_by_retry",
+            });
+          } catch (_) { /* audit-only — don't block repair retry */ }
+        }
         await storage.updateWorkOrder(req.params.id, {
           status: "pending",
           processingAttemptId: invalidationId,
@@ -1022,6 +1054,7 @@ export async function registerRoutes(
           bdmMarker: null,
           tier1Result: null,
           tier2Result: null,
+          workflowExecutionId: null,
         });
         await recoverStuckStepRuns(order);
         await storage.createExecutionLog({
@@ -2803,6 +2836,78 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Know-How Retrieval Routes ====================
+
+  app.get("/api/code-blocks", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const { language, sourceId, tag } = req.query;
+      const filters: { language?: string; sourceId?: string; tags?: string[] } = {};
+      if (typeof language === "string") filters.language = language;
+      if (typeof sourceId === "string") filters.sourceId = sourceId;
+      if (typeof tag === "string") filters.tags = [tag];
+      const blocks = await storage.getCodeBlocks(filters);
+      res.json(blocks);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch code blocks" });
+    }
+  });
+
+  app.get("/api/code-blocks/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const block = await storage.getCodeBlock(req.params.id);
+      if (!block) return res.status(404).json({ message: "Code block not found" });
+      res.json(block);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch code block" });
+    }
+  });
+
+  app.post("/api/code-blocks", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const { name, language, content, description, tags, sourceType, sourceId, sourceName } = req.body;
+      if (!name || !content) return res.status(400).json({ message: "name and content are required" });
+      const block = await storage.createCodeBlock({
+        name,
+        language: language || "text",
+        content,
+        description: description || null,
+        tags: tags || [],
+        sourceType: sourceType || "manual",
+        sourceId: sourceId || null,
+        sourceName: sourceName || null,
+        createdBy: (req as any).appUser?.username || "operator",
+      });
+      res.status(201).json(block);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create code block" });
+    }
+  });
+
+  app.post("/api/knowhow/resolve", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const { KnowHowService } = await import("./knowhow");
+      const { LocalWorkspaceProvider } = await import("./workspace-provider");
+      const service = new KnowHowService(new LocalWorkspaceProvider());
+      const pack = await service.resolve(req.body, req.body.gccMemory);
+      res.json(pack);
+    } catch (err: any) {
+      res.status(500).json({ message: "Know-How retrieval failed", error: err.message });
+    }
+  });
+
+  app.get("/api/knowhow/retrievals", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      // Simple audit log query — returns most recent 50
+      const { contextRetrievals: crTable } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { desc } = await import("drizzle-orm");
+      const records = await db.select().from(crTable).orderBy(desc(crTable.createdAt)).limit(50);
+      res.json(records);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch retrieval records" });
+    }
+  });
+
   // ==================== Sandbox Session Routes ====================
 
   app.get("/api/sandbox-sessions", isAuth, requireRole("viewer"), async (_req, res) => {
@@ -3295,8 +3400,65 @@ You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers li
         }
       }
 
+      // Web Research: search + scrape for questions needing current/real-world data
+      const webSearchPatterns = /\b(what(?:'s| is| are| was| were| happened)|who(?:'s| is| are| was)|when(?:'s| is| did| was)|where(?:'s| is| are)|how (?:much|many|does|did|is|are|do)|latest|current|today|tomorrow|yesterday|recent|news|score|price|stock|weather|forecast|update|happening|trending|right now|as of|this week|this month)\b/i;
+      const urlPattern = /https?:\/\/[^\s,\n]+/g;
+      const foundUrls = message.match(urlPattern);
+      const needsWebSearch = webSearchPatterns.test(message) && !isManagerQuestion(message);
+      if (needsWebSearch || (foundUrls && foundUrls.length > 0)) {
+        const { executeBuiltInWebSearch, executeBuiltInWebScrape } = await import("./tool-executor");
+        const webResults: string[] = [];
+        if (needsWebSearch) {
+          try {
+            const searchQuery = message.replace(urlPattern, "").trim().slice(0, 200);
+            if (searchQuery.length >= 3) {
+              console.log(`[chat] Web search triggered for chat query`);
+              const searchResult = await executeBuiltInWebSearch(searchQuery);
+              if (searchResult && searchResult.length > 100) {
+                webResults.push("### Web Search Results\n" + searchResult.slice(0, 6000));
+              }
+            }
+          } catch (err: any) {
+            console.warn("[chat] Web search failed:", err.message);
+          }
+        }
+        if (foundUrls && foundUrls.length > 0) {
+          try {
+            console.log(`[chat] Web scrape triggered for ${foundUrls.length} URL(s)`);
+            const scrapeResult = await executeBuiltInWebScrape(foundUrls.slice(0, 3).join(" "));
+            if (scrapeResult && scrapeResult.length > 50) {
+              webResults.push("### Web Page Content\n" + scrapeResult.slice(0, 8000));
+            }
+          } catch (err: any) {
+            console.warn("[chat] Web scrape failed:", err.message);
+          }
+        }
+        if (webResults.length > 0) {
+          systemContext += "\n\n=== LIVE WEB RESEARCH (retrieved just now — use this data to answer accurately) ===\n" + webResults.join("\n\n");
+        }
+      }
+
       const gcc = (session.gccMemory as any) || {};
       const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || []), "user_message", "llm_processing"];
+
+      // Know-How Retrieval: inject workspace context when message references workspace content
+      const knowHowTrigger = /\b(from|in|using|folder|artifact|code\s*block|snippet|workspace|look\s*up|find|search|retrieve|reference)\b/i;
+      if (knowHowTrigger.test(message)) {
+        try {
+          const { KnowHowService, parseContextRequestFromChat } = await import("./knowhow");
+          const { LocalWorkspaceProvider } = await import("./workspace-provider");
+          const ctxReq = parseContextRequestFromChat(message);
+          if (ctxReq) {
+            const service = new KnowHowService(new LocalWorkspaceProvider());
+            const pack = await service.resolve(ctxReq, gcc);
+            if (pack.sources.length > 0) {
+              systemContext += "\n\n" + service.formatForLLM(pack);
+            }
+          }
+        } catch (err: any) {
+          console.warn("[chat] Know-How retrieval failed:", err.message);
+        }
+      }
 
       let reply = await chatWithAiden(settings, message, conversationHistory.slice(0, -1), systemContext, gcc);
 
@@ -3757,8 +3919,36 @@ You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers li
         return res.status(503).json({ message: `API key (${keyName}) is not configured. Please add it in Aiden Settings.` });
       }
 
-      const systemContext = await buildSystemContext(settings);
+      let systemContext = await buildSystemContext(settings);
       const conversationHistory = history.slice(-10);
+
+      const webSearchPatterns = /\b(what(?:'s| is| are| was| were| happened)|who(?:'s| is| are| was)|when(?:'s| is| did| was)|where(?:'s| is| are)|how (?:much|many|does|did|is|are|do)|latest|current|today|tomorrow|yesterday|recent|news|score|price|stock|weather|forecast|update|happening|trending|right now|as of|this week|this month)\b/i;
+      const urlPattern = /https?:\/\/[^\s,\n]+/g;
+      const foundUrls = message.match(urlPattern);
+      const { isManagerQuestion: isManagerQ } = await import("./manager-reporting");
+      const needsSearch = webSearchPatterns.test(message) && !isManagerQ(message);
+      if (needsSearch || (foundUrls && foundUrls.length > 0)) {
+        const { executeBuiltInWebSearch, executeBuiltInWebScrape } = await import("./tool-executor");
+        const webResults: string[] = [];
+        if (needsSearch) {
+          try {
+            const sq = message.replace(urlPattern, "").trim().slice(0, 200);
+            if (sq.length >= 3) {
+              const sr = await executeBuiltInWebSearch(sq);
+              if (sr && sr.length > 100) webResults.push("### Web Search Results\n" + sr.slice(0, 6000));
+            }
+          } catch (err: any) { console.warn("[chat] Web search failed:", err.message); }
+        }
+        if (foundUrls && foundUrls.length > 0) {
+          try {
+            const sr = await executeBuiltInWebScrape(foundUrls.slice(0, 3).join(" "));
+            if (sr && sr.length > 50) webResults.push("### Web Page Content\n" + sr.slice(0, 8000));
+          } catch (err: any) { console.warn("[chat] Web scrape failed:", err.message); }
+        }
+        if (webResults.length > 0) {
+          systemContext += "\n\n=== LIVE WEB RESEARCH (retrieved just now — use this data to answer accurately) ===\n" + webResults.join("\n\n");
+        }
+      }
 
       const reply = await chatWithAiden(settings, message, conversationHistory, systemContext);
       res.json({ reply });
@@ -3840,6 +4030,7 @@ You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers li
           emergencyTriggers: ["security_breach", "legal_deadline_24h", "revenue_loss", "system_outage"],
           updatedAt: new Date().toISOString(),
           updatedBy: "system",
+          executionProfile: "safe",
         });
       }
       res.json(settings);
@@ -3868,6 +4059,49 @@ You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers li
       res.json(settings);
     } catch (err) {
       res.status(500).json({ message: "Failed to update operational settings" });
+    }
+  });
+
+  // ==================== Execution Profiles (Phase 3) ====================
+
+  app.get("/api/execution-profiles", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const { getAllProfiles, resolveProfile } = await import("./run-context");
+      const opSettings = await storage.getOperationalSettings().catch(() => null);
+      const active = resolveProfile(opSettings?.executionProfile);
+      res.json({
+        active: active.name,
+        profiles: getAllProfiles(),
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch execution profiles" });
+    }
+  });
+
+  app.put("/api/execution-profiles", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { profile } = req.body;
+      const validProfiles = ["safe", "balanced", "fast"];
+      if (!profile || !validProfiles.includes(profile)) {
+        return res.status(400).json({ message: `Invalid profile. Must be one of: ${validProfiles.join(", ")}` });
+      }
+      const settings = await storage.upsertOperationalSettings({ executionProfile: profile } as any);
+      const { resolveProfile } = await import("./run-context");
+      const resolved = resolveProfile(settings.executionProfile);
+
+      const actor = getActor(req);
+      await storage.createExecutionLog({
+        workOrderId: "system",
+        tier: 0,
+        action: "profile_change",
+        message: `Execution profile changed to "${profile}" by ${actor.actorName}`,
+        metadata: { profile, actor },
+      });
+
+      console.log(`[perf] Execution profile changed to "${profile}" by ${actor.actorName}`);
+      res.json({ active: resolved.name, profile: resolved });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update execution profile" });
     }
   });
 

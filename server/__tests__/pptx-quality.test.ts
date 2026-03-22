@@ -77,11 +77,13 @@ describe("parseContentContract()", () => {
     expect(result.maxSlides).toBe(8);
   });
 
-  it("parses required sections", () => {
+  it("parses required sections (cover and thank you are optional by default)", () => {
     const result = parseContentContract(KLEAR_CONTRACT);
-    expect(result.requiredSections).toContain("cover");
+    // Loop 14 Patch B: cover and thank you are no longer hard-required
+    expect(result.requiredSections).not.toContain("cover");
+    expect(result.requiredSections).not.toContain("thank you");
+    // Real content sections remain required
     expect(result.requiredSections).toContain("executive summary");
-    expect(result.requiredSections).toContain("thank you");
   });
 
   it("parses max bullets per slide", () => {
@@ -108,18 +110,21 @@ describe("parseContentContract()", () => {
     expect(result.maxSlides).toBe(6);
   });
 
-  it("strips parenthetical annotations from section names", () => {
+  it("strips parenthetical annotations and filters optional sections", () => {
     const result = parseContentContract("Required sections: Cover (title + subtitle + date), Executive Summary (key metrics), Thank You (contact info)");
-    expect(result.requiredSections).toContain("cover");
+    // Loop 14: cover and thank you are optional by default
+    expect(result.requiredSections).not.toContain("cover");
+    expect(result.requiredSections).not.toContain("thank you");
     expect(result.requiredSections).toContain("executive summary");
-    expect(result.requiredSections).toContain("thank you");
     expect(result.requiredSections.some(s => s.includes("("))).toBe(false);
   });
 
   it("drops numeric-prefixed entries like '2-4 content slides'", () => {
     const result = parseContentContract(KLEAR_CONTRACT);
     expect(result.requiredSections).not.toContain("2-4 content slides");
-    expect(result.requiredSections).toContain("cover");
+    // Loop 14: cover is optional by default
+    expect(result.requiredSections).not.toContain("cover");
+    expect(result.requiredSections).toContain("executive summary");
   });
 });
 
@@ -201,12 +206,13 @@ describe("validatePptxPreflight()", () => {
     expect(result.hardFailures.some(f => f.includes("below contract minimum"))).toBe(true);
   });
 
-  it("rejects deliverable missing required section from contract", () => {
-    const contract = parseContentContract("Slides: 3-6\nRequired sections: Cover, Thank You");
-    const noThankYou = "# Slide 1: Cover\nWelcome\n---\n# Slide 2: Features\nStuff\n---\n# Slide 3: Pricing\nData";
-    const result = validatePptxPreflight(noThankYou, contract);
+  it("rejects deliverable missing required content section from contract", () => {
+    // Loop 14: cover/thank you are optional, so use a real content section
+    const contract = parseContentContract("Slides: 3-6\nRequired sections: Executive Summary, Roadmap");
+    const noRoadmap = "# Slide 1: Cover\nWelcome\n---\n# Slide 2: Executive Summary\nKey metrics\n---\n# Slide 3: Pricing\nData";
+    const result = validatePptxPreflight(noRoadmap, contract);
     expect(result.ok).toBe(false);
-    expect(result.hardFailures.some(f => f.includes("thank you"))).toBe(true);
+    expect(result.hardFailures.some(f => f.includes("roadmap"))).toBe(true);
   });
 
   it("passes deliverable meeting all contract requirements", () => {

@@ -1,0 +1,37 @@
+{
+  "date": "2026-03-19T14:51:46.504Z",
+  "version": "v0.9.7",
+  "phase": "Phase 1 — Pre-optimization baseline",
+  "environment": "local dev, PostgreSQL in Docker, Groq/OpenRouter LLM providers",
+  "baseline": {
+    "chat_roundtrip": {
+      "wall_clock_ms": 9282,
+      "llm_provider": "groq/openai/gpt-oss-120b",
+      "llm_call_ms": 1963,
+      "prompt_tokens_est": 6206
+    },
+    "chat_websearch": {
+      "wall_clock_ms": 7316,
+      "llm_provider": "groq/openai/gpt-oss-120b"
+    },
+    "simple_wo": {
+      "wall_clock_ms": 78287,
+      "llm_calls": 7,
+      "llm_call_range_ms": [1630, 7771],
+      "prompt_token_range": [1513, 4813]
+    },
+    "multistep_wo": {
+      "wall_clock_ms": 180000,
+      "status": "timed_out_at_180s",
+      "llm_calls_observed": 20,
+      "llm_call_range_ms": [1660, 19969],
+      "prompt_token_range": [1513, 9446]
+    }
+  },
+  "key_findings": {
+    "prompt_bloat": "6x inflation across steps (1500→9400 tokens) from accumulatedOutputs",
+    "llm_dominates": "LLM calls are 1.6s-20s each, 7-20+ calls per WO",
+    "db_slow": "getGammaTemplates 115ms, getTools 116ms per request",
+    "chat_overhead": "~7s non-LLM overhead in chat path"
+  }
+}

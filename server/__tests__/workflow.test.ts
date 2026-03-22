@@ -27,6 +27,8 @@ vi.mock("../storage.js", () => ({
     getSubAgentTools: vi.fn().mockResolvedValue([]),
     createWorkflowStepRun: vi.fn().mockResolvedValue({}),
     updateWorkflowStep: vi.fn().mockResolvedValue({}),
+    getGammaTemplates: vi.fn().mockResolvedValue([]),
+    getWorkflowTemplates: vi.fn().mockResolvedValue([]),
   },
 }));
 

@@ -131,9 +131,15 @@ export interface SharedDict {
   } | null;
   gammaDeliveryPolicy?: string; // "auto_revise" | "candidate_review" — carried from workflow template
   _candidateGroup?: string; // shared UUID across candidates in same revision cycle
+  contextPack?: import("@shared/schema").ContextPack;
   availableTools: AvailableTool[];
   toolResults: ToolExecResult[];
   logs: Array<{ node: string; message: string; metadata?: any }>;
+
+  // Execution-profile flags (BUG-048: propagated via SharedDict, not closure scope)
+  promptCompaction: boolean;
+  batchedSynthesis: boolean;
+  reviewReduction: boolean;
 }
 
 type NodeAction = "continue" | "bdm" | "done" | "more_steps" | "converged" | "refine" | "best_effort";
@@ -177,6 +183,10 @@ function createSharedDict(
     availableTools: [],
     toolResults: [],
     logs: [],
+    // BUG-048: safe defaults — overridden by pocketflowExecute after creation
+    promptCompaction: false,
+    batchedSynthesis: false,
+    reviewReduction: false,
   };
 }
 
@@ -270,6 +280,119 @@ async function nodeValidateWorkOrder(dict: SharedDict): Promise<NodeResult> {
   return { action: "continue" };
 }
 
+/**
+ * Loop 13 WI-2: Detect multi-page HTML/site requests and generate a structured
+ * decomposition plan instead of falling back to a single "Execute Work Order" step.
+ * Returns null if the request is not a multi-page HTML build.
+ */
+function buildMultiPageHtmlPlan(dict: SharedDict): PlanStep[] | null {
+  const text = `${dict.workOrder.title} ${dict.workOrder.description || ""}`.toLowerCase();
+
+  // Only trigger for clearly multi-page site/website requests
+  const isMultiPage = /\b(five.?page|5.?page|multi.?page|static\s+website|mini.?site)\b/.test(text)
+    || (/\b(website|site)\b/.test(text) && /\b(pages?|home|about|contact|services)\b/.test(text));
+
+  if (!isMultiPage) return null;
+
+  // Extract page names from description if mentioned
+  const pageMatches = text.match(/\b(home|about|services?|products?|contact|portfolio|case.?stud|pricing|faq|blog|team)\b/g);
+  const namedPages = pageMatches
+    ? Array.from(new Set(pageMatches)).slice(0, 6)
+    : ["home", "about", "services", "portfolio", "contact"];
+
+  const steps: PlanStep[] = [
+    {
+      id: "step_design",
+      name: "Define brand palette, typography, and design system",
+      description: `Establish the CSS design system: colors, fonts, spacing, component styles. Follow any branding guidelines in the work order. Output a reusable CSS block.`,
+      dependencies: [],
+      status: "pending" as const,
+    },
+    {
+      id: "step_nav",
+      name: "Build site shell with navigation",
+      description: `Create the shared HTML shell: header with navigation linking to all pages (${namedPages.join(", ")}), footer, and responsive layout structure. Output complete HTML with nav links.`,
+      dependencies: ["step_design"],
+      status: "pending" as const,
+    },
+    {
+      id: "step_home",
+      name: `Build page: ${namedPages[0] || "Home"}`,
+      description: `Create the ${namedPages[0] || "Home"} page with hero section, value proposition, and key content. Use the design system and navigation shell from prior steps.`,
+      dependencies: ["step_nav"],
+      status: "pending" as const,
+    },
+    {
+      id: "step_inner_pages",
+      name: `Build remaining pages: ${namedPages.slice(1).join(", ")}`,
+      description: `Create the remaining ${namedPages.length - 1} pages: ${namedPages.slice(1).join(", ")}. Each page must have unique content, use the shared navigation, and follow the design system. Output complete HTML for all pages.`,
+      dependencies: ["step_nav"],
+      status: "pending" as const,
+    },
+    {
+      id: "step_polish",
+      name: "Final assembly, linking, and polish",
+      description: `Assemble all pages into a cohesive site. Ensure all navigation links work, add responsive design, accessibility attributes (ARIA labels, alt text), and any interactive elements. Output the final complete HTML.`,
+      dependencies: ["step_home", "step_inner_pages"],
+      status: "pending" as const,
+    },
+  ];
+
+  return steps;
+}
+
+/**
+ * Loop 13 WI-3: Detect likely incompleteness in multi-page HTML output.
+ * Returns penalty info if the request asked for N pages but the output
+ * appears to contain only one. Returns null if not applicable.
+ */
+function detectMultiPageIncompleteness(
+  dict: SharedDict,
+  output: string,
+): { maxScore: number; gaps: string[] } | null {
+  const text = `${dict.workOrder.title} ${dict.workOrder.description || ""}`.toLowerCase();
+
+  // Only apply to multi-page requests
+  const pageCountMatch = text.match(/\b(\d+).?page/);
+  const requestedPages = pageCountMatch ? parseInt(pageCountMatch[1], 10) : 0;
+  if (requestedPages < 2 && !/\b(multi.?page|static\s+website|mini.?site)\b/.test(text)) {
+    return null;
+  }
+  const expectedPages = requestedPages || 5; // default assumption for "website"
+
+  const outputLower = output.toLowerCase();
+  const gaps: string[] = [];
+
+  // Check 1: Count distinct page structures (look for page-level markers)
+  const pageMarkers = (outputLower.match(/<\!--\s*page\b|<section\s+id=["'][^"']*page|<div\s+(?:id|class)=["'][^"']*page/g) || []).length;
+  const h1Count = (output.match(/<h1[\s>]/g) || []).length;
+  const navLinkCount = (outputLower.match(/<a\s+href=["']#?[^"']+["'][^>]*>/g) || []).length;
+
+  // Check 2: Abrupt termination (no closing </html> or </body>)
+  const hasClosingHtml = /<\/html\s*>/i.test(output);
+  const hasClosingBody = /<\/body\s*>/i.test(output);
+  const abruptlyTerminated = !hasClosingHtml && !hasClosingBody && output.length > 5000;
+
+  // Check 3: Navigation links to other pages
+  const hasNavigation = navLinkCount >= expectedPages - 1;
+
+  // Build gap list
+  if (h1Count < expectedPages && pageMarkers < expectedPages) {
+    gaps.push(`Request asked for ${expectedPages} pages but output appears to contain ~${Math.max(h1Count, pageMarkers, 1)} page structure(s)`);
+  }
+  if (abruptlyTerminated) {
+    gaps.push("Output appears truncated (no closing </html> or </body> tag)");
+  }
+  if (!hasNavigation && expectedPages > 1) {
+    gaps.push(`Expected navigation to ${expectedPages} pages but found ${navLinkCount} navigation links`);
+  }
+
+  if (gaps.length === 0) return null;
+
+  // Cap score at 0.55 — enough to trigger refinement, not enough to converge
+  return { maxScore: 0.55, gaps };
+}
+
 async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
   const settings = getEffectiveSettings(dict);
   const apiKey = getEffectiveApiKey(dict);
@@ -325,17 +448,26 @@ async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
         ...s,
         dependencies: s.dependencies.filter(depId => stepIds.has(depId)),
       }));
-      // Guard: if LLM returned an empty plan, create a single execution step so the
-      // work order actually gets processed instead of silently "completing" with no output.
+      // Guard: if LLM returned an empty plan, try multi-page decomposition first,
+      // then fall back to a single execution step.
       if (dict.planSteps.length === 0) {
-        dict.planSteps = [{
-          id: "step_1",
-          name: "Execute Work Order",
-          description: `Produce the deliverable for "${dict.workOrder.title}" — ${dict.workOrder.description}`,
-          dependencies: [],
-          status: "pending" as const,
-        }];
-        await emitNodeLog(dict, "PlanSteps", `LLM returned empty plan — injecting single execution step`, { recovered: true });
+        const multiPagePlan = buildMultiPageHtmlPlan(dict);
+        if (multiPagePlan) {
+          dict.planSteps = multiPagePlan;
+          await emitNodeLog(dict, "PlanSteps", `LLM returned empty plan — injected structured multi-page HTML plan (${multiPagePlan.length} steps)`, {
+            recovered: true, planType: "multi_page_html", stepCount: multiPagePlan.length,
+            steps: multiPagePlan.map(s => ({ id: s.id, name: s.name, deps: s.dependencies })),
+          });
+        } else {
+          dict.planSteps = [{
+            id: "step_1",
+            name: "Execute Work Order",
+            description: `Produce the deliverable for "${dict.workOrder.title}" — ${dict.workOrder.description}`,
+            dependencies: [],
+            status: "pending" as const,
+          }];
+          await emitNodeLog(dict, "PlanSteps", `LLM returned empty plan — injecting single execution step`, { recovered: true, planType: "single_step" });
+        }
       }
       dict.currentStepIndex = 0;
     }
@@ -354,16 +486,26 @@ async function nodePlanSteps(dict: SharedDict): Promise<NodeResult> {
 
     return { action: "continue" };
   } catch (err: any) {
-    const singleStep: PlanStep = {
-      id: "step_1",
-      name: "Execute Work Order",
-      description: `Process "${dict.workOrder.title}" — ${dict.workOrder.description}`,
-      dependencies: [],
-      status: "pending",
-    };
-    dict.planSteps = [singleStep];
-    dict.currentStepIndex = 0;
-    await emitNodeLog(dict, "PlanSteps", `LLM planning failed, using single-step fallback: ${err.message}`, { error: err.message });
+    // Loop 13 WI-2: Try multi-page decomposition before single-step fallback
+    const multiPagePlan = buildMultiPageHtmlPlan(dict);
+    if (multiPagePlan) {
+      dict.planSteps = multiPagePlan;
+      dict.currentStepIndex = 0;
+      await emitNodeLog(dict, "PlanSteps", `LLM planning failed — injected structured multi-page HTML plan (${multiPagePlan.length} steps): ${err.message}`, {
+        error: err.message, planType: "multi_page_html", stepCount: multiPagePlan.length,
+      });
+    } else {
+      const singleStep: PlanStep = {
+        id: "step_1",
+        name: "Execute Work Order",
+        description: `Process "${dict.workOrder.title}" — ${dict.workOrder.description}`,
+        dependencies: [],
+        status: "pending",
+      };
+      dict.planSteps = [singleStep];
+      dict.currentStepIndex = 0;
+      await emitNodeLog(dict, "PlanSteps", `LLM planning failed, using single-step fallback: ${err.message}`, { error: err.message, planType: "single_step" });
+    }
     return { action: "continue" };
   }
 }
@@ -458,17 +600,97 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
       if (!settings) {
         step.output = generateFallbackDeliverable(dict.workOrder);
       } else {
-        const result = await llmExecStep(
+        // --- Observability: log step start with tool count, prompt size, provider/model ---
+        const stepStartTime = Date.now();
+        const toolCount = dict.availableTools.length;
+        const promptSizeEstimate = (systemPrompt?.length || 0) + (dict.workOrder.description?.length || 0)
+          + Object.values(dict.accumulatedOutputs).reduce((sum, o) => sum + o.length, 0);
+        const llmProvider = dict.llmConfig?.provider || "unknown";
+        const llmModel = dict.llmConfig?.model || "unknown";
+        await emitNodeLog(dict, "ExecStep", `Step "${step.name}" LLM call starting — ${toolCount} tools, ~${Math.round(promptSizeEstimate / 4)} prompt tokens est, ${llmProvider}/${llmModel}`, {
+          stepId: step.id,
+          toolCount,
+          promptSizeEstimate,
+          llmProvider,
+          llmModel,
+          stepStartTime: new Date(stepStartTime).toISOString(),
+        });
+
+        // --- Forward-progress tracking: update heartbeat metadata so watchdog can distinguish ---
+        if (dict.workOrder.id) {
+          storage.updateWorkOrder(dict.workOrder.id, {
+            heartbeatAt: new Date(),
+          } as any).catch(() => {});
+        }
+
+        // --- Application-level timeout: 120s hard abort independent of SDK/provider timeout ---
+        const STEP_TIMEOUT_MS = 120_000;
+        // Phase 4: Prompt compaction — reduce prior outputs injected into prompt
+        let stepOutputs = dict.accumulatedOutputs;
+        if (dict.promptCompaction) {
+          const entries = Object.entries(dict.accumulatedOutputs);
+          const fullSize = entries.reduce((s, [, o]) => s + o.length, 0);
+
+          if (entries.length > 0 && fullSize > 2000) {
+            const hasDeps = step.dependencies && step.dependencies.length > 0;
+            const depSet = hasDeps ? new Set(step.dependencies) : null;
+            const filtered: Record<string, string> = {};
+
+            if (depSet) {
+              // Dependency-aware: full output for deps, truncated summary for others
+              for (const [id, out] of entries) {
+                if (depSet.has(id)) {
+                  filtered[id] = out;
+                } else {
+                  filtered[id] = out.slice(0, 200) + (out.length > 200 ? `\n[...truncated, ${out.length} chars total]` : "");
+                }
+              }
+            } else {
+              // No declared deps: keep the most recent step's full output, truncate older ones
+              const stepIds = entries.map(([id]) => id);
+              const lastStepId = stepIds[stepIds.length - 1];
+              for (const [id, out] of entries) {
+                if (id === lastStepId) {
+                  filtered[id] = out;
+                } else {
+                  filtered[id] = out.slice(0, 200) + (out.length > 200 ? `\n[...truncated, ${out.length} chars total]` : "");
+                }
+              }
+            }
+
+            const compactSize = Object.values(filtered).reduce((s, o) => s + o.length, 0);
+            if (fullSize > compactSize) {
+              console.log(`[perf:compact] Step "${step.name}" prompt compacted: ${Math.round(fullSize/4)}→${Math.round(compactSize/4)} tokens est (${Math.round((1 - compactSize/fullSize) * 100)}% reduction)`);
+            }
+            stepOutputs = filtered;
+          }
+        }
+
+        const llmPromise = llmExecStep(
           settings,
           systemPrompt,
           dict.workOrder,
           step,
-          dict.accumulatedOutputs,
+          stepOutputs,
           apiKey,
           dict.availableTools,
           dict.revisionContext,
-          dict.designContext
+          dict.designContext,
+          dict.contextPack
         );
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`llmExecStep timed out after ${STEP_TIMEOUT_MS / 1000}s — step "${step.name}" aborted. Provider: ${llmProvider}/${llmModel}, tools: ${toolCount}`)), STEP_TIMEOUT_MS)
+        );
+        const result = await Promise.race([llmPromise, timeoutPromise]);
+
+        // --- Observability: log step completion ---
+        const stepDurationMs = Date.now() - stepStartTime;
+        await emitNodeLog(dict, "ExecStep", `Step "${step.name}" LLM call completed in ${(stepDurationMs / 1000).toFixed(1)}s — output: ${(result.output || "").length} chars`, {
+          stepId: step.id,
+          stepDurationMs,
+          outputLength: (result.output || "").length,
+          blocked: result.blocked,
+        });
 
         if (result.blocked) {
           step.status = "blocked";
@@ -492,56 +714,115 @@ async function nodeExecStep(dict: SharedDict): Promise<NodeResult> {
         step.output = result.output || "";
 
         if (result.toolCalls && result.toolCalls.length > 0) {
-          for (const tc of result.toolCalls) {
-            await emitNodeLog(dict, "ToolCall", `Executing tool "${tc.toolSlug}" with input: ${tc.input.slice(0, 100)}`, {
-              stepId: step.id,
-              toolSlug: tc.toolSlug,
-            });
+          const useBatched = dict.batchedSynthesis && result.toolCalls.length > 1;
 
-            const agentId = dict.workOrder.assignedSubAgentId || "aiden-tier2";
-            const toolResult = await executeTool(tc.toolSlug, tc.input, agentId, dict.workOrder.id);
-            dict.toolResults.push(toolResult);
+          if (useBatched) {
+            // Phase 5: Batched tool synthesis — execute all tools, then one synthesis pass
+            console.log(`[perf:batch] Step "${step.name}" batching ${result.toolCalls.length} tool calls`);
+            const toolOutputSections: string[] = [];
 
-            if (toolResult.success) {
-              await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" returned ${toolResult.output.length} chars in ${toolResult.durationMs}ms`, {
-                stepId: step.id,
-                toolSlug: tc.toolSlug,
-                leaseId: toolResult.leaseId,
-                durationMs: toolResult.durationMs,
+            for (const tc of result.toolCalls) {
+              await emitNodeLog(dict, "ToolCall", `Executing tool "${tc.toolSlug}" with input: ${tc.input.slice(0, 100)}`, {
+                stepId: step.id, toolSlug: tc.toolSlug,
               });
+              const agentId = dict.workOrder.assignedSubAgentId || "aiden-tier2";
+              const toolResult = await executeTool(tc.toolSlug, tc.input, agentId, dict.workOrder.id);
+              dict.toolResults.push(toolResult);
 
-              const toolOutputSection = `\n\n---\n### Tool Result: ${toolResult.toolName}\n${toolResult.output}`;
-              const combinedOutput: string = (step.output || "") + toolOutputSection;
+              if (toolResult.success) {
+                await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" returned ${toolResult.output.length} chars in ${toolResult.durationMs}ms`, {
+                  stepId: step.id, toolSlug: tc.toolSlug, leaseId: toolResult.leaseId, durationMs: toolResult.durationMs,
+                });
+                toolOutputSections.push(`### Tool Result: ${toolResult.toolName}\n${toolResult.output.slice(0, 3000)}`);
+              } else {
+                await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" failed: ${toolResult.error}`, {
+                  stepId: step.id, toolSlug: tc.toolSlug, error: toolResult.error,
+                });
+                toolOutputSections.push(`### Tool "${toolResult.toolName}" — FAILED: ${toolResult.error}`);
+              }
+            }
 
-              if (settings) {
-                try {
-                  const synthesisResult = await llmExecStep(
-                    settings,
-                    systemPrompt,
-                    dict.workOrder,
-                    { ...step, description: `${step.description}\n\nTool "${toolResult.toolName}" returned the following data. Synthesize it into your deliverable:\n${toolResult.output.slice(0, 3000)}` },
-                    dict.accumulatedOutputs,
-                    apiKey
-                  );
-                  if (!synthesisResult.blocked && synthesisResult.output) {
-                    step.output = synthesisResult.output;
-                  } else {
-                    step.output = combinedOutput;
-                  }
-                } catch (synthErr: any) {
-                  await emitNodeLog(dict, "ToolCall", `Synthesis after tool call failed, keeping raw output: ${synthErr.message}`, { stepId: step.id });
+            // One synthesis call with all tool results
+            const allToolData = toolOutputSections.join("\n\n---\n");
+            const combinedOutput = (step.output || "") + "\n\n---\n" + allToolData;
+
+            if (settings && toolOutputSections.length > 0) {
+              try {
+                const synthesisResult = await llmExecStep(
+                  settings,
+                  systemPrompt,
+                  dict.workOrder,
+                  { ...step, description: `${step.description}\n\nThe following ${toolOutputSections.length} tool(s) returned data. Synthesize ALL results into your deliverable:\n\n${allToolData}` },
+                  stepOutputs,
+                  apiKey
+                );
+                if (!synthesisResult.blocked && synthesisResult.output) {
+                  step.output = synthesisResult.output;
+                  console.log(`[perf:batch] Batch synthesis succeeded — ${result.toolCalls.length} tools → 1 synthesis call (saved ${result.toolCalls.length - 1} LLM calls)`);
+                } else {
                   step.output = combinedOutput;
                 }
-              } else {
+              } catch (synthErr: any) {
+                await emitNodeLog(dict, "ToolCall", `Batch synthesis failed, keeping raw output: ${synthErr.message}`, { stepId: step.id });
                 step.output = combinedOutput;
               }
             } else {
-              await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" failed: ${toolResult.error}`, {
+              step.output = combinedOutput;
+            }
+
+          } else {
+            // Original N+1 pattern: one synthesis call per tool result
+            for (const tc of result.toolCalls) {
+              await emitNodeLog(dict, "ToolCall", `Executing tool "${tc.toolSlug}" with input: ${tc.input.slice(0, 100)}`, {
                 stepId: step.id,
                 toolSlug: tc.toolSlug,
-                error: toolResult.error,
               });
-              step.output = (step.output || "") + `\n\n> Tool "${toolResult.toolName}" failed: ${toolResult.error}`;
+
+              const agentId = dict.workOrder.assignedSubAgentId || "aiden-tier2";
+              const toolResult = await executeTool(tc.toolSlug, tc.input, agentId, dict.workOrder.id);
+              dict.toolResults.push(toolResult);
+
+              if (toolResult.success) {
+                await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" returned ${toolResult.output.length} chars in ${toolResult.durationMs}ms`, {
+                  stepId: step.id,
+                  toolSlug: tc.toolSlug,
+                  leaseId: toolResult.leaseId,
+                  durationMs: toolResult.durationMs,
+                });
+
+                const toolOutputSection = `\n\n---\n### Tool Result: ${toolResult.toolName}\n${toolResult.output}`;
+                const combinedOutput: string = (step.output || "") + toolOutputSection;
+
+                if (settings) {
+                  try {
+                    const synthesisResult = await llmExecStep(
+                      settings,
+                      systemPrompt,
+                      dict.workOrder,
+                      { ...step, description: `${step.description}\n\nTool "${toolResult.toolName}" returned the following data. Synthesize it into your deliverable:\n${toolResult.output.slice(0, 3000)}` },
+                      stepOutputs,
+                      apiKey
+                    );
+                    if (!synthesisResult.blocked && synthesisResult.output) {
+                      step.output = synthesisResult.output;
+                    } else {
+                      step.output = combinedOutput;
+                    }
+                  } catch (synthErr: any) {
+                    await emitNodeLog(dict, "ToolCall", `Synthesis after tool call failed, keeping raw output: ${synthErr.message}`, { stepId: step.id });
+                    step.output = combinedOutput;
+                  }
+                } else {
+                  step.output = combinedOutput;
+                }
+              } else {
+                await emitNodeLog(dict, "ToolCall", `Tool "${toolResult.toolName}" failed: ${toolResult.error}`, {
+                  stepId: step.id,
+                  toolSlug: tc.toolSlug,
+                  error: toolResult.error,
+                });
+                step.output = (step.output || "") + `\n\n> Tool "${toolResult.toolName}" failed: ${toolResult.error}`;
+              }
             }
           }
         }
@@ -613,7 +894,7 @@ async function nodeEmitBDM(dict: SharedDict): Promise<NodeResult> {
   return { action: "done" };
 }
 
-async function nodeEvaluate(dict: SharedDict): Promise<NodeResult> {
+async function nodeEvaluate(dict: SharedDict, reviewReduction?: boolean): Promise<NodeResult> {
   const settings = getEffectiveSettings(dict);
   const apiKey = getEffectiveApiKey(dict);
   const systemPrompt = getSystemPrompt(dict);
@@ -669,6 +950,21 @@ async function nodeEvaluate(dict: SharedDict): Promise<NodeResult> {
     return { action: "converged" };
   }
 
+  // Phase 7: Review reduction — if first pass and all steps completed cleanly, auto-converge
+  if (reviewReduction && dict.iteration === 0 && failedSteps.length === 0 && completedSteps.length === dict.planSteps.length) {
+    dict.evaluationScore = 0.95;
+    dict.evaluationResult = {
+      score: 0.95,
+      meetsCriteria: true,
+      gaps: [],
+      strengths: [`All ${completedSteps.length} steps completed on first pass`],
+      reasoning: "Review reduction: first-pass clean completion — skipping LLM evaluation",
+    };
+    console.log(`[perf:review] Skipped LLM evaluation — first-pass clean (${completedSteps.length} steps, 0 failures)`);
+    await emitNodeLog(dict, "Evaluate", `Review reduction: auto-converged on first pass (score=0.95)`, { score: 0.95, reviewReduction: true });
+    return { action: "converged" };
+  }
+
   try {
     const evalResult = await llmEvaluate(
       settings,
@@ -679,6 +975,22 @@ async function nodeEvaluate(dict: SharedDict): Promise<NodeResult> {
       apiKey,
       detectRequiredFormat(dict)
     );
+
+    // Loop 13 WI-3: Completeness/truncation penalty for multi-page HTML.
+    // If the request asked for multiple pages but output looks like a single page,
+    // prevent the evaluator from over-scoring it as converged.
+    const multiPagePenalty = detectMultiPageIncompleteness(dict, combinedOutput);
+    if (multiPagePenalty) {
+      const penalizedScore = Math.min(evalResult.score, multiPagePenalty.maxScore);
+      if (penalizedScore < evalResult.score) {
+        evalResult.score = penalizedScore;
+        evalResult.meetsCriteria = false;
+        evalResult.gaps = [...evalResult.gaps, ...multiPagePenalty.gaps];
+        await emitNodeLog(dict, "Evaluate", `Multi-page completeness penalty applied: score capped to ${penalizedScore.toFixed(2)} (was ${dict.evaluationScore?.toFixed(2) || "?"})`, {
+          penalty: multiPagePenalty, originalScore: dict.evaluationScore,
+        });
+      }
+    }
 
     dict.evaluationScore = evalResult.score;
     dict.evaluationResult = evalResult;
@@ -1627,7 +1939,7 @@ export async function pocketflowExecute(
   tier1Result: Tier1Result,
   llmConfig: EffectiveLlmConfig | null,
   settings: LlmSettings | null,
-  options?: { maxIterations?: number; convergenceThreshold?: number; revisionContext?: string }
+  options?: { maxIterations?: number; convergenceThreshold?: number; revisionContext?: string; cachedGammaTemplates?: any[]; promptCompaction?: boolean; batchedSynthesis?: boolean; reviewReduction?: boolean }
 ): Promise<Tier2Result> {
   const dict = createSharedDict(
     order,
@@ -1638,14 +1950,49 @@ export async function pocketflowExecute(
     options?.convergenceThreshold ?? 0.8
   );
 
+  // BUG-048: propagate execution-profile flags onto SharedDict so all node
+  // functions (nodeExecStep, nodeEvaluate, etc.) can read them without
+  // depending on pocketflowExecute's closure-scoped `options` parameter.
+  dict.promptCompaction = options?.promptCompaction ?? false;
+  dict.batchedSynthesis = options?.batchedSynthesis ?? false;
+  dict.reviewReduction = options?.reviewReduction ?? false;
+
   if (options?.revisionContext) {
     dict.revisionContext = options.revisionContext;
   }
 
+  // Know-How Retrieval: resolve workspace context
+  // Priority 1: explicit contextRequest JSONB on the WO
+  // Priority 2: auto-parse folder/content references from WO title + description
+  {
+    let ctxRequest = order.contextRequest as import("@shared/schema").ContextRequest | null;
+    if (!ctxRequest) {
+      try {
+        const { parseContextRequestFromChat } = await import("./knowhow");
+        const woText = `${order.title} ${order.description || ""}`;
+        ctxRequest = parseContextRequestFromChat(woText);
+      } catch {}
+    }
+    if (ctxRequest) {
+      try {
+        const { KnowHowService } = await import("./knowhow");
+        const { LocalWorkspaceProvider } = await import("./workspace-provider");
+        const service = new KnowHowService(new LocalWorkspaceProvider());
+        const gcc = (order.gccMemory as Record<string, any>) || {};
+        dict.contextPack = await service.resolve(ctxRequest, gcc);
+        if (dict.contextPack.sources.length > 0) {
+          console.log(`[pocketflow] Know-How context resolved: ${dict.contextPack.sources.length} sources, ~${dict.contextPack.tokensUsed} tokens`);
+        }
+      } catch (err: any) {
+        console.warn(`[pocketflow] Know-How context resolution failed for WO ${order.id}: ${err.message}`);
+      }
+    }
+  }
+
   try {
-    // Auto-import skills matching work order keywords (same as workflow path)
+    // Auto-import skills matching work order keywords — filtered by agent's tool assignments
     const description = `${order.title} ${order.description || ""}`;
-    const autoImportedIds = await autoImportSkillsForDescription(description);
+    const autoImportedIds = await autoImportSkillsForDescription(description, undefined, order.assignedSubAgentId || undefined);
     if (autoImportedIds.length > 0) {
       console.log(`[pocketflow] Auto-imported ${autoImportedIds.length} skill(s) for "${order.title}": ${autoImportedIds.join(", ")}`);
     }
@@ -1710,7 +2057,7 @@ export async function pocketflowExecute(
       // If the entry's outputFormat doesn't match the expected format, search for an alternative
       if (registryEntry && registryEntry.status === "approved" && expectedFormat && registryEntry.outputFormat !== expectedFormat) {
         console.log(`[pocketflow] Template "${templateKey}" is ${registryEntry.outputFormat} but WO needs ${expectedFormat} — searching for format-matched entry`);
-        const allTemplates = await storage.getGammaTemplates();
+        const allTemplates = options?.cachedGammaTemplates || await storage.getGammaTemplates();
         const formatMatch = allTemplates.find(t => t.status === "approved" && t.outputFormat === expectedFormat);
         if (formatMatch) {
           registryEntry = formatMatch;
@@ -1737,7 +2084,7 @@ export async function pocketflowExecute(
       } else {
         // No entry found by key — try searching by format
         if (expectedFormat) {
-          const allTemplates = await storage.getGammaTemplates();
+          const allTemplates = options?.cachedGammaTemplates || await storage.getGammaTemplates();
           const formatMatch = allTemplates.find(t => t.status === "approved" && t.outputFormat === expectedFormat);
           if (formatMatch) {
             dict.gammaPolicy = {
@@ -1766,11 +2113,18 @@ export async function pocketflowExecute(
     console.error("[pocketflow] Failed to resolve Gamma policy:", err.message);
   }
 
+  // Loop 13 WI-4: Classify request type for observability
+  const isMultiPageRequest = buildMultiPageHtmlPlan(dict) !== null;
+  const requestFormat = detectRequiredFormat(dict);
+
   await emitNodeLog(dict, "PocketFlow", `Starting iterative execution for "${order.title}"`, {
     maxIterations: dict.maxIterations,
     convergenceThreshold: dict.convergenceThreshold,
     hasLLM: !!llmConfig || !!settings?.enabled,
     availableTools: dict.availableTools.map(t => t.slug),
+    isMultiPageHtml: isMultiPageRequest,
+    detectedFormat: requestFormat,
+    iteration: dict.iteration,
   });
 
   const validateResult = await nodeValidateWorkOrder(dict);
@@ -1797,7 +2151,7 @@ export async function pocketflowExecute(
       }
     }
 
-    const evalResult = await nodeEvaluate(dict);
+    const evalResult = await nodeEvaluate(dict, dict.reviewReduction);
 
     if (evalResult.action === "converged" || evalResult.action === "best_effort") {
       await nodeBuildResponse(dict);

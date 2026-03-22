@@ -84,12 +84,17 @@ export function parseContentContract(contractText: string | null | undefined): P
 
   // Parse required sections — "Required sections: Cover, Executive Summary, ..."
   // Strip parenthetical annotations: "Cover (title + subtitle + date)" → "cover"
+  // Loop 14 Patch B: "cover" and "thank you" are optional by default — they are
+  // common deck conventions but not hard requirements. Only enforce sections that
+  // represent real content obligations (executive summary, roadmap, etc.).
+  const OPTIONAL_BY_DEFAULT = new Set(["cover", "title slide", "thank you", "thanks", "closing slide", "q&a"]);
   const sectionsMatch = contractText.match(/required\s+sections?\s*:?\s*([^\n]+)/i);
   if (sectionsMatch) {
     result.requiredSections = sectionsMatch[1]
       .split(/[,;]/)
       .map(s => s.replace(/\s*\([^)]*\)/g, "").trim().toLowerCase()) // strip (...)
-      .filter(s => s.length > 0 && s.length < 50 && !/^\d/.test(s)); // drop numeric-prefixed like "2-4 content slides"
+      .filter(s => s.length > 0 && s.length < 50 && !/^\d/.test(s)) // drop numeric-prefixed like "2-4 content slides"
+      .filter(s => !OPTIONAL_BY_DEFAULT.has(s)); // Loop 14: don't hard-require cover/thank you
   }
 
   // Parse max bullets — "max 5 bullets per slide"
@@ -142,7 +147,16 @@ export function estimateSlideCount(deliverable: string): number {
 
 /**
  * Check if a section name is present in the deliverable (case-insensitive).
+ * Uses fuzzy matching for common section synonyms (e.g., "cover" matches
+ * "title slide", "slide 1", "opening", etc.).
  */
+const SECTION_SYNONYMS: Record<string, string[]> = {
+  cover: ["cover", "title slide", "title page", "opening slide", "opening", "slide 1"],
+  "executive summary": ["executive summary", "exec summary", "overview", "summary"],
+  conclusion: ["conclusion", "closing", "wrap-up", "wrap up", "next steps", "key takeaways"],
+  "thank you": ["thank you", "thanks", "thank-you", "closing slide", "contact", "q&a"],
+};
+
 function sectionPresent(deliverable: string, section: string): boolean {
   const lower = deliverable.toLowerCase();
   // Check for heading with section name
@@ -150,6 +164,22 @@ function sectionPresent(deliverable: string, section: string): boolean {
   if (headingPattern.test(deliverable)) return true;
   // Check for bold/emphasized section name
   if (lower.includes(section)) return true;
+  // Check synonyms for common sections
+  const synonyms = SECTION_SYNONYMS[section.toLowerCase()];
+  if (synonyms) {
+    for (const syn of synonyms) {
+      if (syn === section.toLowerCase()) continue; // already checked
+      const synPattern = new RegExp(`^#{1,3}\\s+.*${escapeRegex(syn)}`, "im");
+      if (synPattern.test(deliverable)) return true;
+      if (lower.includes(syn)) return true;
+    }
+  }
+  // For "cover": also match if the first heading/slide exists (slide 1 is implicitly the cover)
+  if (section.toLowerCase() === "cover") {
+    const firstHeading = deliverable.match(/^#{1,3}\s+.+/m);
+    const firstSlideDelim = deliverable.match(/^---\s*$/m);
+    if (firstHeading || firstSlideDelim) return true;
+  }
   return false;
 }
 
@@ -208,7 +238,15 @@ export function validatePptxPreflight(
 
   // Gate 5: Must have slide structure (headings, delimiters, or sections)
   const derivedSlideCount = estimateSlideCount(trimmed);
-  if (derivedSlideCount < 2) {
+
+  // Detect single-slide intent: if only 1 segment but the content has structure
+  // (headings, emphasis, bullets), treat it as a valid single-slide deliverable.
+  // Single-slide WOs should not be forced through full-deck validation.
+  const isSingleSlide = derivedSlideCount <= 1
+    && (/^#{1,3}\s+/m.test(trimmed) || /^\*\*[^*]+\*\*/m.test(trimmed) || /^\s*[-*•]\s/m.test(trimmed))
+    && trimmed.length >= 200;
+
+  if (derivedSlideCount < 2 && !isSingleSlide) {
     hardFailures.push(`No slide structure detected (found ${derivedSlideCount} segment(s), need at least 2)`);
   }
 
@@ -219,7 +257,9 @@ export function validatePptxPreflight(
   }
 
   // Contract-based checks (only if contract exists)
-  if (contract) {
+  // Skip contract enforcement for single-slide deliverables — contract rules
+  // (min slides, required sections) are deck-level concerns that don't apply.
+  if (contract && !isSingleSlide) {
     // Slide count range
     if (derivedSlideCount < contract.minSlides) {
       hardFailures.push(`Slide count ${derivedSlideCount} is below contract minimum ${contract.minSlides}`);
@@ -247,6 +287,8 @@ export function validatePptxPreflight(
         softWarnings.push(`${bulletHeavySlides.length} slide(s) exceed ${contract.maxBulletsPerSlide} bullets`);
       }
     }
+  } else if (contract && isSingleSlide) {
+    softWarnings.push("Single-slide deliverable — deck-level contract checks skipped");
   }
 
   const ok = hardFailures.length === 0;

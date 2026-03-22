@@ -40,7 +40,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu, CheckCircle2, XCircle, AlertTriangle, Zap, Lock, Wrench, Clock, ArrowUpRight, ArrowDownLeft, ToggleLeft, ToggleRight, Search, Package } from "lucide-react";
+import { Bot, Plus, Pencil, Trash2, Loader2, Brain, UserCheck, Cpu, CheckCircle2, XCircle, AlertTriangle, Zap, Lock, Wrench, Clock, ArrowUpRight, ArrowDownLeft, ToggleLeft, ToggleRight, Search, Package, Shield } from "lucide-react";
 import { ModelSelector, providers } from "@/components/model-selector";
 import type { SubAgent, SubAgentTool, ToolLease, Tool } from "@shared/schema";
 
@@ -211,8 +211,16 @@ function ToolEntitlementsSection({ agentId }: { agentId: string }) {
     );
   }
 
+  // HARDENED: When agent has ANY assignments, only explicitly enabled tools count.
+  // No accessTier fallthrough — matches getAvailableToolsForAgent() backend logic.
+  const hasAssignments = assignmentMap.size > 0;
   const enabledCount = activeTools.filter(t => {
     const assignment = assignmentMap.get(t.id);
+    if (hasAssignments) {
+      // Agent has assignments: only explicitly enabled tools count
+      return assignment ? assignment.enabled !== false : false;
+    }
+    // No assignments at all: default open (tier2/any)
     if (!assignment) return t.accessTier === "any" || t.accessTier === "tier2";
     return assignment.enabled !== false;
   }).length;
@@ -233,8 +241,14 @@ function ToolEntitlementsSection({ agentId }: { agentId: string }) {
       <div className="space-y-1">
         {activeTools.map(tool => {
           const assignment = assignmentMap.get(tool.id);
-          const isEnabled = assignment ? assignment.enabled !== false : (tool.accessTier === "any" || tool.accessTier === "tier2");
-          const isAutoAccess = !assignment && isEnabled;
+          // HARDENED: When agent has assignments, unassigned tools are OFF (not auto-ON).
+          // Matches getAvailableToolsForAgent() backend logic — assignment table is source of truth.
+          const isEnabled = hasAssignments
+            ? (assignment ? assignment.enabled !== false : false)
+            : (assignment ? assignment.enabled !== false : (tool.accessTier === "any" || tool.accessTier === "tier2"));
+          const isAutoAccess = !hasAssignments && !assignment && isEnabled;
+          const isExplicitlyAssigned = !!assignment;
+          const isUnassigned = hasAssignments && !assignment;
 
           return (
             <div key={tool.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors" data-testid={`tool-toggle-${tool.id}`}>
@@ -259,7 +273,17 @@ function ToolEntitlementsSection({ agentId }: { agentId: string }) {
                   </Badge>
                   {isAutoAccess && (
                     <Badge variant="outline" className="border-transparent bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate text-[10px] h-4 px-1">
-                      auto
+                      default
+                    </Badge>
+                  )}
+                  {isExplicitlyAssigned && isEnabled && (
+                    <Badge variant="outline" className="border-transparent bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 no-default-hover-elevate no-default-active-elevate text-[10px] h-4 px-1">
+                      assigned
+                    </Badge>
+                  )}
+                  {isUnassigned && (
+                    <Badge variant="outline" className="border-transparent bg-gray-50 text-gray-400 dark:bg-gray-900/20 dark:text-gray-500 no-default-hover-elevate no-default-active-elevate text-[10px] h-4 px-1">
+                      not assigned
                     </Badge>
                   )}
                 </div>
@@ -274,6 +298,67 @@ function ToolEntitlementsSection({ agentId }: { agentId: string }) {
           <p className="text-xs text-muted-foreground text-center py-2">No tools available in the locker</p>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * RuntimeToolsSummary — Shows exactly what tools this agent will receive at execution time.
+ * Mirrors the backend getAvailableToolsForAgent() logic so operators can verify.
+ */
+function RuntimeToolsSummary({ agentId }: { agentId: string }) {
+  const { data: tools } = useQuery<Tool[]>({ queryKey: ["/api/tools"] });
+  const { data: agentTools } = useQuery<SubAgentTool[]>({
+    queryKey: ["/api/sub-agents", agentId, "tools"],
+    queryFn: async () => {
+      const res = await fetch(`/api/sub-agents/${agentId}/tools`);
+      return res.json();
+    },
+  });
+
+  if (!tools || !agentTools) return null;
+
+  const activeTools = tools.filter(t => t.status === "active" && !t.restricted);
+  const assignmentMap = new Map<string, SubAgentTool>();
+  agentTools.forEach(at => assignmentMap.set(at.toolId, at));
+  const hasAssignments = assignmentMap.size > 0;
+
+  // Mirror backend logic exactly
+  const runtimeTools = hasAssignments
+    ? activeTools.filter(t => {
+        const a = assignmentMap.get(t.id);
+        return a ? a.enabled !== false : false;
+      })
+    : activeTools.filter(t => t.accessTier === "any" || t.accessTier === "tier2");
+
+  return (
+    <div className="border rounded-md p-4 space-y-2" data-testid="section-runtime-tools">
+      <div className="flex items-center gap-2">
+        <Shield className="w-4 h-4" />
+        <span className="text-sm font-medium">Runtime Tools</span>
+        <Badge variant="outline" className={`border-transparent no-default-hover-elevate no-default-active-elevate text-xs ${runtimeTools.length === 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"}`}>
+          {runtimeTools.length} at execution
+        </Badge>
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        {hasAssignments
+          ? "This agent has explicit tool assignments. Only enabled tools will be available at execution time."
+          : "This agent has no explicit assignments. All default-tier tools will be available at execution time."}
+      </p>
+      {runtimeTools.length === 0 && hasAssignments && (
+        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+          Warning: This agent will have zero tools at execution time. Enable tools above to fix this.
+        </p>
+      )}
+      {runtimeTools.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {runtimeTools.map(t => (
+            <Badge key={t.id} variant="outline" className="border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 no-default-hover-elevate no-default-active-elevate text-[10px]">
+              {t.name}
+            </Badge>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1089,6 +1174,10 @@ export default function SubAgentsPage() {
 
               {editingAgent && (
                 <ToolEntitlementsSection agentId={editingAgent.id} />
+              )}
+
+              {editingAgent && (
+                <RuntimeToolsSummary agentId={editingAgent.id} />
               )}
 
               {editingAgent && (

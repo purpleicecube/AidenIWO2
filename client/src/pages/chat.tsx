@@ -1064,37 +1064,79 @@ export default function ChatPage() {
 
         <div className="flex-1 overflow-auto p-6" data-testid="container-messages">
           {!activeSessionId || messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-muted">
-                <Bot className="w-8 h-8 text-muted-foreground" />
+            <div className="flex flex-col h-full">
+              {/* Top spacer — pushes content to vertical center */}
+              <div className="flex-1" />
+              {/* Centered content block */}
+              <div className="flex flex-col items-center text-center gap-6 px-4">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-muted">
+                  <Bot className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-medium" data-testid="text-empty-state">What's on your mind?</h2>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                    Ask Aiden about work orders, sub-agents, workflows, or any operational question.
+                  </p>
+                </div>
+                <div className="w-full max-w-2xl" data-testid="container-input-floating">
+                  <div className="flex gap-2 items-end rounded-2xl shadow-lg border bg-card p-3">
+                    <Textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={(e) => {
+                        setInput(e.target.value);
+                        // Auto-resize textarea to fit content
+                        const el = e.target;
+                        el.style.height = "auto";
+                        el.style.height = Math.min(el.scrollHeight, 200) + "px";
+                      }}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Ask Aiden anything..."
+                      className="resize-none min-h-[44px] text-sm border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 overflow-hidden"
+                      rows={1}
+                      disabled={chatMutation.isPending}
+                      data-testid="input-chat-message"
+                    />
+                    <Button
+                      onClick={handleSend}
+                      disabled={!input.trim() || chatMutation.isPending}
+                      size="icon"
+                      className="rounded-xl flex-shrink-0"
+                      data-testid="button-send-message"
+                    >
+                      {chatMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {[
+                    "What's the current system status?",
+                    "Show me pending work orders",
+                    "Which sub-agents are active?",
+                    "Summarize recent activity",
+                  ].map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full text-xs"
+                      onClick={() => {
+                        setInput(suggestion);
+                        textareaRef.current?.focus();
+                      }}
+                      data-testid={`button-suggestion-${suggestion.slice(0, 10).replace(/\s/g, "-").toLowerCase()}`}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-medium" data-testid="text-empty-state">Welcome! I'm Aiden.</h2>
-                <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                  Your Tier 1 orchestration manager. Ask me about work order statuses, sub-agent assignments, workflow progress, or any operational question.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-4 justify-center">
-                {[
-                  "What's the current system status?",
-                  "Show me pending work orders",
-                  "Which sub-agents are active?",
-                  "Summarize recent activity",
-                ].map((suggestion) => (
-                  <Button
-                    key={suggestion}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setInput(suggestion);
-                      textareaRef.current?.focus();
-                    }}
-                    data-testid={`button-suggestion-${suggestion.slice(0, 10).replace(/\s/g, "-").toLowerCase()}`}
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
-              </div>
+              {/* Bottom spacer — equal to top, keeps content centered */}
+              <div className="flex-1" />
             </div>
           ) : (
             <div className="space-y-4 max-w-3xl mx-auto">
@@ -1179,29 +1221,41 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="border-t p-4" data-testid="container-input">
-          <div className="flex gap-2 max-w-3xl mx-auto items-end">
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask Aiden anything about your work orders and operations..."
-              className="resize-none min-h-[44px] max-h-[120px] text-sm"
-              rows={1}
-              disabled={chatMutation.isPending}
-              data-testid="input-chat-message"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || chatMutation.isPending}
-              size="icon"
-              data-testid="button-send-message"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+        {activeSessionId && messages.length > 0 && (
+          <div className="p-3" data-testid="container-input">
+            <div className="flex gap-2 max-w-3xl mx-auto items-end rounded-2xl shadow-lg border bg-card p-3">
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  const el = e.target;
+                  el.style.height = "auto";
+                  el.style.height = Math.min(el.scrollHeight, 200) + "px";
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask Aiden anything..."
+                className="resize-none min-h-[44px] text-sm border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 overflow-hidden"
+                rows={1}
+                disabled={chatMutation.isPending}
+                data-testid="input-chat-message"
+              />
+              <Button
+                onClick={handleSend}
+                disabled={!input.trim() || chatMutation.isPending}
+                size="icon"
+                className="rounded-xl flex-shrink-0"
+                data-testid="button-send-message"
+              >
+                {chatMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       </SplitPane>
 

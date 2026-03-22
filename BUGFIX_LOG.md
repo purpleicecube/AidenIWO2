@@ -845,6 +845,112 @@ App version: v0.9.5
 
 ---
 
+## Bug Fixes — Session 12: Execution Reliability (2026-03-21)
+
+### BUG-048: PocketFlow options-scope regression (High)
+
+| Field | Detail |
+| --- | --- |
+| Severity | High |
+| Symptom | `ReferenceError: options is not defined` on all `balanced` and `fast` profile PocketFlow runs. `safe` profile unaffected by accident (all flags false, optional chaining short-circuits). GOO2 Website Build Test hit this on every iteration (9/9 failed, convergence 0). |
+| Root Cause | `nodeExecStep()` (line 405, module-level function) referenced `options?.promptCompaction` and `options?.batchedSynthesis` — but `options` is a parameter of `pocketflowExecute()` (line 1789), which is a different scope. When execution profiles were wired in (v0.9.7 performance work), the profile flags were passed through `options` to `pocketflowExecute` but consumed inside `nodeExecStep` without propagation. |
+| Fix | Added `promptCompaction`, `batchedSynthesis`, `reviewReduction` fields to `SharedDict` interface. Set them from `options` at `pocketflowExecute()` entry (with `false` defaults). Replaced all out-of-scope `options?.` reads in `nodeExecStep` and the main loop with `dict.*` reads. |
+| Files Changed | `server/pocketflow.ts` (SharedDict interface, createSharedDict defaults, pocketflowExecute propagation, nodeExecStep reads, main loop eval call) |
+| Verification | All three profiles (safe/balanced/fast) compile and run without ReferenceError. 247/248 tests pass (1 pre-existing timezone test). |
+
+### Lifecycle normalization: retry/reopen/repair workflowExecutionId consistency
+
+| Field | Detail |
+| --- | --- |
+| Severity | Medium |
+| Symptom | `retry` and admin `repair retry` did not reset `workflowExecutionId`, leaving stale workflow linkage on the WO. Only `reopen` cleared it. A retry on a workflow-routed WO could re-enter Tier 1 with a stale `workflowExecutionId` from the previous failed run. |
+| Fix | Added `workflowExecutionId: null` to both retry (line ~412) and admin repair retry (line ~1041) update calls. Prior workflow executions are marked `superseded_by_retry` for audit. All three lifecycle paths (retry, reopen, repair retry) now behave consistently. |
+| Files Changed | `server/routes.ts` (retry endpoint, admin repair retry endpoint) |
+
+### Feature: Deterministic execution-strategy resolver
+
+| Field | Detail |
+| --- | --- |
+| Type | New feature |
+| Purpose | After Tier 1 approval, deterministically decide whether a WO should use direct (single-agent) or workflow (multi-agent template) execution. No LLM, no embeddings — additive scoring on format, category, token overlap, workflow-shaped signals, and explicit agent coverage. |
+| Selection threshold | Score >= 8, margin >= 2 over second candidate |
+| GOO2 behavior | Falls back to direct execution — the existing Purple GOO template uses Mark+Paul, not Hank+Darla as the WO requested. Explicit agent coverage gate rejects mismatched templates. |
+| Double-execution guard | Prevents duplicate active workflows for the same WO |
+| Files Created | `server/execution-strategy-resolver.ts` |
+| Files Changed | `server/orchestration.ts` (import, resolver call, workflow routing fork, audit logging) |
+
+### BUG-049: Quality review heartbeat starvation (High)
+
+| Field | Detail |
+| --- | --- |
+| Severity | High |
+| Symptom | GOO3 WO killed by watchdog ("No heartbeat for 103s") during Tier 1 quality review + auto-revision handoff. PocketFlow execution completed successfully (BUG-048 fix confirmed working), Aiden quality review ran and scored 0.65, revision was requested — then watchdog killed it. |
+| Root Cause | `runAidenQualityReview()` is an LLM call to the Tier 1 provider (Groq/gpt-oss-120b). During this call, no heartbeats are emitted. Combined with the prior PocketFlow execution time, the total gap exceeds the 60s watchdog stale threshold. Same class of bug as BUG-041 (Gamma heartbeat starvation) but in the quality review path. |
+| Fix | Added `withWorkOrderHeartbeatGuard(orderId, phase, fn)` helper — starts a periodic heartbeat (15s interval matching existing `HEARTBEAT_INTERVAL_MS`), executes the callback, always clears interval in `finally`. Wrapped both quality review call sites: initial review and revision-loop review. Added explicit heartbeat refresh before revision re-dispatch to close the handoff gap. No watchdog threshold changes. |
+| Files Changed | `server/orchestration.ts` (helper + 2 call site wraps + 1 handoff heartbeat + ownership-aware interval) |
+| Verification | 248/248 tests pass. Watchdog stale threshold (60s) unchanged. Max revision count (4) unchanged. Truly stuck WOs still fail — the guard only emits heartbeats while the review callback is actively executing and the attempt still owns the WO. |
+
+### BUG-050: Zombie attempt continuation after watchdog invalidation (High)
+
+| Field | Detail |
+| --- | --- |
+| Severity | High |
+| Symptom | GOO4 watchdog killed the WO at 14:23:23 (10-min ceiling), but the `processWorkOrder` function continued running for 6+ more minutes — dispatching revisions 2 and 3, running quality reviews, and executing PocketFlow steps. The zombie could have overwritten the watchdog's `failed` status with `awaiting_operator` or `completed`. |
+| Root Cause | `processWorkOrder` never checks `isAttemptStillOwner()` between revision cycles. The existing `HeartbeatEmitter` class checks ownership on heartbeat ticks, but the revision loop itself has no ownership gates. |
+| Fix | Added 3 ownership checks at critical boundaries: (1) before revision re-dispatch, (2) after `pocketflowExecute()` returns in revision loop, (3) before terminal-state write (`awaiting_operator` after revisions exhausted). If attempt ownership is lost, the function exits silently. |
+| Files Changed | `server/orchestration.ts` (3 `isAttemptStillOwner` guards in revision loop) |
+
+### BUG-051: Watchdog failure reason not materialized on WO/UI (Medium)
+
+| Field | Detail |
+| --- | --- |
+| Severity | Medium |
+| Symptom | GOO4 shows `status: "failed"` with `tier2Result: null` and `bdmMarker: null`. The operator sees "Failed" in the UI with no explanation. The failure reason exists only in execution logs. |
+| Root Cause | The watchdog sweep sets `status: "failed"` and `processingAttemptId` but does not write `bdmMarker` or `tier2Result`. |
+| Fix | Watchdog now writes both `bdmMarker` (type `watchdog_stuck`, includes reason, heartbeat age, total duration) and `tier2Result` (blocked: true, reason: `Watchdog: <reason>`) when killing a stuck WO. The UI already renders `bdmMarker` for non-blocked statuses. |
+| Files Changed | `server/orchestration.ts` (watchdog sweep update) |
+
+### BUG-052: Deterministic hard-ceiling calibration for heavier runs (Medium)
+
+| Field | Detail |
+| --- | --- |
+| Severity | Medium |
+| Symptom | GOO4 hit the 10-min hard ceiling during revision 2 of a 5-page HTML build. The initial PocketFlow + quality review + revision 1 + quality review consumed ~7.5 min, leaving only 2.5 min for revision 2 — not enough. |
+| Root Cause | The 10-min ceiling is per-attempt (correct) but does not account for multi-revision cycles or format-heavy deliverables. |
+| Fix | Replaced single `MAX_PROCESSING_DURATION_MS` with `resolveProcessingCeiling(order)`. Default: 10 min. Extended (20 min) for: format-heavy (PDF/PPTX/Gamma keywords), multi-page HTML builds (website/multi-page/sandbox keywords), and WOs already in auto-revision (GCC metadata shows revision attempts > 0). The ceiling reason is included in the watchdog failure message. Stale-heartbeat threshold (60s) unchanged. |
+| Files Changed | `server/orchestration.ts` (new `resolveProcessingCeiling()` function, watchdog sweep uses per-WO ceiling) |
+
+### BUG-053: Progress-aware soft-timeout routing (High)
+
+| Field | Detail |
+| --- | --- |
+| Severity | High |
+| Symptom | GOO4/GOO6-class WOs that exceed the hard ceiling but are still actively progressing (fresh heartbeat) get labeled `failed`. The operator sees a dead WO when the work was alive and producing output. |
+| Root Cause | The watchdog treated ceiling breach identically regardless of whether the work was dead or alive. Both stale-heartbeat and budget-exceeded-with-fresh-heartbeat mapped to `status: "failed"`. |
+| Fix | Split the watchdog kill path into two classes: (1) `heartbeatStale === true` → hard fail with `bdmMarker.type = "watchdog_stuck"` (unchanged). (2) `exceededHardCeiling === true` but heartbeat is fresh → soft timeout with `status = "awaiting_operator"`, `bdmMarker.type = "watchdog_budget_exceeded"`, best-known artifact preserved. Both paths invalidate the attempt (zombie protection). Design note: fresh heartbeat is used as an operational proxy for live progress, not as a permanent semantic replacement for true forward-progress detection. |
+| Files Changed | `server/orchestration.ts` (watchdog sweep split), `server/__tests__/recovery.test.ts` (updated test expectation) |
+
+### BUG-050 Extension: Main-path ownership guard (High)
+
+| Field | Detail |
+| --- | --- |
+| Severity | High |
+| Symptom | Purple GOO Landing Page1010 completed with `status: "completed"` but `deliverable: 0 chars` and `postProcessedFile: null`. Watchdog had already soft-timeout'd the WO at 22:21, but zombie continued through quality review (approved at 22:29) and wrote `completed` status. |
+| Root Cause | BUG-050 ownership guards were only in the revision loop. The main path (PocketFlow → quality review → completion) had no ownership check after `pocketflowExecute()` returned. Zombie bypassed the watchdog invalidation. |
+| Fix | Added `isAttemptStillOwner()` check after main `pocketflowExecute()` returns, before quality review and completion. Zombie now exits silently if attempt was invalidated during PocketFlow execution. |
+| Files Changed | `server/orchestration.ts` (1 ownership guard on main path) |
+
+### Loop 14 Patches (Medium)
+
+| Field | Detail |
+| --- | --- |
+| Patch A | 2DO checklist counter: split into "Milestones: X/Y" + "Events: N". Milestone classifier uses regex on summary text. Old misleading mixed ratio removed. |
+| Patch B | PPTX content contracts: `cover`, `thank you`, `title slide`, `closing slide`, `q&a` filtered from `requiredSections` by default. Real content sections still enforced. |
+| Patch C | Know-How breadcrumb paths: `Workspace > X > Y` normalized to `X/Y`. Folder lookup tries `Workspace/` prefix. Added `content from` as path trigger keyword. |
+| Files Changed | `client/src/pages/work-order-detail.tsx`, `server/pptx-quality.ts`, `server/__tests__/pptx-quality.test.ts`, `server/knowhow.ts`, `server/storage.ts` |
+
+---
+
 ## Summary
 
 | Category | Count | Critical | High | Medium | Low |
@@ -859,7 +965,8 @@ App version: v0.9.5
 | Bugs fixed (Session 9) | 8 | 0 | 4 | 3 | 1 |
 | Bugs fixed (Session 10) | 3 | 1 | 2 | 0 | 0 |
 | Bugs fixed (Session 11) | 5 | 2 | 3 | 0 | 0 |
-| **Total bugs fixed** | **42** | **8** | **20** | **10** | **1** |
+| Bugs fixed (Session 12) | 7 | 0 | 5 | 2 | 0 |
+| **Total bugs fixed** | **49** | **8** | **25** | **12** | **1** |
 | Feature implementations (Session 6) | 3 | — | — | — | — |
 | Code review findings | 6 | 0 | 0 | 1 | 5 |
 | Performance findings | 1 | — | — | — | — |

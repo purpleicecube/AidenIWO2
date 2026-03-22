@@ -58,6 +58,7 @@ export const workOrders = pgTable("work_orders", {
   archivedReason: text("archived_reason"),
   submittedBy: text("submitted_by").default("system"),
   gammaTemplateKey: text("gamma_template_key"),     // WO-level override: takes precedence over workflow default and global default
+  contextRequest: jsonb("context_request"),           // Know-How Retrieval: ContextRequest for workspace-informed context
   processingAttemptId: varchar("processing_attempt_id"),    // UUID: current processing attempt token (watchdog ownership)
   heartbeatAt: timestamp("heartbeat_at"),                   // last heartbeat from active processing
   processingStartedAt: timestamp("processing_started_at"),  // when current processing attempt began
@@ -77,6 +78,7 @@ export const operationalSettings = pgTable("operational_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   updatedBy: text("updated_by").default("system"),
   memoryAdvisor: text("memory_advisor").notNull().default("none"),
+  executionProfile: text("execution_profile").notNull().default("safe"),
 });
 
 export const insertOperationalSettingsSchema = createInsertSchema(operationalSettings).omit({
@@ -257,6 +259,7 @@ When a work order arrives:
 - Identify which sub-agent owns the domain:
   • marketing|growth|campaign|funnel → Mark (B04_MKTG)
   • document|presentation|pptx|slide|deck → Mark (B04_MKTG) via PPTX pipeline (md-to-pptx)
+  • sop|procedure|process document|workflow template|onboarding doc|training manual|process audit|standardization → SOP Master (B06_SOP)
   • scheduling|stakeholder|vendor → Jamie
   • compliance|PII|audit → Nyx
   • SLA|KPI|capacity|escalation → Polaris
@@ -449,6 +452,7 @@ export const workflowSteps = pgTable("workflow_steps", {
   dependencies: text("dependencies").array().default(sql`'{}'::text[]`),
   retryPolicy: jsonb("retry_policy").default(sql`'{"maxRetries": 1, "retryDelay": 1000}'::jsonb`),
   timeoutMs: integer("timeout_ms").default(30000),
+  parallelGroup: integer("parallel_group"),
 });
 
 export const insertWorkflowStepSchema = createInsertSchema(workflowSteps).omit({
@@ -1041,5 +1045,140 @@ export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit
 
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
+
+// ==================== Know-How Retrieval ====================
+
+// --- Code Blocks (first-class retrieval sources) ---
+
+export const codeBlocks = pgTable("code_blocks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  language: text("language").notNull().default("text"),
+  content: text("content").notNull(),
+  sourceType: text("source_type"),         // "work_order", "artifact", "manual"
+  sourceId: varchar("source_id"),          // WO ID or artifact ID
+  sourceName: text("source_name"),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  description: text("description"),
+  createdBy: text("created_by").default("system"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCodeBlockSchema = createInsertSchema(codeBlocks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCodeBlock = z.infer<typeof insertCodeBlockSchema>;
+export type CodeBlock = typeof codeBlocks.$inferSelect;
+
+// --- Context Retrievals (audit log) ---
+
+export const contextRetrievals = pgTable("context_retrievals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").notNull(),
+  consumer: text("consumer").notNull(),      // "chat", "work_order", "workflow"
+  consumerId: varchar("consumer_id"),
+  request: jsonb("request").notNull(),
+  sourceCount: integer("source_count").default(0),
+  tokensUsed: integer("tokens_used").default(0),
+  truncated: boolean("truncated").default(false),
+  errors: jsonb("errors").default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertContextRetrievalSchema = createInsertSchema(contextRetrievals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertContextRetrieval = z.infer<typeof insertContextRetrievalSchema>;
+export type ContextRetrieval = typeof contextRetrievals.$inferSelect;
+
+// --- Know-How Retrieval Contracts (pure types) ---
+
+export type ContextSourceType =
+  | "artifact"
+  | "code_block"
+  | "workspace_file"
+  | "operator_prompt"
+  | "gcc_advisory";
+
+export type SourceRelationship =
+  | "path_targeted"
+  | "keyword_matched"
+  | "recent_relevant"
+  | "code_block_match"
+  | "operator_supplied"
+  | "gcc_advisory";
+
+export interface ContextRequest {
+  paths?: string[];
+  keywords?: string[];
+  sourceTypes?: ContextSourceType[];
+  limit?: number;
+  tokenBudget?: number;
+  maxPerSource?: number;
+  recencyDays?: number;
+  excludeIds?: string[];
+  codeLanguages?: string[];
+  operatorHint?: string;
+}
+
+export interface RetrievedSource {
+  id: string;
+  name: string;
+  sourceType: ContextSourceType;
+  mimeType: string;
+  folderId?: string | null;
+  folderPath?: string | null;
+  relationship: SourceRelationship;
+  createdAt: string;
+  updatedAt?: string;
+  tags?: string[];
+  score: number;
+  totalLength: number;
+  truncated: boolean;
+}
+
+export interface RetrievedChunk {
+  sourceId: string;
+  content: string;
+  startOffset: number;
+  endOffset: number;
+  lineStart?: number;
+  lineEnd?: number;
+  language?: string;
+  tokenEstimate: number;
+}
+
+export interface ContextCitation {
+  sourceId: string;
+  sourceName: string;
+  folderPath: string | null;
+  sourceType: ContextSourceType;
+  relationship: SourceRelationship;
+}
+
+export interface ContextError {
+  path?: string;
+  sourceType?: string;
+  message: string;
+  code: "NOT_FOUND" | "UNSUPPORTED" | "EMPTY_CONTENT" | "BUDGET_EXCEEDED";
+}
+
+export interface ContextPack {
+  requestId: string;
+  sources: RetrievedSource[];
+  chunks: RetrievedChunk[];
+  citations: ContextCitation[];
+  tokenBudget: number;
+  tokensUsed: number;
+  truncated: boolean;
+  resolvedAt: string;
+  errors: ContextError[];
+}
 
 export * from "./models/auth";

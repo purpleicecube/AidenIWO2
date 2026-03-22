@@ -896,6 +896,32 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       sourceId: order.id,
     });
 
+    // Know-How Retrieval: extract and store code blocks as first-class retrieval sources
+    if (deliverable) {
+      try {
+        const extractedBlocks = extractCodeBlocksFromDeliverable(deliverable);
+        const orderSlug = order.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+        for (const block of extractedBlocks) {
+          await storage.createCodeBlock({
+            name: `${orderSlug}_${block.language}`,
+            language: block.language,
+            content: block.code,
+            sourceType: "work_order",
+            sourceId: order.id,
+            sourceName: order.title,
+            tags: [order.type, block.language, "auto-extracted"],
+            description: `Auto-extracted ${block.language} code from "${order.title}"`,
+            createdBy: "aiden",
+          });
+        }
+        if (extractedBlocks.length > 0) {
+          console.log(`[knowhow] Auto-extracted ${extractedBlocks.length} code block(s) from "${order.title}"`);
+        }
+      } catch (err: any) {
+        console.warn(`[knowhow] Code block extraction failed for WO ${order.id}:`, err.message);
+      }
+    }
+
     console.log(`Auto-filed work order "${order.title}" to Workspace (02_Execution + ${targetFolderName} + ${deliverableFilePath ? "deliverable" : "no deliverable"})`);
   } catch (err: any) {
     console.error("Auto-filing failed:", err.message);

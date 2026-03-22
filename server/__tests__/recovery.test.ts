@@ -149,7 +149,7 @@ describe("watchdogSweep()", () => {
     expect(storage.updateWorkOrder).not.toHaveBeenCalled();
   });
 
-  it("recovers WO that exceeds hard ceiling even with recent heartbeat", async () => {
+  it("routes WO that exceeds hard ceiling but has fresh heartbeat to awaiting_operator (BUG-053 soft timeout)", async () => {
     const longRunning = makeOrder({
       id: "wo-too-long",
       heartbeatAt: new Date(Date.now() - 5_000).toISOString(), // 5s ago — fresh heartbeat
@@ -161,7 +161,11 @@ describe("watchdogSweep()", () => {
     const count = await watchdogSweep();
 
     expect(count).toBe(1);
-    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-too-long", expect.objectContaining({ status: "failed" }));
+    // BUG-053: budget exceeded + fresh heartbeat → soft timeout (awaiting_operator), not hard fail
+    expect(storage.updateWorkOrder).toHaveBeenCalledWith("wo-too-long", expect.objectContaining({
+      status: "awaiting_operator",
+      bdmMarker: expect.objectContaining({ type: "watchdog_budget_exceeded" }),
+    }));
   });
 
   it("skips non-processing orders", async () => {

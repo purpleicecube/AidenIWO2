@@ -129,10 +129,206 @@ async function executeApiTool(tool: Tool, input: string): Promise<string> {
   return text.slice(0, 4000);
 }
 
+// ==================== SSRF Protection + URL Helpers ====================
+
+function isSafeUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const hostname = parsed.hostname.toLowerCase();
+    const blocked = [
+      "localhost", "127.0.0.1", "0.0.0.0", "[::1]", "[::]",
+      "metadata.google.internal", "169.254.169.254",
+    ];
+    if (blocked.includes(hostname)) return false;
+    if (hostname.endsWith(".local") || hostname.endsWith(".internal")) return false;
+    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname)) return false;
+    if (hostname.startsWith("169.254.")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function cleanExtractedUrl(raw: string): string {
+  return raw.replace(/[).,;:!?'">\]]+$/, "");
+}
+
+// ==================== Perplexity / DuckDuckGo / Search Chain ====================
+
+async function executePerplexitySearch(query: string): Promise<string> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) throw new Error("PERPLEXITY_API_KEY not set");
+
+  const resp = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "sonar",
+      messages: [
+        { role: "system", content: "You are a concise research assistant. Provide factual, well-sourced answers with specific numbers and citations. Never approximate or guess — only state what sources confirm. Be direct." },
+        { role: "user", content: query },
+      ],
+      max_tokens: 1500,
+      search_recency_filter: "day",
+    }),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Perplexity API returned ${resp.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = await resp.json() as any;
+  const content = data.choices?.[0]?.message?.content || "";
+  const citations = data.citations || [];
+  let result = `## Perplexity Search: "${query}"\n\n${content}`;
+  if (citations.length > 0) {
+    result += "\n\n**Sources:**\n" + citations.map((c: string, i: number) => `${i + 1}. ${c}`).join("\n");
+  }
+  return result;
+}
+
+async function executeDuckDuckGoSearch(query: string): Promise<string> {
+  const encoded = encodeURIComponent(query);
+  const resp = await fetch(`https://api.duckduckgo.com/?q=${encoded}&format=json&no_html=1&skip_disambig=1`, {
+    headers: { "Accept": "application/json" },
+  });
+
+  if (!resp.ok) throw new Error(`DuckDuckGo API returned ${resp.status}`);
+
+  const data = await resp.json() as any;
+  const results: string[] = [];
+
+  if (data.AbstractText) {
+    results.push(`**Summary:** ${data.AbstractText}\nSource: ${data.AbstractURL || "DuckDuckGo"}`);
+  }
+
+  const topics = [...(data.RelatedTopics || [])].slice(0, 5);
+  for (const topic of topics) {
+    if (topic.Text && topic.FirstURL) {
+      results.push(`- ${topic.Text.slice(0, 200)}\n  URL: ${topic.FirstURL}`);
+    }
+  }
+
+  if (results.length === 0) return `No DuckDuckGo results for: "${query}"`;
+  return `## DuckDuckGo Results: "${query}"\n\n${results.join("\n\n")}`;
+}
+
+// Pattern for queries that need real-time verification (prone to hallucination on sonar)
+const REALTIME_VERIFY_PATTERN = /\b(weather|temperature|forecast|degrees|rain|snow|sunny|cloudy|stock|price|ticker|market|nasdaq|dow|s&p|score|game|match|playoff|standings|won|lost|beat)\b/i;
+
+async function verifyWithScrape(query: string, primaryResult: string): Promise<string> {
+  // Build a verification scrape URL based on query type
+  let verifyUrl: string | null = null;
+  const q = encodeURIComponent(query);
+
+  if (/weather|temperature|forecast|degrees|rain|snow|sunny|cloudy/i.test(query)) {
+    // wttr.in returns plain text weather — fast, no JS needed, highly reliable
+    const locationMatch = query.replace(/\b(what|is|the|weather|in|today|current|right now|forecast|temperature|how|hot|cold)\b/gi, "").trim();
+    if (locationMatch.length >= 2) {
+      verifyUrl = `https://wttr.in/${encodeURIComponent(locationMatch)}?format=3`;
+    }
+  } else if (/stock|price|ticker|market/i.test(query)) {
+    // DuckDuckGo instant answer for stock queries
+    verifyUrl = `https://api.duckduckgo.com/?q=${q}&format=json&no_html=1`;
+  }
+
+  if (!verifyUrl) return primaryResult;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(verifyUrl, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; AidenBot/1.0)" },
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) return primaryResult;
+    const verifyData = await resp.text();
+    if (!verifyData || verifyData.length < 5) return primaryResult;
+
+    console.log("[web-search] Verification pass completed");
+    return primaryResult + `\n\n### Verification Cross-Check\n${verifyData.slice(0, 1000)}`;
+  } catch (err: any) {
+    console.warn("[web-search] Verification scrape failed:", err.message);
+    return primaryResult;
+  }
+}
+
+async function executeWebSearchChain(query: string): Promise<string> {
+  // Chain: Perplexity (best quality) → Brave (structured) → DuckDuckGo (free fallback)
+  const errors: string[] = [];
+
+  const needsVerification = REALTIME_VERIFY_PATTERN.test(query);
+
+  // 1. Perplexity (primary)
+  if (process.env.PERPLEXITY_API_KEY) {
+    try {
+      const result = await executePerplexitySearch(query);
+      if (result.length > 100) {
+        console.log("[web-search] Perplexity search succeeded");
+        return needsVerification ? await verifyWithScrape(query, result) : result;
+      }
+    } catch (err: any) {
+      errors.push(`Perplexity: ${err.message}`);
+      console.warn("[web-search] Perplexity failed, trying Brave:", err.message);
+    }
+  }
+
+  // 2. Brave (secondary — needs a registered tool with API key)
+  try {
+    const tools = await storage.getTools();
+    const braveTool = tools.find(t => t.slug === "brave-search" && t.status === "active");
+    if (braveTool) {
+      const result = await executeBraveSearch(braveTool, query);
+      if (result.length > 50) {
+        console.log("[web-search] Brave search succeeded");
+        return result;
+      }
+    }
+  } catch (err: any) {
+    errors.push(`Brave: ${err.message}`);
+    console.warn("[web-search] Brave failed, trying DuckDuckGo:", err.message);
+  }
+
+  // 3. DuckDuckGo (free fallback)
+  try {
+    const result = await executeDuckDuckGoSearch(query);
+    if (result.length > 50) {
+      console.log("[web-search] DuckDuckGo search succeeded");
+      return result;
+    }
+  } catch (err: any) {
+    errors.push(`DuckDuckGo: ${err.message}`);
+    console.warn("[web-search] DuckDuckGo failed:", err.message);
+  }
+
+  return `Web search failed for "${query}". Errors: ${errors.join("; ")}`;
+}
+
+export async function executeBuiltInWebSearch(input: string): Promise<string> {
+  return executeWebSearchChain(input);
+}
+
+export async function executeBuiltInWebScrape(input: string): Promise<string> {
+  return executeWebScraper(input);
+}
+
+// ==================== Web Scraper ====================
+
 async function executeWebScraper(input: string): Promise<string> {
-  const urls = input.match(/https?:\/\/[^\s,\n]+/g);
-  if (!urls || urls.length === 0) {
+  const rawUrls = input.match(/https?:\/\/[^\s,\n]+/g);
+  if (!rawUrls || rawUrls.length === 0) {
     return `No valid URLs found in input. Provide one or more URLs to scrape. Input received: ${input}`;
+  }
+  const urls = rawUrls.map(cleanExtractedUrl).filter(isSafeUrl);
+  if (urls.length === 0) {
+    return `All extracted URLs were blocked by security policy (private/internal addresses are not allowed).`;
   }
 
   const results: string[] = [];
@@ -462,12 +658,16 @@ export async function getAvailableToolsForAgent(subAgentId?: string): Promise<Av
   if (subAgentId) {
     const assigned = await storage.getSubAgentTools(subAgentId);
     if (assigned.length > 0) {
+      // HARDENED: When an agent has ANY tool assignments, ONLY return explicitly enabled tools.
+      // No accessTier fallthrough. The assignment table is the single source of truth.
+      // Tools not in the assignment table are NOT available to this agent.
+      // Tools in the assignment table with enabled=false are NOT available.
       const enabledIds = new Set(assigned.filter(a => a.enabled !== false).map(a => a.toolId));
-      const disabledIds = new Set(assigned.filter(a => a.enabled === false).map(a => a.toolId));
-      const entitledTools = activeTools.filter(t => !disabledIds.has(t.id) && (enabledIds.has(t.id) || t.accessTier === "any" || t.accessTier === "tier2"));
+      const entitledTools = activeTools.filter(t => enabledIds.has(t.id));
       return entitledTools.map(mapTool);
     }
   }
 
+  // No agent specified or agent has no assignments — return all tier2/any tools (default open)
   return activeTools.filter(t => t.accessTier === "any" || t.accessTier === "tier2").map(mapTool);
 }

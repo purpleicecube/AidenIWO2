@@ -1476,15 +1476,28 @@ export default function WorkOrderDetail() {
             </CardContent>
           </Card>
 
-          {checklistItems && checklistItems.length > 0 && (
+          {checklistItems && checklistItems.length > 0 && (() => {
+            // Loop 14 Patch A: Separate milestones from events for accurate progress display
+            const milestonePatterns = /submitted|approved|completed|published|filed|converged|passed|quality.*passed|routing|dispatched|workflow.*started/i;
+            const milestones = checklistItems.filter(i => milestonePatterns.test(i.summary) || i.status === "done");
+            const milestoneDone = milestones.filter(i => i.status === "done").length;
+            const eventCount = checklistItems.length - milestones.length;
+            return (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <ListChecks className="h-4 w-4 text-primary" />
                   <CardTitle className="text-base font-medium">2DO Checklist</CardTitle>
-                  <Badge variant="secondary" className="ml-auto text-xs">
-                    {checklistItems.filter(i => i.status === "done").length}/{checklistItems.length}
-                  </Badge>
+                  <div className="ml-auto flex gap-1.5">
+                    <Badge variant="secondary" className="text-xs">
+                      Milestones: {milestoneDone}/{milestones.length}
+                    </Badge>
+                    {eventCount > 0 && (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        Events: {eventCount}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1515,7 +1528,8 @@ export default function WorkOrderDetail() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          );
+          })()}
 
           <Card>
             <CardHeader className="pb-3">

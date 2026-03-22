@@ -9,23 +9,26 @@ import path from "path";
 import { storage } from "./storage";
 
 // Keyword map: skill dirName → keywords that trigger auto-import
+// HARDENED: removed broad single-word triggers ("design", "content", "web", "page", "build",
+// "report", "test", "email", "art", "skill") that caused false-positive matches on nearly
+// every WO description. Keywords must be specific enough to avoid tool bloat.
 const SKILL_KEYWORD_MAP: Record<string, string[]> = {
-  "brand-guidelines":      ["brand", "style guide", "color palette", "typography", "logo", "identity"],
-  "canvas-design":         ["design", "visual", "art", "graphic", "poster", "banner", "illustration"],
-  "doc-coauthoring":       ["document", "write", "content", "copy", "draft", "article", "report", "blog"],
-  "docx":                  ["docx", "word", "word document", ".docx"],
-  "frontend-design":       ["html", "css", "frontend", "web", "website", "landing page", "ui", "interface", "page"],
-  "internal-comms":        ["email", "slack", "announcement", "internal", "memo", "comms", "communication"],
-  "mcp-builder":           ["mcp", "tool builder", "protocol", "integration", "connector"],
-  "pdf":                   ["pdf", "portable document"],
-  "klearai-pptx":          ["klear", "klear.ai", "klearai", "workforce intelligence", "staffing deck", "staffing presentation"],
-  "pptx":                  ["pptx", "powerpoint", "presentation", "slide", "deck"],
-  "skill-creator":         ["skill", "agent skill", "capability"],
-  "slack-gif-creator":     ["gif", "slack gif", "animated"],
-  "theme-factory":         ["theme", "styling", "design system", "tokens"],
-  "webapp-testing":        ["test", "qa", "quality assurance", "validation", "verify"],
-  "web-artifacts-builder": ["html", "web", "website", "artifact", "build", "page", "static site"],
-  "xlsx":                  ["xlsx", "excel", "spreadsheet", "csv", "table data"],
+  "brand-guidelines":      ["brand guidelines", "style guide", "color palette", "brand identity", "brand colors"],
+  "canvas-design":         ["canvas design", "visual design document", "graphic design", "poster design", "banner design", "illustration"],
+  "doc-coauthoring":       ["coauthor", "co-author", "collaborative document", "document draft"],
+  "docx":                  ["docx", "word document", ".docx", "create word"],
+  "frontend-design":       ["html page", "css stylesheet", "frontend component", "landing page", "web page", "ui component", "html file", "html5"],
+  "internal-comms":        ["internal email", "slack message", "company announcement", "internal memo", "internal comms"],
+  "mcp-builder":           ["mcp server", "mcp tool", "model context protocol", "mcp integration"],
+  "pdf":                   ["pdf document", "pdf file", "generate pdf", "create pdf"],
+  "klearai-pptx":          ["klear.ai deck", "klearai presentation", "klear branded", "klear.ai pptx"],
+  "pptx":                  ["pptx", "powerpoint", "slide deck", "presentation deck", "pitch deck"],
+  "skill-creator":         ["create skill", "agent skill", "new skill", "skill template"],
+  "slack-gif-creator":     ["slack gif", "animated gif", "create gif"],
+  "theme-factory":         ["design system", "theme tokens", "design tokens", "theme factory"],
+  "webapp-testing":        ["webapp test", "web test", "playwright test", "quality assurance", "qa test"],
+  "web-artifacts-builder": ["html artifact", "web artifact", "static site", "multi-component html", "web build"],
+  "xlsx":                  ["xlsx", "excel file", "spreadsheet", "create excel", ".xlsx"],
 };
 
 const SKILLS_DIR = path.resolve(".local/skills");
@@ -33,10 +36,16 @@ const SKILLS_DIR = path.resolve(".local/skills");
 /**
  * Given a step description (and optional step name), returns the IDs of all
  * skills that match. Imports any not yet in the Tool Locker.
+ *
+ * HARDENED: When subAgentId is provided and the agent has tool assignments,
+ * auto-imported tools are filtered against the agent's assignment table.
+ * Only tools explicitly enabled for this agent are returned.
+ * This ensures the UI tool toggle is the single source of truth.
  */
 export async function autoImportSkillsForDescription(
   description: string,
-  name?: string
+  name?: string,
+  subAgentId?: string
 ): Promise<string[]> {
   const text = `${name || ""} ${description}`.toLowerCase();
 
@@ -49,8 +58,6 @@ export async function autoImportSkillsForDescription(
 
   if (matchedDirs.length === 0) return [];
 
-  // De-duplicate: if both frontend-design and web-artifacts-builder match,
-  // keep both — they serve different purposes.
   const toolIds: string[] = [];
   const existingTools = await storage.getTools();
 
@@ -65,6 +72,20 @@ export async function autoImportSkillsForDescription(
     // Import fresh
     const imported = await importSkill(dirName, slug);
     if (imported) toolIds.push(imported);
+  }
+
+  // HARDENED: If a sub-agent is specified and has tool assignments,
+  // filter auto-imported tools to only those explicitly enabled for this agent.
+  if (subAgentId && toolIds.length > 0) {
+    const assigned = await storage.getSubAgentTools(subAgentId);
+    if (assigned.length > 0) {
+      const enabledIds = new Set(assigned.filter(a => a.enabled !== false).map(a => a.toolId));
+      const filtered = toolIds.filter(id => enabledIds.has(id));
+      if (filtered.length < toolIds.length) {
+        console.log(`[skill-auto-import] Agent ${subAgentId}: filtered ${toolIds.length} auto-imports down to ${filtered.length} (respecting tool assignments)`);
+      }
+      return filtered;
+    }
   }
 
   return toolIds;

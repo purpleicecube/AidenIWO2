@@ -24,6 +24,10 @@ vi.mock("../storage.js", () => ({
     selectGammaCandidate: vi.fn(),
     rejectGammaCandidate: vi.fn(),
     rejectAllGammaCandidates: vi.fn(),
+    getGammaTemplates: vi.fn().mockResolvedValue([]),
+    getWorkflowTemplates: vi.fn().mockResolvedValue([]),
+    getWorkflowSteps: vi.fn().mockResolvedValue([]),
+    getWorkflowExecution: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -36,6 +40,7 @@ vi.mock("../llm-client.js", () => ({
 
 vi.mock("../pocketflow.js", () => ({
   pocketflowExecute: vi.fn(),
+  detectRequiredFormatFromText: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock("../workspace-filing.js", () => ({

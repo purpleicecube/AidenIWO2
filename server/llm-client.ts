@@ -311,25 +311,42 @@ export async function callAnthropic(
 }
 
 export async function callLLM(settings: LlmSettings, systemPrompt: string, userMessage: string, apiKeyEnvVarOverride?: string): Promise<string> {
-  if (settings.provider === "anthropic") {
-    return callAnthropic(settings, systemPrompt, userMessage, apiKeyEnvVarOverride);
+  const _llmStart = Date.now();
+  const _tokEst = Math.round((systemPrompt.length + userMessage.length) / 4);
+  try {
+    let result: string;
+    if (settings.provider === "anthropic") {
+      result = await callAnthropic(settings, systemPrompt, userMessage, apiKeyEnvVarOverride);
+    } else {
+      result = await callOpenAICompatible(settings, [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ], apiKeyEnvVarOverride);
+    }
+    console.log(`[perf:llm] callLLM ${settings.provider}/${settings.model} ${Date.now() - _llmStart}ms ~${_tokEst}tok`);
+    return result;
+  } catch (err) {
+    console.log(`[perf:llm] callLLM ${settings.provider}/${settings.model} ${Date.now() - _llmStart}ms FAILED ~${_tokEst}tok`);
+    throw err;
   }
-
-  return callOpenAICompatible(settings, [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userMessage },
-  ], apiKeyEnvVarOverride);
 }
 
 async function callLLMPlainText(settings: LlmSettings, systemPrompt: string, userMessage: string, apiKeyEnvVarOverride?: string): Promise<string> {
+  const _llmStart = Date.now();
+  const _tokEst = Math.round((systemPrompt.length + userMessage.length) / 4);
+  const _logDone = () => console.log(`[perf:llm] callLLMPlainText ${settings.provider}/${settings.model} ${Date.now() - _llmStart}ms ~${_tokEst}tok`);
   if (settings.provider === "anthropic") {
-    return callAnthropic(settings, systemPrompt, userMessage, apiKeyEnvVarOverride);
+    const r = await callAnthropic(settings, systemPrompt, userMessage, apiKeyEnvVarOverride);
+    _logDone();
+    return r;
   }
 
-  return callOpenAICompatible(settings, [
+  const r = await callOpenAICompatible(settings, [
     { role: "system", content: systemPrompt },
     { role: "user", content: userMessage },
   ], apiKeyEnvVarOverride, { jsonMode: false });
+  _logDone();
+  return r;
 }
 
 function formatGccMemoryForPrompt(gcc: Record<string, any>): string {
@@ -377,6 +394,7 @@ export async function chatWithAiden(
   systemContext: string,
   sessionGccMemory?: Record<string, any>
 ): Promise<string> {
+  const _chatLlmStart = Date.now();
   const gccContext = sessionGccMemory ? formatGccMemoryForPrompt(sessionGccMemory) : "";
   const chatSystemPrompt = `${settings.systemPrompt}
 
@@ -386,6 +404,9 @@ ${gccContext}
 You are Aiden, the Tier 1 Orchestrator on IOWA (Intelligent Work Orchestration) — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are having a direct conversation with your operator. Answer questions about work orders, sub-agents, workflows, system status, and operations. Be helpful, concise, and informative. Use the system context provided to give accurate, data-driven answers. If you don't have enough information to answer, say so clearly.
 
 Respond in natural language (not JSON). Use markdown formatting when helpful for readability.
+
+## LIVE WEB RESEARCH
+When you see a "LIVE WEB RESEARCH" section in your context, that data was retrieved from the internet moments ago in response to the operator's question. Use it as your primary source for that topic and cite specific facts from the web results. If the operator pastes a URL, you may see scraped page content — summarize and reference it directly. For precise real-time data (weather, stock prices, scores, live events), always attribute the source (e.g., "According to web search results...") so the operator knows the data comes from an automated lookup, not a verified feed.
 
 ## MANAGER REPORTING TRUTHFULNESS
 When asked operational questions (daily counts, blocked/failed reasons, status summaries):
@@ -441,6 +462,7 @@ Guidelines for workflow creation:
       messages,
     });
     const textBlock = response.content.find((b) => b.type === "text");
+    console.log(`[perf:llm] chatWithAiden ${settings.provider}/${settings.model} ${Date.now() - _chatLlmStart}ms ~${Math.round(chatSystemPrompt.length / 4)}tok`);
     return textBlock?.text || "I could not generate a response.";
   }
 
@@ -462,6 +484,7 @@ Guidelines for workflow creation:
     });
     const content = response.choices[0]?.message?.content;
     if (content && content.trim().length > 0) {
+      console.log(`[perf:llm] chatWithAiden ${settings.provider}/${settings.model} ${Date.now() - _chatLlmStart}ms ~${Math.round(chatSystemPrompt.length / 4)}tok`);
       return content;
     }
     console.error(`[chatWithAiden] LLM returned empty content. Model: ${settings.model}, Provider: ${settings.provider}, finish_reason: ${response.choices[0]?.finish_reason}`);
@@ -893,7 +916,8 @@ export async function llmExecStep(
   apiKeyOverride?: string,
   availableTools?: Array<{ slug: string; name: string; type: string; description: string }>,
   revisionContext?: string,
-  designContext?: string
+  designContext?: string,
+  contextPack?: import("@shared/schema").ContextPack
 ): Promise<{ blocked: boolean; reason?: string | null; output?: string; toolCalls?: Array<{ toolSlug: string; input: string }> }> {
   const contextEntries = Object.entries(previousOutputs);
   const prevContext = contextEntries.length > 0
@@ -956,11 +980,19 @@ FORMAT REQUIREMENT: The work order requires a document/report. Your "output" fie
     formatGuidance = dataSourceGuidance;
   }
 
+  // Know-How context injection
+  let knowHowContext = "";
+  if (contextPack && contextPack.sources.length > 0) {
+    const { KnowHowService } = await import("./knowhow");
+    const { LocalWorkspaceProvider } = await import("./workspace-provider");
+    knowHowContext = "\n" + new KnowHowService(new LocalWorkspaceProvider()).formatForLLM(contextPack) + "\n";
+  }
+
   const prompt = `You are executing step "${step.name}" of a work order.
 
 Step description: ${step.description}
 ${prevContext}
-${reopenContext}${gccContext}${sandboxExecGuidance}${toolsSection}${revisionGuidance}${execContentContract}
+${reopenContext}${gccContext}${knowHowContext}${sandboxExecGuidance}${toolsSection}${revisionGuidance}${execContentContract}
 Work Order Context:
 - Title: ${order.title}
 - Description: ${order.description}
@@ -1318,15 +1350,34 @@ ${deliverablePreview}${structuralWarnings}${pptxQualitySupplement || ""}`;
     const jsonStr = jsonMatch ? jsonMatch[0] : raw;
     const parsed = safeJsonParse(jsonStr);
 
-    const approved = parsed.approved === true;
+    let approved = parsed.approved === true;
+    let score = typeof parsed.score === "number" ? Math.min(1, Math.max(0, parsed.score)) : 0.7;
     const hasValidRecommendation = ["approve", "request_revision", "block"].includes(parsed.recommendation);
-    const recommendation = hasValidRecommendation ? parsed.recommendation : (approved ? "approve" : "request_revision");
+    let recommendation = hasValidRecommendation ? parsed.recommendation : (approved ? "approve" : "request_revision");
+    let issues: string[] = Array.isArray(parsed.issues) ? parsed.issues : [];
+
+    // BUG-043: When a post-processed file (PDF/PPTX) was successfully generated,
+    // the LLM sometimes ignores the MANDATORY RULE and scores low because the
+    // markdown "doesn't look like a PDF". Override: floor score at 0.6 and filter
+    // out format-related complaints. The file format requirement IS satisfied.
+    if (postProcessedFile && postProcessedFile.size > 1024) {
+      const formatNoise = /\b(not a pdf|not a pptx|missing \.pdf|missing \.pptx|no pdf|no pptx|file format|cannot verify|only.*markdown|only.*text|only.*report|does not provide.*pdf|does not include.*pdf|does not provide.*pptx)\b/i;
+      issues = issues.filter(i => !formatNoise.test(i));
+      if (score < 0.6) {
+        score = 0.6;
+        // If the only reason it was rejected was format, auto-approve
+        if (issues.length === 0) {
+          approved = true;
+          recommendation = "approve";
+        }
+      }
+    }
 
     return {
       approved,
-      score: typeof parsed.score === "number" ? Math.min(1, Math.max(0, parsed.score)) : 0.7,
+      score,
       summary: parsed.summary || "Review completed",
-      issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+      issues,
       recommendation,
     };
   } catch (err: any) {

@@ -17,6 +17,9 @@ Agent rules for any AI working in this codebase. MUST/SHOULD format. Read before
 - MUST NOT remove or bypass the Done Contract gate in `completeAndFileWorkOrder()` — it is the last deterministic closeout check before terminal status.
 - MUST NOT hardcode health dashboard values or KPIs — always derive from real runtime state (DB queries, env var checks, connectivity tests).
 - MUST NOT remove the PPTX preflight validator or slide source shaper from `nodePostProcess()` — they prevent weak content from reaching Gamma.
+- MUST propagate execution-profile flags (`promptCompaction`, `batchedSynthesis`, `reviewReduction`) via `SharedDict` fields, not via closure-scoped `options`. Node functions (`nodeExecStep`, `nodeEvaluate`, etc.) are module-level and cannot access `pocketflowExecute`'s parameters.
+- MUST NOT bypass the execution-strategy resolver in `processWorkOrder()` — it runs after Tier 1 approval and before direct dispatch. The resolver is deterministic and auditable; removing it breaks workflow routing.
+- MUST NOT allow duplicate active workflow executions for the same work order — the double-execution guard in `processWorkOrder()` prevents this.
 
 ## PocketFlow Tuning (current values — MUST NOT change without operator approval)
 
@@ -48,3 +51,5 @@ Agent rules for any AI working in this codebase. MUST/SHOULD format. Read before
 | Tag | Item | Status |
 | --- | --- | --- |
 | ADR-001 | PocketFlow delta_overlay assembly (artifact_key + refine_mode) | Deferred to v0.5+ |
+| BUG-048 | PocketFlow options-scope regression — execution-profile flags must live on SharedDict, not closure scope | Fixed (2026-03-21) |
+| ESR-001 | Execution Strategy Resolver — deterministic workflow template matching after Tier 1 | Shipped (2026-03-21) |

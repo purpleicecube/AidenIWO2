@@ -88,6 +88,11 @@ import {
   type GammaGenerationRecord,
   type InsertGammaGenerationRecord,
   gammaGenerationRecords,
+  type CodeBlock,
+  type InsertCodeBlock,
+  codeBlocks,
+  type InsertContextRetrieval,
+  contextRetrievals,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, asc, inArray } from "drizzle-orm";
@@ -271,6 +276,14 @@ export interface IStorage {
   getChecklistItemsByWorkflow(workflowExecutionId: string): Promise<ChecklistItem[]>;
   createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem>;
   updateChecklistItem(id: string, updates: Partial<ChecklistItem>): Promise<ChecklistItem | undefined>;
+
+  // Know-How Retrieval
+  getCodeBlocks(filters?: { language?: string; sourceId?: string; tags?: string[] }): Promise<CodeBlock[]>;
+  getCodeBlock(id: string): Promise<CodeBlock | undefined>;
+  createCodeBlock(block: InsertCodeBlock): Promise<CodeBlock>;
+  searchArtifactsByKeyword(keyword: string, folderId?: string | null): Promise<Artifact[]>;
+  getArtifactFolderByPath(path: string): Promise<ArtifactFolder | undefined>;
+  createContextRetrieval(record: InsertContextRetrieval): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1166,6 +1179,94 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(checklistItems).set({ ...updates, updatedAt: new Date() }).where(eq(checklistItems.id, id)).returning();
     return updated;
   }
+
+  // Know-How Retrieval
+
+  async getCodeBlocks(filters?: { language?: string; sourceId?: string; tags?: string[] }): Promise<CodeBlock[]> {
+    const conditions = [];
+    if (filters?.language) conditions.push(eq(codeBlocks.language, filters.language));
+    if (filters?.sourceId) conditions.push(eq(codeBlocks.sourceId, filters.sourceId));
+    if (filters?.tags && filters.tags.length > 0) {
+      conditions.push(sql`${codeBlocks.tags} && ${sql`ARRAY[${sql.join(filters.tags.map(t => sql`${t}`), sql`, `)}]::text[]`}`);
+    }
+    if (conditions.length === 0) {
+      return db.select().from(codeBlocks).orderBy(desc(codeBlocks.updatedAt)).limit(100);
+    }
+    return db.select().from(codeBlocks).where(and(...conditions)).orderBy(desc(codeBlocks.updatedAt)).limit(100);
+  }
+
+  async getCodeBlock(id: string): Promise<CodeBlock | undefined> {
+    const [block] = await db.select().from(codeBlocks).where(eq(codeBlocks.id, id));
+    return block;
+  }
+
+  async createCodeBlock(block: InsertCodeBlock): Promise<CodeBlock> {
+    const [created] = await db.insert(codeBlocks).values(block).returning();
+    return created;
+  }
+
+  async searchArtifactsByKeyword(keyword: string, folderId?: string | null): Promise<Artifact[]> {
+    const pattern = `%${keyword}%`;
+    const nameMatch = sql`${artifacts.name} ILIKE ${pattern}`;
+    const contentMatch = sql`${artifacts.content} ILIKE ${pattern}`;
+    const textMatch = sql`(${nameMatch} OR ${contentMatch})`;
+    if (folderId) {
+      return db.select().from(artifacts)
+        .where(and(textMatch, eq(artifacts.folderId, folderId)))
+        .orderBy(desc(artifacts.updatedAt)).limit(50);
+    }
+    return db.select().from(artifacts)
+      .where(textMatch)
+      .orderBy(desc(artifacts.updatedAt)).limit(50);
+  }
+
+  async getArtifactFolderByPath(path: string): Promise<ArtifactFolder | undefined> {
+    // Normalize: try with and without leading slash
+    const withSlash = path.startsWith("/") ? path : `/${path}`;
+    const withoutSlash = path.startsWith("/") ? path.slice(1) : path;
+
+    const [byPath] = await db.select().from(artifactFolders).where(eq(artifactFolders.path, withSlash));
+    if (byPath) return byPath;
+
+    const [byPathNoSlash] = await db.select().from(artifactFolders).where(eq(artifactFolders.path, withoutSlash));
+    if (byPathNoSlash) return byPathNoSlash;
+
+    // Loop 14 Patch C: Try with "Workspace/" prefix (UI breadcrumb paths store this prefix)
+    const withWorkspace = `Workspace/${withoutSlash}`;
+    const [byWorkspacePath] = await db.select().from(artifactFolders).where(eq(artifactFolders.path, withWorkspace));
+    if (byWorkspacePath) return byWorkspacePath;
+
+    // Fallback: match by name (last segment)
+    const lastName = withoutSlash.split("/").pop() || withoutSlash;
+    const [byName] = await db.select().from(artifactFolders).where(eq(artifactFolders.name, lastName));
+    return byName;
+  }
+
+  async createContextRetrieval(record: InsertContextRetrieval): Promise<void> {
+    await db.insert(contextRetrievals).values(record);
+  }
 }
 
-export const storage = new DatabaseStorage();
+const _dbStorage = new DatabaseStorage();
+
+// Perf instrumentation: wrap hot-path methods with timing (logs only when > 50ms)
+const DB_PERF_METHODS = [
+  "getWorkOrder", "getLlmSettings", "getActiveSubAgents", "getGammaTemplates",
+  "getWorkflowTemplate", "getWorkflowSteps", "getOperationalSettings", "getTools",
+  "updateWorkOrder", "getSubAgents", "getWorkflowExecution",
+] as const;
+
+for (const method of DB_PERF_METHODS) {
+  const original = (_dbStorage as any)[method];
+  if (typeof original === "function") {
+    (_dbStorage as any)[method] = async function (...args: any[]) {
+      const start = Date.now();
+      const result = await original.apply(_dbStorage, args);
+      const dur = Date.now() - start;
+      if (dur > 50) console.log(`[perf:db] ${method} ${dur}ms`);
+      return result;
+    };
+  }
+}
+
+export const storage = _dbStorage;
