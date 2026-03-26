@@ -368,11 +368,43 @@ export class KnowHowService {
  * Parse a natural-language chat message into a ContextRequest.
  * Extracts folder references, keywords, and code block intent.
  */
+/**
+ * Normalize a raw path reference from a WO description:
+ * - Strip leading "Workspace/" prefix (provider resolves relative to workspace root)
+ * - Strip leading "/"
+ * - Trim trailing whitespace/punctuation
+ */
+function normalizePath(raw: string): string {
+  return raw
+    .replace(/^Workspace\//i, "")
+    .replace(/^\//, "")
+    .replace(/[,;)\]]+$/, "")
+    .trim();
+}
+
 export function parseContextRequestFromChat(message: string): ContextRequest | null {
   const request: ContextRequest = {};
   let hasSignal = false;
+  const paths: string[] = [];
 
-  // Loop 14 Patch C: Normalize breadcrumb-style paths before folder detection.
+  // --- Phase 1: Label-colon path extraction ---
+  // Catches "Web Style Guide: Design References/Purplegoo_1016-DESIGN.md"
+  // and "Content Guide: Workspace/04_Resources/Demo_Content/KlearContent_Demo"
+  // Pattern: "Label text: <path containing at least one />"
+  // Label allows word chars, spaces, dots, hyphens (e.g., "Klear.ai Content Guide:")
+  const labelColonPattern = /^[ \t]*[\w][\w\s.'-]*?:\s*([^\s:][^\n]*\/[^\n]+)$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = labelColonPattern.exec(message)) !== null) {
+    const candidate = normalizePath(match[1]);
+    // Must contain a "/" path separator (not just " / " prose), and not be a URL.
+    // Require at least one segment that looks like a filename/folder (word chars adjacent to /)
+    if (/[\w]\/[\w]/.test(candidate) && !candidate.match(/^https?:\/\//i)) {
+      paths.push(candidate);
+      hasSignal = true;
+    }
+  }
+
+  // --- Phase 2: Breadcrumb normalization (legacy) ---
   // "Workspace > 04_Resources > Demo_Content > KlearContent_Demo" → "04_Resources/Demo_Content/KlearContent_Demo"
   let normalizedMessage = message;
   const breadcrumbPattern = /(?:Workspace\s*>\s*)?(\d{2}_[A-Za-z_]+(?:\s*>\s*[A-Za-z0-9_.-]+)+)/gi;
@@ -385,14 +417,21 @@ export function parseContextRequestFromChat(message: string): ContextRequest | n
     normalizedMessage = normalizedMessage.replace(breadcrumb, `from ${normalized}`);
   }
 
-  // Detect folder/path references: "from 05_Artifacts", "in /04_Resources", "folder 02_Execution"
-  const folderPattern = /(?:from|in|folder|path|directory|content\s+from)\s+[/"]?(\d{2}_[A-Za-z_]+(?:\/[^\s"]*)?)/gi;
-  let match: RegExpExecArray | null;
-  const paths: string[] = [];
+  // --- Phase 3: Preposition + path extraction ---
+  // Catches "from 05_Artifacts", "in /04_Resources", "folder 02_Execution"
+  // Now also matches paths that DON'T start with ##_ (e.g., "from Design References/...")
+  const folderPattern = /(?:from|in|folder|path|directory|content\s+from|references?\s+(?:in|at|from)?)\s+[/"]?([A-Za-z0-9_#][\w\s-]*(?:\/[^\s"]*)?)/gi;
   while ((match = folderPattern.exec(normalizedMessage)) !== null) {
-    paths.push(match[1]);
-    hasSignal = true;
+    const candidate = normalizePath(match[1]);
+    // Only accept if it looks path-like (contains / or starts with ##_)
+    if (candidate.match(/\//) || candidate.match(/^\d{2}_/)) {
+      if (!paths.includes(candidate)) {
+        paths.push(candidate);
+        hasSignal = true;
+      }
+    }
   }
+
   if (paths.length > 0) request.paths = paths;
 
   // Detect code block intent

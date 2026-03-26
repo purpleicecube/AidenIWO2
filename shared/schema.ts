@@ -801,12 +801,20 @@ export const artifacts = pgTable("artifacts", {
   tags: text("tags").array().default(sql`'{}'::text[]`),
   status: text("status").notNull().default("active"),
   createdBy: text("created_by").default("system"),
+  publishedSlug: varchar("published_slug", { length: 128 }),
+  publishedAt: timestamp("published_at"),
+  publishedUrl: text("published_url"),
+  publishPolicy: text("publish_policy").notNull().default("private"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertArtifactSchema = createInsertSchema(artifacts).omit({
   id: true,
+  publishedSlug: true,
+  publishedAt: true,
+  publishedUrl: true,
+  publishPolicy: true,
   createdAt: true,
   updatedAt: true,
 });

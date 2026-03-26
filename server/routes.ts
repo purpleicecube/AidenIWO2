@@ -32,6 +32,7 @@ import type { LlmSettings } from "@shared/schema";
 import { processWorkOrder, processWorkOrderSafe, isStaleProcessing, startWorkflowExecution, advanceWorkflowExecution, recoverStuckStepRuns, getWatchdogStatus } from "./orchestration";
 import { autoImportSkillsForDescription } from "./skill-auto-import";
 import { isApiKeyConfigured, getRequiredApiKeyName, testLLMConnection, fetchAvailableModels, chatWithAiden, resolveSubAgentLlmConfig, extractWorkOrderFromChat } from "./llm-client";
+import { publishToGitHubPages, unpublishFromGitHubPages, isValidSlug, slugify } from "./publish";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -2644,6 +2645,22 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/artifacts/published", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const items = await storage.getPublishedArtifacts();
+      res.json(items.map(a => ({
+        id: a.id,
+        name: a.name,
+        slug: a.publishedSlug,
+        publicUrl: a.publishedUrl,
+        policy: a.publishPolicy,
+        publishedAt: a.publishedAt,
+      })));
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch published artifacts" });
+    }
+  });
+
   app.get("/api/artifacts/:id", isAuth, requireRole("viewer"), async (req, res) => {
     try {
       const artifact = await storage.getArtifact(req.params.id);
@@ -3091,6 +3108,90 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to re-render preview", error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/sandbox-sessions/:id/publish — One-click publish sandbox HTML to GitHub Pages.
+   * Creates an artifact from the session HTML (or reuses existing), publishes it, returns public URL.
+   * Body: { slug?: string } — auto-generated from session name if omitted.
+   */
+  app.post("/api/sandbox-sessions/:id/publish", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const session = await storage.getSandboxSession(req.params.id);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+
+      const result = session.result as any;
+      if (!result?.html || !result?.renderable) {
+        return res.status(400).json({ message: "Session has no renderable HTML to publish" });
+      }
+
+      const htmlContent: string = result.html;
+      const sessionName = session.name || `sandbox-${session.id.slice(0, 8)}`;
+      const slug = req.body.slug || slugify(sessionName);
+
+      if (!isValidSlug(slug)) {
+        return res.status(400).json({ message: "Invalid slug. Use 3-128 chars: lowercase, numbers, hyphens." });
+      }
+
+      // Check slug uniqueness
+      const existing = await storage.getArtifactBySlug(slug);
+      if (existing) {
+        // Re-publish: update the existing artifact's content and re-push
+        await storage.updateArtifact(existing.id, {
+          content: htmlContent,
+          name: `${sessionName}.html`,
+        });
+        const pubResult = await publishToGitHubPages(slug, htmlContent, `Update: ${sessionName}`);
+        if (!pubResult.success) {
+          return res.status(502).json({ message: "Failed to publish to GitHub Pages", error: pubResult.error });
+        }
+        await storage.updateArtifact(existing.id, {
+          publishedAt: new Date(),
+          publishedUrl: pubResult.publicUrl!,
+        });
+        return res.json({
+          message: "Updated and re-published",
+          publicUrl: pubResult.publicUrl,
+          slug,
+          artifactId: existing.id,
+        });
+      }
+
+      // Create a new artifact from the sandbox HTML
+      const artifact = await storage.createArtifact({
+        name: `${sessionName}.html`,
+        type: "file",
+        mimeType: "text/html",
+        content: htmlContent,
+        sourceType: "sandbox",
+        sourceId: session.id,
+        tags: ["html", "sandbox", "published"],
+        createdBy: "system",
+      });
+
+      // Publish to GitHub Pages
+      const pubResult = await publishToGitHubPages(slug, htmlContent, `Publish: ${sessionName}`);
+      if (!pubResult.success) {
+        return res.status(502).json({ message: "Failed to publish to GitHub Pages", error: pubResult.error });
+      }
+
+      // Update artifact with publish metadata
+      await storage.updateArtifact(artifact.id, {
+        publishedSlug: slug,
+        publishedAt: new Date(),
+        publishedUrl: pubResult.publicUrl!,
+        publishPolicy: "public",
+      });
+
+      res.json({
+        message: "Published successfully",
+        publicUrl: pubResult.publicUrl,
+        slug,
+        artifactId: artifact.id,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to publish sandbox session", error: err.message });
     }
   });
 
@@ -4635,6 +4736,114 @@ You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers li
       res.json({ message: "Image deleted" });
     } catch (err) {
       res.status(500).json({ message: "Failed to delete image" });
+    }
+  });
+
+  // ==================== Publish / Public Preview ====================
+
+  /**
+   * POST /api/artifacts/:id/publish — Publish an HTML artifact to GitHub Pages.
+   * Body: { slug?: string, policy?: "public" | "unlisted" }
+   */
+  app.post("/api/artifacts/:id/publish", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const artifact = await storage.getArtifact(req.params.id);
+      if (!artifact) return res.status(404).json({ message: "Artifact not found" });
+      if (artifact.mimeType !== "text/html") {
+        return res.status(400).json({ message: "Only HTML artifacts can be published" });
+      }
+      if (!artifact.content) {
+        return res.status(400).json({ message: "Artifact has no content" });
+      }
+
+      const slug = req.body.slug || slugify(artifact.name || artifact.id);
+      if (!isValidSlug(slug)) {
+        return res.status(400).json({ message: "Invalid slug. Use 3-128 chars: lowercase, numbers, hyphens." });
+      }
+
+      // Check slug uniqueness
+      const existing = await storage.getArtifactBySlug(slug);
+      if (existing && existing.id !== artifact.id) {
+        return res.status(409).json({ message: `Slug "${slug}" is already in use by another artifact` });
+      }
+
+      const policy = req.body.policy || "public";
+      if (!["public", "unlisted"].includes(policy)) {
+        return res.status(400).json({ message: "Policy must be 'public' or 'unlisted'" });
+      }
+
+      // Push to GitHub Pages
+      const result = await publishToGitHubPages(slug, artifact.content, `Publish: ${artifact.name || slug}`);
+      if (!result.success) {
+        return res.status(502).json({ message: "Failed to publish to GitHub Pages", error: result.error });
+      }
+
+      // Update artifact record
+      const updated = await storage.updateArtifact(artifact.id, {
+        publishedSlug: slug,
+        publishedAt: new Date(),
+        publishedUrl: result.publicUrl!,
+        publishPolicy: policy,
+      });
+
+      res.json({
+        message: "Published successfully",
+        publicUrl: result.publicUrl,
+        slug,
+        policy,
+        artifact: updated,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to publish artifact", error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/artifacts/:id/unpublish — Remove from GitHub Pages and mark private.
+   */
+  app.post("/api/artifacts/:id/unpublish", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const artifact = await storage.getArtifact(req.params.id);
+      if (!artifact) return res.status(404).json({ message: "Artifact not found" });
+      if (!artifact.publishedSlug) {
+        return res.status(400).json({ message: "Artifact is not published" });
+      }
+
+      const result = await unpublishFromGitHubPages(artifact.publishedSlug);
+      if (!result.success) {
+        return res.status(502).json({ message: "Failed to unpublish from GitHub Pages", error: result.error });
+      }
+
+      const updated = await storage.updateArtifact(artifact.id, {
+        publishedSlug: null as any,
+        publishedAt: null as any,
+        publishedUrl: null as any,
+        publishPolicy: "private",
+      });
+
+      res.json({ message: "Unpublished successfully", artifact: updated });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to unpublish artifact", error: err.message });
+    }
+  });
+
+  /**
+   * GET /p/:slug — Public unauthenticated route. Serves published HTML directly.
+   * This is the shareable link: https://your-domain.com/p/my-landing-page
+   * Falls back to local DB serving (useful before GitHub Pages propagates, or for unlisted).
+   */
+  app.get("/p/:slug", async (req, res) => {
+    try {
+      const artifact = await storage.getArtifactBySlug(req.params.slug);
+      if (!artifact || !artifact.publishedAt || !artifact.content) {
+        return res.status(404).send("<!DOCTYPE html><html><body><h1>404 — Not Found</h1><p>This deliverable does not exist or has been unpublished.</p></body></html>");
+      }
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.send(artifact.content);
+    } catch (err) {
+      res.status(500).send("Internal server error");
     }
   });
 

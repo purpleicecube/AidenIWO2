@@ -15,6 +15,7 @@ const WATCHDOG_INTERVAL_MS = 30_000;       // sweep every 30s
 const HEARTBEAT_STALE_MS = 60_000;         // 60s without heartbeat = stuck
 const DEFAULT_CEILING_MS = 10 * 60 * 1000;   // 10 min — simple one-off WOs
 const EXTENDED_CEILING_MS = 20 * 60 * 1000;  // 20 min — format-heavy / revision-eligible runs
+const PHASE_TIMEOUT_MS = 90_000;           // 90s — per-phase timeout for LLM calls (quality review, etc.)
 
 /**
  * BUG-052: Determine the per-attempt hard ceiling for a work order.
@@ -99,12 +100,26 @@ class HeartbeatEmitter {
  * Starts a periodic heartbeat, executes the callback, and always clears
  * the interval — even on throw. Does NOT keep dead calls alive: if the
  * callback throws, the guard re-throws after cleanup.
+ *
+ * BUG-053: Added phase-level timeout (default PHASE_TIMEOUT_MS). If the
+ * wrapped function doesn't resolve within the timeout, a TimeoutError is
+ * thrown so the caller can apply a safe fallback (e.g. auto-approve).
+ * This prevents WOs from getting stuck in "processing" forever when an
+ * LLM call hangs despite the HTTP-level timeout.
  */
+class PhaseTimeoutError extends Error {
+  constructor(phase: string, timeoutMs: number) {
+    super(`Phase "${phase}" timed out after ${(timeoutMs / 1000).toFixed(0)}s`);
+    this.name = "PhaseTimeoutError";
+  }
+}
+
 async function withWorkOrderHeartbeatGuard<T>(
   orderId: string,
   phase: string,
   fn: () => Promise<T>,
   attemptId?: string,
+  timeoutMs: number = PHASE_TIMEOUT_MS,
 ): Promise<T> {
   let stopped = false;
   const interval = setInterval(async () => {
@@ -124,7 +139,14 @@ async function withWorkOrderHeartbeatGuard<T>(
   }, HEARTBEAT_INTERVAL_MS);
 
   try {
-    return await fn();
+    // BUG-053: Race the callback against a phase-level timeout
+    const result = await Promise.race([
+      fn(),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new PhaseTimeoutError(phase, timeoutMs)), timeoutMs);
+      }),
+    ]);
+    return result;
   } finally {
     stopped = true;
     clearInterval(interval);
@@ -978,21 +1000,37 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
       : null;
 
     // BUG-049: Heartbeat guard prevents watchdog false-kill during quality review LLM call
-    qualityReview = await withWorkOrderHeartbeatGuard(orderId, "quality_review", () =>
-      runAidenQualityReview(
-        settings,
-        order,
-        deliverable,
-        convergenceScore,
-        iterations,
-        stepCount,
-        executorLabel,
-        hadSearchTools,
-        tier2Result.output?.postProcessedFile ?? null,
-        pptxSupplement,
-      ),
-      attemptId,
-    );
+    // BUG-053: Phase timeout ensures auto-approve if the review LLM hangs
+    try {
+      qualityReview = await withWorkOrderHeartbeatGuard(orderId, "quality_review", () =>
+        runAidenQualityReview(
+          settings,
+          order,
+          deliverable,
+          convergenceScore,
+          iterations,
+          stepCount,
+          executorLabel,
+          hadSearchTools,
+          tier2Result.output?.postProcessedFile ?? null,
+          pptxSupplement,
+        ),
+        attemptId,
+      );
+    } catch (err: any) {
+      if (err instanceof PhaseTimeoutError) {
+        console.warn(`[BUG-053] Quality review timed out for WO ${orderId} — auto-approving deliverable`);
+        qualityReview = {
+          approved: true,
+          score: convergenceScore,
+          summary: `Auto-approved (quality review timed out after ${(PHASE_TIMEOUT_MS / 1000).toFixed(0)}s). Manual review recommended.`,
+          issues: ["Quality review LLM call timed out — deliverable not independently verified"],
+          recommendation: "approve" as const,
+        };
+      } else {
+        throw err;
+      }
+    }
 
     await storage.createExecutionLog({
       workOrderId: orderId,

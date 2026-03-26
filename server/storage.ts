@@ -97,6 +97,22 @@ import {
 import { db } from "./db";
 import { eq, desc, sql, and, asc, inArray } from "drizzle-orm";
 
+/** Levenshtein edit distance — used for fuzzy folder name matching */
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
@@ -676,6 +692,17 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
+  async getArtifactBySlug(slug: string): Promise<Artifact | undefined> {
+    const [artifact] = await db.select().from(artifacts).where(eq(artifacts.publishedSlug, slug));
+    return artifact;
+  }
+
+  async getPublishedArtifacts(): Promise<Artifact[]> {
+    return db.select().from(artifacts)
+      .where(sql`${artifacts.publishedAt} IS NOT NULL`)
+      .orderBy(desc(artifacts.publishedAt));
+  }
+
   async getSandboxSessions(): Promise<SandboxSession[]> {
     return db.select().from(sandboxSessions).orderBy(desc(sandboxSessions.createdAt));
   }
@@ -1239,7 +1266,25 @@ export class DatabaseStorage implements IStorage {
     // Fallback: match by name (last segment)
     const lastName = withoutSlash.split("/").pop() || withoutSlash;
     const [byName] = await db.select().from(artifactFolders).where(eq(artifactFolders.name, lastName));
-    return byName;
+    if (byName) return byName;
+
+    // Fuzzy fallback: Levenshtein distance on folder name (catches typos like "Referendes" vs "References")
+    const allFolders = await db.select().from(artifactFolders);
+    let bestMatch: ArtifactFolder | undefined;
+    let bestDist = Infinity;
+    const lastNameLC = lastName.toLowerCase();
+    for (const folder of allFolders) {
+      const dist = levenshtein(lastNameLC, folder.name.toLowerCase());
+      // Accept if edit distance <= 2 and name is at least 5 chars (avoid false positives on short names)
+      if (dist < bestDist && dist <= 2 && lastName.length >= 5) {
+        bestDist = dist;
+        bestMatch = folder;
+      }
+    }
+    if (bestMatch) {
+      console.log(`[storage] Fuzzy folder match: "${lastName}" → "${bestMatch.name}" (edit distance ${bestDist})`);
+    }
+    return bestMatch;
   }
 
   async createContextRetrieval(record: InsertContextRetrieval): Promise<void> {

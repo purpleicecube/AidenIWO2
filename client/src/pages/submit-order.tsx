@@ -33,7 +33,7 @@ import { Link } from "wouter";
 
 const submitOrderSchema = insertWorkOrderSchema.extend({
   title: z.string().min(3, "Title must be at least 3 characters").max(200),
-  description: z.string().min(10, "Description must be at least 10 characters").max(20000),
+  description: z.string().min(10, "Description must be at least 10 characters").max(65000),
   type: z.string().min(1, "Type is required"),
   priority: z.string().min(1, "Priority is required"),
   submittedBy: z.string().optional(),

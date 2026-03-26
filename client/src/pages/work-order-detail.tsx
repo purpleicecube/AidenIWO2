@@ -1690,7 +1690,7 @@ export default function WorkOrderDetail() {
             <WorkflowExecutionPanel executionId={order.workflowExecutionId} />
           )}
 
-          <DeliverableCard orderId={order.id} tier2Result={order.tier2Result as any} />
+          <DeliverableCard orderId={order.id} tier2Result={order.tier2Result as any} orderStatus={order.status} />
 
           {(!!order.tier1Result || !!order.tier2Result) && (
             <Card>
@@ -1723,11 +1723,27 @@ export default function WorkOrderDetail() {
   );
 }
 
-function DeliverableCard({ orderId, tier2Result }: { orderId: string; tier2Result: any }) {
+function DeliverableCard({ orderId, tier2Result, orderStatus }: { orderId: string; tier2Result: any; orderStatus: string }) {
+  const { toast } = useToast();
   const { data: artifacts } = useQuery<any[]>({
     queryKey: ["/api/artifacts", { sourceId: orderId }],
     queryFn: () => fetch(`/api/artifacts?sourceId=${orderId}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!orderId,
+  });
+
+  const refileMutation = useMutation({
+    mutationFn: () => fetch(`/api/work-orders/${orderId}/refile`, { method: "POST", credentials: "include" }).then(r => {
+      if (!r.ok) throw new Error("Refile failed");
+      return r.json();
+    }),
+    onSuccess: () => {
+      toast({ title: "Accepted & filed", description: "Deliverable accepted and filed to workspace." });
+      queryClient.invalidateQueries({ queryKey: ["/api/artifacts", { sourceId: orderId }] });
+      queryClient.invalidateQueries({ queryKey: [`/api/work-orders/${orderId}`] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Filing failed", description: err.message, variant: "destructive" });
+    },
   });
 
   // Binary deliverables: pdf, pptx, docx, xlsx, zip, html, etc.
@@ -1812,9 +1828,27 @@ function DeliverableCard({ orderId, tier2Result }: { orderId: string; tier2Resul
                   {mimeLabel(inFlight.mimeType || "")}
                 </span>
                 <span>{formatBytes(inFlight.size || 0)}</span>
-                <span className="text-amber-600 dark:text-amber-400">Pending operator review — accept to file</span>
+                <span className="text-amber-600 dark:text-amber-400">
+                  Pending operator review — accept to file
+                </span>
               </div>
             </div>
+            {orderStatus === "completed" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 flex-shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                disabled={refileMutation.isPending}
+                onClick={() => refileMutation.mutate()}
+              >
+                {refileMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-3.5 h-3.5" />
+                )}
+                Accept & File
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

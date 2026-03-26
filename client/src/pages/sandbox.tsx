@@ -31,6 +31,10 @@ import {
   RotateCcw,
   Globe,
   Code,
+  Upload,
+  ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
 import { ExpandablePanel } from "@/components/expandable-panel";
@@ -86,6 +90,8 @@ export default function SandboxPage() {
   const [execInput, setExecInput] = useState("");
   const [viewMode, setViewMode] = useState<"terminal" | "preview">("preview");
   const [iframeKey, setIframeKey] = useState(0);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
     queryKey: ["/api/sandbox-sessions"],
@@ -159,6 +165,19 @@ export default function SandboxPage() {
     },
   });
 
+  const publishMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/sandbox-sessions/${id}/publish`, {}),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      setPublishedUrl(data.publicUrl);
+      toast({ title: "Published!", description: data.publicUrl });
+    },
+    onError: (err: any) => {
+      toast({ title: "Publish failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const sessionListPanel = (
       <div className="flex flex-col min-w-0 h-full">
         <div className="p-4 border-b sticky top-0 z-10 bg-background">
@@ -209,6 +228,8 @@ export default function SandboxPage() {
                     className={`hover-elevate cursor-pointer ${isSelected ? "ring-2 ring-primary" : ""}`}
                     onClick={() => {
                       setSelectedSession(session);
+                      setPublishedUrl(null);
+                      setCopiedUrl(false);
                       const result = session.result as any;
                       if (result?.html && result?.renderable) {
                         setViewMode("preview");
@@ -376,6 +397,59 @@ export default function SandboxPage() {
                   >
                     <Eye className="w-3.5 h-3.5" />
                   </Button>
+                  <div className="w-px h-4 bg-border mx-0.5" />
+                  {publishedUrl ? (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          window.open(publishedUrl, '_blank');
+                        }}
+                        title="Open public URL"
+                        className="text-green-600 hover:text-green-700 hover:bg-green-500/10 text-xs gap-1"
+                        data-testid="button-open-published"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Live
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          navigator.clipboard.writeText(publishedUrl);
+                          setCopiedUrl(true);
+                          setTimeout(() => setCopiedUrl(false), 2000);
+                        }}
+                        title="Copy public URL"
+                        data-testid="button-copy-url"
+                      >
+                        {copiedUrl ? (
+                          <Check className="w-3 h-3 text-green-600" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => publishMutation.mutate(selectedSession.id)}
+                      disabled={publishMutation.isPending}
+                      title="Publish to public URL"
+                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-500/10 text-xs gap-1"
+                      data-testid="button-publish"
+                    >
+                      {publishMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5" />
+                      )}
+                      Publish
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="flex-1 min-h-0 bg-white">
