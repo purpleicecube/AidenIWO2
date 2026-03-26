@@ -91,6 +91,7 @@ export default function SandboxPage() {
   const [viewMode, setViewMode] = useState<"terminal" | "preview">("preview");
   const [iframeKey, setIframeKey] = useState(0);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [publishedArtifactId, setPublishedArtifactId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
@@ -171,10 +172,24 @@ export default function SandboxPage() {
     onSuccess: async (res) => {
       const data = await res.json();
       setPublishedUrl(data.publicUrl);
+      setPublishedArtifactId(data.artifactId);
       toast({ title: "Published!", description: data.publicUrl });
     },
     onError: (err: any) => {
       toast({ title: "Publish failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const unpublishMutation = useMutation({
+    mutationFn: (artifactId: string) =>
+      apiRequest("POST", `/api/artifacts/${artifactId}/unpublish`, {}),
+    onSuccess: () => {
+      setPublishedUrl(null);
+      setPublishedArtifactId(null);
+      toast({ title: "Unpublished", description: "Page removed from GitHub Pages." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Unpublish failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -229,6 +244,7 @@ export default function SandboxPage() {
                     onClick={() => {
                       setSelectedSession(session);
                       setPublishedUrl(null);
+                      setPublishedArtifactId(null);
                       setCopiedUrl(false);
                       const result = session.result as any;
                       if (result?.html && result?.renderable) {
@@ -430,6 +446,26 @@ export default function SandboxPage() {
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (publishedArtifactId) {
+                            unpublishMutation.mutate(publishedArtifactId);
+                          }
+                        }}
+                        disabled={unpublishMutation.isPending || !publishedArtifactId}
+                        title="Remove from GitHub Pages"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 text-xs gap-1"
+                        data-testid="button-unpublish"
+                      >
+                        {unpublishMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                        Unpublish
                       </Button>
                     </div>
                   ) : (
