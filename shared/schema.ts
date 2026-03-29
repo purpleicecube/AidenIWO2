@@ -1,7 +1,13 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, integer, boolean, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// PostgreSQL tsvector type — Drizzle doesn't have a native tsvector, so we define a custom type.
+// The column is auto-populated by a DB trigger; application code should never write to it directly.
+const tsvector = customType<{ data: string }>({
+  dataType() { return "tsvector"; },
+});
 
 export const subAgents = pgTable("sub_agents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -805,6 +811,15 @@ export const artifacts = pgTable("artifacts", {
   publishedAt: timestamp("published_at"),
   publishedUrl: text("published_url"),
   publishPolicy: text("publish_policy").notNull().default("private"),
+  // Know-How retrieval cache (Loop 21, Phase 2)
+  extractedText: text("extracted_text"),
+  extractionStatus: text("extraction_status").notNull().default("pending"),
+  // Content(i) trust classification (Loop 22, Phase 2)
+  // C0 = raw source (uploaded originals), C1 = operator-curated, C2 = machine-generated, C3 = derivative/ephemeral
+  contentClass: text("content_class").notNull().default("c2"),
+  // Full-text search vector (Loop 23, Phase 2) — auto-populated by DB trigger from name + extracted_text + tags
+  // GIN-indexed for fast tsquery lookups. Do NOT write to this column directly.
+  searchVector: tsvector("search_vector"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -815,6 +830,10 @@ export const insertArtifactSchema = createInsertSchema(artifacts).omit({
   publishedAt: true,
   publishedUrl: true,
   publishPolicy: true,
+  extractedText: true,
+  extractionStatus: true,
+  contentClass: true,
+  searchVector: true,
   createdAt: true,
   updatedAt: true,
 });

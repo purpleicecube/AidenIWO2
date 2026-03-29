@@ -2847,6 +2847,13 @@ export async function registerRoutes(
         createdBy: actor.actorId,
       });
 
+      // Operator uploads are raw source documents (C0)
+      storage.updateArtifact(artifact.id, { contentClass: "c0" } as any).catch(() => {});
+      // Populate extraction cache asynchronously (Loop 21)
+      import("./workspace-filing").then(mod =>
+        (mod as any).populateExtractionCache?.(artifact)
+      ).catch(() => {});
+
       res.status(201).json(artifact);
     } catch (err) {
       res.status(500).json({ message: "Upload failed" });
@@ -3623,6 +3630,9 @@ ${await buildWorkspaceIndex()}`;
       // Also triggers on "know how", "knowhow", and bare ##_FolderName workspace paths
       // Bounded by a 15s timeout — if extraction/resolve takes longer, Chat proceeds without context.
       const knowHowTrigger = /\b(from|in|using|folder|artifact|code\s*block|snippet|workspace|look\s*up|find|search|retrieve|reference|know\s*-?\s*how)\b|\b\d{2}_[A-Za-z]|\b[A-Z][A-Za-z0-9]*_[A-Za-z]/;
+      // Know-How citations for GCC commit (Loop 25)
+      let knowHowCitations: Array<{ sourceId: string; sourceName: string; folderPath: string | null; contentClass?: string }> = [];
+
       if (knowHowTrigger.test(message)) {
         try {
           const { KnowHowService, parseContextRequestFromChat } = await import("./knowhow");
@@ -3640,6 +3650,19 @@ ${await buildWorkspaceIndex()}`;
             if (pack && pack.sources.length > 0) {
               console.log(`[chat] Know-How resolved: ${pack.sources.length} sources, ~${pack.tokensUsed} tokens in ${resolveMs}ms`);
               systemContext += "\n\n" + service.formatForLLM(pack);
+              // Capture citations for GCC commit — map score back to content class label
+              knowHowCitations = pack.citations.map(c => {
+                const src = pack.sources.find(s => s.id === c.sourceId);
+                const score = src?.score ?? 0;
+                // Content(i): c0=1.0, c1=0.9, c2=0.6, c3=0.3
+                const label = score >= 1.0 ? "c0:source" : score >= 0.9 ? "c1:curated" : score >= 0.5 ? "c2:generated" : "c3:ephemeral";
+                return {
+                  sourceId: c.sourceId,
+                  sourceName: c.sourceName,
+                  folderPath: c.folderPath,
+                  contentClass: label,
+                };
+              });
             } else if (!pack) {
               console.warn(`[chat] Know-How retrieval timed out after ${resolveMs}ms — proceeding without context`);
             } else {
@@ -4053,7 +4076,16 @@ ${await buildWorkspaceIndex()}`;
         });
       }
 
-      const updatedBreadcrumbs = [...breadcrumbs, "assistant_reply", ...(actionResults.length > 0 ? ["action_executed"] : []), "committed"];
+      // Loop 25: Persist Know-How citations in GCC for operator/agent visibility
+      if (knowHowCitations.length > 0) {
+        logEntries.push({
+          timestamp: now,
+          source_node: "KnowHowRetrievalNode",
+          entry: `Know-How sources (${knowHowCitations.length}): ${knowHowCitations.map(c => `${c.sourceName} [${c.folderPath || "?"}] (${c.contentClass})`).join(", ")}`,
+        });
+      }
+
+      const updatedBreadcrumbs = [...breadcrumbs, "assistant_reply", ...(knowHowCitations.length > 0 ? ["knowhow_cited"] : []), ...(actionResults.length > 0 ? ["action_executed"] : []), "committed"];
       await storage.updateChatSession(sessionId, {
         gccMemory: {
           "gcc.project_id": gcc["gcc.project_id"] || `aiden-chat-${session.correlationId.slice(0, 8)}`,
@@ -4072,6 +4104,14 @@ ${await buildWorkspaceIndex()}`;
             status: "active",
             last_commit: now,
             ...(actionResults.length > 0 ? { lastActions: actionResults } : {}),
+            ...(knowHowCitations.length > 0 ? {
+              lastKnowHowSources: knowHowCitations.map(c => ({
+                id: c.sourceId,
+                name: c.sourceName,
+                path: c.folderPath,
+                class: c.contentClass,
+              })),
+            } : {}),
           },
         },
         title: session.messageCount === 0 ? message.slice(0, 80) : session.title,

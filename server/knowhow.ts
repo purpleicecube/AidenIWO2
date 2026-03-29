@@ -84,10 +84,8 @@ export class KnowHowService {
               if (this.isUnsupportedMime(entry.mimeType)) continue;
               if (request.excludeIds?.includes(entry.id)) continue;
               // Score source documents higher than WO-generated derivatives.
-              // WO outputs (work-product.md, execution-log.md, summaries, Gamma PDFs)
-              // live in #Documents, 02_Execution, 00_Planning, or have WO-derived names.
-              // Source documents (uploaded originals) live in 04_Resources, 05_Artifacts, etc.
-              const score = this.isWoGeneratedArtifact(entry) ? 0.5 : 1.0;
+              // Content(i) trust classification — score modifier based on content class
+              const score = this.contentClassModifier(entry);
               sourceMap.set(entry.id, {
                 id: entry.id,
                 name: entry.name,
@@ -116,8 +114,8 @@ export class KnowHowService {
         for (const entry of entries) {
           if (this.isUnsupportedMime(entry.mimeType)) continue;
           if (request.excludeIds?.includes(entry.id)) continue;
-          // WO-generated artifacts (summaries, execution logs) score lower than source documents
-          const baseScore = this.isWoGeneratedArtifact(entry) ? 0.5 : 1.0;
+          // Content(i) trust classification — score modifier based on content class
+          const baseScore = this.contentClassModifier(entry);
           sourceMap.set(entry.id, {
             id: entry.id,
             name: entry.name,
@@ -148,8 +146,8 @@ export class KnowHowService {
           if (existing && existing.score >= 0.7) continue; // path-targeted already higher
           let score = 0.7;
           if (entry.name.toLowerCase().includes(keyword.toLowerCase())) score += 0.1;
-          // WO-generated artifacts deprioritized in keyword results too
-          if (this.isWoGeneratedArtifact(entry)) score *= 0.6;
+          // Content(i) trust modifier applied to keyword results
+          score *= this.contentClassModifier(entry);
           sourceMap.set(entry.id, {
             id: entry.id,
             name: entry.name,
@@ -473,38 +471,37 @@ export class KnowHowService {
   }
 
   /**
-   * Detect whether an artifact is a WO-generated derivative rather than an original source.
-   * WO outputs contain LLM-generated content that may include hallucinated data —
-   * they should be deprioritized in favor of original source documents.
+   * Content(i) score modifier based on trust classification.
+   * Uses the `contentClass` column when available (Loop 22+),
+   * falls back to heuristic detection for pre-Loop-22 artifacts.
    *
-   * WO outputs typically:
-   *  - Live in #Documents, 02_Execution, 00_Planning, 01_Directive-SOP, #Code_Blocks
-   *  - Have names like work-product.md, execution-log.md
-   *  - Have names that start with WO-derived slugs (e.g., "summarize-xxx", "read-and-xxx")
-   *
-   * Source documents typically:
-   *  - Live in 04_Resources, 05_Artifacts (manually uploaded)
-   *  - Have original filenames with extensions (e.g., "Company Report.pdf")
+   * | Class | Label              | Modifier |
+   * | c0    | Raw source         | 1.0      |
+   * | c1    | Operator-curated   | 0.9      |
+   * | c2    | Machine-generated  | 0.6      |
+   * | c3    | Derivative/ephemeral | 0.3    |
    */
-  private isWoGeneratedArtifact(entry: { name: string; path: string }): boolean {
+  private contentClassModifier(entry: { name: string; path: string; contentClass?: string }): number {
+    // Prefer explicit content class if set
+    const cc = (entry as any).contentClass;
+    if (cc === "c0") return 1.0;
+    if (cc === "c1") return 0.9;
+    if (cc === "c2") return 0.6;
+    if (cc === "c3") return 0.3;
+
+    // Fallback heuristic for unclassified artifacts (pre-Loop-22 data)
     const path = (entry.path || "").toLowerCase();
     const name = (entry.name || "").toLowerCase();
 
-    // WO filing folders
     if (path.includes("#documents/") || path.includes("02_execution/") ||
         path.includes("00_planning/") || path.includes("01_directive") ||
         path.includes("#code_blocks/")) {
-      return true;
+      return 0.5; // WO filing folders → treat as c2-c3
     }
+    if (name === "work-product.md" || name === "execution-log.md") return 0.3;
+    if (name.match(/^(summarize|read-and-|create-|generate-|build-|write-|draft-|wf-)/)) return 0.5;
 
-    // WO-generated artifact names
-    if (name === "work-product.md" || name === "execution-log.md") return true;
-
-    // WO-derived slug names (auto-generated from WO titles)
-    // These follow the pattern: "wo-title-slug.ext" or "wf-title-slug.ext"
-    if (name.match(/^(summarize|read-and-|create-|generate-|build-|write-|draft-|wf-)/)) return true;
-
-    return false;
+    return 1.0; // Default: trust as source
   }
 }
 

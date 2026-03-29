@@ -19,6 +19,7 @@ export interface WorkspaceEntry {
   type: "file" | "folder";
   mimeType?: string;
   size?: number;
+  contentClass?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -39,6 +40,7 @@ function artifactToEntry(a: Artifact, folderPath?: string): WorkspaceEntry {
     type: "file",
     mimeType: a.mimeType ?? undefined,
     size: a.size ?? undefined,
+    contentClass: (a as any).contentClass ?? undefined,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt?.toISOString(),
   };
@@ -79,11 +81,16 @@ export class LocalWorkspaceProvider implements WorkspaceProvider {
   async readFile(id: string): Promise<string | null> {
     const artifact = await storage.getArtifact(id);
     if (!artifact) return null;
+
+    // Prefer cached extracted text (populated at filing/upload time)
+    if ((artifact as any).extractedText) {
+      return (artifact as any).extractedText;
+    }
+
+    // Fallback: live extraction (for artifacts created before extraction cache)
     const content = artifact.content ?? null;
     if (!content) return null;
     const mimeType = artifact.mimeType || "text/plain";
-
-    // Delegate to universal text extractor — handles PDF, DOCX, PPTX, and text passthrough
     return extractText(content, mimeType);
   }
 

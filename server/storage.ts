@@ -1234,17 +1234,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchArtifactsByKeyword(keyword: string, folderId?: string | null): Promise<Artifact[]> {
-    const pattern = `%${keyword}%`;
-    const nameMatch = sql`${artifacts.name} ILIKE ${pattern}`;
-    const contentMatch = sql`${artifacts.content} ILIKE ${pattern}`;
-    const textMatch = sql`(${nameMatch} OR ${contentMatch})`;
+    // Loop 23: Use PostgreSQL full-text search (tsquery/tsvector + GIN index) when search_vector
+    // is populated, falling back to name-only ILIKE for unindexed artifacts.
+    // This replaces the old content-column ILIKE scan that was O(n * content_size).
+    const tsMatch = sql`search_vector @@ plainto_tsquery('english', ${keyword})`;
+    const namePattern = `%${keyword}%`;
+    const nameFallback = sql`${artifacts.name} ILIKE ${namePattern}`;
+    const combinedMatch = sql`(${tsMatch} OR ${nameFallback})`;
+
     if (folderId) {
       return db.select().from(artifacts)
-        .where(and(textMatch, eq(artifacts.folderId, folderId)))
+        .where(and(combinedMatch, eq(artifacts.folderId, folderId)))
         .orderBy(desc(artifacts.updatedAt)).limit(50);
     }
     return db.select().from(artifacts)
-      .where(textMatch)
+      .where(combinedMatch)
       .orderBy(desc(artifacts.updatedAt)).limit(50);
   }
 

@@ -1,5 +1,64 @@
 import { storage } from "./storage";
-import type { WorkOrder, ExecutionLog } from "@shared/schema";
+import { extractText, canExtract } from "./text-extractor";
+import type { WorkOrder, ExecutionLog, Artifact } from "@shared/schema";
+
+/**
+ * Populate the extraction cache on a newly created artifact.
+ * - Text content (text/*, JSON, JS): stored as-is in extractedText, status = "not_applicable"
+ * - Binary with extractor (PDF, DOCX, PPTX): extracted and cached, status = "completed" or "failed"
+ * - Binary without extractor: status = "pending" (future extractor may handle it)
+ *
+ * Fire-and-forget — errors are logged but do not block filing.
+ */
+export async function populateExtractionCache(artifact: Artifact): Promise<void> {
+  try {
+    const mime = artifact.mimeType || "text/plain";
+    const content = artifact.content;
+    if (!content) {
+      await storage.updateArtifact(artifact.id, {
+        extractionStatus: "failed",
+      } as any);
+      return;
+    }
+
+    // Text types: content IS the extracted text
+    if (mime.startsWith("text/") || mime === "application/json" || mime === "application/javascript") {
+      await storage.updateArtifact(artifact.id, {
+        extractedText: content,
+        extractionStatus: "not_applicable",
+      } as any);
+      return;
+    }
+
+    // Binary types with registered extractor
+    if (canExtract(mime)) {
+      const extracted = await extractText(content, mime);
+      if (extracted && extracted.length > 0 && !extracted.startsWith("[")) {
+        await storage.updateArtifact(artifact.id, {
+          extractedText: extracted,
+          extractionStatus: "completed",
+        } as any);
+        console.log(`[extraction-cache] ${artifact.name}: ${extracted.length} chars extracted`);
+      } else {
+        await storage.updateArtifact(artifact.id, {
+          extractedText: extracted,
+          extractionStatus: extracted ? "completed" : "failed",
+        } as any);
+      }
+      return;
+    }
+
+    // No extractor available
+    await storage.updateArtifact(artifact.id, {
+      extractionStatus: "pending",
+    } as any);
+  } catch (err: any) {
+    console.warn(`[extraction-cache] ${artifact.name}: extraction failed —`, err.message);
+    try {
+      await storage.updateArtifact(artifact.id, { extractionStatus: "failed" } as any);
+    } catch { /* ignore update failure */ }
+  }
+}
 
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -634,7 +693,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
     const logs = await storage.getExecutionLogs(order.id);
 
     const executionLogContent = buildExecutionLog(order, logs);
-    await storage.createArtifact({
+    const execLogArtifact = await storage.createArtifact({
       name: "execution-log.md",
       folderId: execOrderFolder.id,
       type: "file",
@@ -647,6 +706,8 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
       sourceType: "work_order",
       sourceId: order.id,
     });
+    await storage.updateArtifact(execLogArtifact.id, { contentClass: "c3" } as any);
+    populateExtractionCache(execLogArtifact).catch(() => {});
 
     const tier2 = (order.tier2Result as any) || {};
     const deliverable = tier2.output?.deliverable || null;
@@ -683,7 +744,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
         const ext = getFileExtension(deliverableType);
         const fileName = `${fileSlug}${ext}`;
 
-        await storage.createArtifact({
+        const deliverableArtifact = await storage.createArtifact({
           name: fileName,
           folderId: outOrderFolder.id,
           type: "file",
@@ -696,6 +757,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
           sourceType: "work_order",
           sourceId: order.id,
         });
+        populateExtractionCache(deliverableArtifact).catch(() => {});
 
         deliverableFilePath = `${outputFolderName}/${dateStr}/${folderName}/${fileName}`;
         console.log(`  Deliverable saved to ${deliverableFilePath}`);
@@ -717,6 +779,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
             sourceType: "work_order",
             sourceId: order.id,
           });
+          populateExtractionCache(htmlArtifact).catch(() => {});
           console.log(`  HTML artifact saved: ${htmlFileName} (${(htmlContent.length / 1024).toFixed(0)}KB)`);
 
           // Backfill postProcessedFile into tier2_result so the UI download icon appears
@@ -749,7 +812,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
               const formatTag = ext === "pdf" ? "pdf" : ext === "pptx" ? "pptx" : "binary";
               const fileName = `${fileSlug}.${ext}`;
 
-              await storage.createArtifact({
+              const ppArtifact = await storage.createArtifact({
                 name: fileName,
                 folderId: outOrderFolder.id,
                 type: "file",
@@ -762,6 +825,7 @@ export async function fileWorkOrderOutput(order: WorkOrder) {
                 sourceType: "work_order",
                 sourceId: order.id,
               });
+              populateExtractionCache(ppArtifact).catch(() => {});
 
               console.log(`  ${ext.toUpperCase()} artifact saved: ${fileName} (${(postProcessedFile.size / 1024).toFixed(0)}KB)`);
 
