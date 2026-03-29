@@ -53,3 +53,10 @@ Agent rules for any AI working in this codebase. MUST/SHOULD format. Read before
 | ADR-001 | PocketFlow delta_overlay assembly (artifact_key + refine_mode) | Deferred to v0.5+ |
 | BUG-048 | PocketFlow options-scope regression — execution-profile flags must live on SharedDict, not closure scope | Fixed (2026-03-21) |
 | ESR-001 | Execution Strategy Resolver — deterministic workflow template matching after Tier 1 | Shipped (2026-03-21) |
+| BUG-054 | Know-How parser: article blindness + missing bare folder detection + narrow Chat trigger. Universal fix in shared parser. | Fixed (2026-03-27, Loop 15) |
+| BUG-055 | Know-How name search timeout: ILIKE on content column scanning base64 blobs. Fix: name-only search. | Fixed (2026-03-28, Loop 18) |
+| BUG-056 | WO-generated artifacts polluting retrieval. Fix: source-over-derivative scoring via `isWoGeneratedArtifact()`. | Fixed (2026-03-28, Loop 19) |
+| FEAT-006 | Universal text extraction service (`server/text-extractor.ts`). Registry pattern: PDF/DOCX/PPTX. Add new formats via `registerExtractor()`. | Shipped (2026-03-28, Loop 17) |
+| FEAT-007 | Chat workspace awareness: `buildWorkspaceIndex()` live directory tree in system prompt. | Shipped (2026-03-28, Loop 20) |
+| FUTURE | Consider removing Chat Know-How trigger gate — rely solely on `parseContextRequestFromChat` returning `null` for irrelevant messages. Would eliminate trigger/parser mismatch class of bugs. | Noted (2026-03-27) |
+| FUTURE | Content(i) formal classification (`content_class` column replacing `isWoGeneratedArtifact()` heuristic). Phase 2 of Know-How Evolution Plan. | Planned |

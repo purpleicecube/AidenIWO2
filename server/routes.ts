@@ -3449,7 +3449,84 @@ Provider: ${settings.provider} | Model: ${settings.model} | ${new Date().toISOSt
 
 === PLATFORM IDENTITY ===
 Platform: IOWA (Intelligent Work Orchestration) v${APP_VERSION}
-You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers like v0.3.8, v0.6.9, or v0.8.9 — those are historical. Your current version is ${APP_VERSION}.`;
+You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers like v0.3.8, v0.6.9, or v0.8.9 — those are historical. Your current version is ${APP_VERSION}.
+
+${await buildWorkspaceIndex()}`;
+  }
+
+  /**
+   * Build a lightweight workspace directory index for the Chat system context.
+   * Gives Aiden awareness of all folders, subfolders, and recent artifacts so it can:
+   *  - Answer "what's in folder X?" directly without Know-How
+   *  - Guide users to the correct path when they reference content by partial name
+   *  - Self-resolve ambiguous references (e.g., "RH2026_Klearai" → KlearContent_Demo)
+   *
+   * This is intentionally compact — folder names + descriptions + artifact names only,
+   * no content. Keeps the system prompt lean (~500-1500 tokens for a typical workspace).
+   */
+  async function buildWorkspaceIndex(): Promise<string> {
+    try {
+      const allFolders = await storage.getArtifactFolders();
+      if (allFolders.length === 0) return "";
+
+      // Build parent→children map
+      const childMap = new Map<string | null, typeof allFolders>();
+      for (const f of allFolders) {
+        const pid = f.parentId ?? null;
+        if (!childMap.has(pid)) childMap.set(pid, []);
+        childMap.get(pid)!.push(f);
+      }
+
+      const lines: string[] = ["=== WORKSPACE DIRECTORY (your folders and files — reference these paths when the operator asks about content) ==="];
+
+      // Show top-level folders with their direct children and artifact counts
+      const topLevel = childMap.get(null) || [];
+      for (const folder of topLevel.slice(0, 20)) {
+        const path = (folder as any).path || folder.name;
+        const desc = folder.description ? ` — ${folder.description}` : "";
+        lines.push(`\n📁 ${path}${desc}`);
+
+        // List direct children (subfolders)
+        const children = childMap.get(folder.id) || [];
+        for (const child of children.slice(0, 15)) {
+          const childDesc = child.description ? ` — ${child.description}` : "";
+          lines.push(`  📂 ${child.name}${childDesc}`);
+
+          // List artifacts in child folder (name only, no content)
+          const arts = await storage.getArtifacts(child.id);
+          for (const a of arts.slice(0, 10)) {
+            const mime = a.mimeType ? ` [${a.mimeType}]` : "";
+            lines.push(`    📄 ${a.name}${mime}`);
+          }
+
+          // Show grandchildren count if any
+          const grandchildren = childMap.get(child.id) || [];
+          if (grandchildren.length > 0) {
+            lines.push(`    (${grandchildren.length} subfolder${grandchildren.length === 1 ? "" : "s"})`);
+          }
+        }
+
+        // List artifacts directly in this top-level folder
+        const directArts = await storage.getArtifacts(folder.id);
+        for (const a of directArts.slice(0, 5)) {
+          lines.push(`  📄 ${a.name}`);
+        }
+      }
+
+      lines.push("");
+      lines.push(`IMPORTANT — WORKSPACE CONTENT RULES:
+1. You have DIRECT ACCESS to ALL files listed above via your Know-How retrieval system. Their content is automatically injected into your context when the operator references them.
+2. NEVER say "I don't have access to that file" — you DO have access. If the content appears in your context (look for "=== KNOW-HOW CONTEXT ===" sections), USE it to answer directly.
+3. When the operator asks about a file's content, ANSWER FROM THE INJECTED CONTEXT — do NOT create a work order unless the operator explicitly asks for one.
+4. If a file name doesn't exactly match, search the directory listing above for the closest match.
+5. When referencing files back to the operator, use the full path from the directory listing (e.g., "04_Resources/Demo_Content/KlearContent_Demo/RH2026_Klearai.pdf").
+6. ONLY the content under "=== KNOW-HOW CONTEXT ===" with "GROUNDING RULES" is from actual source documents. Do NOT fabricate statistics, percentages, or claims not found in that grounded content.`);
+
+      return lines.join("\n");
+    } catch (err: any) {
+      console.warn("[buildWorkspaceIndex] Failed:", err.message);
+      return "";
+    }
   }
 
   app.post("/api/chat/sessions/:id/messages", isAuth, requireRole("viewer"), async (req, res) => {
@@ -3543,17 +3620,30 @@ You are Aiden, version ${APP_VERSION}. Do NOT reference older version numbers li
       const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || []), "user_message", "llm_processing"];
 
       // Know-How Retrieval: inject workspace context when message references workspace content
-      const knowHowTrigger = /\b(from|in|using|folder|artifact|code\s*block|snippet|workspace|look\s*up|find|search|retrieve|reference)\b/i;
+      // Also triggers on "know how", "knowhow", and bare ##_FolderName workspace paths
+      // Bounded by a 15s timeout — if extraction/resolve takes longer, Chat proceeds without context.
+      const knowHowTrigger = /\b(from|in|using|folder|artifact|code\s*block|snippet|workspace|look\s*up|find|search|retrieve|reference|know\s*-?\s*how)\b|\b\d{2}_[A-Za-z]|\b[A-Z][A-Za-z0-9]*_[A-Za-z]/;
       if (knowHowTrigger.test(message)) {
         try {
           const { KnowHowService, parseContextRequestFromChat } = await import("./knowhow");
           const { LocalWorkspaceProvider } = await import("./workspace-provider");
           const ctxReq = parseContextRequestFromChat(message);
           if (ctxReq) {
+            console.log("[chat] Know-How triggered, parsed request:", JSON.stringify(ctxReq));
             const service = new KnowHowService(new LocalWorkspaceProvider());
-            const pack = await service.resolve(ctxReq, gcc);
-            if (pack.sources.length > 0) {
+            const resolveStart = Date.now();
+            const pack = await Promise.race([
+              service.resolve(ctxReq, gcc),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000)),
+            ]);
+            const resolveMs = Date.now() - resolveStart;
+            if (pack && pack.sources.length > 0) {
+              console.log(`[chat] Know-How resolved: ${pack.sources.length} sources, ~${pack.tokensUsed} tokens in ${resolveMs}ms`);
               systemContext += "\n\n" + service.formatForLLM(pack);
+            } else if (!pack) {
+              console.warn(`[chat] Know-How retrieval timed out after ${resolveMs}ms — proceeding without context`);
+            } else {
+              console.log(`[chat] Know-How resolved but 0 sources in ${resolveMs}ms`);
             }
           }
         } catch (err: any) {

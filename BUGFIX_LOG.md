@@ -951,6 +951,125 @@ App version: v0.9.5
 
 ---
 
+## Features & Fixes — Session 12b (2026-03-25)
+
+Operator: Darrel Vaughn | Reviewer: Claude Code (Opus 4.6)
+
+### FEAT-004: GitHub Pages Publish Pipeline + Sandbox Publish/Unpublish
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-25 |
+| Type | Feature |
+| Status | Shipped |
+| Summary | One-click publish HTML deliverables to GitHub Pages. New `server/publish.ts` service pushes artifacts to `purpleicecube/deliverables` repo via GitHub REST Contents API. Schema: `publishedSlug`, `publishedAt`, `publishedUrl`, `publishPolicy` on artifacts table. API: publish, unpublish, list published, sandbox publish. Public route `GET /p/:slug` serves HTML without auth. Sandbox UI: Publish button, Live link, Copy URL, Unpublish with spinner. |
+| Files Changed | `server/publish.ts` (new), `server/routes.ts`, `server/storage.ts`, `shared/schema.ts`, `client/src/pages/sandbox.tsx` |
+
+### BUG-053 Hardened: Phase-level timeout for LLM calls
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-25 |
+| Severity | High |
+| Status | Fixed |
+| Symptom | WOs stuck in "processing" when quality review LLM call hangs despite HTTP-level timeout. |
+| Fix | Added `PhaseTimeoutError` class and 90s phase-level timeout to `withWorkOrderHeartbeatGuard()`. Quality review auto-approves on timeout instead of blocking forever. `Promise.race` pattern ensures bounded execution. |
+| Files Changed | `server/orchestration.ts` |
+
+### Additional Changes (2026-03-25)
+
+| Field | Detail |
+| --- | --- |
+| Know-How parser | Label-colon path extraction (Phase 1 added), `normalizePath()` extracted as shared function, broader Phase 3 regex accepting non-`##_` paths, `references in/at/from` trigger. |
+| WO detail | Accept and File button for completed WOs with pending artifacts. |
+| Submit order | Description max length bumped to 65,000 characters. |
+| Files Changed | `server/knowhow.ts`, `client/src/pages/work-order-detail.tsx`, `client/src/pages/submit-order.tsx` |
+
+---
+
+## Bug Fixes — Session 13 (2026-03-27)
+
+Operator: Darrel Vaughn | Reviewer: Claude Code (Opus 4.6)
+
+### BUG-054: Know-How Chat parser fails on natural language folder references (High)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-27 |
+| Severity | High |
+| Status | Fixed, verified |
+| Symptom | Chat messages like "Can you tell me what is in the 04_Resources folder" failed to trigger Know-How retrieval. Aiden responded with "I don't have information about a 04_Resources folder" despite the folder existing in the workspace. The user's follow-up "if you use your know how" also failed to trigger retrieval. |
+| Root Cause | Three compounding issues in the Know-How parsing pipeline: (1) **Article blindness in Phase 3 regex** (`server/knowhow.ts`): the preposition+path pattern captured everything after the preposition including articles, producing `"the 04_Resources folder"` which failed the `##_` or `/` validation check. (2) **No bare folder detection**: workspace-standard `##_Name` paths (e.g., `04_Resources`) appearing without a preposition were invisible to all 3 parser phases. (3) **Chat trigger regex too narrow** (`server/routes.ts`): the trigger gate did not recognize "know how" or bare `##_FolderName` patterns, so some legitimate messages never reached the parser. |
+| Fix | **Universal fix across all `parseContextRequestFromChat` consumers** (Chat + PocketFlow WO fallback): (1) Phase 3 regex: added optional article skip `(?:the/a/an)` between preposition and path capture group. (2) Added Phase 3b: bare `##_FolderName` pattern detection — matches workspace folder references anywhere in the message without requiring a preposition. (3) `normalizePath()`: added trailing noise-word cleanup so captured paths like `"04_Resources folder"` normalize to `"04_Resources"`. (4) Chat trigger regex: added `know-how` and `##_FolderName` patterns so "use your know how" and bare folder names enter the retrieval block. |
+| Architecture Note | All fixes are in the shared parser (`knowhow.ts:normalizePath`, `knowhow.ts:parseContextRequestFromChat`) and are inherited by every consumer — Chat handler, PocketFlow WO fallback, and any future consumer that imports `parseContextRequestFromChat`. The Chat trigger regex widening is the only Chat-specific change. **Future consideration (not implemented):** removing the Chat trigger gate entirely and relying solely on the parser's `null` return would eliminate this class of trigger/parser mismatch bugs permanently. |
+| Files Changed | `server/knowhow.ts` (`normalizePath`, `parseContextRequestFromChat` Phase 3 + new Phase 3b), `server/routes.ts` (Chat trigger regex) |
+| Verified | Parser test: 5 natural-language inputs all produce correct `ContextRequest` with clean paths. API test: `POST /api/knowhow/resolve` with `paths: ["04_Resources"]` returns sources with score 1.0. |
+
+---
+
+## Session 14 — Know-How Chat Retrieval Hardening (2026-03-27 / 2026-03-28)
+
+Operator: Darrel Vaughn | Reviewer: Claude Code (Opus 4.6)
+
+**Note:** Loops 15–20 below are **retrospective normalization** per `LOOP_SOP.md`. Last contemporaneously documented loop: Loop 14 + Addendum (2026-03-21). Full implementation report: `WS006_AIDEN(TIB)/05_Artifacts/IWO2_KNOWHOW_CHAT_RETRIEVAL_IMPLEMENTATION_REPORT_v0.1.0.md`.
+
+### Loop 15: BUG-054 — Know-How Parser Fix (High)
+
+Documented above in Session 13 entry. Parser: article skip, Phase 3b bare folder detection, trigger regex widened.
+
+### Loop 16: FEAT-005 — Folder Directory Listing in Retrieval
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-27 |
+| Type | Feature |
+| Summary | New `buildFolderListing()` on KnowHowService. Injects synthetic directory source with child folders, descriptions, and artifact counts into path-targeted retrieval results. Score 1.0. |
+| Files Changed | `server/knowhow.ts` |
+
+### Loop 17: FEAT-006 — Universal Text Extraction Service
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-28 |
+| Type | Feature |
+| Summary | New `server/text-extractor.ts` — registry-based extraction. PDF (pdf-parse), DOCX (mammoth), PPTX (jszip + XML). Exports `canExtract()`, `extractText()`, `registerExtractor()`. Workspace provider refactored to delegate. `isUnsupportedMime()` calls `canExtract()`. |
+| Dependencies | `mammoth` (new) |
+| Files Changed | `server/text-extractor.ts` (new), `server/workspace-provider.ts`, `server/knowhow.ts`, `package.json` |
+
+### Loop 18: BUG-055 — Name Search Timeout (High)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-28 |
+| Severity | High |
+| Symptom | Know-How Chat retrieval timed out (>15s) resolving artifact names. Aiden responded "I don't have access." |
+| Root Cause | Path-resolution fallback used `searchArtifactsByKeyword` which does `ILIKE` on content column (base64 blobs). |
+| Fix | New `searchArtifactsByName()` (name-only ILIKE). New `searchByName()` on WorkspaceProvider interface. Know-How fallback uses name-only search. |
+| Performance | 15s timeout → 0.76s (20x speedup) |
+| Files Changed | `server/storage.ts`, `server/workspace-provider.ts`, `server/knowhow.ts` |
+
+### Loop 19: BUG-056 — Source-Over-Derivative Scoring (High)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-28 |
+| Severity | High |
+| Symptom | Aiden returned hallucinated statistics from WO-generated summaries instead of actual source document content. |
+| Root Cause | WO outputs (work-product.md, Gamma PDFs, auto-summaries) scored identically to original source documents, filling token budget with derivative content. |
+| Fix | New `isWoGeneratedArtifact()` detects WO outputs by filing path and name patterns. Score: source docs 1.0, WO derivatives 0.5 (path tier) or x0.6 (keyword tier). Applied universally across all retrieval tiers. |
+| Files Changed | `server/knowhow.ts` |
+
+### Loop 20: FEAT-007 — Chat Workspace Awareness + Hardening
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-03-28 |
+| Type | Feature + hardening |
+| Summary | (A) `buildWorkspaceIndex()` — live directory tree in Chat system prompt, refreshed per message. (B) 6-point Workspace Content Rules instructing Aiden to answer from Know-How context, not create WOs. (C) 15s timeout guard on Know-How resolve with logging. |
+| Files Changed | `server/routes.ts` |
+
+---
+
 ## Summary
 
 | Category | Count | Critical | High | Medium | Low |
@@ -966,8 +1085,13 @@ App version: v0.9.5
 | Bugs fixed (Session 10) | 3 | 1 | 2 | 0 | 0 |
 | Bugs fixed (Session 11) | 5 | 2 | 3 | 0 | 0 |
 | Bugs fixed (Session 12) | 7 | 0 | 5 | 2 | 0 |
-| **Total bugs fixed** | **49** | **8** | **25** | **12** | **1** |
+| Bugs fixed (Session 12b) | 1 | 0 | 1 | 0 | 0 |
+| Bugs fixed (Session 13) | 1 | 0 | 1 | 0 | 0 |
+| Bugs fixed (Session 14) | 3 | 0 | 3 | 0 | 0 |
+| **Total bugs fixed** | **54** | **8** | **30** | **12** | **1** |
 | Feature implementations (Session 6) | 3 | — | — | — | — |
+| Feature implementations (Session 12b) | 1 | — | — | — | — |
+| Feature implementations (Session 14) | 3 | — | — | — | — |
 | Code review findings | 6 | 0 | 0 | 1 | 5 |
 | Performance findings | 1 | — | — | — | — |
 | Infrastructure changes | 6 | — | — | — | — |

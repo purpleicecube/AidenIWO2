@@ -9,6 +9,7 @@
 
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
+import { canExtract } from "./text-extractor";
 import type { WorkspaceProvider } from "./workspace-provider";
 import type {
   ContextRequest,
@@ -48,17 +49,75 @@ export class KnowHowService {
     if (request.paths && request.paths.length > 0) {
       for (const path of request.paths) {
         const entries = await this.provider.listFolder(path);
-        if (entries.length === 0) {
-          errors.push({
-            path,
-            message: `Folder "${path}" not found or empty`,
-            code: "NOT_FOUND",
-          });
+
+        // Inject a folder directory listing so the LLM can answer "what's in this folder?"
+        // This includes child folders + artifacts as a structured overview.
+        const dirListing = await this.buildFolderListing(path);
+        if (dirListing) {
+          const dirId = `dir:${path}`;
+          sourceMap.set(dirId, {
+            id: dirId,
+            name: `Directory: ${path}`,
+            sourceType: "artifact",
+            mimeType: "text/plain",
+            folderId: null,
+            folderPath: path,
+            relationship: "path_targeted",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            tags: [],
+            score: 1.0,
+            totalLength: dirListing.length,
+            truncated: false,
+            _content: dirListing,
+          } as any);
+        }
+
+        if (entries.length === 0 && !dirListing) {
+          // Path didn't match a folder — fall back to artifact name search.
+          // This handles cases like "RH2026_Klearai" which is a file name, not a folder.
+          // Uses searchByName (name-only ILIKE) instead of searchByKeyword (name+content ILIKE)
+          // to avoid scanning large base64 content blobs which can timeout on big workspaces.
+          const nameHits = await this.provider.searchByName(path);
+          if (nameHits.length > 0) {
+            for (const entry of nameHits) {
+              if (this.isUnsupportedMime(entry.mimeType)) continue;
+              if (request.excludeIds?.includes(entry.id)) continue;
+              // Score source documents higher than WO-generated derivatives.
+              // WO outputs (work-product.md, execution-log.md, summaries, Gamma PDFs)
+              // live in #Documents, 02_Execution, 00_Planning, or have WO-derived names.
+              // Source documents (uploaded originals) live in 04_Resources, 05_Artifacts, etc.
+              const score = this.isWoGeneratedArtifact(entry) ? 0.5 : 1.0;
+              sourceMap.set(entry.id, {
+                id: entry.id,
+                name: entry.name,
+                sourceType: "artifact",
+                mimeType: entry.mimeType || "text/plain",
+                folderId: null,
+                folderPath: entry.path,
+                relationship: score === 1.0 ? "path_targeted" : "keyword_matched",
+                createdAt: entry.createdAt,
+                updatedAt: entry.updatedAt,
+                tags: [],
+                score,
+                totalLength: 0,
+                truncated: false,
+              });
+            }
+          } else {
+            errors.push({
+              path,
+              message: `Folder or artifact "${path}" not found`,
+              code: "NOT_FOUND",
+            });
+          }
           continue;
         }
         for (const entry of entries) {
           if (this.isUnsupportedMime(entry.mimeType)) continue;
           if (request.excludeIds?.includes(entry.id)) continue;
+          // WO-generated artifacts (summaries, execution logs) score lower than source documents
+          const baseScore = this.isWoGeneratedArtifact(entry) ? 0.5 : 1.0;
           sourceMap.set(entry.id, {
             id: entry.id,
             name: entry.name,
@@ -70,7 +129,7 @@ export class KnowHowService {
             createdAt: entry.createdAt,
             updatedAt: entry.updatedAt,
             tags: [],
-            score: 1.0,
+            score: baseScore,
             totalLength: 0,
             truncated: false,
           });
@@ -89,6 +148,8 @@ export class KnowHowService {
           if (existing && existing.score >= 0.7) continue; // path-targeted already higher
           let score = 0.7;
           if (entry.name.toLowerCase().includes(keyword.toLowerCase())) score += 0.1;
+          // WO-generated artifacts deprioritized in keyword results too
+          if (this.isWoGeneratedArtifact(entry)) score *= 0.6;
           sourceMap.set(entry.id, {
             id: entry.id,
             name: entry.name,
@@ -353,14 +414,97 @@ export class KnowHowService {
     return lines.join("\n");
   }
 
+  /**
+   * Build a structured folder listing for a workspace path.
+   * Returns a text overview of child folders and artifacts so the LLM
+   * can answer "what's in this folder?" without needing file content.
+   */
+  private async buildFolderListing(path: string): Promise<string | null> {
+    const folder = await storage.getArtifactFolderByPath(path);
+    if (!folder) return null;
+
+    const allFolders = await storage.getArtifactFolders();
+    const folderPath = (folder as any).path || folder.name;
+
+    // Find direct child folders
+    const childFolders = allFolders.filter(f => f.parentId === folder.id);
+
+    // Find direct artifacts
+    const directArts = await storage.getArtifacts(folder.id);
+
+    if (childFolders.length === 0 && directArts.length === 0) return null;
+
+    const lines: string[] = [];
+    lines.push(`# Folder: ${folderPath}`);
+    if (folder.description) lines.push(`Description: ${folder.description}`);
+    lines.push("");
+
+    if (childFolders.length > 0) {
+      lines.push(`## Subfolders (${childFolders.length})`);
+      for (const child of childFolders) {
+        const childPath = (child as any).path || child.name;
+        const desc = child.description ? ` — ${child.description}` : "";
+        // Count artifacts in child folder
+        const childArts = await storage.getArtifacts(child.id);
+        const artCount = childArts.length > 0 ? ` (${childArts.length} file${childArts.length === 1 ? "" : "s"})` : "";
+        lines.push(`- **${child.name}**${artCount}${desc}`);
+      }
+      lines.push("");
+    }
+
+    if (directArts.length > 0) {
+      lines.push(`## Files (${directArts.length})`);
+      for (const art of directArts) {
+        const size = art.size ? ` (${(art.size / 1024).toFixed(0)}KB)` : "";
+        const mime = art.mimeType ? ` [${art.mimeType}]` : "";
+        lines.push(`- ${art.name}${mime}${size}`);
+      }
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  }
+
   private isUnsupportedMime(mimeType?: string): boolean {
     if (!mimeType) return false;
-    // Allow text/*, JSON, JS, and PDF (text extraction handled by WorkspaceProvider)
-    if (mimeType.startsWith("text/")) return false;
-    if (mimeType === "application/json") return false;
-    if (mimeType === "application/javascript") return false;
-    if (mimeType === "application/pdf") return false;
-    return true;
+    // Delegate to the universal text extractor registry — any MIME type with
+    // a registered extractor (or natively text-readable) is supported.
+    return !canExtract(mimeType);
+  }
+
+  /**
+   * Detect whether an artifact is a WO-generated derivative rather than an original source.
+   * WO outputs contain LLM-generated content that may include hallucinated data —
+   * they should be deprioritized in favor of original source documents.
+   *
+   * WO outputs typically:
+   *  - Live in #Documents, 02_Execution, 00_Planning, 01_Directive-SOP, #Code_Blocks
+   *  - Have names like work-product.md, execution-log.md
+   *  - Have names that start with WO-derived slugs (e.g., "summarize-xxx", "read-and-xxx")
+   *
+   * Source documents typically:
+   *  - Live in 04_Resources, 05_Artifacts (manually uploaded)
+   *  - Have original filenames with extensions (e.g., "Company Report.pdf")
+   */
+  private isWoGeneratedArtifact(entry: { name: string; path: string }): boolean {
+    const path = (entry.path || "").toLowerCase();
+    const name = (entry.name || "").toLowerCase();
+
+    // WO filing folders
+    if (path.includes("#documents/") || path.includes("02_execution/") ||
+        path.includes("00_planning/") || path.includes("01_directive") ||
+        path.includes("#code_blocks/")) {
+      return true;
+    }
+
+    // WO-generated artifact names
+    if (name === "work-product.md" || name === "execution-log.md") return true;
+
+    // WO-derived slug names (auto-generated from WO titles)
+    // These follow the pattern: "wo-title-slug.ext" or "wf-title-slug.ext"
+    if (name.match(/^(summarize|read-and-|create-|generate-|build-|write-|draft-|wf-)/)) return true;
+
+    return false;
   }
 }
 
@@ -379,6 +523,7 @@ function normalizePath(raw: string): string {
     .replace(/^Workspace\//i, "")
     .replace(/^\//, "")
     .replace(/[,;)\]]+$/, "")
+    .replace(/\s+(?:folder|directory|path)$/i, "")
     .trim();
 }
 
@@ -420,15 +565,45 @@ export function parseContextRequestFromChat(message: string): ContextRequest | n
   // --- Phase 3: Preposition + path extraction ---
   // Catches "from 05_Artifacts", "in /04_Resources", "folder 02_Execution"
   // Now also matches paths that DON'T start with ##_ (e.g., "from Design References/...")
-  const folderPattern = /(?:from|in|folder|path|directory|content\s+from|references?\s+(?:in|at|from)?)\s+[/"]?([A-Za-z0-9_#][\w\s-]*(?:\/[^\s"]*)?)/gi;
+  // Allows optional articles (the/a/an) between preposition and path
+  const folderPattern = /(?:from|in|of|find\s+in|inside|within|folder|path|directory|content\s+from|references?\s+(?:in|at|from)?)\s+(?:the\s+|a\s+|an\s+)?[/"]?([A-Za-z0-9_#][\w-]*(?:\/[^\s"]*)?)/gi;
   while ((match = folderPattern.exec(normalizedMessage)) !== null) {
     const candidate = normalizePath(match[1]);
-    // Only accept if it looks path-like (contains / or starts with ##_)
-    if (candidate.match(/\//) || candidate.match(/^\d{2}_/)) {
+    // Accept if path-like (contains /) or starts with ##_ or contains an underscore
+    // (workspace folders commonly use underscores: Demo_Content, KlearContent_Demo, etc.)
+    // The preposition gate ("from", "in", "folder", etc.) already provides intent signal,
+    // so an underscore-joined name following a preposition is very likely a folder reference.
+    if (candidate.match(/\//) || candidate.match(/^\d{2}_/) || candidate.includes("_")) {
       if (!paths.includes(candidate)) {
         paths.push(candidate);
         hasSignal = true;
       }
+    }
+  }
+
+  // --- Phase 3b: Bare workspace folder references ---
+  // Catches "04_Resources" even without a preposition — standard ##_Name workspace folders
+  const bareFolderPattern = /\b(\d{2}_[A-Za-z][A-Za-z0-9_-]*(?:\/[^\s"]*)?)\b/g;
+  while ((match = bareFolderPattern.exec(message)) !== null) {
+    const candidate = normalizePath(match[1]);
+    if (!paths.includes(candidate)) {
+      paths.push(candidate);
+      hasSignal = true;
+    }
+  }
+
+  // --- Phase 3c: Bare underscore-joined names ---
+  // Catches workspace folder names like "Demo_Content", "KlearContent_Demo", "Do_Not_Use"
+  // without a preposition. Requires at least one underscore and starts with a capital letter
+  // to avoid matching common programming identifiers.
+  const bareUnderscorePattern = /\b([A-Z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+(?:\/[^\s"]*)?)\b/g;
+  while ((match = bareUnderscorePattern.exec(message)) !== null) {
+    const candidate = normalizePath(match[1]);
+    // Skip common programming/prose words that happen to have underscores
+    if (candidate.match(/^(Work_Order|Sub_Agent|Know_How)$/i)) continue;
+    if (!paths.includes(candidate)) {
+      paths.push(candidate);
+      hasSignal = true;
     }
   }
 

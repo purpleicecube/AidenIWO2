@@ -298,6 +298,7 @@ export interface IStorage {
   getCodeBlock(id: string): Promise<CodeBlock | undefined>;
   createCodeBlock(block: InsertCodeBlock): Promise<CodeBlock>;
   searchArtifactsByKeyword(keyword: string, folderId?: string | null): Promise<Artifact[]>;
+  searchArtifactsByName(keyword: string): Promise<Artifact[]>;
   getArtifactFolderByPath(path: string): Promise<ArtifactFolder | undefined>;
   createContextRetrieval(record: InsertContextRetrieval): Promise<void>;
 }
@@ -1245,6 +1246,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(artifacts)
       .where(textMatch)
       .orderBy(desc(artifacts.updatedAt)).limit(50);
+  }
+
+  /**
+   * Search artifacts by name only — no content column scan.
+   * Much faster than searchArtifactsByKeyword for binary-heavy workspaces
+   * since content stores base64 blobs that are expensive to ILIKE.
+   */
+  async searchArtifactsByName(keyword: string): Promise<Artifact[]> {
+    const pattern = `%${keyword}%`;
+    return db.select().from(artifacts)
+      .where(sql`${artifacts.name} ILIKE ${pattern}`)
+      .orderBy(desc(artifacts.updatedAt)).limit(20);
   }
 
   async getArtifactFolderByPath(path: string): Promise<ArtifactFolder | undefined> {
