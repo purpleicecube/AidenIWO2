@@ -116,11 +116,17 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Startup validation — warn early if 21st.dev key is missing
+  // Startup validation — warn early if MCP tool keys are missing
   if (!process.env.TWENTY_FIRST_API_KEY) {
     console.warn(
       "[startup] TWENTY_FIRST_API_KEY is not set — 21st.dev Magic MCP tool will fail at runtime. " +
       "Set it in .env to enable UI component generation for Mark/Tom sub-agents."
+    );
+  }
+  if (!process.env.STITCH_API_KEY) {
+    console.warn(
+      "[startup] STITCH_API_KEY is not set — Google Stitch MCP tool will fail at runtime. " +
+      "Set it in .env to enable Stitch design generation for workflow steps."
     );
   }
 
