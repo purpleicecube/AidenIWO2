@@ -233,6 +233,12 @@ export async function pmRequestStepRevision(
 ): Promise<PmRevisionGuidance> {
   const outputStr = typeof stepOutput === "string" ? stepOutput : JSON.stringify(stepOutput, null, 2);
 
+  // Check if the step has MCP tools available (Loop 34)
+  const hasMcpTools = stepDef.toolIds && (stepDef.toolIds as string[]).length > 0;
+  const mcpExecutionRule = hasMcpTools
+    ? `\nCRITICAL: If the previous output described what MCP tools SHOULD be called but did NOT actually include "tool_calls" in the JSON response, your revision instructions MUST explicitly demand that the agent returns valid JSON with a "tool_calls" array containing the actual MCP tool calls. The step agent must return executable tool calls, not prose about what tools to use. Example format: "tool_calls": [{"toolSlug": "tool-slug", "input": "toolName: mcp_tool_name\\nargs: {\\"key\\": \\"value\\"}"}]`
+    : "";
+
   const prompt = `You are the Project Manager. Step "${stepDef.name}" needs revision (attempt ${revisionAttempt + 1}).
 
 STEP DESCRIPTION: ${stepDef.description || stepDef.name}
@@ -244,7 +250,7 @@ PM FEEDBACK: ${reviewResult.feedback}
 CURRENT OUTPUT (truncated):
 ${outputStr.slice(0, 3000)}
 
-Generate specific revision instructions for the step agent. Be concrete about what needs to change.
+Generate specific revision instructions for the step agent. Be concrete about what needs to change.${mcpExecutionRule}
 
 Respond with ONLY a JSON object:
 {

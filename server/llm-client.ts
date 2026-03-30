@@ -953,7 +953,9 @@ ${availableTools.map(t => {
 }).join("\n")}
 
 To use a tool, include a "tool_calls" array in your JSON response. Each tool call needs a "toolSlug" and "input" string.
-Example: "tool_calls": [{"toolSlug": "brave-search", "input": "your search query"}]
+For regular tools: "tool_calls": [{"toolSlug": "brave-search", "input": "your search query"}]
+For MCP server tools: "tool_calls": [{"toolSlug": "mcp-google-stitch", "input": "toolName: list_projects\nargs: {}"}]
+MCP tools require the inner "toolName" and "args" fields in the input string. Use the exact MCP tool names shown in the tool description.
 The tool results will be provided back to you for synthesis. You can include both "output" (your initial content) and "tool_calls" in the same response.`
     : "";
 
@@ -1010,14 +1012,14 @@ Work Order Context:
 ${formatGuidance}
 IMPORTANT: Produce the ACTUAL deliverable content for this step. Write the real work product — not a summary, not a status update, not JSON metadata about the work product. The "output" field must contain the FINISHED content itself.
 If this step cannot be executed (missing info, external dependency, etc.), set blocked=true.
-If the step description mentions using a tool, you SHOULD include tool_calls in your response.
+${availableTools && availableTools.some(t => t.type === "mcp_server") ? `TOOL EXECUTION RULE (MANDATORY): You have MCP tools available. If this step requires fetching external data, generating content via an external service, or calling an API, you MUST include "tool_calls" in your JSON response. A step that describes importing, fetching, syncing, generating, or retrieving external content is INCOMPLETE if it returns only prose without tool_calls. Do NOT describe what tools should be called — actually call them.` : `If the step description mentions using a tool, you SHOULD include tool_calls in your response.`}
 
 Respond with ONLY a JSON object:
 {
   "blocked": false,
   "reason": null,
   "output": "THE ACTUAL CONTENT/DELIVERABLE FOR THIS STEP — real content, not metadata",
-  "tool_calls": []
+  "tool_calls": [{"toolSlug": "tool-slug-here", "input": "toolName: mcp_tool_name\nargs: {\\"key\\": \\"value\\"}"}]
 }`;
 
   try {

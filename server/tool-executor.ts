@@ -509,6 +509,8 @@ async function executeMcpTool(tool: Tool, input: string): Promise<string> {
   let targetToolName: string | null = null;
   let toolArgs: Record<string, any> = {};
 
+  // Parse MCP tool input — accepts multiple formats (Loop 34: broadened parsing)
+  // Format 1: "toolName: X\nargs: {...}" (string-based, original)
   const toolNameMatch = input.match(/^toolName:\s*(.+?)(?:\n|$)/i);
   const argsMatch = input.match(/^args:\s*(.+)/im);
 
@@ -522,15 +524,23 @@ async function executeMcpTool(tool: Tool, input: string): Promise<string> {
       }
     }
   } else {
+    // Format 2: JSON object with toolName/tool/name + args/arguments/input
     const jsonMatch = input.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
-        targetToolName = parsed.toolName || parsed.tool || parsed.name || null;
-        toolArgs = parsed.args || parsed.arguments || parsed.input || {};
-        if (typeof toolArgs === "string") toolArgs = { query: toolArgs };
+        targetToolName = parsed.toolName || parsed.tool || parsed.name || parsed.method || null;
+        toolArgs = parsed.args || parsed.arguments || parsed.input || parsed.params || {};
+        if (typeof toolArgs === "string") {
+          try { toolArgs = JSON.parse(toolArgs); } catch { toolArgs = { query: toolArgs }; }
+        }
       } catch {}
     }
+  }
+
+  // Format 3: plain "toolName" without args (e.g. "list_projects")
+  if (!targetToolName && input.trim() && !input.includes("{") && !input.includes("\n")) {
+    targetToolName = input.trim();
   }
 
   if (!targetToolName) {
