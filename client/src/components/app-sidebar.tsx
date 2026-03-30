@@ -1,4 +1,4 @@
-import { LayoutDashboard, ClipboardList, Plus, Activity, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical, MessageSquare, Users, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plus, Activity, Layers, Brain, Bot, GitBranch, Wrench, FolderOpen, FlaskConical, MessageSquare, Users, LogOut, Shield, Palette } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -29,6 +29,7 @@ const navigationItems = [
 const environmentItems = [
   { title: "Workspace", url: "/workspace", icon: FolderOpen, minRole: "operator" },
   { title: "Sandbox", url: "/sandbox", icon: FlaskConical, minRole: "operator" },
+  { title: "Design Lab", url: "/design-lab", icon: Palette, minRole: "operator" },
 ];
 
 const configItems = [

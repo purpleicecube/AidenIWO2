@@ -26,6 +26,7 @@ import ChatPage from "@/pages/chat";
 import LandingPage from "@/pages/landing";
 import UserManagementPage from "@/pages/user-management";
 import AttributionsPage from "@/pages/attributions";
+import StitchAccessPage from "@/pages/stitch-access";
 
 function Router() {
   return (
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/chat" component={ChatPage} />
       <Route path="/users" component={UserManagementPage} />
       <Route path="/attributions" component={AttributionsPage} />
+      <Route path="/design-lab" component={StitchAccessPage} />
       <Route component={NotFound} />
     </Switch>
   );

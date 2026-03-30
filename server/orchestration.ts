@@ -1829,6 +1829,25 @@ export async function advanceWorkflowExecution(executionId: string, attemptId?: 
     });
   }
 
+  // External steps (operator-owned, no sub-agent dispatch) → awaiting_operator (Loop 26)
+  if (stepDef.stepType === "external") {
+    await storage.updateWorkflowStepRun(nextStepRun.id, {
+      status: "awaiting_operator",
+      aidenDecision: { action: "external_step_awaiting_operator", stepName: stepDef.name },
+    });
+    await storage.updateWorkflowExecution(executionId, { status: "awaiting_operator" });
+    if (execution.workOrderId) {
+      await storage.updateWorkOrder(execution.workOrderId, { status: "awaiting_operator" });
+      await storage.createExecutionLog({
+        workOrderId: execution.workOrderId, tier: 1,
+        action: "Awaiting Operator",
+        message: `External step "${stepDef.name}" requires operator action — workflow paused until resolved.`,
+        metadata: { stepKey: stepDef.stepKey, stepType: "external" },
+      });
+    }
+    return storage.getWorkflowExecution(executionId);
+  }
+
   const subAgent = stepDef.assignedSubAgentId
     ? await storage.getSubAgent(stepDef.assignedSubAgentId)
     : await findSubAgentForStep(stepDef, runCtx.activeSubAgents);
@@ -2049,6 +2068,7 @@ function findRunnableParallelGroup(steps: WorkflowStep[], stepRuns: WorkflowStep
 
   for (const step of sortedSteps) {
     if (step.parallelGroup == null) continue;
+    if (step.stepType === "external") continue; // external steps are operator-owned, not parallelizable
     const run = stepRuns.find((r) => r.stepKey === step.stepKey);
     if (!run || run.status !== "pending") continue;
 

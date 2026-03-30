@@ -1718,6 +1718,80 @@ export async function registerRoutes(
     }
   });
 
+  // Resolve an external/operator step — operator-accessible (Loop 27)
+  app.post("/api/workflow-executions/:id/step-runs/:stepRunId/operator-resolve", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+      const stepRuns = await storage.getWorkflowStepRuns(req.params.id);
+      const stepRun = stepRuns.find(r => r.id === req.params.stepRunId);
+      if (!stepRun) return res.status(404).json({ message: "Step run not found" });
+      if (stepRun.status !== "awaiting_operator") {
+        return res.status(400).json({ message: `Step is not awaiting operator (status: ${stepRun.status})` });
+      }
+      const { resolution, output } = req.body;
+      await storage.updateWorkflowStepRun(stepRun.id, {
+        status: "completed", completedAt: new Date(),
+        output: output || { message: resolution || "Resolved by operator", resolvedBy: "operator" },
+      });
+      if (execution.status !== "running") {
+        await storage.updateWorkflowExecution(req.params.id, { status: "running" });
+      }
+      if (execution.workOrderId) {
+        await storage.updateWorkOrder(execution.workOrderId, { status: "processing" });
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId, tier: 1,
+          action: `Operator: Step Resolved`,
+          message: `Operator resolved step "${stepRun.stepName}": ${resolution || "Manual resolution"}`,
+          metadata: { stepRunId: stepRun.id, resolution },
+        });
+      }
+      const result = await advanceWorkflowExecution(req.params.id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to resolve step" });
+    }
+  });
+
+  // Update Stitch context on a workflow execution (Loop 27)
+  app.post("/api/workflow-executions/:id/stitch-context", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) return res.status(404).json({ message: "Execution not found" });
+
+      const allowed = ["projectUrl", "projectId", "syncStatus", "notes", "selectedVariantId", "selectedVariantLabel", "variantCount", "lastSyncedAt"];
+      const updates: Record<string, any> = {};
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) updates[key] = req.body[key];
+      }
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid stitch context fields provided" });
+      }
+
+      const currentContext = (execution.context as any) || {};
+      const currentStitch = currentContext.stitch || {};
+      const mergedContext = {
+        ...currentContext,
+        stitch: { ...currentStitch, ...updates, accessMode: "external_link" },
+      };
+
+      await storage.updateWorkflowExecution(req.params.id, { context: mergedContext });
+
+      if (execution.workOrderId) {
+        await storage.createExecutionLog({
+          workOrderId: execution.workOrderId, tier: 1,
+          action: "Stitch Context Updated",
+          message: `Operator updated Stitch context: ${Object.keys(updates).join(", ")}`,
+          metadata: { stitchFields: Object.keys(updates) },
+        });
+      }
+
+      res.json({ stitch: mergedContext.stitch });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to update stitch context" });
+    }
+  });
+
   // Cancel a running or blocked workflow execution
   app.post("/api/workflow-executions/:id/cancel", isAuth, requireRole("admin"), async (req, res) => {
     try {
@@ -2860,6 +2934,58 @@ export async function registerRoutes(
     }
   });
 
+  // Upload artifact linked to a work order (Loop 28 — manual Stitch artifact attach)
+  app.post("/api/work-orders/:id/artifacts/upload", isAuth, requireRole("operator"), async (req, res) => {
+    try {
+      const order = await storage.getWorkOrder(req.params.id);
+      if (!order) return res.status(404).json({ message: "Work order not found" });
+
+      const { name, mimeType, data, tags } = req.body;
+      if (!name || !mimeType || !data) {
+        return res.status(400).json({ message: "Missing required fields: name, mimeType, data" });
+      }
+
+      const allowedTypes = [
+        "text/markdown", "text/plain", "text/html",
+        "application/json", "application/pdf",
+        "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml",
+      ];
+      if (!allowedTypes.includes(mimeType)) {
+        return res.status(400).json({ message: `Unsupported file type: ${mimeType}` });
+      }
+
+      const isTextType = mimeType.startsWith("text/") || mimeType === "application/json";
+      const sizeBytes = isTextType ? Buffer.byteLength(data, "utf8") : Math.ceil(data.length * 0.75);
+      if (sizeBytes > 10 * 1024 * 1024) {
+        return res.status(400).json({ message: "File too large (max 10MB)" });
+      }
+
+      const actor = getActor(req);
+      const artifact = await storage.createArtifact({
+        name,
+        type: "file",
+        mimeType,
+        content: data,
+        size: sizeBytes,
+        sourceType: "work_order",
+        sourceId: order.id,
+        createdBy: actor.actorId,
+        metadata: tags ? { tags } : undefined,
+      });
+
+      await storage.createExecutionLog({
+        workOrderId: order.id, tier: 1,
+        action: "Artifact Attached",
+        message: `Operator attached "${name}" (${mimeType}) to work order${tags ? ` [${tags.join(", ")}]` : ""}`,
+        metadata: { artifactId: artifact.id, tags },
+      });
+
+      res.status(201).json(artifact);
+    } catch (err) {
+      res.status(500).json({ message: "Upload failed" });
+    }
+  });
+
   // ==================== Know-How Retrieval Routes ====================
 
   app.get("/api/code-blocks", isAuth, requireRole("viewer"), async (req, res) => {
@@ -3585,43 +3711,18 @@ ${await buildWorkspaceIndex()}`;
         }
       }
 
-      // Web Research: search + scrape for questions needing current/real-world data
-      const webSearchPatterns = /\b(what(?:'s| is| are| was| were| happened)|who(?:'s| is| are| was)|when(?:'s| is| did| was)|where(?:'s| is| are)|how (?:much|many|does|did|is|are|do)|latest|current|today|tomorrow|yesterday|recent|news|score|price|stock|weather|forecast|update|happening|trending|right now|as of|this week|this month)\b/i;
-      const urlPattern = /https?:\/\/[^\s,\n]+/g;
-      const foundUrls = message.match(urlPattern);
-      const needsWebSearch = webSearchPatterns.test(message) && !isManagerQuestion(message);
-      if (needsWebSearch || (foundUrls && foundUrls.length > 0)) {
-        const { executeBuiltInWebSearch, executeBuiltInWebScrape } = await import("./tool-executor");
-        const webResults: string[] = [];
-        if (needsWebSearch) {
-          try {
-            const searchQuery = message.replace(urlPattern, "").trim().slice(0, 200);
-            if (searchQuery.length >= 3) {
-              console.log(`[chat] Web search triggered for chat query`);
-              const searchResult = await executeBuiltInWebSearch(searchQuery);
-              if (searchResult && searchResult.length > 100) {
-                webResults.push("### Web Search Results\n" + searchResult.slice(0, 6000));
-              }
-            }
-          } catch (err: any) {
-            console.warn("[chat] Web search failed:", err.message);
-          }
-        }
-        if (foundUrls && foundUrls.length > 0) {
-          try {
-            console.log(`[chat] Web scrape triggered for ${foundUrls.length} URL(s)`);
-            const scrapeResult = await executeBuiltInWebScrape(foundUrls.slice(0, 3).join(" "));
-            if (scrapeResult && scrapeResult.length > 50) {
-              webResults.push("### Web Page Content\n" + scrapeResult.slice(0, 8000));
-            }
-          } catch (err: any) {
-            console.warn("[chat] Web scrape failed:", err.message);
-          }
-        }
-        if (webResults.length > 0) {
-          systemContext += "\n\n=== LIVE WEB RESEARCH (retrieved just now — use this data to answer accurately) ===\n" + webResults.join("\n\n");
-        }
+      // Web Research: centralized routing via web-research.ts (Loop 21)
+      const { resolveWebResearch } = await import("./web-research");
+      const webResearch = await resolveWebResearch({
+        message,
+        conversationHistory,
+        isManagerQuestion: isManagerQuestion(message),
+      });
+      if (webResearch.contextBlock) {
+        systemContext += webResearch.contextBlock;
       }
+      // Inject tool state so LLM knows whether research ran (Loop 22)
+      systemContext += `\n\n=== TOOL STATE ===\n${webResearch.statusLine}`;
 
       const gcc = (session.gccMemory as any) || {};
       const breadcrumbs = [...(gcc["gcc.breadcrumbs"] || []), "user_message", "llm_processing"];
@@ -3867,16 +3968,31 @@ ${await buildWorkspaceIndex()}`;
 
             const activeSubAgents = await storage.getActiveSubAgents();
 
-            const template = await storage.createWorkflowTemplate({
-              name: templateName,
-              description: templateGoal,
-              goal: templateGoal,
-              category: templateCategory,
-              executionMode: "autonomous",
-              status: "active",
-            });
+            // Check for existing template with the same name before creating a new one (Loop 26 fix)
+            const existingTemplates = await storage.getWorkflowTemplates();
+            const existingMatch = existingTemplates.find(t =>
+              t.name.toLowerCase() === templateName.toLowerCase() && t.status === "active"
+            );
 
-            for (let i = 0; i < steps.length; i++) {
+            let template: any;
+            let useExistingSteps = false;
+            if (existingMatch) {
+              template = existingMatch;
+              const existingSteps = await storage.getWorkflowSteps(existingMatch.id);
+              useExistingSteps = existingSteps.length > 0;
+              console.log(`[Chat Workflow] Reusing existing template "${template.name}" (${template.id}) with ${existingSteps.length} steps`);
+            } else {
+              template = await storage.createWorkflowTemplate({
+                name: templateName,
+                description: templateGoal,
+                goal: templateGoal,
+                category: templateCategory,
+                executionMode: "autonomous",
+                status: "active",
+              });
+            }
+
+            if (!useExistingSteps) for (let i = 0; i < steps.length; i++) {
               const step = steps[i];
               const assignTo: string | null = step.assignTo || step.agent || null;
               let assignedSubAgentId: string | null = null;
@@ -4153,33 +4269,19 @@ ${await buildWorkspaceIndex()}`;
       let systemContext = await buildSystemContext(settings);
       const conversationHistory = history.slice(-10);
 
-      const webSearchPatterns = /\b(what(?:'s| is| are| was| were| happened)|who(?:'s| is| are| was)|when(?:'s| is| did| was)|where(?:'s| is| are)|how (?:much|many|does|did|is|are|do)|latest|current|today|tomorrow|yesterday|recent|news|score|price|stock|weather|forecast|update|happening|trending|right now|as of|this week|this month)\b/i;
-      const urlPattern = /https?:\/\/[^\s,\n]+/g;
-      const foundUrls = message.match(urlPattern);
+      // Web Research: centralized routing via web-research.ts (Loop 21)
+      const { resolveWebResearch } = await import("./web-research");
       const { isManagerQuestion: isManagerQ } = await import("./manager-reporting");
-      const needsSearch = webSearchPatterns.test(message) && !isManagerQ(message);
-      if (needsSearch || (foundUrls && foundUrls.length > 0)) {
-        const { executeBuiltInWebSearch, executeBuiltInWebScrape } = await import("./tool-executor");
-        const webResults: string[] = [];
-        if (needsSearch) {
-          try {
-            const sq = message.replace(urlPattern, "").trim().slice(0, 200);
-            if (sq.length >= 3) {
-              const sr = await executeBuiltInWebSearch(sq);
-              if (sr && sr.length > 100) webResults.push("### Web Search Results\n" + sr.slice(0, 6000));
-            }
-          } catch (err: any) { console.warn("[chat] Web search failed:", err.message); }
-        }
-        if (foundUrls && foundUrls.length > 0) {
-          try {
-            const sr = await executeBuiltInWebScrape(foundUrls.slice(0, 3).join(" "));
-            if (sr && sr.length > 50) webResults.push("### Web Page Content\n" + sr.slice(0, 8000));
-          } catch (err: any) { console.warn("[chat] Web scrape failed:", err.message); }
-        }
-        if (webResults.length > 0) {
-          systemContext += "\n\n=== LIVE WEB RESEARCH (retrieved just now — use this data to answer accurately) ===\n" + webResults.join("\n\n");
-        }
+      const webResearch = await resolveWebResearch({
+        message,
+        conversationHistory,
+        isManagerQuestion: isManagerQ(message),
+      });
+      if (webResearch.contextBlock) {
+        systemContext += webResearch.contextBlock;
       }
+      // Inject tool state so LLM knows whether research ran (Loop 22)
+      systemContext += `\n\n=== TOOL STATE ===\n${webResearch.statusLine}`;
 
       const reply = await chatWithAiden(settings, message, conversationHistory, systemContext);
       res.json({ reply });

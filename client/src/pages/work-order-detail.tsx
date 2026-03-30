@@ -58,6 +58,8 @@ import {
   CircleCheck,
   CircleX,
   CircleMinus,
+  Palette,
+  ExternalLink,
 } from "lucide-react";
 import type { WorkOrder, ExecutionLog, WorkflowExecution, WorkflowStepRun, SubAgent } from "@shared/schema";
 import { useState } from "react";
@@ -1690,6 +1692,10 @@ export default function WorkOrderDetail() {
             <WorkflowExecutionPanel executionId={order.workflowExecutionId} />
           )}
 
+          {order.workflowExecutionId && (
+            <StitchPanel executionId={order.workflowExecutionId} />
+          )}
+
           <DeliverableCard orderId={order.id} tier2Result={order.tier2Result as any} orderStatus={order.status} />
 
           {(!!order.tier1Result || !!order.tier2Result) && (
@@ -1879,7 +1885,7 @@ function WorkflowExecutionPanel({ executionId }: { executionId: string }) {
     onError: (e: any) => toast({ title: "Skip failed", description: e.message, variant: "destructive" }),
   });
   const resolveMutation = useMutation({
-    mutationFn: (stepRunId: string) => apiRequest("POST", `/api/workflow-executions/${executionId}/step-runs/${stepRunId}/resolve`, { resolution: "Operator manual resolution" }),
+    mutationFn: (stepRunId: string) => apiRequest("POST", `/api/workflow-executions/${executionId}/step-runs/${stepRunId}/operator-resolve`, { resolution: "Operator manual resolution" }),
     onSuccess: () => { refetch(); toast({ title: "Step resolved" }); },
     onError: (e: any) => toast({ title: "Resolve failed", description: e.message, variant: "destructive" }),
   });
@@ -2021,6 +2027,148 @@ function WorkflowExecutionPanel({ executionId }: { executionId: string }) {
               </div>
               <p className="text-xs text-muted-foreground mt-1">{execReview.feedback}</p>
             </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Stitch Design Panel — shows when workflow has Stitch context (Loop 27)
+function StitchPanel({ executionId }: { executionId: string }) {
+  const { toast } = useToast();
+  const { data: execution, refetch } = useQuery<WorkflowExecution & { stepRuns: WorkflowStepRun[]; template?: any }>({
+    queryKey: ["/api/workflow-executions", executionId],
+  });
+
+  const [projectUrl, setProjectUrl] = useState("");
+  const [notes, setNotes] = useState("");
+  const [editing, setEditing] = useState(false);
+
+  const stitchContext = (execution?.context as any)?.stitch;
+
+  const updateStitchMutation = useMutation({
+    mutationFn: (data: Record<string, any>) =>
+      apiRequest("POST", `/api/workflow-executions/${executionId}/stitch-context`, data),
+    onSuccess: () => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/workflow-executions", executionId] });
+      toast({ title: "Stitch context updated" });
+      setEditing(false);
+    },
+    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
+
+  const templateName = (execution?.template?.name || "").toLowerCase();
+  if (!stitchContext && !templateName.includes("stitch")) return null;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+        <div className="flex items-center gap-2">
+          <Palette className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+          <CardTitle className="text-base font-medium">Stitch Design</CardTitle>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => window.open("https://stitch.withgoogle.com", "_blank", "noopener")}
+          >
+            <ExternalLink className="w-3 h-3" />
+            Open Stitch
+          </Button>
+          {!editing && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => {
+              setProjectUrl(stitchContext?.projectUrl || "");
+              setNotes(stitchContext?.notes || "");
+              setEditing(true);
+            }}>
+              <Pencil className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {editing ? (
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Stitch Project URL</Label>
+              <Input
+                placeholder="https://stitch.withgoogle.com/project/..."
+                value={projectUrl}
+                onChange={(e) => setProjectUrl(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Notes</Label>
+              <Textarea
+                placeholder="Design notes, variant choices, etc."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => {
+                  const data: Record<string, any> = {};
+                  if (projectUrl) data.projectUrl = projectUrl;
+                  if (notes) data.notes = notes;
+                  data.syncStatus = projectUrl ? "in_progress" : "not_started";
+                  data.lastSyncedAt = new Date().toISOString();
+                  updateStitchMutation.mutate(data);
+                }}
+                disabled={updateStitchMutation.isPending}
+              >
+                {updateStitchMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                Save
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {stitchContext?.projectUrl ? (
+              <div>
+                <p className="text-xs text-muted-foreground">Project URL</p>
+                <a href={stitchContext.projectUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline text-primary break-all">
+                  {stitchContext.projectUrl}
+                </a>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No Stitch project linked yet. Click the edit button to add a project URL.</p>
+            )}
+            {stitchContext?.syncStatus && (
+              <div>
+                <p className="text-xs text-muted-foreground">Sync Status</p>
+                <Badge variant="outline" className="text-xs">{stitchContext.syncStatus}</Badge>
+              </div>
+            )}
+            {stitchContext?.selectedVariantLabel && (
+              <div>
+                <p className="text-xs text-muted-foreground">Selected Variant</p>
+                <p className="text-sm">{stitchContext.selectedVariantLabel}</p>
+              </div>
+            )}
+            {stitchContext?.notes && (
+              <div>
+                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="text-sm whitespace-pre-wrap">{stitchContext.notes}</p>
+              </div>
+            )}
+            {stitchContext?.lastSyncedAt && (
+              <p className="text-xs text-muted-foreground">
+                Last updated: {new Date(stitchContext.lastSyncedAt).toLocaleString()}
+              </p>
+            )}
           </div>
         )}
       </CardContent>
