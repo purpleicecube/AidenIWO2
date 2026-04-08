@@ -1068,6 +1068,17 @@ Documented above in Session 13 entry. Parser: article skip, Phase 3b bare folder
 | Summary | (A) `buildWorkspaceIndex()` — live directory tree in Chat system prompt, refreshed per message. (B) 6-point Workspace Content Rules instructing Aiden to answer from Know-How context, not create WOs. (C) 15s timeout guard on Know-How resolve with logging. |
 | Files Changed | `server/routes.ts` |
 
+### BUG-057: Gamma PDF never called — HTML early-exit bypasses post-processing (Critical)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-04-07 |
+| Severity | Critical |
+| Symptom | Work orders with `gammaTemplateKey: klear_pdf_v1` never triggered Gamma PDF generation. Log repeated: `Deliverable is HTML — skipping PPTX/PDF post-processing.` Zero `gamma_generation_records` written. Sub-agent produced HTML output; `nodePostProcess()` bailed out before reaching the Gamma path. |
+| Root Cause | `nodePostProcess()` (pocketflow.ts:1375) had an unconditional HTML early-exit: any deliverable starting with `<!DOCTYPE html` or `<html` returned immediately, regardless of whether a Gamma PDF/PPTX policy was active. The guard was designed for Hank/WebBuilder HTML deliverables but fired for all agents, including Mark producing HTML for PDF work orders. |
+| Fix | (A) HTML early-exit now checks `dict.gammaPolicy?.outputFormat` — if Gamma PDF or PPTX is the target, HTML content passes through as Gamma input instead of triggering the bail-out. (B) `gamma-client.ts` fixed hardcoded `.pptx` file extension in download path — now uses `exportAs` to determine correct extension (`.pdf` or `.pptx`). |
+| Files Changed | `server/pocketflow.ts`, `server/gamma-client.ts` |
+
 ---
 
 ## Summary
@@ -1088,7 +1099,8 @@ Documented above in Session 13 entry. Parser: article skip, Phase 3b bare folder
 | Bugs fixed (Session 12b) | 1 | 0 | 1 | 0 | 0 |
 | Bugs fixed (Session 13) | 1 | 0 | 1 | 0 | 0 |
 | Bugs fixed (Session 14) | 3 | 0 | 3 | 0 | 0 |
-| **Total bugs fixed** | **54** | **8** | **30** | **12** | **1** |
+| Bugs fixed (Session 17) | 1 | 1 | 0 | 0 | 0 |
+| **Total bugs fixed** | **55** | **9** | **30** | **12** | **1** |
 | Feature implementations (Session 6) | 3 | — | — | — | — |
 | Feature implementations (Session 12b) | 1 | — | — | — | — |
 | Feature implementations (Session 14) | 3 | — | — | — | — |

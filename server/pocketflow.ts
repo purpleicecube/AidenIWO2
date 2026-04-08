@@ -1150,8 +1150,17 @@ function cleanDeliverable(raw: string): string {
 /**
  * Detect if the work order deliverable should be a specific file format
  * based on work order description and assigned tool skills.
+ * If a gammaPolicy has already been resolved, its outputFormat takes precedence
+ * over keyword/skill heuristics — the user explicitly chose a template.
  */
 function detectRequiredFormat(dict: SharedDict): "pptx" | "pdf" | null {
+  // Priority 0: Resolved gammaPolicy carries explicit format intent from the
+  // user-selected template (e.g. klear_pdf_v1 → "pdf"). This MUST override
+  // keyword/skill heuristics to prevent format-swap regressions (BUG-055).
+  if (dict.gammaPolicy?.outputFormat === "pdf" || dict.gammaPolicy?.outputFormat === "pptx") {
+    return dict.gammaPolicy.outputFormat;
+  }
+
   const text = `${dict.workOrder.title} ${dict.workOrder.description}`.toLowerCase();
 
   // Explicit keyword matching takes priority over skill-based detection
@@ -1360,12 +1369,21 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 async function nodePostProcess(dict: SharedDict): Promise<void> {
-  // If the deliverable is HTML (e.g. from Hank/WebBuilder), skip binary post-processing entirely.
-  // HTML deliverables go straight to Sandbox via Paul — no PPTX/PDF conversion needed.
+  // If the deliverable is HTML (e.g. from Hank/WebBuilder), skip binary post-processing
+  // UNLESS a Gamma PDF/PPTX policy is active — in that case the HTML is input content
+  // that Gamma will convert into a branded binary artifact (BUG-056).
   const trimmed = dict.finalDeliverable?.trim() || "";
-  if (/^<!DOCTYPE\s+html|^<html[\s>]/i.test(trimmed)) {
+  const isHtml = /^<!DOCTYPE\s+html|^<html[\s>]/i.test(trimmed);
+  const gammaFormatActive = dict.gammaPolicy?.outputFormat === "pdf" || dict.gammaPolicy?.outputFormat === "pptx";
+
+  if (isHtml && !gammaFormatActive) {
     await emitNodeLog(dict, "PostProcess", "Deliverable is HTML — skipping PPTX/PDF post-processing.", {});
     return;
+  }
+  if (isHtml && gammaFormatActive) {
+    await emitNodeLog(dict, "PostProcess",
+      `Deliverable is HTML but Gamma ${dict.gammaPolicy!.outputFormat.toUpperCase()} policy active — proceeding with Gamma conversion.`,
+      { format: dict.gammaPolicy!.outputFormat, templateKey: dict.gammaPolicy!.templateKey });
   }
 
   const format = detectRequiredFormat(dict);
@@ -2007,10 +2025,12 @@ export async function pocketflowExecute(
   try {
     const expectedFormat = detectRequiredFormat(dict);
     let templateKey: string | null = null;
+    let templateKeyIsWoOverride = false; // BUG-055: track explicit user choice to prevent format-swap
 
     // Priority 1: WO-level override
     if (order.gammaTemplateKey) {
       templateKey = order.gammaTemplateKey;
+      templateKeyIsWoOverride = true;
       console.log(`[pocketflow] Using WO-level templateKey override: "${templateKey}"`);
     }
 
@@ -2054,8 +2074,10 @@ export async function pocketflowExecute(
     if (templateKey) {
       let registryEntry = await storage.getGammaTemplateByKey(templateKey);
 
-      // If the entry's outputFormat doesn't match the expected format, search for an alternative
-      if (registryEntry && registryEntry.status === "approved" && expectedFormat && registryEntry.outputFormat !== expectedFormat) {
+      // If the entry's outputFormat doesn't match the expected format, search for an alternative.
+      // BUG-055: NEVER swap when the templateKey was an explicit WO-level override — the user
+      // intentionally chose that template/format. Only swap for inherited (workflow/global) keys.
+      if (registryEntry && registryEntry.status === "approved" && expectedFormat && registryEntry.outputFormat !== expectedFormat && !templateKeyIsWoOverride) {
         console.log(`[pocketflow] Template "${templateKey}" is ${registryEntry.outputFormat} but WO needs ${expectedFormat} — searching for format-matched entry`);
         const allTemplates = options?.cachedGammaTemplates || await storage.getGammaTemplates();
         const formatMatch = allTemplates.find(t => t.status === "approved" && t.outputFormat === expectedFormat);
@@ -2063,6 +2085,8 @@ export async function pocketflowExecute(
           registryEntry = formatMatch;
           console.log(`[pocketflow] Found format-matched template "${formatMatch.templateKey}" (${expectedFormat})`);
         }
+      } else if (templateKeyIsWoOverride && registryEntry && expectedFormat && registryEntry.outputFormat !== expectedFormat) {
+        console.log(`[pocketflow] WO-level templateKey "${templateKey}" is ${registryEntry.outputFormat} (overrides keyword-detected "${expectedFormat}")`);
       }
 
       if (registryEntry && registryEntry.status === "approved") {

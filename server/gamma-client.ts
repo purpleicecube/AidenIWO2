@@ -211,14 +211,15 @@ export async function generateWithGamma(
     // 2. Poll for completion (BUG-041: pass heartbeat to keep watchdog alive)
     const pollResult = await pollGeneration(generationId, onHeartbeat);
 
-    // 3. Download the exported file
+    // 3. Download the exported file (use correct extension for the requested format)
     fs.mkdirSync(outputDir, { recursive: true });
-    const outputPath = path.join(outputDir, `gamma-${generationId}.pptx`);
+    const fileExt = options.exportAs === "pdf" ? "pdf" : "pptx";
+    const outputPath = path.join(outputDir, `gamma-${generationId}.${fileExt}`);
 
     if (pollResult.exportUrls && pollResult.exportUrls.length > 0) {
       // Download from the first available export URL
       const exportUrl = pollResult.exportUrls[0];
-      console.log(`[gamma] Downloading PPTX from export URL...`);
+      console.log(`[gamma] Downloading ${fileExt.toUpperCase()} from export URL...`);
       const fileSize = await downloadFile(exportUrl, outputPath);
 
       return {
