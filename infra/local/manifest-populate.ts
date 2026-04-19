@@ -75,9 +75,16 @@ async function main(): Promise<void> {
 
     // Report drift — any public.* table not registered.
     // This is informational; the regression test is authoritative.
+    // Partitions (per ADR-010 Phase 1.5) are excluded — they are
+    // implementation detail of their parent, which IS registered.
     const { rows } = await pool.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables
-       WHERE table_schema = 'public'`
+      `SELECT t.table_name
+       FROM information_schema.tables t
+       JOIN pg_class c
+         ON c.relname = t.table_name
+        AND c.relnamespace = 'public'::regnamespace
+       WHERE t.table_schema = 'public'
+         AND c.relispartition = false`
     );
     const known = new Set(KNOWN_TABLES.map((t) => t.name));
     const drift: string[] = [];

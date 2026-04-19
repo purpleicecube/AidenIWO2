@@ -11,9 +11,17 @@ describeIwo3("Loop 1 — migration ownership invariant (ADR-008)", () => {
     await pool.end();
   });
 
-  it("every public table (except alembic_version) has a manifest row", async () => {
+  it("every public table (except alembic_version and partitions) has a manifest row", async () => {
+    // Partitions of registered parents are excluded (ADR-010 Phase 1.5 —
+    // they are implementation detail of their parent, which IS registered).
     const { rows: tables } = await pool.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema='public'`
+      `SELECT t.table_name
+       FROM information_schema.tables t
+       JOIN pg_class c
+         ON c.relname = t.table_name
+        AND c.relnamespace = 'public'::regnamespace
+       WHERE t.table_schema = 'public'
+         AND c.relispartition = false`
     );
     const { rows: manifest } = await pool.query<{ table_name: string }>(
       `SELECT table_name FROM migration_source_manifest`
@@ -89,10 +97,15 @@ describeIwo3("Loop 1 — migration ownership invariant (ADR-008)", () => {
     expect(rows).toHaveLength(expected.length);
   });
 
-  it("no unregistered public table exists (CODEX ADR-008 revision)", async () => {
+  it("no unregistered public table exists (CODEX ADR-008 revision; partitions excluded per ADR-010)", async () => {
     const { rows: tables } = await pool.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables
-       WHERE table_schema = 'public'`
+      `SELECT t.table_name
+       FROM information_schema.tables t
+       JOIN pg_class c
+         ON c.relname = t.table_name
+        AND c.relnamespace = 'public'::regnamespace
+       WHERE t.table_schema = 'public'
+         AND c.relispartition = false`
     );
     const { rows: manifest } = await pool.query<{ table_name: string }>(
       `SELECT table_name FROM migration_source_manifest`
