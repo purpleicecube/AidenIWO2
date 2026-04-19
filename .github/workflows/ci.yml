@@ -76,8 +76,10 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          config-path: .gitleaks.toml
+          # gitleaks-action@v2 takes no `with:` inputs. Config is discovered
+          # automatically from `.gitleaks.toml` at the repo root; pass the
+          # path explicitly via env for clarity.
+          GITLEAKS_CONFIG: .gitleaks.toml
 
       - name: Baseline check
         run: bash infra/ci/baseline-check.sh
