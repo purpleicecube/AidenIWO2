@@ -1,0 +1,21 @@
+{
+  "note": "admin does NOT hold system:admin (owner-only per §Q2)",
+  "role": "admin",
+  "rolePermissions": [
+    "client:update",
+    "user:invite",
+    "membership:grant",
+    "membership:revoke",
+    "prompt_profile:publish",
+    "workflow_template:publish",
+    "adapter_credential:rotate",
+    "audit_log:read"
+  ],
+  "userGrants": [],
+  "permission": "system:admin",
+  "expected": {
+    "allowed": false,
+    "reason": "role_lacks_permission",
+    "role": "admin"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "note": "no active membership (intruder / cross-tenant) → empty set even with allow",
+  "role": null,
+  "rolePermissions": [],
+  "userGrants": [
+    { "permissionKey": "work_order:read", "grantType": "allow" }
+  ],
+  "permission": "work_order:read",
+  "expected": {
+    "allowed": false,
+    "reason": "no_membership",
+    "role": null
+  }
+}

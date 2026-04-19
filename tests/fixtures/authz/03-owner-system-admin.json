@@ -1,0 +1,23 @@
+{
+  "note": "owner holds system:admin by role default",
+  "role": "owner",
+  "rolePermissions": [
+    "system:admin",
+    "client:update",
+    "user:invite",
+    "user:revoke",
+    "membership:grant",
+    "membership:revoke",
+    "prompt_profile:publish",
+    "workflow_template:publish",
+    "adapter_credential:rotate",
+    "audit_log:read"
+  ],
+  "userGrants": [],
+  "permission": "system:admin",
+  "expected": {
+    "allowed": true,
+    "reason": "role_default",
+    "role": "owner"
+  }
+}

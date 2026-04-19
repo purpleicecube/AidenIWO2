@@ -1,0 +1,19 @@
+{
+  "note": "allow override grants operator audit_log:read on top of role default",
+  "role": "operator",
+  "rolePermissions": [
+    "work_order:create",
+    "work_order:read",
+    "work_order:submit",
+    "output_package:submit"
+  ],
+  "userGrants": [
+    { "permissionKey": "audit_log:read", "grantType": "allow" }
+  ],
+  "permission": "audit_log:read",
+  "expected": {
+    "allowed": true,
+    "reason": "allow_override",
+    "role": "operator"
+  }
+}

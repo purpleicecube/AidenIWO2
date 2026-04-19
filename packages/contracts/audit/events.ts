@@ -99,6 +99,12 @@ export const AUDIT_EVENTS = {
   ROLE_PERMISSION_REVOKED: "role_permission.revoked",
   PERMISSION_GRANT_CREATED: "permission_grant.created",
   PERMISSION_GRANT_REVOKED: "permission_grant.revoked",
+
+  // Loop 4 Phase 2 — authorization check outcomes. `authz.granted` is
+  // deliberately NOT emitted (see require_permission.ts comment): every
+  // allowed call is followed by a typed mutation audit row; doubling up
+  // would bloat the log without adding forensic value.
+  AUTHZ_DENIED: "authz.denied",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -171,4 +177,8 @@ export const LOOP_4_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.ROLE_PERMISSION_REVOKED,
   AUDIT_EVENTS.PERMISSION_GRANT_CREATED,
   AUDIT_EVENTS.PERMISSION_GRANT_REVOKED,
+];
+
+export const LOOP_4_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.AUTHZ_DENIED,
 ];

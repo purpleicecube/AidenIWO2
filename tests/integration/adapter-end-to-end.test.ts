@@ -306,6 +306,7 @@ describeIwo3("Loop 3 Phase 4 — adapter registry end-to-end", () => {
         adapterKey: "gamma",
         actionKey: "generate",
         outputPackage: pkg,
+        actorUserId: KLEAR_OPERATOR,
       });
       await client.query("COMMIT");
     } finally {
@@ -327,6 +328,92 @@ describeIwo3("Loop 3 Phase 4 — adapter registry end-to-end", () => {
     const events = audits.map((r) => r.action);
     expect(events).toContain(AUDIT_EVENTS.ADAPTER_DISPATCH_PACKAGE_INVALID);
     expect(events).not.toContain(AUDIT_EVENTS.ADAPTER_DISPATCH_SUBMITTED);
+  });
+
+  it("authz-denied path: viewer dispatch is rejected before policy / validate", async () => {
+    const KLEAR_VIEWER = "00000000-0000-4000-8000-000001000005";
+    const pkg = await insertOutputPackage(pool);
+
+    const client = await pool.connect();
+    let dispatch;
+    try {
+      await client.query("BEGIN");
+      dispatch = await dispatchToAdapter(client, {
+        clientId: KLEAR_CLIENT,
+        adapterKey: "gamma",
+        actionKey: "render_from_template",
+        outputPackage: pkg,
+        actorUserId: KLEAR_VIEWER,
+      });
+      await client.query("COMMIT");
+    } finally {
+      client.release();
+    }
+
+    expect(dispatch.status).toBe("permission_denied");
+    if (dispatch.status === "permission_denied") {
+      expect(dispatch.reason).toMatch(/output_package:submit/);
+      expect(dispatch.role).toBe("viewer");
+    }
+
+    // No handoff row on authz denial.
+    const { rows: handoffs } = await pool.query(
+      `SELECT id FROM output_handoffs WHERE output_package_id = $1`,
+      [pkg.id]
+    );
+    expect(handoffs).toHaveLength(0);
+
+    // Audit chain: authz.denied present; dispatch-specific events NOT.
+    const { rows: audits } = await pool.query<{ action: string }>(
+      `SELECT action FROM action_audit_log
+       WHERE client_id = $1
+         AND (target_id = $2 OR metadata->>'outputPackageId' = $2)
+       ORDER BY id`,
+      [KLEAR_CLIENT, pkg.id]
+    );
+    const events = audits.map((r) => r.action);
+    expect(events).toContain(AUDIT_EVENTS.AUTHZ_DENIED);
+    expect(events).not.toContain(AUDIT_EVENTS.ADAPTER_DISPATCH_INITIATED);
+    expect(events).not.toContain(AUDIT_EVENTS.ADAPTER_DISPATCH_SUBMITTED);
+  });
+
+  it("authz-denied path: missing actorUserId produces permission_denied without hitting policy", async () => {
+    const pkg = await insertOutputPackage(pool);
+
+    const client = await pool.connect();
+    let dispatch;
+    try {
+      await client.query("BEGIN");
+      dispatch = await dispatchToAdapter(client, {
+        clientId: KLEAR_CLIENT,
+        adapterKey: "gamma",
+        actionKey: "render_from_template",
+        outputPackage: pkg,
+        // actorUserId deliberately omitted
+      });
+      await client.query("COMMIT");
+    } finally {
+      client.release();
+    }
+
+    expect(dispatch.status).toBe("permission_denied");
+    if (dispatch.status === "permission_denied") {
+      expect(dispatch.role).toBeNull();
+      expect(dispatch.reason).toMatch(/actor/);
+    }
+
+    const { rows: audits } = await pool.query<{
+      action: string;
+      metadata: { decision_reason?: string };
+    }>(
+      `SELECT action, metadata FROM action_audit_log
+       WHERE client_id = $1
+         AND target_id = $2
+       ORDER BY id`,
+      [KLEAR_CLIENT, pkg.id]
+    );
+    const reasons = audits.map((r) => r.metadata?.decision_reason);
+    expect(reasons).toContain("no_actor");
   });
 
   it("full demonstrator: DigiFLOW intake → route → WO-sourced package → dispatch → handoff", async () => {

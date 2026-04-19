@@ -1,0 +1,17 @@
+{
+  "note": "vocabulary guard — permission not in knownPermissions fails closed",
+  "role": "operator",
+  "rolePermissions": ["work_order:create", "work_order:read"],
+  "userGrants": [],
+  "permission": "bogus:permission",
+  "knownPermissions": [
+    "work_order:create",
+    "work_order:read",
+    "output_package:submit"
+  ],
+  "expected": {
+    "allowed": false,
+    "reason": "unknown_permission",
+    "role": "operator"
+  }
+}

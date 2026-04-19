@@ -23,6 +23,7 @@ import type { PoolClient } from "pg";
 import { AUDIT_EVENTS } from "../audit/events";
 import { writeAuditRow } from "../audit/writer";
 import { resolveAdapterPolicy } from "./policy_resolver";
+import { PermissionDenied, requirePermission } from "../authz/require_permission";
 import type { AdapterContract } from "./types";
 import { gammaTestDouble } from "../../adapters/gamma/adapter";
 import type { OutputPackage } from "../../../db/schema/output_packages";
@@ -72,6 +73,7 @@ export type DispatchResult =
       externalReference: string;
       resultPayloadRef: string | null;
     }
+  | { status: "permission_denied"; reason: string; role: string | null }
   | { status: "rejected_policy"; reason: string }
   | { status: "approval_required"; reason: string }
   | { status: "package_invalid"; errors: readonly string[] }
@@ -201,6 +203,56 @@ export async function dispatchToAdapter(
   client: PoolClient,
   input: DispatchInput
 ): Promise<DispatchResult> {
+  // Step 0 (Loop 4 Phase 2): authorization gate — every dispatch requires
+  // an actor and the `output_package:submit` permission on the tenant.
+  // Denials write an `authz.denied` audit row and return without touching
+  // adapter_catalog / policy / handoff. This is additive to the existing
+  // adapter_action_policy layer (Loop 3 Phase 2) — §Q4 `keep_both`.
+  if (!input.actorUserId) {
+    await writeAuditRow(client, {
+      clientId: input.clientId,
+      actorUserId: null,
+      event: AUDIT_EVENTS.AUTHZ_DENIED,
+      targetType: "adapter_dispatch",
+      targetId: input.outputPackage.id,
+      metadata: {
+        adapterKey: input.adapterKey,
+        actionKey: input.actionKey,
+        permission: "output_package:submit",
+        decision_reason: "no_actor",
+        role: null,
+      },
+    });
+    return {
+      status: "permission_denied",
+      reason: "dispatch requires an actor user id",
+      role: null,
+    };
+  }
+
+  try {
+    await requirePermission(client, {
+      userId: input.actorUserId,
+      clientId: input.clientId,
+      permission: "output_package:submit",
+      targetType: "adapter_dispatch",
+      targetId: input.outputPackage.id,
+      metadata: {
+        adapterKey: input.adapterKey,
+        actionKey: input.actionKey,
+      },
+    });
+  } catch (err) {
+    if (err instanceof PermissionDenied) {
+      return {
+        status: "permission_denied",
+        reason: err.message,
+        role: err.role,
+      };
+    }
+    throw err;
+  }
+
   // Resolve the adapter catalog id up-front so we can set adapter_catalog_id
   // on output_handoffs. A missing catalog row aborts the dispatch.
   const adapterCatalogId = await resolveAdapterCatalogId(

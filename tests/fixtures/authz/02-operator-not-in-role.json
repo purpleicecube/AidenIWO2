@@ -1,0 +1,18 @@
+{
+  "note": "operator + output_handoff:approve_send → denied; reviewer/admin-gated",
+  "role": "operator",
+  "rolePermissions": [
+    "work_order:create",
+    "work_order:submit",
+    "output_package:submit",
+    "output_handoff:read",
+    "prompt_override:apply_style"
+  ],
+  "userGrants": [],
+  "permission": "output_handoff:approve_send",
+  "expected": {
+    "allowed": false,
+    "reason": "role_lacks_permission",
+    "role": "operator"
+  }
+}

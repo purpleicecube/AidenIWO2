@@ -1,0 +1,20 @@
+{
+  "note": "deny override strips user:invite from an admin that normally holds it",
+  "role": "admin",
+  "rolePermissions": [
+    "user:invite",
+    "user:read",
+    "user:update",
+    "membership:grant",
+    "membership:revoke"
+  ],
+  "userGrants": [
+    { "permissionKey": "user:invite", "grantType": "deny" }
+  ],
+  "permission": "user:invite",
+  "expected": {
+    "allowed": false,
+    "reason": "deny_override",
+    "role": "admin"
+  }
+}

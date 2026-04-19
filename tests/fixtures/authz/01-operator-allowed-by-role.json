@@ -1,0 +1,18 @@
+{
+  "note": "operator + work_order:create → allowed via role_default",
+  "role": "operator",
+  "rolePermissions": [
+    "work_order:create",
+    "work_order:read",
+    "work_order:update",
+    "output_package:submit",
+    "prompt_override:apply_style"
+  ],
+  "userGrants": [],
+  "permission": "work_order:create",
+  "expected": {
+    "allowed": true,
+    "reason": "role_default",
+    "role": "operator"
+  }
+}
