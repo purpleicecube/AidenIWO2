@@ -1,0 +1,16 @@
+[project]
+name = "iwo3-console-streamlit"
+version = "0.0.1"
+description = "AIDEN IWO3 operator console (Streamlit). Loop 1 placeholder; pages ship in Loop 8."
+requires-python = ">=3.11"
+dependencies = [
+  "streamlit>=1.40.0",
+  "httpx>=0.28.0",
+  "pydantic>=2.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "ruff>=0.8.0",
+]

@@ -12,3 +12,22 @@ backups/
 .local/gamma_candidates/
 .local/iowa-site/
 .local/workspace/
+
+# IWO3 Python toolchain
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IWO3 local artifacts
+infra/local/last-seed.json
+**/.env
+**/.env.local
+
+# IWO3 coverage
+.coverage
+coverage/
+htmlcov/

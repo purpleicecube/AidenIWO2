@@ -1,0 +1,24 @@
+{
+  "$meta": {
+    "source": "IWO2 @ 1535c2f — client/src/components/status-badge.tsx",
+    "extractedAt": "2026-04-19",
+    "purpose": "Frozen IWO2 status-badge semantics for IWO3 Streamlit console continuity (Loop 8). These MUST be preserved verbatim unless an explicit ADR authorizes change."
+  },
+  "statuses": {
+    "pending":            { "icon": "Clock",          "bgLight": "muted",          "textLight": "muted-foreground", "bgDark": "muted",           "textDark": "muted-foreground" },
+    "processing":         { "icon": "Loader2(spin)",  "bgLight": "primary/10",     "textLight": "primary",          "bgDark": "primary/20",      "textDark": "primary" },
+    "completed":          { "icon": "CheckCircle",    "bgLight": "emerald-100",    "textLight": "emerald-700",      "bgDark": "emerald-900/30",  "textDark": "emerald-400" },
+    "blocked":            { "icon": "AlertTriangle",  "bgLight": "amber-100",      "textLight": "amber-700",        "bgDark": "amber-900/30",    "textDark": "amber-400" },
+    "failed":             { "icon": "XCircle",        "bgLight": "red-100",        "textLight": "red-700",          "bgDark": "red-900/30",      "textDark": "red-400" },
+    "awaiting_operator":  { "icon": "UserCheck",      "bgLight": "violet-100",     "textLight": "violet-700",       "bgDark": "violet-900/30",   "textDark": "violet-400" },
+    "reopened":           { "icon": "RotateCcw",      "bgLight": "purple-100",     "textLight": "purple-700",       "bgDark": "purple-900/30",   "textDark": "purple-400" },
+    "deferred":           { "icon": "CalendarClock",  "bgLight": "sky-100",        "textLight": "sky-700",          "bgDark": "sky-900/30",      "textDark": "sky-400" },
+    "killed":             { "icon": "Skull",          "bgLight": "red-200",        "textLight": "red-900",          "bgDark": "red-900/50",      "textDark": "red-300" }
+  },
+  "priorities": {
+    "low":      { "bgLight": "muted",       "textLight": "muted-foreground" },
+    "medium":   { "bgLight": "blue-100",    "textLight": "blue-700",    "bgDark": "blue-900/30",   "textDark": "blue-400" },
+    "high":     { "bgLight": "orange-100",  "textLight": "orange-700",  "bgDark": "orange-900/30", "textDark": "orange-400" },
+    "critical": { "bgLight": "red-100",     "textLight": "red-700",     "bgDark": "red-900/30",    "textDark": "red-400" }
+  }
+}

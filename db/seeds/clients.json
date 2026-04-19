@@ -1,0 +1,16 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-00000000c001",
+    "designation": "IWO | Klear.ai",
+    "displayName": "Klear.ai",
+    "deploymentMode": "dedicated_single_client",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000c002",
+    "designation": "IWO | FreedomForge.AI",
+    "displayName": "FreedomForge.AI",
+    "deploymentMode": "shared_multi_tenant",
+    "status": "active"
+  }
+]

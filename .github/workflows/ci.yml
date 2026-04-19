@@ -1,0 +1,80 @@
+name: iwo3-ci
+
+on:
+  push:
+    branches: [ "iwo3/**" ]
+  pull_request:
+    branches: [ "iwo3/**" ]
+
+jobs:
+  baseline:
+    name: Loop-1 baseline check
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: aiden_iwo3
+          POSTGRES_USER: iwo3
+          POSTGRES_PASSWORD: iwo3
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U iwo3 -d aiden_iwo3"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      IWO3_DATABASE_URL: postgresql://iwo3:iwo3@localhost:5434/aiden_iwo3
+      IWO3_PG_USER: iwo3
+      IWO3_PG_PASSWORD: iwo3
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks needs history
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Install Python deps (api-fastapi)
+        working-directory: apps/api-fastapi
+        run: uv sync
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5434 -U iwo3 -d aiden_iwo3; then
+              echo "postgres ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "postgres not ready"; exit 1
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: .gitleaks.toml
+
+      - name: Baseline check
+        run: bash infra/ci/baseline-check.sh

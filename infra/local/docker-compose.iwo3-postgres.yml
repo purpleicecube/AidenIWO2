@@ -1,0 +1,24 @@
+name: aiden-iwo3
+
+services:
+  aiden-iwo3-postgres:
+    image: postgres:16
+    container_name: aiden-iwo3-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aiden_iwo3
+      POSTGRES_USER: ${IWO3_PG_USER:-iwo3}
+      POSTGRES_PASSWORD: ${IWO3_PG_PASSWORD:-iwo3}
+    ports:
+      - "5434:5432"
+    volumes:
+      - aiden-iwo3-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IWO3_PG_USER:-iwo3} -d aiden_iwo3"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  aiden-iwo3-pgdata:
+    name: aiden-iwo3-pgdata

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000010000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "profileKey": "klear_pptx_primary",
+    "outputKind": "pptx",
+    "engine": "gamma",
+    "externalRef": "g_onfwfqpb52zcws3",
+    "fidelityRequired": true,
+    "fallbackPolicy": "none",
+    "contentContract": { "label": "Klear.ai primary PPTX template" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000010000002",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "profileKey": "klear_pdf_rmis",
+    "outputKind": "pdf",
+    "engine": "gamma",
+    "externalRef": "g_szfb73vjsyir322",
+    "fidelityRequired": true,
+    "fallbackPolicy": "none",
+    "contentContract": { "label": "RMIS PDF template (ROI / Risk v06)" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000010000003",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "profileKey": "klear_pdf_claims",
+    "outputKind": "pdf",
+    "engine": "gamma",
+    "externalRef": "g_122ahx4j0eer8lz",
+    "fidelityRequired": true,
+    "fallbackPolicy": "none",
+    "contentContract": { "label": "Claims PDF template (w/ overview 26.03.12)" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000020000001",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "profileKey": "ffai_pptx_gamma_basic",
+    "outputKind": "pptx",
+    "engine": "gamma_basic",
+    "externalRef": null,
+    "fidelityRequired": false,
+    "fallbackPolicy": "allowed_with_approval",
+    "contentContract": { "label": "FreedomForge.AI generic PPTX stub" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000020000002",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "profileKey": "ffai_pdf_gamma_basic",
+    "outputKind": "pdf",
+    "engine": "gamma_basic",
+    "externalRef": null,
+    "fidelityRequired": false,
+    "fallbackPolicy": "allowed_with_approval",
+    "contentContract": { "label": "FreedomForge.AI generic PDF stub" },
+    "status": "active"
+  }
+]

@@ -1,0 +1,54 @@
+{
+  "$meta": {
+    "source": "IWO2 @ 1535c2f — client/src/index.css + client/tailwind.config.ts",
+    "extractedAt": "2026-04-19",
+    "purpose": "Frozen IWO2 design tokens for IWO3 Streamlit console continuity (Loop 8)."
+  },
+  "fonts": {
+    "sans": "Inter, sans-serif",
+    "serif": "Merriweather, Georgia, serif",
+    "mono": "JetBrains Mono, Fira Code, monospace"
+  },
+  "colorsHSL": {
+    "light": {
+      "primary": "210 92% 45%",
+      "primary-foreground": "210 92% 98%",
+      "secondary": "0 0% 89%",
+      "accent": "210 15% 94%",
+      "background": "0 0% 100%",
+      "foreground": "0 0% 9%",
+      "card": "0 0% 98%",
+      "border": "0 0% 91%",
+      "muted": "0 0% 93%",
+      "destructive": "0 84% 42%",
+      "sidebar": "0 0% 96%",
+      "sidebar-primary": "210 92% 45%"
+    },
+    "dark": {
+      "primary": "210 92% 55%",
+      "background": "0 0% 7%",
+      "foreground": "0 0% 98%",
+      "card": "0 0% 10%",
+      "note": "Other dark tokens derive from light tokens with shifted lightness; extract in full when Loop 8 renders the Streamlit theme."
+    }
+  },
+  "presenceStatusColors": {
+    "online": "rgb(34 197 94)",
+    "away": "rgb(245 158 11)",
+    "busy": "rgb(239 68 68)",
+    "offline": "rgb(156 163 175)"
+  },
+  "radius": {
+    "lg": "9px",
+    "md": "6px",
+    "sm": "3px"
+  },
+  "spacingBaseRem": 0.25,
+  "breakpointsPx": {
+    "sm": 640,
+    "md": 768,
+    "lg": 1024,
+    "xl": 1280
+  },
+  "iconFamily": "lucide-react@0.453.0"
+}

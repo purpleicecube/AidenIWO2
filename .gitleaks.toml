@@ -1,0 +1,33 @@
+# gitleaks config for IWO3
+# Invoked via:  gitleaks detect --no-banner --exit-code 1 --config .gitleaks.toml
+#
+# Policy (per IWO3_LOOP_1_PLAN §4.11, CODEX revision #5):
+#   - Any credential-shaped field in fixtures/seeds must hold `credential_ref:`
+#     or null. Anything else fails the scan.
+#   - No .env files committed.
+#   - No credential screenshots/docs (images/PDFs) of secrets.
+
+title = "IWO3 gitleaks config"
+
+[extend]
+useDefault = true
+
+# Custom rule: credential-shaped fields in JSON/YAML must be placeholder or null.
+[[rules]]
+id = "iwo3-fixture-credential-placeholder"
+description = "Fixture/seed field with a credential-shaped name must hold credential_ref: or null"
+regex = '''(?i)"(credential|token|api[_-]?key|secret|password|bearer|access[_-]?key|private[_-]?key|auth)"\s*:\s*"(?!credential_ref:)(?!null")[^"]+"'''
+path = '''(^|/)(db/(fixtures|seeds)/|tests/fixtures/).+\.(json|ya?ml)$'''
+tags = ["iwo3", "fixtures"]
+
+[allowlist]
+description = "Allow Gamma template IDs — they are not secrets"
+regexes = [
+  '''g_[a-z0-9]{15,}''',
+]
+
+paths = [
+  # Documentation may legitimately reference secret-shaped example text
+  '''^docs/''',
+  '''^WS024_IWO3\[Branch\]/''',
+]

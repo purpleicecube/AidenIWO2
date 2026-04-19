@@ -11,7 +11,13 @@
     "db:push": "drizzle-kit push",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "db:push:iwo3": "drizzle-kit push --config drizzle.config.iwo3.ts",
+    "db:generate:iwo3": "drizzle-kit generate --config drizzle.config.iwo3.ts",
+    "seed:iwo3": "bash infra/local/seed-iwo3.sh"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.77.0",
