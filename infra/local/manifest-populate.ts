@@ -30,13 +30,24 @@ interface ManifestEntry {
 }
 
 const LOOP_1_VERSION = "iwo3@v0.1.0-loop1";
+const LOOP_2_VERSION = "iwo3@v0.2.0-loop2";
 
 const KNOWN_TABLES: ManifestEntry[] = [
+  // Loop 1 — foundation
   { name: "clients",                    source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — tenant anchor" },
   { name: "users",                      source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — identity anchor" },
   { name: "client_memberships",         source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — tenant/role link" },
   { name: "template_profiles",          source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — render template anchor" },
   { name: "migration_source_manifest",  source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — manifest itself" },
+
+  // Loop 2 — multi-client data + prompt + repository foundation
+  { name: "prompt_profiles",            source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — per-client prompt profile" },
+  { name: "prompt_profile_versions",    source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — versioned prompt constraints" },
+  { name: "prompt_rendered_snapshots",  source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — execution-time rendered prompt provenance" },
+  { name: "repository_bindings",        source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — client-scoped read connectors" },
+  { name: "data_source_bindings",       source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — client-scoped structured data sources" },
+  { name: "artifacts",                  source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — tenant-scoped artifact storage (see ADR-009)" },
+  { name: "action_audit_log",           source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — privileged-action audit log (see ADR-010)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

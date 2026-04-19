@@ -1,0 +1,24 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000041000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "bindingKey": "klear_warehouse_primary",
+    "connectorType": "postgres",
+    "scope": { "schemas": ["klear_analytics"] },
+    "credentialRef": "credential_ref:dev-local-klear-warehouse-01",
+    "allowedLocations": { "allow_write": false },
+    "freshnessPolicy": { "max_age_hours": 1 },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000041000002",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "bindingKey": "ffai_rest_bench_api",
+    "connectorType": "rest_api",
+    "scope": { "base_url": "https://api.freedomforge.ai/v1/bench" },
+    "credentialRef": "credential_ref:dev-local-ffai-rest-01",
+    "allowedLocations": { "endpoints": ["/benchmarks", "/runs"] },
+    "freshnessPolicy": { "max_age_hours": 1 },
+    "status": "active"
+  }
+]

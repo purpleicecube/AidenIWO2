@@ -1,0 +1,50 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000050000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "sourceType": "upload",
+    "contentClass": "c1",
+    "mimeType": "text/markdown",
+    "filename": "klear_onepager.md",
+    "storageRef": "clients/klear/artifacts/klear_onepager.md",
+    "extractedText": "Klear.ai — one-page overview. Risk-aware analytics for mid-market SaaS.",
+    "metadata": { "tags": ["onepager", "v1"], "source_binding": "klear_local_fixtures" },
+    "createdByUserId": "00000000-0000-4000-8000-000001000003"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000050000002",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "sourceType": "generated",
+    "contentClass": "c2",
+    "mimeType": "text/plain",
+    "filename": "klear_rmis_summary.txt",
+    "storageRef": "clients/klear/artifacts/klear_rmis_summary.txt",
+    "extractedText": "RMIS ROI summary (fixture).",
+    "metadata": { "generated_by": "fixture_seed" },
+    "createdByUserId": "00000000-0000-4000-8000-000001000006"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000050000003",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "sourceType": "upload",
+    "contentClass": "c1",
+    "mimeType": "text/markdown",
+    "filename": "ffai_mission.md",
+    "storageRef": "clients/ffai/artifacts/ffai_mission.md",
+    "extractedText": "FreedomForge.AI — mission brief. Forge builder-owned AI benchmarks.",
+    "metadata": { "tags": ["mission"], "source_binding": "ffai_local_fixtures" },
+    "createdByUserId": "00000000-0000-4000-8000-000002000003"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000050000004",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "sourceType": "imported",
+    "contentClass": "c2",
+    "mimeType": "application/json",
+    "filename": "ffai_bench_run_2026_04.json",
+    "storageRef": "clients/ffai/artifacts/ffai_bench_run_2026_04.json",
+    "extractedText": null,
+    "metadata": { "source_binding": "ffai_rest_bench_api", "run_id": "bench-2026-04-001" },
+    "createdByUserId": "00000000-0000-4000-8000-000002000006"
+  }
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000030000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "profileKey": "klear_brand_v1",
+    "displayName": "Klear.ai brand voice",
+    "scope": "client",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000030000002",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "profileKey": "ffai_brand_v1",
+    "displayName": "FreedomForge.AI brand voice",
+    "scope": "client",
+    "status": "active"
+  }
+]

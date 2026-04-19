@@ -1,0 +1,58 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000031000001",
+    "profileId": "00000000-0000-4000-8000-000030000001",
+    "version": "1",
+    "basePrompt": "You speak as Klear.ai. Tone: confident, technical, risk-aware. Avoid marketing fluff.",
+    "constraints": {
+      "forbidden_words": ["synergy", "leverage (as verb)"],
+      "approved_ctas": ["Book a demo", "Read the case study"],
+      "max_paragraph_length": 4
+    },
+    "authoredByUserId": "00000000-0000-4000-8000-000001000002",
+    "status": "published",
+    "publishedAt": "2026-04-19T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000031000002",
+    "profileId": "00000000-0000-4000-8000-000030000001",
+    "version": "2",
+    "basePrompt": "You speak as Klear.ai. Tone: confident, technical, risk-aware. Avoid marketing fluff. v2 adds: highlight RMIS integration where relevant.",
+    "constraints": {
+      "forbidden_words": ["synergy", "leverage (as verb)"],
+      "approved_ctas": ["Book a demo", "Read the case study", "Try RMIS"],
+      "max_paragraph_length": 4
+    },
+    "authoredByUserId": "00000000-0000-4000-8000-000001000002",
+    "status": "draft",
+    "publishedAt": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000031000003",
+    "profileId": "00000000-0000-4000-8000-000030000002",
+    "version": "1",
+    "basePrompt": "You speak as FreedomForge.AI. Tone: direct, founder-energy, concrete. Cite numbers.",
+    "constraints": {
+      "forbidden_words": ["revolutionary", "cutting-edge"],
+      "approved_ctas": ["Forge your stack", "See the benchmark"],
+      "max_paragraph_length": 3
+    },
+    "authoredByUserId": "00000000-0000-4000-8000-000002000002",
+    "status": "published",
+    "publishedAt": "2026-04-19T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000031000004",
+    "profileId": "00000000-0000-4000-8000-000030000002",
+    "version": "2",
+    "basePrompt": "You speak as FreedomForge.AI. Tone: direct, founder-energy, concrete. Cite numbers. v2 adds: pair every benefit with its trade-off.",
+    "constraints": {
+      "forbidden_words": ["revolutionary", "cutting-edge"],
+      "approved_ctas": ["Forge your stack", "See the benchmark"],
+      "max_paragraph_length": 3
+    },
+    "authoredByUserId": "00000000-0000-4000-8000-000002000002",
+    "status": "draft",
+    "publishedAt": null
+  }
+]

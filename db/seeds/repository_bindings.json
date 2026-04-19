@@ -1,0 +1,46 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000040000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "bindingKey": "klear_drive_primary",
+    "connectorType": "google_drive",
+    "scope": { "shared_drives": ["Klear.ai — Marketing"], "roots": ["/Klear.ai"] },
+    "credentialRef": "credential_ref:dev-local-klear-drive-01",
+    "allowedLocations": { "folder_ids": ["dev-local-klear-marketing"] },
+    "freshnessPolicy": { "max_age_hours": 24 },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000040000002",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "bindingKey": "klear_local_fixtures",
+    "connectorType": "local",
+    "scope": { "paths": ["./db/fixtures/assets"] },
+    "credentialRef": null,
+    "allowedLocations": { "paths": ["./db/fixtures/assets"] },
+    "freshnessPolicy": { "max_age_hours": 720 },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000040000003",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "bindingKey": "ffai_github_specs",
+    "connectorType": "github",
+    "scope": { "org": "FreedomForge-AI", "repos": ["product-specs"] },
+    "credentialRef": "credential_ref:dev-local-ffai-github-01",
+    "allowedLocations": { "branches": ["main"] },
+    "freshnessPolicy": { "max_age_hours": 6 },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000040000004",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "bindingKey": "ffai_local_fixtures",
+    "connectorType": "local",
+    "scope": { "paths": ["./db/fixtures/assets"] },
+    "credentialRef": null,
+    "allowedLocations": { "paths": ["./db/fixtures/assets"] },
+    "freshnessPolicy": { "max_age_hours": 720 },
+    "status": "active"
+  }
+]
