@@ -1,0 +1,18 @@
+{
+  "id": "intake-2026-04-003",
+  "schema_version": "v0",
+  "source_system": "digiflow",
+  "client_designation": "IWO | FreedomForge.AI",
+  "requester": { "kind": "user", "email": "admin_ffai@dev.local" },
+  "intake_type": "campaign",
+  "requested_execution_mode": "auto",
+  "title": "Weekly benchmark digest",
+  "objective": "Produce the weekly benchmark digest for the FreedomForge.AI community.",
+  "campaign_or_project_goal": "Drive consistent weekly awareness of benchmark results.",
+  "audience": "FreedomForge.AI community subscribers",
+  "desired_outputs": [
+    { "output_kind": "email_campaign", "destination_adapter_key": "email_campaign" }
+  ],
+  "recurrence": { "kind": "weekly" },
+  "priority": "medium"
+}

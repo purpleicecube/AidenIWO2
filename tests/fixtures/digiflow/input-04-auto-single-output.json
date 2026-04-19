@@ -1,0 +1,15 @@
+{
+  "id": "intake-2026-04-004",
+  "schema_version": "v0",
+  "source_system": "digiflow",
+  "client_designation": "IWO | Klear.ai",
+  "requester": { "kind": "user", "email": "operator_klear@dev.local" },
+  "intake_type": "content",
+  "requested_execution_mode": "auto",
+  "title": "Claims PDF — Q2 risk overview",
+  "objective": "Compose the Q2 claims PDF using the Klear claims template.",
+  "desired_outputs": [
+    { "output_kind": "gamma_pdf", "template_profile_key": "klear_pdf_claims" }
+  ],
+  "priority": "medium"
+}

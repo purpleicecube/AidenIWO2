@@ -1,0 +1,19 @@
+{
+  "id": "intake-2026-04-005",
+  "schema_version": "v0",
+  "source_system": "digiflow",
+  "client_designation": "IWO | Klear.ai",
+  "requester": { "kind": "user", "email": "admin_klear@dev.local" },
+  "intake_type": "campaign_burst",
+  "requested_execution_mode": "auto",
+  "title": "March RMIS campaign burst",
+  "objective": "Ship RMIS March highlights across three channels in one campaign run.",
+  "campaign_or_project_goal": "One-time March campaign push.",
+  "desired_outputs": [
+    { "output_kind": "gamma_pptx", "template_profile_key": "klear_pptx_primary" },
+    { "output_kind": "drive_upload" },
+    { "output_kind": "email_campaign" }
+  ],
+  "destination_preferences": ["gamma", "google_drive", "email_campaign"],
+  "priority": "high"
+}

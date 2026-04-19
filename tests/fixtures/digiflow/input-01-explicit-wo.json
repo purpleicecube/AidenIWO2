@@ -1,0 +1,18 @@
+{
+  "id": "intake-2026-04-001",
+  "schema_version": "v0",
+  "source_system": "digiflow",
+  "source_ref": "digiflow-api-2026-04-001",
+  "client_designation": "IWO | Klear.ai",
+  "requester": {
+    "kind": "user",
+    "email": "operator_klear@dev.local",
+    "display_name": "Klear Operator (Dev)"
+  },
+  "intake_type": "content",
+  "requested_execution_mode": "wo",
+  "title": "One-pager: April RMIS highlight",
+  "objective": "Create a one-pager summarizing the April RMIS highlight for the Klear.ai sales team.",
+  "desired_outputs": [{ "output_kind": "gamma_pptx", "template_profile_key": "klear_pptx_primary" }],
+  "priority": "medium"
+}

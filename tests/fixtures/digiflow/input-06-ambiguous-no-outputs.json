@@ -1,0 +1,15 @@
+{
+  "id": "intake-2026-04-006",
+  "schema_version": "v0",
+  "source_system": "digiflow",
+  "client_designation": "IWO | Klear.ai",
+  "requester": { "kind": "user", "email": "operator_klear@dev.local" },
+  "intake_type": "vague",
+  "requested_execution_mode": "auto",
+  "title": "Something about April",
+  "objective": "Something — details TBD.",
+  "desired_outputs": [
+    { "output_kind": "placeholder_pending_review" }
+  ],
+  "priority": "low"
+}

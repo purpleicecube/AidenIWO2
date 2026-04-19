@@ -1,0 +1,13 @@
+{
+  "id": "intake-2026-04-002",
+  "schema_version": "v0",
+  "source_system": "digiflow",
+  "client_designation": "IWO | Klear.ai",
+  "requester": { "kind": "user", "email": "admin_klear@dev.local" },
+  "intake_type": "workflow_registration",
+  "requested_execution_mode": "wf",
+  "title": "Weekly marketing brief — register as workflow",
+  "objective": "Register the weekly marketing brief as a repeatable workflow template.",
+  "desired_outputs": [{ "output_kind": "gamma_pptx", "template_profile_key": "klear_pptx_primary" }],
+  "priority": "high"
+}
