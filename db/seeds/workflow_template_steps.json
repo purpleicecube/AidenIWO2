@@ -1,0 +1,74 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000072000001",
+    "templateId": "00000000-0000-4000-8000-000071000001",
+    "stepKey": "research_landscape",
+    "stepOrder": 1,
+    "displayName": "Research RMIS market landscape",
+    "assignedSubAgentKey": "mark",
+    "promptRef": { "kind": "client_profile", "profileKey": "klear_brand_v1", "version": "1" },
+    "retryPolicy": { "maxRetries": 2 },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000002",
+    "templateId": "00000000-0000-4000-8000-000071000001",
+    "stepKey": "assemble_brief",
+    "stepOrder": 2,
+    "displayName": "Assemble six-section brief",
+    "assignedSubAgentKey": "mark",
+    "promptRef": { "kind": "inline", "text": "Compose the weekly brief using the Klear six-section structure." },
+    "retryPolicy": { "maxRetries": 2 },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000003",
+    "templateId": "00000000-0000-4000-8000-000071000001",
+    "stepKey": "pm_review",
+    "stepOrder": 3,
+    "displayName": "PM Alpha quality review",
+    "assignedSubAgentKey": "pm_alpha",
+    "promptRef": { "kind": "inline", "text": "Review the brief for tone, structure, and forbidden words." },
+    "retryPolicy": { "maxRetries": 1 },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000004",
+    "templateId": "00000000-0000-4000-8000-000071000002",
+    "stepKey": "gather_bench_data",
+    "stepOrder": 1,
+    "displayName": "Gather latest benchmark data",
+    "assignedSubAgentKey": "agent_system",
+    "promptRef": { "kind": "inline", "text": "Pull last month's benchmark run summaries from the FFAI rest binding." },
+    "retryPolicy": { "maxRetries": 3 },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000005",
+    "templateId": "00000000-0000-4000-8000-000071000002",
+    "stepKey": "synthesize_findings",
+    "stepOrder": 2,
+    "displayName": "Synthesize four-section findings",
+    "assignedSubAgentKey": "mark",
+    "promptRef": { "kind": "client_profile", "profileKey": "ffai_brand_v1", "version": "1" },
+    "retryPolicy": { "maxRetries": 2 },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000006",
+    "templateId": "00000000-0000-4000-8000-000071000002",
+    "stepKey": "pm_review",
+    "stepOrder": 3,
+    "displayName": "PM Alpha quality review",
+    "assignedSubAgentKey": "pm_alpha",
+    "promptRef": { "kind": "inline", "text": "Review the report for clarity and benchmark-trade-off pairing." },
+    "retryPolicy": { "maxRetries": 1 },
+    "timeoutMs": 60000,
+    "toolIds": []
+  }
+]

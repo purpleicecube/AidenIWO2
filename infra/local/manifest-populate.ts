@@ -31,6 +31,7 @@ interface ManifestEntry {
 
 const LOOP_1_VERSION = "iwo3@v0.1.0-loop1";
 const LOOP_2_VERSION = "iwo3@v0.2.0-loop2";
+const LOOP_3_VERSION = "iwo3@v0.3.0-loop3";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -47,7 +48,16 @@ const KNOWN_TABLES: ManifestEntry[] = [
   { name: "repository_bindings",        source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — client-scoped read connectors" },
   { name: "data_source_bindings",       source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — client-scoped structured data sources" },
   { name: "artifacts",                  source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — tenant-scoped artifact storage (see ADR-009)" },
-  { name: "action_audit_log",           source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — privileged-action audit log (see ADR-010)" },
+  { name: "action_audit_log",           source: "iwo3_native", sourceVersion: LOOP_2_VERSION, ownedBy: "drizzle", notes: "Loop 2 — privileged-action audit log (partitioned per ADR-010 Phase 1.5)" },
+
+  // Loop 3 Phase 1 — WO / WF / execution cycles
+  { name: "work_orders",                source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — one-time execution (ADR-011)" },
+  { name: "workflows",                  source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — repeatable pipeline container (ADR-011)" },
+  { name: "workflow_templates",         source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — versioned template recipe (ADR-011)" },
+  { name: "workflow_template_steps",    source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — ordered steps within a template version (ADR-011)" },
+  { name: "workflow_executions",        source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — running instance of a template version (ADR-011)" },
+  { name: "workflow_step_runs",         source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — per-step run within an execution (ADR-011)" },
+  { name: "execution_cycles",           source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — retry/reopen attempt lineage (ADR-011)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

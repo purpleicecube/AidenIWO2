@@ -1,0 +1,28 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000071000001",
+    "workflowId": "00000000-0000-4000-8000-000070000001",
+    "version": "1",
+    "description": "Klear.ai weekly marketing brief — v1 template (3 steps).",
+    "config": {
+      "category": "content_brief",
+      "preferredPmKey": "pm_alpha",
+      "defaultRenderRoute": "gamma_basic"
+    },
+    "status": "published",
+    "publishedAt": "2026-04-19T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000002",
+    "workflowId": "00000000-0000-4000-8000-000070000002",
+    "version": "1",
+    "description": "FreedomForge.AI benchmark report v1 — 3-step template.",
+    "config": {
+      "category": "content_brief",
+      "preferredPmKey": "pm_alpha",
+      "defaultRenderRoute": "gamma_basic"
+    },
+    "status": "published",
+    "publishedAt": "2026-04-19T00:00:00.000Z"
+  }
+]

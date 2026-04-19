@@ -127,6 +127,57 @@ interface SeedArtifact {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Loop 3 Phase 1 — WO / WF / execution_cycles shapes
+// ──────────────────────────────────────────────────────────────────────────
+
+interface SeedWorkOrder {
+  id: string;
+  clientId: string;
+  title: string;
+  description: string | null;
+  type: string;
+  priority: string;
+  status: string;
+  submittedByUserId: string | null;
+  correlationId: string | null;
+  gccMemory: unknown;
+  deferredUntil: string | null;
+  deferredReason: string | null;
+}
+
+interface SeedWorkflow {
+  id: string;
+  clientId: string;
+  key: string;
+  displayName: string;
+  description: string | null;
+  status: string;
+}
+
+interface SeedWorkflowTemplate {
+  id: string;
+  workflowId: string;
+  version: string;
+  description: string | null;
+  config: unknown;
+  status: string;
+  publishedAt: string | null;
+}
+
+interface SeedWorkflowTemplateStep {
+  id: string;
+  templateId: string;
+  stepKey: string;
+  stepOrder: number;
+  displayName: string;
+  assignedSubAgentKey: string | null;
+  promptRef: unknown;
+  retryPolicy: unknown;
+  timeoutMs: number | null;
+  toolIds: unknown;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Upsert helpers — Loop 1
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -374,6 +425,133 @@ async function upsertArtifacts(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Upsert helpers — Loop 3 Phase 1
+// ──────────────────────────────────────────────────────────────────────────
+
+async function upsertWorkOrders(
+  c: PoolClient,
+  rows: SeedWorkOrder[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO work_orders
+         (id, client_id, title, description, type, priority, status,
+          submitted_by_user_id, correlation_id, gcc_memory,
+          deferred_until, deferred_reason)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (id) DO UPDATE SET
+         title = EXCLUDED.title,
+         description = EXCLUDED.description,
+         type = EXCLUDED.type,
+         priority = EXCLUDED.priority,
+         status = EXCLUDED.status,
+         submitted_by_user_id = EXCLUDED.submitted_by_user_id,
+         correlation_id = EXCLUDED.correlation_id,
+         gcc_memory = EXCLUDED.gcc_memory,
+         deferred_until = EXCLUDED.deferred_until,
+         deferred_reason = EXCLUDED.deferred_reason,
+         updated_at = now()`,
+      [
+        r.id,
+        r.clientId,
+        r.title,
+        r.description,
+        r.type,
+        r.priority,
+        r.status,
+        r.submittedByUserId,
+        r.correlationId,
+        JSON.stringify(r.gccMemory ?? null),
+        r.deferredUntil,
+        r.deferredReason,
+      ]
+    );
+  }
+}
+
+async function upsertWorkflows(
+  c: PoolClient,
+  rows: SeedWorkflow[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO workflows (id, client_id, key, display_name, description, status)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO UPDATE SET
+         key = EXCLUDED.key,
+         display_name = EXCLUDED.display_name,
+         description = EXCLUDED.description,
+         status = EXCLUDED.status,
+         updated_at = now()`,
+      [r.id, r.clientId, r.key, r.displayName, r.description, r.status]
+    );
+  }
+}
+
+async function upsertWorkflowTemplates(
+  c: PoolClient,
+  rows: SeedWorkflowTemplate[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO workflow_templates
+         (id, workflow_id, version, description, config, status, published_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         version = EXCLUDED.version,
+         description = EXCLUDED.description,
+         config = EXCLUDED.config,
+         status = EXCLUDED.status,
+         published_at = EXCLUDED.published_at`,
+      [
+        r.id,
+        r.workflowId,
+        r.version,
+        r.description,
+        JSON.stringify(r.config ?? null),
+        r.status,
+        r.publishedAt,
+      ]
+    );
+  }
+}
+
+async function upsertWorkflowTemplateSteps(
+  c: PoolClient,
+  rows: SeedWorkflowTemplateStep[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO workflow_template_steps
+         (id, template_id, step_key, step_order, display_name,
+          assigned_sub_agent_key, prompt_ref, retry_policy, timeout_ms, tool_ids)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (id) DO UPDATE SET
+         step_key = EXCLUDED.step_key,
+         step_order = EXCLUDED.step_order,
+         display_name = EXCLUDED.display_name,
+         assigned_sub_agent_key = EXCLUDED.assigned_sub_agent_key,
+         prompt_ref = EXCLUDED.prompt_ref,
+         retry_policy = EXCLUDED.retry_policy,
+         timeout_ms = EXCLUDED.timeout_ms,
+         tool_ids = EXCLUDED.tool_ids`,
+      [
+        r.id,
+        r.templateId,
+        r.stepKey,
+        r.stepOrder,
+        r.displayName,
+        r.assignedSubAgentKey,
+        JSON.stringify(r.promptRef ?? null),
+        JSON.stringify(r.retryPolicy ?? null),
+        r.timeoutMs,
+        JSON.stringify(r.toolIds ?? null),
+      ]
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Entry
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -406,6 +584,16 @@ async function main(): Promise<void> {
   );
   const artifacts = loadJson<SeedArtifact[]>("db/seeds/artifacts.json");
 
+  // Loop 3 Phase 1
+  const workOrders = loadJson<SeedWorkOrder[]>("db/seeds/work_orders.json");
+  const workflows = loadJson<SeedWorkflow[]>("db/seeds/workflows.json");
+  const workflowTemplates = loadJson<SeedWorkflowTemplate[]>(
+    "db/seeds/workflow_templates.json"
+  );
+  const workflowTemplateSteps = loadJson<SeedWorkflowTemplateStep[]>(
+    "db/seeds/workflow_template_steps.json"
+  );
+
   const pool = new Pool({ connectionString: url });
   const c = await pool.connect();
   try {
@@ -420,6 +608,10 @@ async function main(): Promise<void> {
     await upsertRepositoryBindings(c, repositoryBindings);
     await upsertDataSourceBindings(c, dataSourceBindings);
     await upsertArtifacts(c, artifacts);
+    await upsertWorkOrders(c, workOrders);
+    await upsertWorkflows(c, workflows);
+    await upsertWorkflowTemplates(c, workflowTemplates);
+    await upsertWorkflowTemplateSteps(c, workflowTemplateSteps);
     await c.query("COMMIT");
 
     const receipt = {
@@ -434,6 +626,10 @@ async function main(): Promise<void> {
         repository_bindings: repositoryBindings.length,
         data_source_bindings: dataSourceBindings.length,
         artifacts: artifacts.length,
+        work_orders: workOrders.length,
+        workflows: workflows.length,
+        workflow_templates: workflowTemplates.length,
+        workflow_template_steps: workflowTemplateSteps.length,
       },
       sources: {
         clients: "db/seeds/clients.json",
@@ -445,6 +641,10 @@ async function main(): Promise<void> {
         repository_bindings: "db/seeds/repository_bindings.json",
         data_source_bindings: "db/seeds/data_source_bindings.json",
         artifacts: "db/seeds/artifacts.json",
+        work_orders: "db/seeds/work_orders.json",
+        workflows: "db/seeds/workflows.json",
+        workflow_templates: "db/seeds/workflow_templates.json",
+        workflow_template_steps: "db/seeds/workflow_template_steps.json",
       },
     };
     writeFileSync(

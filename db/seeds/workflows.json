@@ -1,0 +1,18 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000070000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "weekly_marketing_brief",
+    "displayName": "Klear.ai Weekly Marketing Brief",
+    "description": "Six-section weekly marketing brief: landscape, RMIS highlight, claims highlight, case study, CTA, call-out.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000002",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "bench_report_v1",
+    "displayName": "FreedomForge.AI Benchmark Report v1",
+    "description": "Four-section benchmark report: setup, findings, trade-offs, next steps.",
+    "status": "active"
+  }
+]

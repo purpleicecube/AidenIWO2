@@ -97,6 +97,33 @@ describeIwo3("Loop 1 — migration ownership invariant (ADR-008)", () => {
     expect(rows).toHaveLength(expected.length);
   });
 
+  it("Loop 3 Phase 1 WO/WF/execution_cycles schema is marked iwo3_native / drizzle", async () => {
+    const expected = [
+      "work_orders",
+      "workflows",
+      "workflow_templates",
+      "workflow_template_steps",
+      "workflow_executions",
+      "workflow_step_runs",
+      "execution_cycles",
+    ];
+    const { rows } = await pool.query<{
+      table_name: string;
+      source: string;
+      owned_by: string;
+    }>(
+      `SELECT table_name, source, owned_by
+       FROM migration_source_manifest
+       WHERE table_name = ANY($1)`,
+      [expected]
+    );
+    for (const r of rows) {
+      expect(r.source).toBe("iwo3_native");
+      expect(r.owned_by).toBe("drizzle");
+    }
+    expect(rows).toHaveLength(expected.length);
+  });
+
   it("no unregistered public table exists (CODEX ADR-008 revision; partitions excluded per ADR-010)", async () => {
     const { rows: tables } = await pool.query<{ table_name: string }>(
       `SELECT t.table_name

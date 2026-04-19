@@ -5,14 +5,19 @@ const url = process.env.IWO3_DATABASE_URL;
 const describeIwo3 = url ? describe : describe.skip;
 
 /**
- * In Loop 1 no IWO2 operational tables are mirrored yet, so this test
- * passes by absence. As soon as Loop 2+ mirrors one of these tables into
- * IWO3 it must be empty after reset+seed.
+ * Clean-baseline invariant: no IWO2 operational table whose rows were
+ * carried forward from the IWO2 runtime should be populated.
+ *
+ * Loop 3 Phase 1 intentionally created `work_orders`, `workflow_executions`,
+ * and `workflow_step_runs` as IWO3-NATIVE tables (tenant-first schema, no
+ * IWO2 row mirroring — per ADR-005 + ADR-011). They are populated from
+ * Loop 3 seed JSON, NOT from IWO2. They are removed from this list.
+ *
+ * The remaining tables are IWO2-only and would only appear in IWO3 if
+ * someone mirrored them forward; if they ever do appear, they must be
+ * empty after reset+seed.
  */
 const IWO2_OPERATIONAL_TABLES = [
-  "work_orders",
-  "workflow_executions",
-  "workflow_step_runs",
   "chat_sessions",
   "chat_messages",
   "gamma_generation_records",

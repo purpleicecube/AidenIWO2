@@ -12,3 +12,12 @@ export * from "./repository_bindings";
 export * from "./data_source_bindings";
 export * from "./artifacts";
 export * from "./action_audit_log";
+
+// Loop 3 Phase 1 — WO / WF / execution cycles
+export * from "./work_orders";
+export * from "./workflows";
+export * from "./workflow_templates";
+export * from "./workflow_template_steps";
+export * from "./workflow_executions";
+export * from "./workflow_step_runs";
+export * from "./execution_cycles";

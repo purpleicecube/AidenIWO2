@@ -1,0 +1,30 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000060000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "title": "Draft RMIS ROI one-pager for April brief",
+    "description": "Write the RMIS highlight section for the weekly Klear.ai marketing brief. Targets mid-market SaaS risk audience.",
+    "type": "content_brief",
+    "priority": "medium",
+    "status": "pending",
+    "submittedByUserId": "00000000-0000-4000-8000-000001000002",
+    "correlationId": "wo-klear-rmis-apr-001",
+    "gccMemory": { "origin": "loop-3-phase-1-seed" },
+    "deferredUntil": null,
+    "deferredReason": null
+  },
+  {
+    "id": "00000000-0000-4000-8000-000060000002",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "title": "Benchmark April findings summary",
+    "description": "Synthesize last month's benchmark runs for the FreedomForge.AI community update.",
+    "type": "content_brief",
+    "priority": "high",
+    "status": "pending",
+    "submittedByUserId": "00000000-0000-4000-8000-000002000002",
+    "correlationId": "wo-ffai-bench-apr-001",
+    "gccMemory": { "origin": "loop-3-phase-1-seed" },
+    "deferredUntil": null,
+    "deferredReason": null
+  }
+]
