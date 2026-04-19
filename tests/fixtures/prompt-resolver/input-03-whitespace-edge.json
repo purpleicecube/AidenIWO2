@@ -1,0 +1,8 @@
+{
+  "layers": {
+    "profile": "first line   \nsecond line\t\t\n   third line trailing   \n   "
+  },
+  "layerIds": {
+    "profileId": "00000000-0000-4000-8000-000031000001"
+  }
+}

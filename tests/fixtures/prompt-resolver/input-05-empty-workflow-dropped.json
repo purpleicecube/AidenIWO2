@@ -1,0 +1,12 @@
+{
+  "layers": {
+    "profile": "You speak as Klear.ai.",
+    "workflow": "   \n\t\n",
+    "wo": "Write one paragraph about ROI."
+  },
+  "layerIds": {
+    "profileId": "00000000-0000-4000-8000-000031000001",
+    "workflowId": "wf-empty",
+    "woId": "wo-short"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "profile": "Klear.ai v2-draft voice — highlight RMIS integration where relevant."
+  },
+  "layerIds": {
+    "profileId": "00000000-0000-4000-8000-000031000002"
+  },
+  "override": {
+    "kind": "profile_swap",
+    "text": "",
+    "userId": "00000000-0000-4000-8000-000001000002",
+    "reason": "Dry-run the v2 draft before publishing."
+  }
+}

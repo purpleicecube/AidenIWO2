@@ -10,5 +10,7 @@
   { "id": "00000000-0000-4000-8000-000002000003", "email": "operator_ffai@dev.local", "displayName": "FFAI Operator (Dev)", "status": "active" },
   { "id": "00000000-0000-4000-8000-000002000004", "email": "reviewer_ffai@dev.local", "displayName": "FFAI Reviewer (Dev)", "status": "active" },
   { "id": "00000000-0000-4000-8000-000002000005", "email": "viewer_ffai@dev.local", "displayName": "FFAI Viewer (Dev)", "status": "active" },
-  { "id": "00000000-0000-4000-8000-000002000006", "email": "agent_ffai@dev.local", "displayName": "FFAI Agent/System (Dev)", "status": "active" }
+  { "id": "00000000-0000-4000-8000-000002000006", "email": "agent_ffai@dev.local", "displayName": "FFAI Agent/System (Dev)", "status": "active" },
+  { "id": "00000000-0000-4000-8000-000099000001", "email": "super@dev.local", "displayName": "Super Cross-Tenant Tester (Dev)", "status": "active" },
+  { "id": "00000000-0000-4000-8000-000099000002", "email": "intruder@dev.local", "displayName": "Intruder No Memberships (Dev)", "status": "active" }
 ]

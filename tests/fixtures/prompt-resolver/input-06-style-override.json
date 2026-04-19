@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "profile": "Klear.ai formal brand voice."
+  },
+  "layerIds": {
+    "profileId": "00000000-0000-4000-8000-000031000001"
+  },
+  "override": {
+    "kind": "style",
+    "text": "For this WO only: shorten each paragraph to two sentences.",
+    "userId": "00000000-0000-4000-8000-000001000003",
+    "reason": "Audience is a CEO briefing — keep it tight."
+  }
+}

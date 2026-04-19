@@ -1,0 +1,16 @@
+{
+  "layers": {
+    "profile": "FreedomForge.AI founder-energy voice.",
+    "wo": "Email campaign copy for the April benchmark launch."
+  },
+  "layerIds": {
+    "profileId": "00000000-0000-4000-8000-000031000003",
+    "woId": "wo-ffai-bench-launch"
+  },
+  "override": {
+    "kind": "external_send",
+    "text": "Tighten the CTA to 'See the benchmark' in the last block.",
+    "userId": "00000000-0000-4000-8000-000002000002",
+    "reason": "Aligning CTA with landing page test."
+  }
+}
