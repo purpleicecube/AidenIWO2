@@ -12,13 +12,24 @@ title = "IWO3 gitleaks config"
 [extend]
 useDefault = true
 
-# Custom rule: credential-shaped fields in JSON/YAML must be placeholder or null.
+# Custom rule: credential-shaped fields in JSON/YAML must hold a
+# `credential_ref:` placeholder (or be JSON null — unquoted nulls are
+# already excluded because the regex requires a quoted string value).
+#
+# RE2 note: gitleaks v8 uses the RE2 engine, which does NOT support
+# Perl-style lookahead (`(?!...)`). Exclusions live in the rule
+# allowlist below, not inside the pattern.
 [[rules]]
 id = "iwo3-fixture-credential-placeholder"
-description = "Fixture/seed field with a credential-shaped name must hold credential_ref: or null"
-regex = '''(?i)"(credential|token|api[_-]?key|secret|password|bearer|access[_-]?key|private[_-]?key|auth)"\s*:\s*"(?!credential_ref:)(?!null")[^"]+"'''
+description = "Fixture/seed field with a credential-shaped name must hold credential_ref:"
+regex = '''(?i)"(credential|token|api[_-]?key|secret|password|bearer|access[_-]?key|private[_-]?key|auth)"\s*:\s*"([^"]+)"'''
+secretGroup = 2
 path = '''(^|/)(db/(fixtures|seeds)/|tests/fixtures/).+\.(json|ya?ml)$'''
 tags = ["iwo3", "fixtures"]
+
+  [rules.allowlist]
+  description = "Permit credential_ref: placeholder values (RE2-safe replacement for negative lookahead)"
+  stopwords = ["credential_ref:"]
 
 [allowlist]
 description = "Allow Gamma template IDs — they are not secrets"
