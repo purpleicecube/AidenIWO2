@@ -178,6 +178,49 @@ interface SeedWorkflowTemplateStep {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Loop 3 Phase 2 — adapter registry shapes
+// ──────────────────────────────────────────────────────────────────────────
+
+interface SeedAdapterCatalog {
+  id: string;
+  adapterKey: string;
+  displayName: string;
+  category: string;
+  description: string | null;
+  contractVersion: string;
+  status: string;
+}
+
+interface SeedAdapterAction {
+  id: string;
+  adapterCatalogId: string;
+  actionKey: string;
+  displayName: string;
+  description: string | null;
+  requiresOutputPackage: boolean;
+}
+
+interface SeedClientAdapterConfig {
+  id: string;
+  clientId: string;
+  adapterCatalogId: string;
+  enabled: boolean;
+  credentialRef: string | null;
+  config: unknown;
+  status: string;
+}
+
+interface SeedAdapterActionPolicy {
+  id: string;
+  clientId: string;
+  adapterCatalogId: string;
+  actionKey: string;
+  mode: string;
+  reason: string | null;
+  metadata: unknown;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Upsert helpers — Loop 1
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -552,6 +595,132 @@ async function upsertWorkflowTemplateSteps(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Upsert helpers — Loop 3 Phase 2
+// ──────────────────────────────────────────────────────────────────────────
+
+async function upsertAdapterCatalog(
+  c: PoolClient,
+  rows: SeedAdapterCatalog[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO adapter_catalog
+         (id, adapter_key, display_name, category, description,
+          contract_version, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         adapter_key = EXCLUDED.adapter_key,
+         display_name = EXCLUDED.display_name,
+         category = EXCLUDED.category,
+         description = EXCLUDED.description,
+         contract_version = EXCLUDED.contract_version,
+         status = EXCLUDED.status,
+         updated_at = now()`,
+      [
+        r.id,
+        r.adapterKey,
+        r.displayName,
+        r.category,
+        r.description,
+        r.contractVersion,
+        r.status,
+      ]
+    );
+  }
+}
+
+async function upsertAdapterActions(
+  c: PoolClient,
+  rows: SeedAdapterAction[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO adapter_actions
+         (id, adapter_catalog_id, action_key, display_name, description,
+          requires_output_package)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO UPDATE SET
+         adapter_catalog_id = EXCLUDED.adapter_catalog_id,
+         action_key = EXCLUDED.action_key,
+         display_name = EXCLUDED.display_name,
+         description = EXCLUDED.description,
+         requires_output_package = EXCLUDED.requires_output_package,
+         updated_at = now()`,
+      [
+        r.id,
+        r.adapterCatalogId,
+        r.actionKey,
+        r.displayName,
+        r.description,
+        r.requiresOutputPackage,
+      ]
+    );
+  }
+}
+
+async function upsertClientAdapterConfigs(
+  c: PoolClient,
+  rows: SeedClientAdapterConfig[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO client_adapter_configs
+         (id, client_id, adapter_catalog_id, enabled, credential_ref,
+          config, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         client_id = EXCLUDED.client_id,
+         adapter_catalog_id = EXCLUDED.adapter_catalog_id,
+         enabled = EXCLUDED.enabled,
+         credential_ref = EXCLUDED.credential_ref,
+         config = EXCLUDED.config,
+         status = EXCLUDED.status,
+         updated_at = now()`,
+      [
+        r.id,
+        r.clientId,
+        r.adapterCatalogId,
+        r.enabled,
+        r.credentialRef,
+        JSON.stringify(r.config ?? null),
+        r.status,
+      ]
+    );
+  }
+}
+
+async function upsertAdapterActionPolicies(
+  c: PoolClient,
+  rows: SeedAdapterActionPolicy[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO adapter_action_policies
+         (id, client_id, adapter_catalog_id, action_key, mode, reason,
+          metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         client_id = EXCLUDED.client_id,
+         adapter_catalog_id = EXCLUDED.adapter_catalog_id,
+         action_key = EXCLUDED.action_key,
+         mode = EXCLUDED.mode,
+         reason = EXCLUDED.reason,
+         metadata = EXCLUDED.metadata,
+         updated_at = now()`,
+      [
+        r.id,
+        r.clientId,
+        r.adapterCatalogId,
+        r.actionKey,
+        r.mode,
+        r.reason,
+        JSON.stringify(r.metadata ?? null),
+      ]
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Entry
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -594,6 +763,20 @@ async function main(): Promise<void> {
     "db/seeds/workflow_template_steps.json"
   );
 
+  // Loop 3 Phase 2
+  const adapterCatalogRows = loadJson<SeedAdapterCatalog[]>(
+    "db/seeds/adapter_catalog.json"
+  );
+  const adapterActionsRows = loadJson<SeedAdapterAction[]>(
+    "db/seeds/adapter_actions.json"
+  );
+  const clientAdapterConfigsRows = loadJson<SeedClientAdapterConfig[]>(
+    "db/seeds/client_adapter_configs.json"
+  );
+  const adapterActionPoliciesRows = loadJson<SeedAdapterActionPolicy[]>(
+    "db/seeds/adapter_action_policies.json"
+  );
+
   const pool = new Pool({ connectionString: url });
   const c = await pool.connect();
   try {
@@ -612,6 +795,10 @@ async function main(): Promise<void> {
     await upsertWorkflows(c, workflows);
     await upsertWorkflowTemplates(c, workflowTemplates);
     await upsertWorkflowTemplateSteps(c, workflowTemplateSteps);
+    await upsertAdapterCatalog(c, adapterCatalogRows);
+    await upsertAdapterActions(c, adapterActionsRows);
+    await upsertClientAdapterConfigs(c, clientAdapterConfigsRows);
+    await upsertAdapterActionPolicies(c, adapterActionPoliciesRows);
     await c.query("COMMIT");
 
     const receipt = {
@@ -630,6 +817,10 @@ async function main(): Promise<void> {
         workflows: workflows.length,
         workflow_templates: workflowTemplates.length,
         workflow_template_steps: workflowTemplateSteps.length,
+        adapter_catalog: adapterCatalogRows.length,
+        adapter_actions: adapterActionsRows.length,
+        client_adapter_configs: clientAdapterConfigsRows.length,
+        adapter_action_policies: adapterActionPoliciesRows.length,
       },
       sources: {
         clients: "db/seeds/clients.json",
@@ -645,6 +836,10 @@ async function main(): Promise<void> {
         workflows: "db/seeds/workflows.json",
         workflow_templates: "db/seeds/workflow_templates.json",
         workflow_template_steps: "db/seeds/workflow_template_steps.json",
+        adapter_catalog: "db/seeds/adapter_catalog.json",
+        adapter_actions: "db/seeds/adapter_actions.json",
+        client_adapter_configs: "db/seeds/client_adapter_configs.json",
+        adapter_action_policies: "db/seeds/adapter_action_policies.json",
       },
     };
     writeFileSync(

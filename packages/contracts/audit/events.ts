@@ -56,6 +56,28 @@ export const AUDIT_EVENTS = {
   WORKFLOW_EXECUTION_COMPLETED: "workflow_execution.completed",
   WORKFLOW_STEP_RUN_COMPLETED: "workflow_step_run.completed",
   EXECUTION_CYCLE_STARTED: "execution_cycle.started",
+
+  // Loop 3 Phase 2 — output packages + adapter registry + handoff +
+  // candidate-review minimal lifecycle.
+  // Locked at phase start per IWO3_LOOP_3_APPROVAL_DECISIONS §Q6.
+  OUTPUT_PACKAGE_CREATED: "output_package.created",
+  OUTPUT_PACKAGE_VALIDATED: "output_package.validated",
+  OUTPUT_PACKAGE_SUBMITTED: "output_package.submitted",
+  OUTPUT_PACKAGE_REJECTED: "output_package.rejected",
+  OUTPUT_HANDOFF_CREATED: "output_handoff.created",
+  OUTPUT_HANDOFF_SUBMITTED: "output_handoff.submitted",
+  OUTPUT_HANDOFF_COMPLETED: "output_handoff.completed",
+  OUTPUT_HANDOFF_FAILED: "output_handoff.failed",
+  OUTPUT_CANDIDATE_SELECTED: "output_candidate.selected",
+  OUTPUT_CANDIDATE_REJECTED: "output_candidate.rejected",
+  ADAPTER_CONFIG_CREATED: "adapter_config.created",
+  ADAPTER_CONFIG_UPDATED: "adapter_config.updated",
+  ADAPTER_CONFIG_ENABLED: "adapter_config.enabled",
+  ADAPTER_CONFIG_DISABLED: "adapter_config.disabled",
+  ADAPTER_CREDENTIAL_ROTATED: "adapter_credential.rotated",
+  ADAPTER_CREDENTIAL_REVOKED: "adapter_credential.revoked",
+  ADAPTER_POLICY_CREATED: "adapter_policy.created",
+  ADAPTER_POLICY_UPDATED: "adapter_policy.updated",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -89,4 +111,25 @@ export const LOOP_3_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.WORKFLOW_EXECUTION_COMPLETED,
   AUDIT_EVENTS.WORKFLOW_STEP_RUN_COMPLETED,
   AUDIT_EVENTS.EXECUTION_CYCLE_STARTED,
+];
+
+export const LOOP_3_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.OUTPUT_PACKAGE_CREATED,
+  AUDIT_EVENTS.OUTPUT_PACKAGE_VALIDATED,
+  AUDIT_EVENTS.OUTPUT_PACKAGE_SUBMITTED,
+  AUDIT_EVENTS.OUTPUT_PACKAGE_REJECTED,
+  AUDIT_EVENTS.OUTPUT_HANDOFF_CREATED,
+  AUDIT_EVENTS.OUTPUT_HANDOFF_SUBMITTED,
+  AUDIT_EVENTS.OUTPUT_HANDOFF_COMPLETED,
+  AUDIT_EVENTS.OUTPUT_HANDOFF_FAILED,
+  AUDIT_EVENTS.OUTPUT_CANDIDATE_SELECTED,
+  AUDIT_EVENTS.OUTPUT_CANDIDATE_REJECTED,
+  AUDIT_EVENTS.ADAPTER_CONFIG_CREATED,
+  AUDIT_EVENTS.ADAPTER_CONFIG_UPDATED,
+  AUDIT_EVENTS.ADAPTER_CONFIG_ENABLED,
+  AUDIT_EVENTS.ADAPTER_CONFIG_DISABLED,
+  AUDIT_EVENTS.ADAPTER_CREDENTIAL_ROTATED,
+  AUDIT_EVENTS.ADAPTER_CREDENTIAL_REVOKED,
+  AUDIT_EVENTS.ADAPTER_POLICY_CREATED,
+  AUDIT_EVENTS.ADAPTER_POLICY_UPDATED,
 ];

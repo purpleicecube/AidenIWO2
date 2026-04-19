@@ -58,6 +58,16 @@ const KNOWN_TABLES: ManifestEntry[] = [
   { name: "workflow_executions",        source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — running instance of a template version (ADR-011)" },
   { name: "workflow_step_runs",         source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — per-step run within an execution (ADR-011)" },
   { name: "execution_cycles",           source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 — retry/reopen attempt lineage (ADR-011)" },
+
+  // Loop 3 Phase 2 — output packages + adapter registry + handoffs
+  { name: "adapter_catalog",            source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — global adapter kind catalog (ADR-012)" },
+  { name: "adapter_actions",            source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — actions each adapter supports (ADR-012)" },
+  { name: "client_adapter_configs",     source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — per-tenant adapter enable/config (ADR-012)" },
+  { name: "adapter_action_policies",    source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — per-tenant per-action approval gate (ADR-012)" },
+  { name: "adapter_credentials",        source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — per-tenant credential reference (never raw secrets) (ADR-012)" },
+  { name: "output_packages",            source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — typed output envelope (ADR-012)" },
+  { name: "output_handoffs",            source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — 13-field adapter handoff provenance + candidate shape (ADR-012)" },
+  { name: "external_execution_results", source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — result payload from external adapter target (ADR-012)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

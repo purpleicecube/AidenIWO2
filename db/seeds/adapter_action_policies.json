@@ -1,0 +1,47 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000083000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000003",
+    "actionKey": "send",
+    "mode": "approval_required",
+    "reason": "Klear.ai email_campaign sends require operator approval (external-send override policy per IWO3_LOOP_3_APPROVAL_DECISIONS §Q2).",
+    "metadata": { "source": "loop-3-phase-2-seed" }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000083000002",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000003",
+    "actionKey": "send",
+    "mode": "approval_required",
+    "reason": "FreedomForge.AI email_campaign sends require operator approval even though adapter is not yet enabled for this tenant.",
+    "metadata": { "source": "loop-3-phase-2-seed" }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000083000003",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000007",
+    "actionKey": "create_record",
+    "mode": "disallowed",
+    "reason": "Klear.ai CRM mutations disallowed in v0 per approval memo §Q2.",
+    "metadata": { "source": "loop-3-phase-2-seed" }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000083000004",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000007",
+    "actionKey": "create_record",
+    "mode": "disallowed",
+    "reason": "FreedomForge.AI CRM mutations disallowed in v0 per approval memo §Q2.",
+    "metadata": { "source": "loop-3-phase-2-seed" }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000083000005",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000002",
+    "actionKey": "upload",
+    "mode": "approval_required",
+    "reason": "FreedomForge.AI Drive uploads are approval-gated per tenant preference.",
+    "metadata": { "source": "loop-3-phase-2-seed" }
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000082000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000001",
+    "enabled": true,
+    "credentialRef": "credential_ref:dev-local-klear-gamma-01",
+    "config": { "default_contract_version": "v0" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000082000002",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000002",
+    "enabled": true,
+    "credentialRef": "credential_ref:dev-local-klear-drive-01",
+    "config": { "root_folder_id": "dev-local-klear-marketing" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000082000003",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000003",
+    "enabled": true,
+    "credentialRef": "credential_ref:dev-local-klear-email-01",
+    "config": { "provider": "emailoctopus", "from_profile": "klear-marketing" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000082000004",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000001",
+    "enabled": true,
+    "credentialRef": "credential_ref:dev-local-ffai-gamma-01",
+    "config": { "default_contract_version": "v0" },
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000082000005",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "adapterCatalogId": "00000000-0000-4000-8000-000080000002",
+    "enabled": true,
+    "credentialRef": "credential_ref:dev-local-ffai-drive-01",
+    "config": { "root_folder_id": "dev-local-ffai-bench" },
+    "status": "active"
+  }
+]

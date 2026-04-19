@@ -21,3 +21,13 @@ export * from "./workflow_template_steps";
 export * from "./workflow_executions";
 export * from "./workflow_step_runs";
 export * from "./execution_cycles";
+
+// Loop 3 Phase 2 — output packages + adapter registry + handoffs
+export * from "./adapter_catalog";
+export * from "./adapter_actions";
+export * from "./client_adapter_configs";
+export * from "./adapter_action_policies";
+export * from "./adapter_credentials";
+export * from "./output_packages";
+export * from "./output_handoffs";
+export * from "./external_execution_results";

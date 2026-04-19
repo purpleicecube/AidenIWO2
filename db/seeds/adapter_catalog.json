@@ -1,0 +1,65 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000080000001",
+    "adapterKey": "gamma",
+    "displayName": "Gamma",
+    "category": "design_render",
+    "description": "Gamma.app generate / render-from-template for PPTX + PDF.",
+    "contractVersion": "v0",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000002",
+    "adapterKey": "google_drive",
+    "displayName": "Google Drive",
+    "category": "storage",
+    "description": "Upload + share files to a tenant-scoped Drive folder.",
+    "contractVersion": "v0",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000003",
+    "adapterKey": "email_campaign",
+    "displayName": "Email Campaign",
+    "category": "campaign",
+    "description": "Compose / test-send / send tenant email campaigns. Approval-gated.",
+    "contractVersion": "v0",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000004",
+    "adapterKey": "figma",
+    "displayName": "Figma",
+    "category": "design_render",
+    "description": "Design-lane handoff to Figma. Contract-only in Loop 3; real adapter in Loop 10.",
+    "contractVersion": "v0",
+    "status": "beta"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000005",
+    "adapterKey": "stitch",
+    "displayName": "Google Stitch",
+    "category": "design_render",
+    "description": "Design-lane handoff to Google Stitch. SDK is early; contract-only in Loop 3.",
+    "contractVersion": "v0",
+    "status": "beta"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000006",
+    "adapterKey": "claude_design",
+    "displayName": "Claude Design Studio",
+    "category": "design_render",
+    "description": "Design-lane handoff to Claude Design Studio. Contract-only in Loop 3.",
+    "contractVersion": "v0",
+    "status": "beta"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000007",
+    "adapterKey": "crm",
+    "displayName": "CRM",
+    "category": "crm",
+    "description": "CRM record create / update / delete. Mutations disallowed by default in v0.",
+    "contractVersion": "v0",
+    "status": "beta"
+  }
+]
