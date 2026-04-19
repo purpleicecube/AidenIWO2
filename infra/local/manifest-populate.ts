@@ -1,73 +1,91 @@
 /**
- * Populates `migration_source_manifest` with one row per table that currently
- * exists in the IWO3 database. Run after Drizzle push + Alembic upgrade.
+ * Populates `migration_source_manifest` from an explicit registry.
  *
- * Loop 1 convention:
- *   - Loop 1 narrow schema (clients, users, client_memberships,
- *     template_profiles, migration_source_manifest) = iwo2_parity / drizzle
- *     (they are the tenant/RBAC anchor that IWO3 inherits forward).
- *   - Later IWO3-native tables created by Alembic (output_packages,
- *     render_jobs, channel_events, etc.) = iwo3_native / alembic.
+ * Rules (ADR-008 v0.1.1 per CODEX revision):
+ *   - Every IWO3 table must be explicitly registered below.
+ *   - Unknown public.* tables are NOT auto-classified. The
+ *     `tests/integration/migration-ownership.test.ts` suite fails when
+ *     it finds a table in the database that has no manifest row.
+ *   - `source` values:
+ *       iwo3_native   — table introduced natively for IWO3
+ *                       (Loop 1 foundation tables fall here)
+ *       iwo2_parity   — table mirrored into IWO3 from IWO2 schema
+ *                       (reserved for Loop 2+ when actual IWO2 schema
+ *                        is brought forward)
+ *   - `owned_by` values:
+ *       drizzle       — migration owned by Drizzle (schema lives in
+ *                       db/schema/*.ts, SQL in db/migrations/*.sql)
+ *       alembic       — migration owned by Alembic (schema lives in
+ *                       apps/api-fastapi/alembic/versions/)
  */
 
 import { Pool } from "pg";
 
-const IWO2_BRANCH_POINT = "iwo2@1535c2f";
-const IWO3_VERSION = "iwo3@v0.1.0-loop1";
+interface ManifestEntry {
+  name: string;
+  source: "iwo2_parity" | "iwo3_native";
+  sourceVersion: string;
+  ownedBy: "drizzle" | "alembic";
+  notes?: string;
+}
 
-const LOOP_1_DRIZZLE_TABLES: Array<{ name: string; notes?: string }> = [
-  { name: "clients" },
-  { name: "users" },
-  { name: "client_memberships" },
-  { name: "template_profiles" },
-  { name: "migration_source_manifest" },
+const LOOP_1_VERSION = "iwo3@v0.1.0-loop1";
+
+const KNOWN_TABLES: ManifestEntry[] = [
+  { name: "clients",                    source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — tenant anchor" },
+  { name: "users",                      source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — identity anchor" },
+  { name: "client_memberships",         source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — tenant/role link" },
+  { name: "template_profiles",          source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — render template anchor" },
+  { name: "migration_source_manifest",  source: "iwo3_native", sourceVersion: LOOP_1_VERSION, ownedBy: "drizzle", notes: "Loop 1 foundation — manifest itself" },
 ];
+
+// Tables that exist in the database but are deliberately NOT tracked
+// in the manifest (alembic's internal bookkeeping).
+const IGNORED_TABLES = new Set<string>(["alembic_version"]);
 
 async function main(): Promise<void> {
   const url = process.env.IWO3_DATABASE_URL;
   if (!url) throw new Error("IWO3_DATABASE_URL is required");
   const pool = new Pool({ connectionString: url });
   try {
-    const existing = await pool.query<{ table_name: string }>(`
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-    `);
-    const names = new Set(existing.rows.map((r) => r.table_name));
-
-    for (const t of LOOP_1_DRIZZLE_TABLES) {
-      if (!names.has(t.name)) continue;
+    for (const t of KNOWN_TABLES) {
       await pool.query(
         `INSERT INTO migration_source_manifest
            (table_name, source, source_version, owned_by, notes)
-         VALUES ($1, 'iwo2_parity', $2, 'drizzle', $3)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (table_name) DO UPDATE SET
            source = EXCLUDED.source,
            source_version = EXCLUDED.source_version,
            owned_by = EXCLUDED.owned_by,
            notes = EXCLUDED.notes`,
-        [t.name, IWO2_BRANCH_POINT, t.notes ?? null]
+        [t.name, t.source, t.sourceVersion, t.ownedBy, t.notes ?? null]
       );
     }
 
-    // Any additional table created by Alembic goes in as iwo3_native/alembic.
-    for (const name of names) {
-      if (LOOP_1_DRIZZLE_TABLES.some((t) => t.name === name)) continue;
-      // Skip Alembic's own bookkeeping table; it is not "owned" in our sense.
-      if (name === "alembic_version") continue;
-      await pool.query(
-        `INSERT INTO migration_source_manifest
-           (table_name, source, source_version, owned_by)
-         VALUES ($1, 'iwo3_native', $2, 'alembic')
-         ON CONFLICT (table_name) DO UPDATE SET
-           source = EXCLUDED.source,
-           source_version = EXCLUDED.source_version,
-           owned_by = EXCLUDED.owned_by`,
-        [name, IWO3_VERSION]
+    // Report drift — any public.* table not registered.
+    // This is informational; the regression test is authoritative.
+    const { rows } = await pool.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public'`
+    );
+    const known = new Set(KNOWN_TABLES.map((t) => t.name));
+    const drift: string[] = [];
+    for (const r of rows) {
+      if (known.has(r.table_name)) continue;
+      if (IGNORED_TABLES.has(r.table_name)) continue;
+      drift.push(r.table_name);
+    }
+    if (drift.length > 0) {
+      console.warn(
+        `[manifest-populate] WARNING: unregistered tables found: ${drift.join(", ")}.\n` +
+          `  Add them to KNOWN_TABLES in infra/local/manifest-populate.ts or remove them.`
       );
     }
 
-    console.log(`[manifest-populate] Manifest rows up to date.`);
+    console.log(
+      `[manifest-populate] Registered ${KNOWN_TABLES.length} tables. ` +
+        `Drift: ${drift.length}.`
+    );
   } finally {
     await pool.end();
   }

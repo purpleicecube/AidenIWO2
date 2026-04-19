@@ -9,7 +9,12 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["server/__tests__/**/*.test.ts"],
+    include: [
+      "server/__tests__/**/*.test.ts",
+      "tests/integration/**/*.test.ts",
+      "tests/fixtures/**/*.test.ts",
+      "tests/contract/**/*.test.ts",
+    ],
     environment: "node",
     globals: false,
   },

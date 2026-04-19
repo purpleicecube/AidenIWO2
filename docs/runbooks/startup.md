@@ -8,7 +8,7 @@ Loop 1 — production floor. Read this first.
 - Python 3.11 (see `.python-version`)
 - `uv` (install: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - Docker + Docker Compose
-- `gitleaks` (install: https://github.com/gitleaks/gitleaks — `brew install gitleaks` or binary)
+- `gitleaks` (install: https://github.com/gitleaks/gitleaks — `brew install gitleaks` or binary from the GitHub releases page). If absent locally, `baseline-check.sh` soft-skips the scan and prints install guidance; CI runs `gitleaks/gitleaks-action@v2` as a separate authoritative step.
 
 ## Clone + env
 
@@ -32,11 +32,29 @@ cd apps/api-fastapi && uv sync --extra dev && cd -
 
 ## Start IWO3 Postgres
 
+Preferred (Docker Compose v2):
+
 ```bash
 docker compose -f infra/local/docker-compose.iwo3-postgres.yml up -d
 ```
 
-Postgres listens on `localhost:5434`, db `aiden_iwo3`.
+Fallback (Docker Compose v1 or hosts with broken port forwarding —
+matches the pattern IWO2's `aiden-postgres` already uses on these hosts):
+
+```bash
+docker run -d \
+  --name aiden-iwo3-postgres \
+  --network host \
+  --restart unless-stopped \
+  -e POSTGRES_DB=aiden_iwo3 \
+  -e POSTGRES_USER=iwo3 \
+  -e POSTGRES_PASSWORD=iwo3 \
+  -e PGPORT=5434 \
+  -v aiden-iwo3-pgdata:/var/lib/postgresql/data \
+  postgres:16
+```
+
+Both paths end with Postgres listening on `localhost:5434`, db `aiden_iwo3`.
 
 ## Reset + seed
 

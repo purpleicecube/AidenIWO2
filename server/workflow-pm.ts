@@ -41,7 +41,7 @@ export interface EscalationResult {
 export function resolvePmLlmConfig(
   pmSubAgent: SubAgent | null | undefined,
   template: WorkflowTemplate,
-  globalSettings: LlmSettings | undefined
+  globalSettings: LlmSettings | null | undefined
 ): EffectiveLlmConfig | null {
   const llmMode = template.llmMode || "inherited";
 
@@ -98,7 +98,7 @@ ${pmSubAgent?.description ? `Your specialization: ${pmSubAgent.description}` : "
 export async function selectProjectManager(
   template: WorkflowTemplate,
   activeSubAgents: SubAgent[],
-  globalSettings: LlmSettings | undefined
+  globalSettings: LlmSettings | null | undefined
 ): Promise<{ pm: SubAgent | null; llmConfig: EffectiveLlmConfig | null }> {
   if (template.preferredPmId) {
     const preferred = activeSubAgents.find(a => a.id === template.preferredPmId);
@@ -368,7 +368,7 @@ Respond with ONLY a JSON object:
 }
 
 export async function pmEscalateToAiden(
-  globalSettings: LlmSettings | undefined,
+  globalSettings: LlmSettings | null | undefined,
   executionMode: string,
   reason: string,
   context: {
@@ -441,7 +441,7 @@ Respond with ONLY a JSON object:
 }
 
 export async function aidenExecutiveReview(
-  globalSettings: LlmSettings | undefined,
+  globalSettings: LlmSettings | null | undefined,
   workflowGoal: string,
   workProduct: WorkProductResult,
   executionSummary: {

@@ -36,6 +36,9 @@ interface HealthStatus {
     database: boolean;
     orchestration: boolean;
     schemaValidation: boolean;
+    llm?: boolean;
+    gamma?: boolean;
+    session?: boolean;
   };
 }
 

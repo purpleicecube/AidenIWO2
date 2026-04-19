@@ -55,7 +55,7 @@ function safeJsonParse(jsonStr: string): any {
 
 export function resolveSubAgentLlmConfig(
   subAgent: SubAgent | null | undefined,
-  globalSettings: LlmSettings | undefined
+  globalSettings: LlmSettings | null | undefined
 ): EffectiveLlmConfig | null {
   if (subAgent?.llmEnabled && subAgent.llmProvider && subAgent.llmModel) {
     const defaultKeyMap: Record<string, string> = {
@@ -168,6 +168,10 @@ const tier2ResponseSchema = z.object({
     })).optional(),
     toolsUsed: z.array(z.any()).optional(),
     bdmMarker: z.any().optional(),
+    // BUG-038: PPTX quality evidence (preflight + compliance + content contract)
+    _pptxPreflight: z.any().optional(),
+    _pptxCompliance: z.any().optional(),
+    _pptxContract: z.any().optional(),
   }).optional(),
   gammaDeliveryPolicy: z.string().optional(), // "auto_revise" | "candidate_review" — passed through from pocketflow
 });

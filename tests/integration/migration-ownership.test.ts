@@ -37,7 +37,7 @@ describeIwo3("Loop 1 — migration ownership invariant (ADR-008)", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("Loop 1 narrow schema is marked iwo2_parity / drizzle", async () => {
+  it("Loop 1 foundation schema is marked iwo3_native / drizzle (ADR-008 v0.1.1)", async () => {
     const expected = [
       "clients",
       "users",
@@ -56,9 +56,25 @@ describeIwo3("Loop 1 — migration ownership invariant (ADR-008)", () => {
       [expected]
     );
     for (const r of rows) {
-      expect(r.source).toBe("iwo2_parity");
+      expect(r.source).toBe("iwo3_native");
       expect(r.owned_by).toBe("drizzle");
     }
     expect(rows).toHaveLength(expected.length);
+  });
+
+  it("no unregistered public table exists (CODEX ADR-008 revision)", async () => {
+    const { rows: tables } = await pool.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public'`
+    );
+    const { rows: manifest } = await pool.query<{ table_name: string }>(
+      `SELECT table_name FROM migration_source_manifest`
+    );
+    const registered = new Set(manifest.map((r) => r.table_name));
+    const ignored = new Set(["alembic_version"]);
+    const unregistered = tables
+      .map((r) => r.table_name)
+      .filter((name) => !registered.has(name) && !ignored.has(name));
+    expect(unregistered).toEqual([]);
   });
 });

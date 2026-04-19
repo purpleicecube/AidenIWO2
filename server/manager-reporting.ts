@@ -102,11 +102,15 @@ export function resolveTimeRange(
   // "today" — midnight in the operator's timezone to now
   const todayStr = now.toLocaleDateString("en-US", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" });
   const [month, day, year] = todayStr.split("/");
-  // Build a date string that represents midnight in that timezone
-  const midnightLocal = new Date(`${year}-${month}-${day}T00:00:00`);
-  // Adjust to UTC by finding the offset
+  // Anchor the calendar date at midnight UTC so the result is independent
+  // of the host's local TZ (prior bug: `new Date("YYYY-MM-DDT00:00:00")`
+  // without a TZ designator parsed in the system TZ, producing wrong
+  // results on any non-UTC host).
+  const midnightAsUtc = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 0, 0, 0));
+  // offsetMs > 0 when `timezone` is behind UTC; shift UTC-midnight forward
+  // to land on the true local-midnight wall-clock in UTC.
   const offsetMs = getTimezoneOffsetMs(timezone, now);
-  const startUtc = new Date(midnightLocal.getTime() + offsetMs);
+  const startUtc = new Date(midnightAsUtc.getTime() + offsetMs);
 
   return {
     window: "today",

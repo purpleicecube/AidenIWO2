@@ -2619,6 +2619,7 @@ async function executeWorkflowStepWithPocketFlow(
     processingAttemptId: null,
     heartbeatAt: null,
     processingStartedAt: null,
+    contextRequest: null,
   } satisfies WorkOrder;
 
   const tier1Result: Tier1Result = {

@@ -1571,16 +1571,16 @@ export async function registerRoutes(
           description: goal || template.goal || `Workflow execution of "${template.name}"`,
           type: template.category || "operations",
           priority: "medium",
-          status: "processing",
-          submittedBy: actor?.name || "Local Admin",
+          submittedBy: actor?.actorName || "Local Admin",
         });
         effectiveWoId = trackingWo.id;
         await storage.updateWorkOrder(trackingWo.id, {
+          status: "processing",
           gccMemory: {
             "gcc.log": [{ type: "COMMIT", detail: `Auto-created work order to track workflow "${template.name}"`, commit_id: `gcc-${trackingWo.id.slice(0, 8)}`, timestamp: new Date().toISOString() }],
             "gcc.tier": "tier1",
             "gcc.branch": "main",
-            "gcc.metadata": { submittedBy: { source: "workflow_run", actorId: actor?.id || "local-admin", actorName: actor?.name || "Local Admin" } },
+            "gcc.metadata": { submittedBy: { source: "workflow_run", actorId: actor?.actorId || "local-admin", actorName: actor?.actorName || "Local Admin" } },
             "gcc.breadcrumbs": ["created_for_workflow"],
             "gcc.last_action": "created_for_workflow",
           },
@@ -1589,6 +1589,9 @@ export async function registerRoutes(
 
       // Return execution immediately, advance in background
       const execution = await startWorkflowExecution(templateId, effectiveWoId, goal || template.goal, context || {}, pmSubAgentId || undefined, { skipAdvance: true });
+      if (!execution) {
+        return res.status(500).json({ message: "Failed to start workflow execution" });
+      }
       res.status(201).json(execution);
       // Advance workflow asynchronously (don't block the HTTP response)
       const { advanceWorkflowExecution } = await import("./orchestration");

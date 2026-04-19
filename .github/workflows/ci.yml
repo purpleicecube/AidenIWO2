@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Python deps (api-fastapi)
         working-directory: apps/api-fastapi
-        run: uv sync
+        run: uv sync --extra dev
 
       - name: Wait for Postgres
         run: |
@@ -69,6 +69,9 @@ jobs:
           done
           echo "postgres not ready"; exit 1
 
+      # Separate secret-scan step — authoritative for CI. baseline-check.sh
+      # does NOT invoke gitleaks in CI (it soft-skips when the CLI is absent,
+      # which it is here: the gitleaks-action runs out-of-process).
       - name: Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
         env:

@@ -1,8 +1,8 @@
 # ADR-007 — Python toolchain: uv
 
 Date: 2026-04-19
-Status: Accepted
-Deciders: AI, MD (per `IWO3_LOOP_1_PLAN_v0.1.0.md` §9)
+Status: Accepted (v0.1.1 — lockfile policy + dev-extras mandate added per CODEX Loop 1 Phase 1 review)
+Deciders: AI, MD (per `IWO3_LOOP_1_PLAN_v0.1.0.md` §9), with CODEX revision
 
 ## Context
 
@@ -34,9 +34,17 @@ CI install: `uv sync` per app. Local dev: same.
 ## Consequences
 
 - Every Python app ships `pyproject.toml` with `[project.optional-dependencies] dev = [...]` for test/lint tooling.
-- CI uses `astral-sh/setup-uv@v3` + `uv sync --extra dev` per app.
+- CI **and** local commands use `uv sync --extra dev` per app (plain `uv sync` is disallowed for test/lint-critical paths — it omits the dev extras that `pytest`, `ruff`, and `mypy` need).
 - Local dev runbook documents `uv run pytest`, `uv run uvicorn main:app`, etc.
 - No `requirements.txt` files.
+
+## Lockfile policy (CODEX revision)
+
+- Every Python app commits its `uv.lock` file alongside `pyproject.toml`.
+- CI and local `uv sync --extra dev` must run against the committed lockfile — never with `--upgrade` or `--no-lock` on shared paths.
+- Lockfiles are regenerated intentionally by running `uv lock` and committing the result as part of a dep-bump PR.
+- The Loop 1 acceptance gate includes a post-`npm ci` / post-`uv sync` diff check: if any tracked `uv.lock` or `package-lock.json` was modified during install, CI fails. (To be wired in a Loop 1 Phase 1.2 follow-up if not in Phase 1.1.)
+- A Python app that legitimately cannot lock (e.g., a pure-placeholder `pyproject.toml` with zero runtime deps) documents the deferral in its README. Loop 1's `apps/console-streamlit` falls here until real pages ship in Loop 8.
 
 ## Revisit triggers
 
