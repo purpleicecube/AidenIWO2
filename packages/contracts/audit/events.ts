@@ -89,6 +89,16 @@ export const AUDIT_EVENTS = {
   ADAPTER_DISPATCH_SUBMITTED: "adapter_dispatch.submitted",
   ADAPTER_DISPATCH_COMPLETED: "adapter_dispatch.completed",
   ADAPTER_DISPATCH_FAILED: "adapter_dispatch.failed",
+
+  // Loop 4 Phase 1 — permission vocabulary + role mapping + grant
+  // lifecycle. Locked at phase start per IWO3_LOOP_4_APPROVAL_DECISIONS
+  // §Q1 (`lock_upfront`). Phase 4.2 adds authz decision events; Phase
+  // 4.3 adds RLS-related events; Phase 4.4 adds no new events.
+  PERMISSION_CREATED: "permission.created",
+  ROLE_PERMISSION_GRANTED: "role_permission.granted",
+  ROLE_PERMISSION_REVOKED: "role_permission.revoked",
+  PERMISSION_GRANT_CREATED: "permission_grant.created",
+  PERMISSION_GRANT_REVOKED: "permission_grant.revoked",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -153,4 +163,12 @@ export const LOOP_3_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.ADAPTER_CREDENTIAL_REVOKED,
   AUDIT_EVENTS.ADAPTER_POLICY_CREATED,
   AUDIT_EVENTS.ADAPTER_POLICY_UPDATED,
+];
+
+export const LOOP_4_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.PERMISSION_CREATED,
+  AUDIT_EVENTS.ROLE_PERMISSION_GRANTED,
+  AUDIT_EVENTS.ROLE_PERMISSION_REVOKED,
+  AUDIT_EVENTS.PERMISSION_GRANT_CREATED,
+  AUDIT_EVENTS.PERMISSION_GRANT_REVOKED,
 ];

@@ -29,6 +29,13 @@
       "when": 1776630764959,
       "tag": "0004_loop3_phase2_output_adapters",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776638336006,
+      "tag": "0005_loop4_phase1_permissions",
+      "breakpoints": true
     }
   ]
 }

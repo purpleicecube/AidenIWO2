@@ -1,0 +1,485 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-0000a0000001",
+    "permissionKey": "system:admin",
+    "displayName": "System admin",
+    "description": "Unrestricted cross-tenant admin capability.",
+    "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000002",
+    "permissionKey": "client:read",
+    "displayName": "Read client profile",
+    "description": "Read the tenant's client record.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000003",
+    "permissionKey": "client:update",
+    "displayName": "Update client profile",
+    "description": "Update the tenant's client record.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000004",
+    "permissionKey": "user:read",
+    "displayName": "Read users in tenant",
+    "description": "List and read users scoped to this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000005",
+    "permissionKey": "user:update",
+    "displayName": "Update user in tenant",
+    "description": "Update user profile fields for a user in this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000006",
+    "permissionKey": "user:invite",
+    "displayName": "Invite user to tenant",
+    "description": "Create an invitation for a new user into this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000007",
+    "permissionKey": "user:revoke",
+    "displayName": "Revoke user from tenant",
+    "description": "Mark a user revoked for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000008",
+    "permissionKey": "membership:grant",
+    "displayName": "Grant membership",
+    "description": "Attach a user to this tenant with a role.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000009",
+    "permissionKey": "membership:revoke",
+    "displayName": "Revoke membership",
+    "description": "Revoke a user's membership on this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000010",
+    "permissionKey": "prompt_profile:create",
+    "displayName": "Create prompt profile",
+    "description": "Create a new prompt profile.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000011",
+    "permissionKey": "prompt_profile:read",
+    "displayName": "Read prompt profiles",
+    "description": "Read prompt profiles for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000012",
+    "permissionKey": "prompt_profile:publish",
+    "displayName": "Publish prompt profile version",
+    "description": "Mark a prompt profile version published.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000013",
+    "permissionKey": "prompt_profile:deprecate",
+    "displayName": "Deprecate prompt profile version",
+    "description": "Mark a prompt profile version deprecated.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000014",
+    "permissionKey": "prompt_override:apply_style",
+    "displayName": "Apply style override",
+    "description": "Apply a style-only override at prompt-resolve time.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000015",
+    "permissionKey": "prompt_override:apply_profile_swap",
+    "displayName": "Apply profile-swap override",
+    "description": "Swap prompt profile at resolve time.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000016",
+    "permissionKey": "prompt_override:apply_external_send",
+    "displayName": "Apply external-send override",
+    "description": "Override external send policy at resolve time.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000017",
+    "permissionKey": "repository_binding:create",
+    "displayName": "Create repository binding",
+    "description": "Create a read-side repository binding.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000018",
+    "permissionKey": "repository_binding:read",
+    "displayName": "Read repository bindings",
+    "description": "Read repository bindings for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000019",
+    "permissionKey": "repository_binding:update",
+    "displayName": "Update repository binding",
+    "description": "Update a repository binding.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000020",
+    "permissionKey": "repository_binding:delete",
+    "displayName": "Delete repository binding",
+    "description": "Delete a repository binding.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000021",
+    "permissionKey": "data_source_binding:create",
+    "displayName": "Create data source binding",
+    "description": "Create a structured-data source binding.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000022",
+    "permissionKey": "data_source_binding:read",
+    "displayName": "Read data source bindings",
+    "description": "Read data source bindings for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000023",
+    "permissionKey": "data_source_binding:update",
+    "displayName": "Update data source binding",
+    "description": "Update a data source binding.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000024",
+    "permissionKey": "data_source_binding:delete",
+    "displayName": "Delete data source binding",
+    "description": "Delete a data source binding.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000025",
+    "permissionKey": "adapter_config:create",
+    "displayName": "Create adapter config",
+    "description": "Create a client_adapter_config row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000026",
+    "permissionKey": "adapter_config:read",
+    "displayName": "Read adapter configs",
+    "description": "Read client_adapter_configs for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000027",
+    "permissionKey": "adapter_config:update",
+    "displayName": "Update adapter config",
+    "description": "Update a client_adapter_config.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000028",
+    "permissionKey": "adapter_config:delete",
+    "displayName": "Delete adapter config",
+    "description": "Remove a client_adapter_config.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000029",
+    "permissionKey": "adapter_policy:create",
+    "displayName": "Create adapter action policy",
+    "description": "Create an adapter_action_policies row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000030",
+    "permissionKey": "adapter_policy:read",
+    "displayName": "Read adapter action policies",
+    "description": "Read adapter_action_policies for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000031",
+    "permissionKey": "adapter_policy:update",
+    "displayName": "Update adapter action policy",
+    "description": "Update an adapter_action_policies row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000032",
+    "permissionKey": "adapter_policy:delete",
+    "displayName": "Delete adapter action policy",
+    "description": "Delete an adapter_action_policies row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000033",
+    "permissionKey": "adapter_credential:rotate",
+    "displayName": "Rotate adapter credential",
+    "description": "Rotate an adapter_credentials credential_ref.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000034",
+    "permissionKey": "work_order:create",
+    "displayName": "Create work order",
+    "description": "Create a new work_orders row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000035",
+    "permissionKey": "work_order:read",
+    "displayName": "Read work orders",
+    "description": "Read work_orders for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000036",
+    "permissionKey": "work_order:update",
+    "displayName": "Update work order",
+    "description": "Update a work_orders row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000037",
+    "permissionKey": "work_order:submit",
+    "displayName": "Submit work order",
+    "description": "Submit a work_orders row for execution.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000038",
+    "permissionKey": "work_order:cancel",
+    "displayName": "Cancel work order",
+    "description": "Cancel a work_orders row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000039",
+    "permissionKey": "workflow:create",
+    "displayName": "Create workflow",
+    "description": "Create a workflows row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000040",
+    "permissionKey": "workflow:read",
+    "displayName": "Read workflows",
+    "description": "Read workflows for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000041",
+    "permissionKey": "workflow:update",
+    "displayName": "Update workflow",
+    "description": "Update a workflows row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000042",
+    "permissionKey": "workflow:cancel",
+    "displayName": "Cancel workflow",
+    "description": "Cancel a workflows row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000043",
+    "permissionKey": "workflow_template:create",
+    "displayName": "Create workflow template",
+    "description": "Create a workflow_templates row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000044",
+    "permissionKey": "workflow_template:read",
+    "displayName": "Read workflow templates",
+    "description": "Read workflow_templates for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000045",
+    "permissionKey": "workflow_template:update",
+    "displayName": "Update workflow template",
+    "description": "Update a workflow_templates row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000046",
+    "permissionKey": "workflow_template:publish",
+    "displayName": "Publish workflow template",
+    "description": "Mark a workflow_templates row published.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000047",
+    "permissionKey": "workflow_execution:read",
+    "displayName": "Read workflow executions",
+    "description": "Read workflow_executions for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000048",
+    "permissionKey": "workflow_execution:update",
+    "displayName": "Update workflow execution",
+    "description": "Advance workflow_executions state.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000049",
+    "permissionKey": "workflow_step_run:read",
+    "displayName": "Read workflow step runs",
+    "description": "Read workflow_step_runs for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000050",
+    "permissionKey": "workflow_step_run:create",
+    "displayName": "Create workflow step run",
+    "description": "Create a workflow_step_runs row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000051",
+    "permissionKey": "workflow_step_run:update",
+    "displayName": "Update workflow step run",
+    "description": "Advance workflow_step_runs state.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000052",
+    "permissionKey": "execution_cycle:create",
+    "displayName": "Create execution cycle",
+    "description": "Open a new execution_cycles attempt.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000053",
+    "permissionKey": "execution_cycle:reopen",
+    "displayName": "Reopen execution cycle",
+    "description": "Reopen an execution_cycles attempt for retry.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000054",
+    "permissionKey": "output_package:create",
+    "displayName": "Create output package",
+    "description": "Create an output_packages row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000055",
+    "permissionKey": "output_package:read",
+    "displayName": "Read output packages",
+    "description": "Read output_packages for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000056",
+    "permissionKey": "output_package:update",
+    "displayName": "Update output package",
+    "description": "Update an output_packages row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000057",
+    "permissionKey": "output_package:validate",
+    "displayName": "Validate output package",
+    "description": "Mark an output_packages row validated.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000058",
+    "permissionKey": "output_package:submit",
+    "displayName": "Submit output package",
+    "description": "Submit an output_packages row to the registry.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000059",
+    "permissionKey": "output_package:delete",
+    "displayName": "Delete output package",
+    "description": "Delete an output_packages row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000060",
+    "permissionKey": "output_handoff:create",
+    "displayName": "Create output handoff",
+    "description": "Create an output_handoffs row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000061",
+    "permissionKey": "output_handoff:read",
+    "displayName": "Read output handoffs",
+    "description": "Read output_handoffs for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000062",
+    "permissionKey": "output_handoff:update",
+    "displayName": "Update output handoff",
+    "description": "Update an output_handoffs row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000063",
+    "permissionKey": "output_handoff:record",
+    "displayName": "Record handoff provenance",
+    "description": "Write adapter submission provenance fields.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000064",
+    "permissionKey": "output_handoff:approve_send",
+    "displayName": "Approve external send",
+    "description": "Approve an external send on an output_handoffs row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000065",
+    "permissionKey": "output_candidate:select",
+    "displayName": "Select candidate",
+    "description": "Select a candidate output_handoff for finalization.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000066",
+    "permissionKey": "output_candidate:reject",
+    "displayName": "Reject candidate",
+    "description": "Reject a candidate output_handoff.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000067",
+    "permissionKey": "external_execution_result:create",
+    "displayName": "Record external execution result",
+    "description": "Write an external_execution_results row.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000068",
+    "permissionKey": "external_execution_result:read",
+    "displayName": "Read external execution results",
+    "description": "Read external_execution_results for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000069",
+    "permissionKey": "audit_log:read",
+    "displayName": "Read audit log",
+    "description": "Read action_audit_log rows for this tenant.",
+    "scope": "tenant"
+  }
+]

@@ -221,6 +221,23 @@ interface SeedAdapterActionPolicy {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Loop 4 Phase 1 — RBAC vocabulary + role defaults shapes
+// ──────────────────────────────────────────────────────────────────────────
+
+interface SeedPermission {
+  id: string;
+  permissionKey: string;
+  displayName: string;
+  description: string | null;
+  scope: string;
+}
+
+interface SeedRolePermission {
+  role: string;
+  permissionKey: string;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Upsert helpers — Loop 1
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -721,6 +738,49 @@ async function upsertAdapterActionPolicies(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Upsert helpers — Loop 4 Phase 1
+// ──────────────────────────────────────────────────────────────────────────
+
+async function upsertPermissions(
+  c: PoolClient,
+  rows: SeedPermission[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO permissions
+         (id, permission_key, display_name, description, scope)
+       VALUES ($1, $2, $3, $4, $5::permission_scope)
+       ON CONFLICT (id) DO UPDATE SET
+         permission_key = EXCLUDED.permission_key,
+         display_name = EXCLUDED.display_name,
+         description = EXCLUDED.description,
+         scope = EXCLUDED.scope,
+         updated_at = now()`,
+      [r.id, r.permissionKey, r.displayName, r.description, r.scope]
+    );
+  }
+}
+
+async function upsertRolePermissions(
+  c: PoolClient,
+  rows: SeedRolePermission[]
+): Promise<void> {
+  // Resolve permission_key → permission_id via JOIN. Idempotent on the
+  // (role, permission_id) unique index.
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO role_permissions (role, permission_id)
+       SELECT $1::membership_role, p.id
+       FROM permissions p
+       WHERE p.permission_key = $2
+       ON CONFLICT ON CONSTRAINT role_permissions_role_permission_uniq
+       DO UPDATE SET updated_at = now()`,
+      [r.role, r.permissionKey]
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Entry
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -777,6 +837,14 @@ async function main(): Promise<void> {
     "db/seeds/adapter_action_policies.json"
   );
 
+  // Loop 4 Phase 1
+  const permissionsRows = loadJson<SeedPermission[]>(
+    "db/seeds/permissions.json"
+  );
+  const rolePermissionsRows = loadJson<SeedRolePermission[]>(
+    "db/seeds/role_permissions.json"
+  );
+
   const pool = new Pool({ connectionString: url });
   const c = await pool.connect();
   try {
@@ -799,6 +867,8 @@ async function main(): Promise<void> {
     await upsertAdapterActions(c, adapterActionsRows);
     await upsertClientAdapterConfigs(c, clientAdapterConfigsRows);
     await upsertAdapterActionPolicies(c, adapterActionPoliciesRows);
+    await upsertPermissions(c, permissionsRows);
+    await upsertRolePermissions(c, rolePermissionsRows);
     await c.query("COMMIT");
 
     const receipt = {
@@ -821,6 +891,8 @@ async function main(): Promise<void> {
         adapter_actions: adapterActionsRows.length,
         client_adapter_configs: clientAdapterConfigsRows.length,
         adapter_action_policies: adapterActionPoliciesRows.length,
+        permissions: permissionsRows.length,
+        role_permissions: rolePermissionsRows.length,
       },
       sources: {
         clients: "db/seeds/clients.json",
@@ -840,6 +912,8 @@ async function main(): Promise<void> {
         adapter_actions: "db/seeds/adapter_actions.json",
         client_adapter_configs: "db/seeds/client_adapter_configs.json",
         adapter_action_policies: "db/seeds/adapter_action_policies.json",
+        permissions: "db/seeds/permissions.json",
+        role_permissions: "db/seeds/role_permissions.json",
       },
     };
     writeFileSync(

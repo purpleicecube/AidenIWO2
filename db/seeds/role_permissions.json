@@ -1,0 +1,854 @@
+[
+  {
+    "role": "owner",
+    "permissionKey": "system:admin"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "client:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "client:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "user:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "user:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "user:invite"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "user:revoke"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "membership:grant"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "membership:revoke"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "prompt_profile:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "prompt_profile:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "prompt_profile:publish"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "prompt_profile:deprecate"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "prompt_override:apply_style"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "prompt_override:apply_profile_swap"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "prompt_override:apply_external_send"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "repository_binding:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "repository_binding:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "repository_binding:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "repository_binding:delete"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "data_source_binding:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "data_source_binding:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "data_source_binding:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "data_source_binding:delete"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_config:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_config:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_config:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_config:delete"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_policy:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_policy:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_policy:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_policy:delete"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "adapter_credential:rotate"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "work_order:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "work_order:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "work_order:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "work_order:submit"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "work_order:cancel"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow:cancel"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_template:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_template:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_template:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_template:publish"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_execution:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_execution:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_step_run:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_step_run:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workflow_step_run:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "execution_cycle:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "execution_cycle:reopen"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_package:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_package:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_package:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_package:validate"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_package:submit"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_package:delete"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_handoff:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_handoff:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_handoff:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_handoff:record"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_handoff:approve_send"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_candidate:select"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "output_candidate:reject"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "external_execution_result:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "external_execution_result:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "audit_log:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "client:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "client:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "user:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "user:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "user:invite"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "membership:grant"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "membership:revoke"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "prompt_profile:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "prompt_profile:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "prompt_profile:publish"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "prompt_profile:deprecate"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "prompt_override:apply_style"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "prompt_override:apply_profile_swap"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "prompt_override:apply_external_send"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "repository_binding:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "repository_binding:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "repository_binding:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "repository_binding:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "data_source_binding:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "data_source_binding:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "data_source_binding:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "data_source_binding:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_config:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_config:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_config:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_config:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_policy:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_policy:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_policy:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_policy:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "adapter_credential:rotate"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "work_order:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "work_order:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "work_order:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "work_order:submit"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "work_order:cancel"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow:cancel"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_template:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_template:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_template:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_template:publish"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_execution:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_execution:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_step_run:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_step_run:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workflow_step_run:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "execution_cycle:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "execution_cycle:reopen"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_package:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_package:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_package:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_package:validate"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_package:submit"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_package:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_handoff:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_handoff:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_handoff:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_handoff:record"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_handoff:approve_send"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_candidate:select"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "output_candidate:reject"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "external_execution_result:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "external_execution_result:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "audit_log:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "client:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "user:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "prompt_profile:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "repository_binding:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "data_source_binding:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workflow_template:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "external_execution_result:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "work_order:create"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "work_order:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "work_order:update"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "work_order:submit"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "work_order:cancel"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workflow:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workflow:create"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workflow:update"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workflow:cancel"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workflow_execution:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workflow_step_run:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "execution_cycle:create"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "execution_cycle:reopen"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "prompt_override:apply_style"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "output_package:create"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "output_package:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "output_package:update"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "output_package:validate"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "output_package:submit"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "output_handoff:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "client:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "user:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "prompt_profile:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "repository_binding:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "data_source_binding:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "workflow_template:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "external_execution_result:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "work_order:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "workflow:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "workflow_execution:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "workflow_step_run:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "output_package:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "output_handoff:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "output_package:validate"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "output_candidate:select"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "output_candidate:reject"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "prompt_override:apply_style"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "client:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "user:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "prompt_profile:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "repository_binding:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "data_source_binding:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "workflow_template:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "external_execution_result:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "work_order:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "workflow:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "workflow_execution:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "workflow_step_run:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "output_package:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "output_handoff:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "work_order:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "work_order:create"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "work_order:update"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workflow:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workflow:update"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workflow_execution:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workflow_execution:update"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workflow_step_run:create"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workflow_step_run:update"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "execution_cycle:create"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "execution_cycle:reopen"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_package:create"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_package:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_package:update"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_package:validate"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_package:submit"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_handoff:create"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_handoff:record"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "output_handoff:update"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "external_execution_result:create"
+  }
+]

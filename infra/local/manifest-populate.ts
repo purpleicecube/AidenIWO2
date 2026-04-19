@@ -32,6 +32,7 @@ interface ManifestEntry {
 const LOOP_1_VERSION = "iwo3@v0.1.0-loop1";
 const LOOP_2_VERSION = "iwo3@v0.2.0-loop2";
 const LOOP_3_VERSION = "iwo3@v0.3.0-loop3";
+const LOOP_4_VERSION = "iwo3@v0.4.0-loop4";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -68,6 +69,11 @@ const KNOWN_TABLES: ManifestEntry[] = [
   { name: "output_packages",            source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — typed output envelope (ADR-012)" },
   { name: "output_handoffs",            source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — 13-field adapter handoff provenance + candidate shape (ADR-012)" },
   { name: "external_execution_results", source: "iwo3_native", sourceVersion: LOOP_3_VERSION, ownedBy: "drizzle", notes: "Loop 3 Phase 2 — result payload from external adapter target (ADR-012)" },
+
+  // Loop 4 Phase 1 — permission vocabulary + role mapping + per-user grants
+  { name: "permissions",                source: "iwo3_native", sourceVersion: LOOP_4_VERSION, ownedBy: "drizzle", notes: "Loop 4 Phase 1 — locked-upfront permission vocabulary (ADR-014)" },
+  { name: "role_permissions",           source: "iwo3_native", sourceVersion: LOOP_4_VERSION, ownedBy: "drizzle", notes: "Loop 4 Phase 1 — six-role default permission mapping (ADR-014)" },
+  { name: "permission_grants",          source: "iwo3_native", sourceVersion: LOOP_4_VERSION, ownedBy: "drizzle", notes: "Loop 4 Phase 1 — per-user (user,client) allow/deny override (ADR-014)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

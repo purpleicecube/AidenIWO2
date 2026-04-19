@@ -31,3 +31,8 @@ export * from "./adapter_credentials";
 export * from "./output_packages";
 export * from "./output_handoffs";
 export * from "./external_execution_results";
+
+// Loop 4 Phase 1 — permission vocabulary + role mapping + grants
+export * from "./permissions";
+export * from "./role_permissions";
+export * from "./permission_grants";
