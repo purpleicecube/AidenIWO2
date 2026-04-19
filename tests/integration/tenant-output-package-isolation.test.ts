@@ -22,6 +22,7 @@ const LIST_OUTPUT_PACKAGES_FOR_USER = `
   JOIN client_memberships m ON m.client_id = op.client_id AND m.status = 'active'
   JOIN users u ON u.id = m.user_id AND u.status = 'active'
   WHERE u.email = $1
+    AND op.provenance->>'test_marker' = 'tenant-output-package'
   ORDER BY c.designation, op.created_at
 `;
 
@@ -31,6 +32,7 @@ const READ_PKG_FOR_USER = `
   JOIN client_memberships m ON m.client_id = op.client_id AND m.status = 'active'
   JOIN users u ON u.id = m.user_id AND u.status = 'active'
   WHERE u.email = $1 AND op.id = $2
+    AND op.provenance->>'test_marker' = 'tenant-output-package'
 `;
 
 describeIwo3("Loop 3 Phase 2 — tenant output_package isolation", () => {

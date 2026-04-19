@@ -78,6 +78,17 @@ export const AUDIT_EVENTS = {
   ADAPTER_CREDENTIAL_REVOKED: "adapter_credential.revoked",
   ADAPTER_POLICY_CREATED: "adapter_policy.created",
   ADAPTER_POLICY_UPDATED: "adapter_policy.updated",
+
+  // Loop 3 Phase 4 — adapter dispatch lifecycle (registry + test-double
+  // Gamma demonstrator). Locked at phase start per
+  // IWO3_LOOP_3_APPROVAL_DECISIONS §Q6.
+  ADAPTER_DISPATCH_INITIATED: "adapter_dispatch.initiated",
+  ADAPTER_DISPATCH_POLICY_REJECTED: "adapter_dispatch.policy_rejected",
+  ADAPTER_DISPATCH_APPROVAL_REQUIRED: "adapter_dispatch.approval_required",
+  ADAPTER_DISPATCH_PACKAGE_INVALID: "adapter_dispatch.package_invalid",
+  ADAPTER_DISPATCH_SUBMITTED: "adapter_dispatch.submitted",
+  ADAPTER_DISPATCH_COMPLETED: "adapter_dispatch.completed",
+  ADAPTER_DISPATCH_FAILED: "adapter_dispatch.failed",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -111,6 +122,16 @@ export const LOOP_3_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.WORKFLOW_EXECUTION_COMPLETED,
   AUDIT_EVENTS.WORKFLOW_STEP_RUN_COMPLETED,
   AUDIT_EVENTS.EXECUTION_CYCLE_STARTED,
+];
+
+export const LOOP_3_PHASE_4_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.ADAPTER_DISPATCH_INITIATED,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_POLICY_REJECTED,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_APPROVAL_REQUIRED,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_PACKAGE_INVALID,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_SUBMITTED,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_COMPLETED,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_FAILED,
 ];
 
 export const LOOP_3_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
