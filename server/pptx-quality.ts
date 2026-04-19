@@ -87,7 +87,10 @@ export function parseContentContract(contractText: string | null | undefined): P
   // Loop 14 Patch B: "cover" and "thank you" are optional by default — they are
   // common deck conventions but not hard requirements. Only enforce sections that
   // represent real content obligations (executive summary, roadmap, etc.).
-  const OPTIONAL_BY_DEFAULT = new Set(["cover", "title slide", "thank you", "thanks", "closing slide", "q&a"]);
+  const OPTIONAL_BY_DEFAULT = new Set([
+    "cover", "cover slide", "title", "title slide", "opening", "opening slide",
+    "thank you", "thanks", "closing", "closing slide", "q&a", "questions",
+  ]);
   const sectionsMatch = contractText.match(/required\s+sections?\s*:?\s*([^\n]+)/i);
   if (sectionsMatch) {
     result.requiredSections = sectionsMatch[1]
@@ -174,8 +177,12 @@ function sectionPresent(deliverable: string, section: string): boolean {
       if (lower.includes(syn)) return true;
     }
   }
-  // For "cover": also match if the first heading/slide exists (slide 1 is implicitly the cover)
-  if (section.toLowerCase() === "cover") {
+  // Slide 1 is implicitly the cover/title slide — treat any first heading as satisfying this
+  // section, regardless of whether the contract spells it "cover", "cover slide", "title",
+  // "title slide", or "opening". LLMs naturally write "# <Deck Title>" as their first heading
+  // rather than a literal "# Cover Slide", and rejecting that was blocking Gamma generation.
+  const coverAliases = ["cover", "cover slide", "title", "title slide", "opening", "opening slide"];
+  if (coverAliases.includes(section.toLowerCase())) {
     const firstHeading = deliverable.match(/^#{1,3}\s+.+/m);
     const firstSlideDelim = deliverable.match(/^---\s*$/m);
     if (firstHeading || firstSlideDelim) return true;
@@ -430,6 +437,66 @@ export function buildPptxReviewSupplement(
   parts.push("If the source content would produce poor slides, recommend request_revision and describe the issues.");
 
   return parts.join("\n");
+}
+
+// ─── Preflight → Revision Guidance ───────────────────────────────────────────
+// When preflight hard-fails, Aiden's LLM review often summarizes the issue in
+// its own words (e.g., "improve slide structure") rather than the literal
+// preflight failure. The sub-agent then misses the actionable instruction
+// (e.g., "add an H1 heading called 'Cover Slide'"). This helper rewrites
+// preflight hardFailures as explicit, actionable revision instructions and
+// injects them into the review's issues list so the revision prompt contains
+// unambiguous directives.
+
+function titleCaseSection(s: string): string {
+  return s.split(/\s+/).map(w => w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w).join(" ");
+}
+
+function preflightFailureToInstruction(failure: string): string {
+  const missingSection = failure.match(/Required section "([^"]+)" not found/i);
+  if (missingSection) {
+    const name = titleCaseSection(missingSection[1]);
+    return `PPTX preflight: required section "${missingSection[1]}" is missing. Add an H1 or H2 heading literally named "# ${name}" (or "## ${name}") to your markdown deliverable.`;
+  }
+  const belowMin = failure.match(/Slide count (\d+) is below contract minimum (\d+)/i);
+  if (belowMin) {
+    return `PPTX preflight: deliverable has only ${belowMin[1]} slides but the contract requires at least ${belowMin[2]}. Split content across more slides using H1/H2 headings or "---" separators.`;
+  }
+  return `PPTX preflight: ${failure}`;
+}
+
+export interface PreflightEnrichableReview {
+  approved: boolean;
+  score: number;
+  summary: string;
+  issues: string[];
+  recommendation: "approve" | "request_revision" | "block";
+}
+
+/**
+ * Enrich an Aiden quality review with explicit PPTX preflight failures.
+ * If preflight failed, preflight issues are prepended to review.issues as
+ * actionable directives, and the review is downgraded to request_revision
+ * (so a passing Aiden review cannot overrule a failing preflight).
+ */
+export function enrichReviewWithPreflight<T extends PreflightEnrichableReview>(
+  review: T,
+  preflight: PreflightResult | null,
+): T {
+  if (!preflight || preflight.ok || preflight.hardFailures.length === 0) return review;
+
+  const preflightIssues = preflight.hardFailures.map(preflightFailureToInstruction);
+  const alreadyMentioned = new Set(review.issues.map(i => i.toLowerCase()));
+  const newIssues = preflightIssues.filter(i => !alreadyMentioned.has(i.toLowerCase()));
+
+  return {
+    ...review,
+    approved: false,
+    recommendation: "request_revision",
+    score: Math.min(review.score, 0.65),
+    issues: [...newIssues, ...review.issues],
+    summary: `${review.summary} [PPTX preflight failed: ${preflight.hardFailures.length} hard issue(s) — revision required]`,
+  };
 }
 
 // ─── Slide Source Shaper ─────────────────────────────────────────────────────

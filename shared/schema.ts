@@ -1124,6 +1124,33 @@ export const insertContextRetrievalSchema = createInsertSchema(contextRetrievals
 export type InsertContextRetrieval = z.infer<typeof insertContextRetrievalSchema>;
 export type ContextRetrieval = typeof contextRetrievals.$inferSelect;
 
+// ==================== Pipelines ====================
+
+export const pipelines = pgTable("pipelines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  overview: text("overview"),             // Markdown (.md) content
+  diagram: text("diagram"),               // Mermaid (.mmd) content
+  outputFormat: text("output_format"),     // "pptx" | "pdf" | "html" | "docx" | "md" | null
+  category: text("category").notNull().default("general"),  // research, presentation, document, web, sop, etc.
+  status: text("status").notNull().default("active"),       // active | draft | archived
+  owner: text("owner"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPipelineSchema = createInsertSchema(pipelines).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPipeline = z.infer<typeof insertPipelineSchema>;
+export type Pipeline = typeof pipelines.$inferSelect;
+
 // --- Know-How Retrieval Contracts (pure types) ---
 
 export type ContextSourceType =

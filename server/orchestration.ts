@@ -2,10 +2,10 @@ import { storage } from "./storage";
 import type { WorkOrder, SubAgent, WorkflowStep, WorkflowStepRun, InsertChecklistItem } from "@shared/schema";
 import { runTier1WithLLM, runTier2WithLLM, resolveSubAgentLlmConfig, runAidenQualityReview, type Tier1Result, type Tier2Result } from "./llm-client";
 import { fileWorkOrderOutput } from "./workspace-filing";
-import { pocketflowExecute, detectRequiredFormatFromText, postProcessWorkflowDeliverable } from "./pocketflow";
+import { pocketflowExecute, detectRequiredFormatFromText, postProcessWorkflowDeliverable, resolveWorkflowGammaPolicy } from "./pocketflow";
 import crypto from "crypto";
 import { evaluateDoneContract, buildWorkOrderCloseoutContext, type DoneDecision } from "./done-contract";
-import { buildPptxReviewSupplement, type PreflightResult, type GammaComplianceResult, type ParsedContract } from "./pptx-quality";
+import { buildPptxReviewSupplement, enrichReviewWithPreflight, type PreflightResult, type GammaComplianceResult, type ParsedContract } from "./pptx-quality";
 import { resolveExecutionStrategy, type ResolverResult } from "./execution-strategy-resolver";
 
 // ─── Watchdog: Heartbeat + Attempt Ownership ─────────────────────────────────
@@ -1032,6 +1032,8 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
       }
     }
 
+    qualityReview = enrichReviewWithPreflight(qualityReview, pptxPreflight || null);
+
     await storage.createExecutionLog({
       workOrderId: orderId,
       tier: 1,
@@ -1200,6 +1202,7 @@ export async function processWorkOrder(orderId: string, attemptId?: string): Pro
             runAidenQualityReview(settings!, revisedOrder, revDeliverable, revPfMeta?.convergenceScore ?? 0, revPfMeta?.iterations ?? 1, revPfMeta?.stepResults?.length ?? 0, executorLabel, hadSearchTools, revPostProcessedFile, revPptxSupplement),
             attemptId,
           );
+          revQualityReview = enrichReviewWithPreflight(revQualityReview, revPptxPreflight || null);
           await storage.createExecutionLog({
             workOrderId: orderId, tier: 1,
             action: `Aiden: Revision ${revisionsDone} Quality ${revQualityReview.approved ? "Approved" : "Flagged"}`,
@@ -2407,15 +2410,21 @@ async function handleWorkflowCompletion(
             });
 
             try {
+              const wfGammaPolicy = await resolveWorkflowGammaPolicy(
+                execution.workOrderId,
+                execution.templateId,
+                requiredFormat,
+              );
               stepPostProcessedFile = await postProcessWorkflowDeliverable(
                 workProduct.deliverable,
                 requiredFormat,
                 execution.workOrderId,
                 parentWo.title,
+                wfGammaPolicy,
               );
               if (stepPostProcessedFile) {
                 addChecklistItem(execution.workOrderId, "filing",
-                  `Workflow post-processed: ${requiredFormat.toUpperCase()} binary generated from assembled work product`,
+                  `Workflow post-processed: ${requiredFormat.toUpperCase()} binary generated${wfGammaPolicy ? ` via Gamma (${wfGammaPolicy.templateKey})` : " (local)"}`,
                   "system"
                 );
               }
@@ -2522,8 +2531,11 @@ async function handleWorkflowCompletion(
         const requiredFormat = detectRequiredFormatFromText(parentWo.title, parentWo.description || "");
         if (requiredFormat) {
           try {
+            const wfGammaPolicy = await resolveWorkflowGammaPolicy(
+              execution.workOrderId, execution.templateId, requiredFormat,
+            );
             fallbackPostProcessedFile = await postProcessWorkflowDeliverable(
-              workProduct.deliverable, requiredFormat, execution.workOrderId, parentWo.title,
+              workProduct.deliverable, requiredFormat, execution.workOrderId, parentWo.title, wfGammaPolicy,
             );
           } catch (ppErr: any) {
             console.warn(`[workflow-postprocess] Fallback post-process failed: ${ppErr.message}`);

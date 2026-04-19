@@ -33,10 +33,11 @@ const environmentItems = [
 ];
 
 const configItems = [
-  { title: "Sub-Agents", url: "/sub-agents", icon: Bot, minRole: "admin" },
-  { title: "Workflows", url: "/workflows", icon: GitBranch, minRole: "admin" },
-  { title: "Tools", url: "/tools", icon: Wrench, minRole: "admin" },
   { title: "Aiden Settings", url: "/settings", icon: Brain, minRole: "admin" },
+  { title: "Sub-Agents", url: "/sub-agents", icon: Bot, minRole: "admin" },
+  { title: "Tools", url: "/tools", icon: Wrench, minRole: "admin" },
+  { title: "Pipelines", url: "/pipelines", icon: Layers, minRole: "admin" },
+  { title: "Workflows", url: "/workflows", icon: GitBranch, minRole: "admin" },
   { title: "User Management", url: "/users", icon: Users, minRole: "admin" },
 ];
 

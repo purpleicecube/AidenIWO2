@@ -93,6 +93,9 @@ import {
   codeBlocks,
   type InsertContextRetrieval,
   contextRetrievals,
+  type Pipeline,
+  type InsertPipeline,
+  pipelines,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, asc, inArray } from "drizzle-orm";
@@ -301,6 +304,14 @@ export interface IStorage {
   searchArtifactsByName(keyword: string): Promise<Artifact[]>;
   getArtifactFolderByPath(path: string): Promise<ArtifactFolder | undefined>;
   createContextRetrieval(record: InsertContextRetrieval): Promise<void>;
+
+  // Pipelines
+  getPipelines(): Promise<Pipeline[]>;
+  getPipeline(id: string): Promise<Pipeline | undefined>;
+  getPipelineBySlug(slug: string): Promise<Pipeline | undefined>;
+  createPipeline(pipeline: InsertPipeline): Promise<Pipeline>;
+  updatePipeline(id: string, updates: Partial<Pipeline>): Promise<Pipeline | undefined>;
+  deletePipeline(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1306,6 +1317,39 @@ export class DatabaseStorage implements IStorage {
 
   async createContextRetrieval(record: InsertContextRetrieval): Promise<void> {
     await db.insert(contextRetrievals).values(record);
+  }
+  // Pipelines
+  async getPipelines(): Promise<Pipeline[]> {
+    return db.select().from(pipelines).orderBy(pipelines.name);
+  }
+
+  async getPipeline(id: string): Promise<Pipeline | undefined> {
+    const [entry] = await db.select().from(pipelines).where(eq(pipelines.id, id));
+    return entry;
+  }
+
+  async getPipelineBySlug(slug: string): Promise<Pipeline | undefined> {
+    const [entry] = await db.select().from(pipelines).where(eq(pipelines.slug, slug));
+    return entry;
+  }
+
+  async createPipeline(pipeline: InsertPipeline): Promise<Pipeline> {
+    const [created] = await db.insert(pipelines).values(pipeline).returning();
+    return created;
+  }
+
+  async updatePipeline(id: string, updates: Partial<Pipeline>): Promise<Pipeline | undefined> {
+    const [updated] = await db
+      .update(pipelines)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(pipelines.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePipeline(id: string): Promise<boolean> {
+    const result = await db.delete(pipelines).where(eq(pipelines.id, id)).returning();
+    return result.length > 0;
   }
 }
 

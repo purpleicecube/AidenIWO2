@@ -1011,7 +1011,7 @@ Operator: Darrel Vaughn | Reviewer: Claude Code (Opus 4.6)
 
 Operator: Darrel Vaughn | Reviewer: Claude Code (Opus 4.6)
 
-**Note:** Loops 15–20 below are **retrospective normalization** per `LOOP_SOP.md`. Last contemporaneously documented loop: Loop 14 + Addendum (2026-03-21). Full implementation report: `WS006_AIDEN(TIB)/05_Artifacts/IWO2_KNOWHOW_CHAT_RETRIEVAL_IMPLEMENTATION_REPORT_v0.1.0.md`.
+**Note:** Loops 15–20 below are **retrospective normalization** per `LOOP_SOP.md`. Last contemporaneously documented loop: Loop 14 + Addendum (2026-03-21). Full implementation report: `WS006_AIDEN(GLOBAL)/05_Artifacts/IWO2_KNOWHOW_CHAT_RETRIEVAL_IMPLEMENTATION_REPORT_v0.1.0.md`.
 
 ### Loop 15: BUG-054 — Know-How Parser Fix (High)
 

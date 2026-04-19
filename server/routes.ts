@@ -4516,6 +4516,74 @@ ${await buildWorkspaceIndex()}`;
     }
   });
 
+  // ==================== Pipelines ====================
+
+  app.get("/api/pipelines", isAuth, requireRole("viewer"), async (_req, res) => {
+    try {
+      const list = await storage.getPipelines();
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch pipelines" });
+    }
+  });
+
+  app.get("/api/pipelines/:id", isAuth, requireRole("viewer"), async (req, res) => {
+    try {
+      const entry = await storage.getPipeline(req.params.id);
+      if (!entry) return res.status(404).json({ message: "Pipeline not found" });
+      res.json(entry);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch pipeline" });
+    }
+  });
+
+  app.post("/api/pipelines", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { name, slug, description, overview, diagram, outputFormat, category, status, owner, metadata } = req.body;
+      if (!name || !slug) {
+        return res.status(400).json({ message: "name and slug are required" });
+      }
+      const entry = await storage.createPipeline({
+        name,
+        slug,
+        description: description || null,
+        overview: overview || null,
+        diagram: diagram || null,
+        outputFormat: outputFormat || null,
+        category: category || "general",
+        status: status || "active",
+        owner: owner || null,
+        metadata: metadata || null,
+      });
+      res.status(201).json(entry);
+    } catch (err: any) {
+      if (err.message?.includes("unique") || err.code === "23505") {
+        return res.status(409).json({ message: `Pipeline slug "${req.body.slug}" already exists` });
+      }
+      res.status(500).json({ message: "Failed to create pipeline" });
+    }
+  });
+
+  app.put("/api/pipelines/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const updated = await storage.updatePipeline(req.params.id, req.body);
+      if (!updated) return res.status(404).json({ message: "Pipeline not found" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to update pipeline" });
+    }
+  });
+
+  app.delete("/api/pipelines/:id", isAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const deleted = await storage.deletePipeline(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Pipeline not found" });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to delete pipeline" });
+    }
+  });
+
   // ==================== Gamma Template Registry ====================
 
   app.get("/api/gamma-templates", isAuth, requireRole("viewer"), async (_req, res) => {

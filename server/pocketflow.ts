@@ -2285,6 +2285,92 @@ export function detectRequiredFormatFromText(title: string, description: string)
 }
 
 /**
+ * Resolve a Gamma policy for the workflow post-processing context.
+ *
+ * Mirrors the priority order used in pocketflowExecute():
+ *   1. WO-level override (order.gammaTemplateKey)
+ *   2. Workflow template default (workflowTemplate.gammaTemplateKey)
+ *   3. Global Gamma settings (templateKey, then legacy gammaId)
+ *
+ * Returns null if no policy is resolvable — caller should fall back to local.
+ *
+ * BUG-039 residual: previously the workflow post-process ran with no policy
+ * at all, so Gamma was never called even when a template was configured.
+ */
+export async function resolveWorkflowGammaPolicy(
+  workOrderId: string,
+  workflowTemplateId: string | null | undefined,
+  expectedFormat: "pptx" | "pdf",
+): Promise<{
+  templateKey: string;
+  resolvedGammaId: string;
+  mode: string;
+  contentContract: string | null;
+  fallbackAllowed: boolean;
+} | null> {
+  try {
+    let templateKey: string | null = null;
+
+    // Priority 1: WO-level override
+    const order = await storage.getWorkOrder(workOrderId);
+    if (order?.gammaTemplateKey) {
+      templateKey = order.gammaTemplateKey;
+    }
+
+    // Priority 2: Workflow template
+    if (!templateKey && workflowTemplateId) {
+      const wfTemplate = await storage.getWorkflowTemplate(workflowTemplateId);
+      if (wfTemplate?.pptxEngine === "local") {
+        return null; // Explicit local override
+      }
+      if (wfTemplate?.gammaTemplateKey) {
+        templateKey = wfTemplate.gammaTemplateKey;
+      }
+    }
+
+    // Priority 3: Global default
+    if (!templateKey) {
+      const gammaSettings = await storage.getGammaSettings();
+      if (gammaSettings?.templateKey) {
+        templateKey = gammaSettings.templateKey;
+      } else if (gammaSettings?.enabled && gammaSettings?.gammaId) {
+        // Legacy: raw gammaId without registry
+        return {
+          templateKey: "_legacy",
+          resolvedGammaId: gammaSettings.gammaId,
+          mode: "flexible",
+          contentContract: null,
+          fallbackAllowed: gammaSettings.fallbackToLocal !== false,
+        };
+      }
+    }
+
+    if (!templateKey) return null;
+
+    // Resolve templateKey through registry — prefer format-matched entry
+    let entry = await storage.getGammaTemplateByKey(templateKey);
+    if (!entry || entry.status !== "approved" || entry.outputFormat !== expectedFormat) {
+      const all = await storage.getGammaTemplates();
+      const match = all.find(t => t.status === "approved" && t.outputFormat === expectedFormat);
+      if (match) entry = match;
+    }
+
+    if (!entry || entry.status !== "approved") return null;
+
+    return {
+      templateKey: entry.templateKey,
+      resolvedGammaId: entry.gammaId,
+      mode: entry.mode,
+      contentContract: entry.contentContract,
+      fallbackAllowed: entry.mode !== "template_locked",
+    };
+  } catch (err: any) {
+    console.warn(`[resolveWorkflowGammaPolicy] ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Run PPTX/PDF post-processing on a deliverable string outside of PocketFlow.
  * Uses Gamma policy from the WO's workflow template settings if available,
  * otherwise falls back to local conversion.

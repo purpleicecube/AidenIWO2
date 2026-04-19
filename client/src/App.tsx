@@ -25,6 +25,7 @@ import SandboxPage from "@/pages/sandbox";
 import ChatPage from "@/pages/chat";
 import LandingPage from "@/pages/landing";
 import UserManagementPage from "@/pages/user-management";
+import PipelinesPage from "@/pages/pipelines";
 import AttributionsPage from "@/pages/attributions";
 import StitchAccessPage from "@/pages/stitch-access";
 
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/sandbox" component={SandboxPage} />
       <Route path="/chat" component={ChatPage} />
       <Route path="/users" component={UserManagementPage} />
+      <Route path="/pipelines" component={PipelinesPage} />
       <Route path="/attributions" component={AttributionsPage} />
       <Route path="/design-lab" component={StitchAccessPage} />
       <Route component={NotFound} />
