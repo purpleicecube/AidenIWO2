@@ -11,7 +11,10 @@ from shell import page_requires_api
 
 
 def main() -> None:
-    st.markdown("## 🎯 Handoffs & Candidate Review")
+    st.markdown(
+        '<h2 style="margin:0 0 14px 0; font-size:1.5rem; font-weight:700;">Handoffs & Candidate Review</h2>',
+        unsafe_allow_html=True,
+    )
 
     api = page_requires_api()
     if api is None:

@@ -110,6 +110,13 @@ class PermissionDecision(BaseModel):
     role: Optional[str] = None
 
 
+class WorkOrderMetrics(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    total: int
+    by_status: dict[str, int]
+    reopened_count: int
+
+
 class ApiClient:
     def __init__(
         self,
@@ -174,6 +181,31 @@ class ApiClient:
     def get_work_order(self, wo_id: str) -> WorkOrderRow:
         data = self._request("GET", f"/work_orders/{wo_id}")
         return WorkOrderRow(**data)
+
+    def work_order_metrics(self) -> WorkOrderMetrics:
+        data = self._request("GET", "/work_orders/metrics")
+        return WorkOrderMetrics(**data)
+
+    def create_work_order(
+        self,
+        *,
+        title: str,
+        description: Optional[str],
+        wo_type: str,
+        priority: str,
+        correlation_id: Optional[str],
+    ) -> dict:
+        return self._request(
+            "POST",
+            "/work_orders",
+            json={
+                "title": title,
+                "description": description,
+                "type": wo_type,
+                "priority": priority,
+                "correlation_id": correlation_id,
+            },
+        )
 
     def transition_work_order(
         self, wo_id: str, to: str, reason: Optional[str] = None

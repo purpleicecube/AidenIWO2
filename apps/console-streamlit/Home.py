@@ -24,37 +24,41 @@ def main() -> None:
         page_icon="🧭",
         layout="wide",
         initial_sidebar_state="expanded",
+        menu_items={"Get help": None, "Report a bug": None, "About": None},
     )
     render_sidebar_shell()
 
+    # Icons: Streamlit `:material/*:` (monochrome line-style; inherits
+    # text color). Replaces the Loop 8.3-initial emoji set which read as
+    # amateur next to IWO2's lucide-style nav.
     pages = {
         "Navigation": [
-            st.Page("views/dashboard.py", title="Dashboard", icon="🏠", default=True),
-            st.Page("views/chat.py", title="Chat with Aiden", icon="💬"),
-            st.Page("views/work_orders.py", title="Work Orders", icon="📋"),
-            st.Page("views/submit_order.py", title="Submit Order", icon="➕"),
-            st.Page("views/system_health.py", title="System Health", icon="🩺"),
+            st.Page("views/dashboard.py", title="Dashboard", icon=":material/dashboard:", default=True),
+            st.Page("views/chat.py", title="Chat with Aiden", icon=":material/forum:"),
+            st.Page("views/work_orders.py", title="Work Orders", icon=":material/assignment:"),
+            st.Page("views/submit_order.py", title="Submit Order", icon=":material/add_circle_outline:"),
+            st.Page("views/system_health.py", title="System Health", icon=":material/monitor_heart:"),
         ],
         "Environments": [
-            st.Page("views/workspace.py", title="Workspace", icon="🗂️"),
-            st.Page("views/sandbox.py", title="Sandbox", icon="🧪"),
-            st.Page("views/design_lab.py", title="Design Lab", icon="🎨"),
+            st.Page("views/workspace.py", title="Workspace", icon=":material/folder_open:"),
+            st.Page("views/sandbox.py", title="Sandbox", icon=":material/science:"),
+            st.Page("views/design_lab.py", title="Design Lab", icon=":material/palette:"),
         ],
         "Architecture": [
-            st.Page("views/tier_overview.py", title="Tier Overview", icon="📐"),
+            st.Page("views/tier_overview.py", title="Tier Overview", icon=":material/layers:"),
         ],
         "Configuration": [
-            st.Page("views/aiden_settings.py", title="Aiden Settings", icon="⚙️"),
-            st.Page("views/sub_agents.py", title="Sub-Agents", icon="🤖"),
-            st.Page("views/tools.py", title="Tools", icon="🛠️"),
-            st.Page("views/pipelines.py", title="Pipelines", icon="🔗"),
-            st.Page("views/workflows.py", title="Workflows", icon="🔄"),
-            st.Page("views/user_management.py", title="User Management", icon="👥"),
+            st.Page("views/aiden_settings.py", title="Aiden Settings", icon=":material/settings:"),
+            st.Page("views/sub_agents.py", title="Sub-Agents", icon=":material/smart_toy:"),
+            st.Page("views/tools.py", title="Tools", icon=":material/build:"),
+            st.Page("views/pipelines.py", title="Pipelines", icon=":material/conversion_path:"),
+            st.Page("views/workflows.py", title="Workflows", icon=":material/account_tree:"),
+            st.Page("views/user_management.py", title="User Management", icon=":material/group:"),
         ],
         "Technical Console": [
-            st.Page("views/output_packages.py", title="Output Packages", icon="📦"),
-            st.Page("views/handoffs.py", title="Handoffs", icon="🎯"),
-            st.Page("views/audit_log.py", title="Audit Log", icon="📜"),
+            st.Page("views/output_packages.py", title="Output Packages", icon=":material/inventory_2:"),
+            st.Page("views/handoffs.py", title="Handoffs", icon=":material/send:"),
+            st.Page("views/audit_log.py", title="Audit Log", icon=":material/history:"),
         ],
     }
 

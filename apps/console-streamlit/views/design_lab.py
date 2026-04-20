@@ -26,11 +26,16 @@ def _tool_card(icon: str, name: str, status: str, blurb: str) -> None:
 
 
 def main() -> None:
-    st.markdown("## 🎨 Design Lab")
-    st.caption(
-        "Design tooling lane for IWO3 — Gamma / sandbox PPTX/PDF "
-        "production, Figma + Stitch + Claude Design hooks. Live "
-        "external calls are Loop 10+ with separate approval."
+    st.markdown(
+        """
+        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">Design Lab</h2>
+        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
+          Design tooling lane — Gamma / sandbox PPTX/PDF production plus
+          Figma / Stitch / Claude Design hooks. All live integrations are
+          Loop 10+ and go through separate approval.
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     if page_requires_api() is None:

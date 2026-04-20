@@ -1,17 +1,24 @@
 # IWO3 Operator Console — streamlit theme.
 #
-# Aligned with IWO2 visual language (per CLAUDE.md guidance): deep
-# navy + purple accent on a light lavender base. Lexend SemiBold for
-# headings, Barlow Regular for body. These are the same tokens used
-# by the WS016 DigiFlow Streamlit deck.
+# Aligned with IWO2 product-shell visual language (Loop 8.3 R-014
+# correction): IWO2 primary blue on a near-white surface with deep
+# navy text. Palette was re-baselined away from the earlier purple
+# Klear.ai brand tokens after Darrel review of Loop 8.3 corrective
+# cut; see ADR-019 + LOOP_8_3_RECORD.md for context.
 
 [theme]
 base = "light"
-primaryColor = "#8B49E2"
-backgroundColor = "#F3F4FA"
+primaryColor = "#1E5F91"
+backgroundColor = "#FAFBFC"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#091C53"
+textColor = "#111827"
 font = "sans serif"
 
 [server]
 headless = true
+
+[client]
+toolbarMode = "minimal"
+
+[ui]
+hideTopBar = true

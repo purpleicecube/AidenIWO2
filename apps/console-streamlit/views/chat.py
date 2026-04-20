@@ -50,10 +50,14 @@ def _placeholder_reply(user_text: str) -> dict[str, Any]:
 
 
 def main() -> None:
-    st.markdown("## 💬 Chat with Aiden")
-    st.caption(
-        "First-pass chat surface for the IWO3 operator console. "
-        "Messages persist in session state only."
+    st.markdown(
+        """
+        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">Chat with Aiden</h2>
+        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
+          Ask Aiden anything. Messages persist in this browser session only.
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     api = page_requires_api()

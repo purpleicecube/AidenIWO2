@@ -21,8 +21,15 @@ def _tier_row(icon: str, tier: str, subtitle: str, body: str) -> None:
 
 
 def main() -> None:
-    st.markdown("## 📐 Tier Overview")
-    st.caption("AIDEN's tier architecture — what runs at each layer.")
+    st.markdown(
+        """
+        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">Tier Overview</h2>
+        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
+          AIDEN's tier architecture — what runs at each layer.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if page_requires_api() is None:
         return

@@ -67,7 +67,15 @@ def _transition_button(api, wo_id: str, from_status: str, to_status: str) -> Non
 
 
 def main() -> None:
-    st.markdown("## 📋 Work Orders")
+    st.markdown(
+        """
+        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">Work Orders</h2>
+        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
+          Tenant-scoped work orders with role-aware transition actions.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     api = page_requires_api()
     if api is None:

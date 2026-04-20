@@ -10,8 +10,15 @@ from shell import page_requires_api
 
 
 def main() -> None:
-    st.markdown("## 🩺 System Health")
-    st.caption("Live checks against the FastAPI runtime + Postgres backing store.")
+    st.markdown(
+        """
+        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">System Health</h2>
+        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
+          Live checks against the FastAPI runtime + Postgres backing store.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     api = page_requires_api()
     if api is None:

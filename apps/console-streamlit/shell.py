@@ -46,58 +46,178 @@ TENANT_LABELS: dict[str, str] = {
 # minimal + brand-aligned.
 _CSS = """
 <style>
+  /* ── Global tone — tighten Streamlit's default leading + restore IWO2 neutrals ── */
+  html, body, [data-testid="stAppViewContainer"] {
+    color: #111827;
+    background: #FAFBFC;
+  }
+  [data-testid="stAppViewContainer"] .main .block-container {
+    padding-top: 1.6rem; padding-bottom: 2rem; max-width: 1400px;
+  }
+  h1, h2, h3, h4, h5 { color: #111827; letter-spacing: -0.01em; }
+
+  /* ── Sidebar shell ── */
   [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #FFFFFF 0%, #F3F4FA 100%);
-    border-right: 1px solid #E5E7F2;
+    background: #FFFFFF;
+    border-right: 1px solid #E5E7EB;
   }
   [data-testid="stSidebarHeader"] + div { padding-top: 0 !important; }
+  [data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+    padding-top: 2px; padding-bottom: 2px;
+  }
+  [data-testid="stSidebarNav"] ul { padding: 0 4px; }
+  /* Group-label tightening — uppercase with small leading */
+  [data-testid="stSidebarNav"] > div > span,
+  [data-testid="stSidebarNav"] [data-testid="stSidebarNavSeparator"] + span {
+    font-size: 0.7rem !important; letter-spacing: 0.06em;
+    color: #6B7280 !important; text-transform: uppercase;
+    padding: 10px 12px 4px 12px !important;
+  }
+  [data-testid="stSidebarNav"] a {
+    border-radius: 6px; padding: 5px 8px; font-size: 0.86rem;
+    color: #374151; line-height: 1.25;
+  }
+  [data-testid="stSidebarNav"] a:hover { background: #F3F4F6; }
+  [data-testid="stSidebarNav"] a[aria-current="page"] {
+    background: #EFF6FF; color: #1E40AF; font-weight: 600;
+  }
+  /* Suppress the top-right hamburger + decoration strip */
+  [data-testid="stToolbar"] { display: none !important; }
+  [data-testid="stDecoration"] { display: none !important; }
+  [data-testid="stHeader"] { background: transparent; height: 0; }
+
   .iwo3-brand {
     display: flex; gap: 10px; align-items: center;
-    padding: 14px 10px 8px 10px; border-bottom: 1px solid #E5E7F2;
-    margin-bottom: 6px;
+    padding: 16px 14px 12px 14px; border-bottom: 1px solid #E5E7EB;
+    margin-bottom: 4px;
   }
   .iwo3-brand .mark {
     width: 34px; height: 34px; border-radius: 8px;
-    background: linear-gradient(135deg, #8B49E2, #37517E);
+    background: linear-gradient(135deg, #2563EB, #1E3A8A);
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 700;
+    color: white; font-weight: 700; font-size: 0.96rem;
+    box-shadow: 0 1px 2px rgba(30, 64, 175, 0.25);
   }
-  .iwo3-brand .name { font-weight: 700; color: #091C53; line-height: 1.15; }
-  .iwo3-brand .sub  { font-size: 0.78rem; color: #4a5a8a; }
-  .iwo3-group-label {
-    text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em;
-    color: #4a5a8a; padding: 10px 10px 4px 10px;
-  }
+  .iwo3-brand .name { font-weight: 700; color: #111827; line-height: 1.15; letter-spacing: -0.01em; }
+  .iwo3-brand .sub  { font-size: 0.74rem; color: #6B7280; margin-top: 1px; }
+
   .iwo3-user {
-    margin-top: 12px; padding: 10px; border-top: 1px solid #E5E7F2;
+    margin-top: 12px; padding: 12px 14px; border-top: 1px solid #E5E7EB;
     display: flex; gap: 10px; align-items: center;
   }
   .iwo3-user .avatar {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: #091C53; color: white; font-weight: 700;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #1E3A8A; color: white; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.82rem;
+    font-size: 0.82rem; letter-spacing: 0.02em;
   }
-  .iwo3-user .role { font-size: 0.72rem; color: #4a5a8a; }
+  .iwo3-user .name { font-size: 0.88rem; font-weight: 600; color: #111827; line-height: 1.2; }
+  .iwo3-user .role { font-size: 0.74rem; color: #6B7280; margin-top: 1px; }
+  .iwo3-chip-admin {
+    background: #DBEAFE; color: #1E40AF; padding: 1px 8px;
+    border-radius: 999px; font-size: 0.7rem; font-weight: 600; margin-left: 4px;
+  }
   .iwo3-footer {
-    padding: 6px 10px 14px 10px; font-size: 0.72rem; color: #4a5a8a;
+    padding: 4px 14px 16px 14px; font-size: 0.72rem; color: #9CA3AF;
   }
+
+  /* ── Dashboard: metric cards ── */
   .iwo3-metric {
-    border: 1px solid #E5E7F2; border-radius: 10px; padding: 14px 16px;
-    background: white;
+    border: 1px solid #E5E7EB; border-radius: 10px; padding: 14px 16px;
+    background: #FFFFFF; position: relative; min-height: 100px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   }
-  .iwo3-metric .label { font-size: 0.78rem; color: #4a5a8a; text-transform: none; }
-  .iwo3-metric .value { font-size: 2rem; font-weight: 700; color: #091C53; line-height: 1.1; }
-  .iwo3-metric .hint  { font-size: 0.72rem; color: #6b7aa7; margin-top: 4px; }
-  .iwo3-section-head { font-size: 1.15rem; font-weight: 700; color: #091C53; }
+  .iwo3-metric .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 2px;
+  }
+  .iwo3-metric .label { font-size: 0.78rem; color: #6B7280; font-weight: 500; }
+  .iwo3-metric .icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem;
+  }
+  .iwo3-metric .icon.blue   { background: #DBEAFE; color: #1E40AF; }
+  .iwo3-metric .icon.green  { background: #D1FAE5; color: #065F46; }
+  .iwo3-metric .icon.amber  { background: #FEF3C7; color: #92400E; }
+  .iwo3-metric .icon.red    { background: #FEE2E2; color: #991B1B; }
+  .iwo3-metric .icon.violet { background: #EDE9FE; color: #5B21B6; }
+  .iwo3-metric .icon.gray   { background: #F3F4F6; color: #374151; }
+  .iwo3-metric .value {
+    font-size: 1.75rem; font-weight: 700; color: #111827;
+    line-height: 1.1; letter-spacing: -0.02em; margin-top: 4px;
+  }
+  .iwo3-metric .hint  { font-size: 0.74rem; color: #6B7280; margin-top: 4px; }
+
+  /* ── Dashboard: section heads ── */
+  .iwo3-section-head {
+    font-size: 0.98rem; font-weight: 600; color: #111827;
+    margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .iwo3-section-head .link {
+    font-size: 0.78rem; font-weight: 500; color: #2563EB;
+  }
+
+  /* ── Recent Work Orders rows ── */
+  .iwo3-panel {
+    border: 1px solid #E5E7EB; border-radius: 10px; background: #FFFFFF;
+    padding: 16px 18px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  }
+  .iwo3-wo-row {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 12px;
+    align-items: center; padding: 10px 0;
+    border-bottom: 1px solid #F3F4F6;
+  }
+  .iwo3-wo-row:last-child { border-bottom: 0; }
+  .iwo3-wo-row .title { font-weight: 600; color: #111827; font-size: 0.92rem; }
+  .iwo3-wo-row .meta { color: #6B7280; font-size: 0.78rem; margin-top: 2px; }
+
+  /* ── Tier cards ── */
   .iwo3-tier-card {
-    border: 1px solid #E5E7F2; border-radius: 10px; padding: 12px 14px;
-    background: white; margin-bottom: 8px;
+    border: 1px solid #E5E7EB; border-left: 3px solid #2563EB;
+    border-radius: 8px; padding: 12px 14px; background: #FFFFFF;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    display: flex; gap: 10px; align-items: flex-start;
   }
-  .iwo3-tier-card .t { font-weight: 700; color: #091C53; }
-  .iwo3-tier-card .d { font-size: 0.82rem; color: #4a5a8a; }
-  .iwo3-chip-m  { background: #E6F2FA; color: #1E5F91; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; }
-  .iwo3-chip-ok { background: #E6F8EE; color: #177245; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; }
+  .iwo3-tier-card .tier-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: #EFF6FF; color: #1E40AF;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 0.96rem;
+  }
+  .iwo3-tier-card.t15 { border-left-color: #8B5CF6; }
+  .iwo3-tier-card.t15 .tier-icon { background: #EDE9FE; color: #5B21B6; }
+  .iwo3-tier-card.t2  { border-left-color: #F59E0B; }
+  .iwo3-tier-card.t2  .tier-icon { background: #FEF3C7; color: #92400E; }
+  .iwo3-tier-card .t { font-weight: 600; color: #111827; font-size: 0.92rem; }
+  .iwo3-tier-card .d { font-size: 0.78rem; color: #6B7280; margin-top: 2px; }
+
+  /* ── Status chips ── */
+  .iwo3-chip {
+    padding: 2px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  }
+  .iwo3-chip.blue   { background: #DBEAFE; color: #1E40AF; }
+  .iwo3-chip.green  { background: #D1FAE5; color: #065F46; }
+  .iwo3-chip.amber  { background: #FEF3C7; color: #92400E; }
+  .iwo3-chip.red    { background: #FEE2E2; color: #991B1B; }
+  .iwo3-chip.gray   { background: #F3F4F6; color: #374151; }
+
+  /* ── Streamlit button — align to IWO2 primary-blue pill ── */
+  .stButton > button[kind="primary"], [data-testid="stPageLink"] button {
+    background: #2563EB !important; color: white !important;
+    border: none !important; border-radius: 6px !important;
+    font-weight: 500 !important;
+  }
+  .stButton > button[kind="primary"]:hover { background: #1E40AF !important; }
+
+  /* ── Placeholder page card ── */
+  .iwo3-placeholder {
+    border: 1px dashed #D1D5DB; border-radius: 10px; padding: 24px 28px;
+    background: #FFFFFF; color: #4B5563;
+  }
+  .iwo3-placeholder h4 { color: #111827; margin: 0 0 8px 0; font-size: 1rem; font-weight: 600; }
 </style>
 """
 
@@ -197,11 +317,11 @@ def render_sidebar_footer() -> None:
         <div class="iwo3-user">
           <div class="avatar">{initials}</div>
           <div>
-            <div style="font-weight:600;color:#091C53;font-size:0.88rem;">{user_label}</div>
-            <div class="role">{tenant_label} · <span class="iwo3-chip-ok">{role}</span></div>
+            <div class="name">{user_label}</div>
+            <div class="role">{tenant_label}<span class="iwo3-chip-admin">{role}</span></div>
           </div>
         </div>
-        <div class="iwo3-footer">AIDEN_IWO3 · Loop 8.3 (dev)</div>
+        <div class="iwo3-footer">AIDEN_IWO3 v0.8.3</div>
         """,
         unsafe_allow_html=True,
     )

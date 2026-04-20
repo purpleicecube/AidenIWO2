@@ -9,8 +9,15 @@ from shell import page_requires_api
 
 
 def main() -> None:
-    st.markdown("## 📦 Output Packages")
-    st.caption("Tenant-scoped output packages + linked handoffs.")
+    st.markdown(
+        """
+        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">Output Packages</h2>
+        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
+          Tenant-scoped output packages + linked handoffs.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     api = page_requires_api()
     if api is None:
