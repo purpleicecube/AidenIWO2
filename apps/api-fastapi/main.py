@@ -1,26 +1,43 @@
-"""AIDEN IWO3 FastAPI runtime API — bootstrap.
+"""AIDEN IWO3 FastAPI runtime API.
 
-Loop 1 scope: health endpoint only.
-Future loops add auth, RBAC dependency, channel webhooks, workflow routes,
-output adapter routes, render routes.
+Loop 7 Phase 7.1 expansion — routers + CORS + startup/shutdown hooks.
+Previously Loop 1 bootstrap (health endpoint only).
 """
 
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+
+from deps import shutdown_db_pool, startup_db_pool
+from routes import health, tenants
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await startup_db_pool()
+    try:
+        yield
+    finally:
+        await shutdown_db_pool()
+
 
 app = FastAPI(
     title="AIDEN IWO3 API",
-    version="0.0.1",
-    description="IWO3 runtime API and channel gateway (Loop 1 bootstrap)",
+    version="0.1.0",
+    description="IWO3 runtime API — Loop 7 Phase 7.1 foundation",
+    lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8501", "http://127.0.0.1:8501"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=False,
+)
 
-class HealthResponse(BaseModel):
-    status: str
-    service: str
-    version: str
-
-
-@app.get("/health", response_model=HealthResponse)
-async def health() -> HealthResponse:
-    return HealthResponse(status="ok", service="iwo3-api-fastapi", version="0.0.1")
+app.include_router(health.router)
+app.include_router(tenants.router)

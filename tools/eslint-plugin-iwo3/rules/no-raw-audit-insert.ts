@@ -33,6 +33,7 @@ const RULE_ID = "no-raw-audit-insert";
 // architectural deviation that CODEX should review.
 export const AUDIT_WRITE_ALLOWLIST: readonly string[] = [
   "packages/contracts/audit/writer.ts",
+  "apps/api-fastapi/authz/audit_writer.py", // Loop 7 Phase 7.1 Python mirror
   "db/migrations/", // any file under migrations/
   "tests/integration/audit-partition.test.ts",
   "tools/eslint-plugin-iwo3/", // rule text itself contains the pattern
