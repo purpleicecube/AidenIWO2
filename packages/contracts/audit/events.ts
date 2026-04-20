@@ -105,6 +105,24 @@ export const AUDIT_EVENTS = {
   // allowed call is followed by a typed mutation audit row; doubling up
   // would bloat the log without adding forensic value.
   AUTHZ_DENIED: "authz.denied",
+
+  // Loop 6 Phase 1 — WO/WF lifecycle transition vocabulary. 12 events
+  // locked upfront per §Q1 precedent from Loop 4. Every state-machine
+  // transition (see packages/contracts/wo-wf/state_machines.ts) emits
+  // exactly one of these events; the transition helper (Phase 6.2)
+  // attaches {from, to, machine, reason?} metadata.
+  WORK_ORDER_TRANSITIONED: "work_order.transitioned",
+  WORK_ORDER_REOPENED: "work_order.reopened",
+  WORK_ORDER_CANCELLED: "work_order.cancelled",
+  WORK_ORDER_BLOCKED: "work_order.blocked",
+  WORK_ORDER_UNBLOCKED: "work_order.unblocked",
+  WORK_ORDER_WATCHDOG_EXPIRED: "work_order.watchdog_expired",
+  WORKFLOW_TRANSITIONED: "workflow.transitioned",
+  WORKFLOW_PAUSED: "workflow.paused",
+  WORKFLOW_RESUMED: "workflow.resumed",
+  WORKFLOW_EXECUTION_TRANSITIONED: "workflow_execution.transitioned",
+  WORKFLOW_EXECUTION_CANCELLED: "workflow_execution.cancelled",
+  WORKFLOW_STEP_RUN_TRANSITIONED: "workflow_step_run.transitioned",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -181,4 +199,19 @@ export const LOOP_4_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
 
 export const LOOP_4_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.AUTHZ_DENIED,
+];
+
+export const LOOP_6_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.WORK_ORDER_TRANSITIONED,
+  AUDIT_EVENTS.WORK_ORDER_REOPENED,
+  AUDIT_EVENTS.WORK_ORDER_CANCELLED,
+  AUDIT_EVENTS.WORK_ORDER_BLOCKED,
+  AUDIT_EVENTS.WORK_ORDER_UNBLOCKED,
+  AUDIT_EVENTS.WORK_ORDER_WATCHDOG_EXPIRED,
+  AUDIT_EVENTS.WORKFLOW_TRANSITIONED,
+  AUDIT_EVENTS.WORKFLOW_PAUSED,
+  AUDIT_EVENTS.WORKFLOW_RESUMED,
+  AUDIT_EVENTS.WORKFLOW_EXECUTION_TRANSITIONED,
+  AUDIT_EVENTS.WORKFLOW_EXECUTION_CANCELLED,
+  AUDIT_EVENTS.WORKFLOW_STEP_RUN_TRANSITIONED,
 ];

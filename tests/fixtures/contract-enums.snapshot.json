@@ -283,14 +283,26 @@
       "role_permission.granted",
       "role_permission.revoked",
       "work_order.archived",
+      "work_order.blocked",
+      "work_order.cancelled",
       "work_order.created",
+      "work_order.reopened",
+      "work_order.transitioned",
+      "work_order.unblocked",
       "work_order.updated",
+      "work_order.watchdog_expired",
       "workflow.archived",
       "workflow.created",
+      "workflow.paused",
+      "workflow.resumed",
+      "workflow.transitioned",
       "workflow.updated",
+      "workflow_execution.cancelled",
       "workflow_execution.completed",
       "workflow_execution.started",
+      "workflow_execution.transitioned",
       "workflow_step_run.completed",
+      "workflow_step_run.transitioned",
       "workflow_template.created",
       "workflow_template.deprecated",
       "workflow_template.published"
@@ -363,6 +375,20 @@
       ],
       "LOOP_4_PHASE_2_AUDIT_EVENTS": [
         "authz.denied"
+      ],
+      "LOOP_6_PHASE_1_AUDIT_EVENTS": [
+        "work_order.transitioned",
+        "work_order.reopened",
+        "work_order.cancelled",
+        "work_order.blocked",
+        "work_order.unblocked",
+        "work_order.watchdog_expired",
+        "workflow.transitioned",
+        "workflow.paused",
+        "workflow.resumed",
+        "workflow_execution.transitioned",
+        "workflow_execution.cancelled",
+        "workflow_step_run.transitioned"
       ]
     }
   },
