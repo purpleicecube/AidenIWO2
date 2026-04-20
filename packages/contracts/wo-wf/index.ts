@@ -11,3 +11,18 @@ export {
   type TransitionSpec,
   type TransitionLookupResult,
 } from "./state_machines";
+export {
+  transitionWorkOrder,
+  transitionWorkflow,
+  transitionWorkflowExecution,
+  transitionWorkflowStepRun,
+  watchdogExpireWorkOrder,
+  IllegalTransition,
+  RowNotFound,
+  type TransitionWorkOrderInput,
+  type TransitionWorkflowInput,
+  type TransitionWorkflowExecutionInput,
+  type TransitionWorkflowStepRunInput,
+  type WatchdogExpireInput,
+  type TransitionResult,
+} from "./transitions";
