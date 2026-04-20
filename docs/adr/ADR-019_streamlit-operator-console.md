@@ -14,6 +14,36 @@ Predecessors: ADR-018 (FastAPI runtime), ADR-014/015/016/017.
 > surface is accepted as the verification lane; the product shell
 > is the user-facing MVP.
 >
+> **Revision 2026-04-20 (Loop 8.3 section-by-section visual parity,
+> R-015):** After R-014 Darrel review, Darrel directed a tighter
+> section-by-section approach: stop broad redesign passes, fix one
+> visual section at a time and hold for approval before moving
+> down. R-015 scope = **top identity badge + KPI card system only**
+> (no changes to Chat, Work Orders, Submit Order, Design Lab, or
+> other pages). Identity badge rebuilt as a blue 42×42 rounded
+> square with a white Lucide-style layers SVG inside; headline
+> updated to "AIDEN\_IWO3 | \<tenant\>" (dynamic — reads from the
+> active `TENANT_LABELS[client_id]` so the tenant shifts to e.g.
+> "FreedomForge.AI" when a different tenant is picked). Subtitle
+> "Orchestration Engine" preserved. Positioned absolutely at
+> `top: 0` of `stSidebar` (overriding Streamlit's per-element
+> wrapper with `position: static !important` so our
+> `.iwo3-brand` resolves its containing block to
+> `stSidebarContent`); matching `padding-top: 72px` reserves space
+> so nav does not collide. Streamlit's default sidebar
+> collapse-button spacer (`stSidebarHeader`) hidden — operator
+> console is always expanded. KPI cards: letter glyphs replaced
+> with 8 inline Lucide/Feather-style SVGs (grid / clock /
+> check-circle / refresh / user / alert-triangle / calendar /
+> archive), color mapping per Darrel's spec — Total blue, Pending
+> blue (clock), Completed green, Reopened violet, Awaiting Operator
+> violet (user), Blocked amber, Deferred sky-blue (calendar),
+> Archived gray. New `skyblue` tint added to the metric-icon
+> palette. Icon chip grew from 28×28 to 32×32 with 18×18 SVG inside.
+> Dead "route pending" fallback branch removed (`work_order_metrics`
+> shipped in R-014 so the fallback was unreachable and looked
+> amateur per directive). 27/27 tests still pass.
+>
 > **Revision 2026-04-20 (Loop 8.3 visual quality correction,
 > R-014):** Darrel review of the first 8.3 cut flagged the Streamlit
 > surface as "amateur, generic, and materially unlike IWO2" —
@@ -195,8 +225,9 @@ fixed in the ADR-018 error mapping table.
 - Loop 8 Phase 8.2 commit `65b7403` / CI run `24660791813` (technical console)
 - Loop 8 Phase 8.3 commit `740b470` / CI run `24666245407` (IWO2 product-shell parity)
 - Loop 8 Phase 8.3 hotfix commits `793ee09` + `32575c3` (widget-key collision + CI skip)
-- Loop 8 Phase 8.3 visual correction commit (R-014, IWO2 visual-density rebuild; ui-designer skill + Design Critic subagent)
-- `LOOP_8_3_RECORD.md` — per-phase record of corrective + hotfix + visual-correction passes
+- Loop 8 Phase 8.3 visual correction commit `84d15e6` (R-014, IWO2 visual-density rebuild; ui-designer skill + Design Critic subagent)
+- Loop 8 Phase 8.3 section-by-section visual parity commit (R-015, identity badge + KPI card system)
+- `LOOP_8_3_RECORD.md` — per-phase record of corrective + hotfix + R-014 + R-015 passes
 - `apps/console-streamlit/Home.py` + `pages/`
 - ADR-018 (FastAPI runtime) — Streamlit's server-side contract
 - `docs/runbooks/contracts.md` — TS/Python shape parity rules

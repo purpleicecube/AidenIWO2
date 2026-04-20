@@ -10,11 +10,12 @@ Predecessors: LOOP 8.1 (FastAPI/Streamlit scaffolding, `6bfcbf3`), LOOP 8.2 (Out
 
 Loop 8.1/8.2 shipped a **technical console** — enough pages to prove the FastAPI → Streamlit path works, enough to verify RBAC/RLS end-to-end, but not an IWO2-parity product shell. Darrel review flagged that the surface users see should match the IWO2 reference image (WS024 screenshot). Loop 8.3 is the set of corrective passes that brought the surface up to IWO2 product-shell parity.
 
-Loop 8.3 has **three sub-phases**:
+Loop 8.3 has **four sub-phases**:
 
 1. **Corrective (IWO2 product-shell parity)** — commit `740b470`, 2026-04-19.
 2. **Hotfix (Streamlit widget-state collision + invalid emoji)** — commits `793ee09` + `32575c3`, 2026-04-19 / 2026-04-20.
-3. **Visual correction (IWO2 visual density; ui-designer skill; R-014)** — this commit.
+3. **Visual correction (IWO2 visual density; ui-designer skill; R-014)** — commit `84d15e6`, 2026-04-20.
+4. **Section-by-section visual parity (identity badge + KPI cards; R-015)** — this commit, 2026-04-20.
 
 ---
 
@@ -89,12 +90,66 @@ Streamlit gets this surface to ~75–80% IWO2 parity. The remaining 20% — exac
 
 ---
 
+---
+
+## Phase 4 — Section-by-section visual parity (2026-04-20, R-015)
+
+### Trigger
+
+Darrel review of R-014: "This is the right way to tighten it: stop trying to fix the whole UI at once and force pixel-level parity by section, starting with the top identity + KPI row." The broad-pass approach was abandoned in favor of a section-at-a-time visual QA checklist. R-015 scope is frozen to **top identity badge + KPI card system only** — no changes to Chat, Work Orders, Submit Order, Design Lab, or other pages in this pass. After Darrel + CODEX approve this section, the next pass moves down to Recent Work Orders, then Orchestration, then Chat with Aiden.
+
+### Scope frozen to two sections
+
+1. Top-left product identity badge (sidebar)
+2. Dashboard KPI card layout, icons, and color mapping
+
+Everything else is explicitly untouched.
+
+### Identity badge changes (`shell.py`)
+
+- **Mark.** Now a 42×42 rounded square (10px radius) in IWO2 primary blue (`#2563EB`) with a white Lucide-style 24×24 layers SVG centered inside. No emoji, no compass, no gradient. Matches the IWO2 reference's stacked-layers badge exactly in structure.
+- **Headline.** "AIDEN_IWO3 | \<tenant\>" — the tenant name is dynamic and derived from `TENANT_LABELS[client_id]` (with the "IWO | " prefix stripped). Current render: "AIDEN_IWO3 | Klear.ai". When a FFAI operator is picked, it becomes "AIDEN_IWO3 | FreedomForge.AI".
+- **Subtitle.** "Orchestration Engine" — unchanged.
+- **Position.** Previously appeared at mid-sidebar below Streamlit's auto-injected nav. Fixed by absolute-positioning `.iwo3-brand` to `top: 0` of `stSidebar` and overriding the per-element Streamlit wrapper to `position: static` so the containing block resolves to the full sidebar. `stSidebarContent` now has `padding-top: 72px` to reserve space for the brand block; the default `stSidebarHeader` (collapse-button spacer) is hidden since the operator sidebar is always expanded.
+- **Rendering order.** `render_sidebar_shell()` reserves the brand slot with `st.sidebar.empty()` at the top of the function, runs the Dev-auth expander (which determines the active tenant), then fills the slot with the fully resolved tenant label. Keeps the identity block at the top visually while still reading the tenant the user picked below.
+
+### KPI card changes (`views/dashboard.py` + `shell.py` CSS)
+
+- **Icon system.** Letter glyphs (`T`, `P`, `✓`, `⟲`, `A`, `!`, `D`, `A`) removed. Replaced with 8 inline Lucide/Feather-style SVGs embedded directly in the HTML: grid (Total), clock (Pending), check-circle (Completed), refresh (Reopened), user (Awaiting Operator), alert-triangle (Blocked), calendar (Deferred), archive (Archived). No emoji.
+- **Color mapping** (per Darrel's R-015 spec):
+  - Total → blue
+  - Pending → blue (clock)
+  - Completed → green (check)
+  - Reopened → violet (refresh)
+  - Awaiting Operator → violet (user)
+  - Blocked → amber (alert)
+  - Deferred → sky-blue (calendar) — new tint added to metric palette
+  - Archived → gray (archive)
+- **Icon chip** grew from 28×28 to 32×32 (8px radius) to hold the 18×18 SVG with enough breathing room and match IWO2's badge proportions. Tint colors re-tuned for better contrast against the tint background.
+- **"Route pending" amateur fallback removed.** The `AttributeError` branch that showed "route pending" in every card was unreachable after R-014 shipped `work_order_metrics()`; it remained as dead code. Deleted. Comment added noting that richer per-status aggregates are a Loop 9+ consideration; default `c.get(status, 0)` keeps the UI polished if a status is missing from the payload.
+
+### Verification
+
+- 27/27 Streamlit tests pass.
+- Playwright screenshot at `/tmp/iwo3-design-review/iwo3_r015_v3.png` (full page) and `_topcrop.png` (identity + KPI row only) for side-by-side review against `/tmp/iwo2_reference.png`.
+- DOM inspection: brand block resolves `getBoundingClientRect().y = 0` relative to `stSidebar`, `width = 279px`. Identity block, nav groups, Dev-auth expander, operator badge, version footer all stacked in IWO2 order.
+- Scope holds: no edits to Chat, Work Orders, Submit Order, Design Lab, Tier Overview, workflows, handoffs, audit, or output packages views in this pass.
+
+### CODEX log entry
+
+- **R-015 — IWO2 visual parity correction started with tenant identity badge and KPI card system.**
+  Approach: section-by-section visual QA, one section at a time, Darrel approval gate before moving to the next. This pass: identity badge (blue square + white layers SVG + "AIDEN_IWO3 | Klear.ai" + Orchestration Engine), KPI card icon system (Lucide SVGs with R-015 color mapping), removal of dead "route pending" fallback, absolute-positioning fix so brand pins to top of sidebar over Streamlit's per-element wrappers. Next passes (if R-015 approved): Recent Work Orders panel → Orchestration panel → Chat with Aiden.
+
+---
+
 ## Status
 
 - **LOOP 8.3 corrective:** complete.
 - **LOOP 8.3 hotfix:** complete.
-- **LOOP 8.3 visual correction:** complete; held for Darrel + CODEX review.
-- **Loop 9 (live adapters):** NOT started. Per directive: do not proceed until the corrected UI screenshot is reviewed and approved.
+- **LOOP 8.3 visual correction (R-014):** complete; superseded by section-by-section approach.
+- **LOOP 8.3 section-by-section visual parity (R-015, identity + KPI):** complete; held for Darrel + CODEX review.
+- **Next visual section (Recent Work Orders):** NOT started; gated on R-015 approval.
+- **Loop 9 (live adapters):** NOT started. Per directive: do not proceed until the section-by-section visual parity is approved end-to-end.
 
 ## References
 

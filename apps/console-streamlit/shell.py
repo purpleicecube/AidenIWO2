@@ -60,7 +60,13 @@ _CSS = """
   [data-testid="stSidebar"] {
     background: #FFFFFF;
     border-right: 1px solid #E5E7EB;
+    position: relative;
   }
+  /* Streamlit's default header strip carries the collapse button; we
+     hide it so our .iwo3-brand can pin to top:0 (R-015 identity parity
+     with IWO2). Operator console is always expanded, so no loss. */
+  [data-testid="stSidebarHeader"] { display: none !important; }
+  [data-testid="stSidebarContent"] { padding-top: 72px !important; }
   [data-testid="stSidebarHeader"] + div { padding-top: 0 !important; }
   [data-testid="stSidebar"] [data-testid="stSidebarNav"] {
     padding-top: 2px; padding-bottom: 2px;
@@ -86,20 +92,42 @@ _CSS = """
   [data-testid="stDecoration"] { display: none !important; }
   [data-testid="stHeader"] { background: transparent; height: 0; }
 
+  /* Brand lives inside Streamlit's stSidebarUserContent (natural flow),
+     but is absolute-positioned to the top of the sidebar so it sits
+     above stSidebarNav without our having to reorder Streamlit's
+     internal children. Streamlit's per-element wrapper has position:
+     relative by default, which would capture our absolute positioning;
+     the :has() override neutralises that wrapper for the brand's
+     containing block so top:0 resolves to stSidebarContent (the whole
+     sidebar area). The stSidebarContent padding-top above reserves the
+     matching space so nav doesn't collide with it. */
+  [data-testid="stSidebarUserContent"] [data-testid="stElementContainer"]:has(.iwo3-brand) {
+    position: static !important;
+  }
   .iwo3-brand {
-    display: flex; gap: 10px; align-items: center;
-    padding: 16px 14px 12px 14px; border-bottom: 1px solid #E5E7EB;
-    margin-bottom: 4px;
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    background: #FFFFFF;
+    display: flex; gap: 12px; align-items: center;
+    padding: 18px 14px 14px 14px; border-bottom: 1px solid #E5E7EB;
+    margin: 0;
   }
   .iwo3-brand .mark {
-    width: 34px; height: 34px; border-radius: 8px;
-    background: linear-gradient(135deg, #2563EB, #1E3A8A);
+    width: 42px; height: 42px; border-radius: 10px;
+    background: #2563EB;
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 700; font-size: 0.96rem;
+    color: white;
     box-shadow: 0 1px 2px rgba(30, 64, 175, 0.25);
+    flex-shrink: 0;
   }
-  .iwo3-brand .name { font-weight: 700; color: #111827; line-height: 1.15; letter-spacing: -0.01em; }
-  .iwo3-brand .sub  { font-size: 0.74rem; color: #6B7280; margin-top: 1px; }
+  .iwo3-brand .mark svg { width: 24px; height: 24px; display: block; }
+  .iwo3-brand .name {
+    font-weight: 700; color: #111827; line-height: 1.15;
+    letter-spacing: -0.01em; font-size: 0.98rem;
+  }
+  .iwo3-brand .name .tenant {
+    color: #6B7280; font-weight: 500; margin: 0 2px;
+  }
+  .iwo3-brand .sub  { font-size: 0.76rem; color: #6B7280; margin-top: 2px; }
 
   .iwo3-user {
     margin-top: 12px; padding: 12px 14px; border-top: 1px solid #E5E7EB;
@@ -133,16 +161,18 @@ _CSS = """
   }
   .iwo3-metric .label { font-size: 0.78rem; color: #6B7280; font-weight: 500; }
   .iwo3-metric .icon {
-    width: 28px; height: 28px; border-radius: 6px;
+    width: 32px; height: 32px; border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem;
+    flex-shrink: 0;
   }
-  .iwo3-metric .icon.blue   { background: #DBEAFE; color: #1E40AF; }
-  .iwo3-metric .icon.green  { background: #D1FAE5; color: #065F46; }
-  .iwo3-metric .icon.amber  { background: #FEF3C7; color: #92400E; }
-  .iwo3-metric .icon.red    { background: #FEE2E2; color: #991B1B; }
-  .iwo3-metric .icon.violet { background: #EDE9FE; color: #5B21B6; }
-  .iwo3-metric .icon.gray   { background: #F3F4F6; color: #374151; }
+  .iwo3-metric .icon svg { width: 18px; height: 18px; display: block; }
+  .iwo3-metric .icon.blue   { background: #DBEAFE; color: #1D4ED8; }
+  .iwo3-metric .icon.skyblue{ background: #E0F2FE; color: #0369A1; }
+  .iwo3-metric .icon.green  { background: #D1FAE5; color: #047857; }
+  .iwo3-metric .icon.amber  { background: #FEF3C7; color: #B45309; }
+  .iwo3-metric .icon.red    { background: #FEE2E2; color: #B91C1C; }
+  .iwo3-metric .icon.violet { background: #EDE9FE; color: #6D28D9; }
+  .iwo3-metric .icon.gray   { background: #F3F4F6; color: #4B5563; }
   .iwo3-metric .value {
     font-size: 1.75rem; font-weight: 700; color: #111827;
     line-height: 1.1; letter-spacing: -0.02em; margin-top: 4px;
@@ -235,25 +265,41 @@ def _api_from_session() -> ApiClient:
     return st.session_state["iwo3_api"]
 
 
+def _brand_block_html(tenant_short: str) -> str:
+    """IWO2-style identity block: blue square with white layers SVG +
+    'AIDEN_IWO3 | <tenant>' headline + 'Orchestration Engine' subtitle."""
+    layers_svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+        'fill="none" stroke="currentColor" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<polygon points="12 2 2 7 12 12 22 7 12 2"/>'
+        '<polyline points="2 17 12 22 22 17"/>'
+        '<polyline points="2 12 12 17 22 12"/>'
+        '</svg>'
+    )
+    return (
+        '<div class="iwo3-brand">'
+        f'<div class="mark">{layers_svg}</div>'
+        '<div>'
+        f'<div class="name">AIDEN_IWO3<span class="tenant">|</span>'
+        f'<span style="font-weight:500;color:#374151;">{tenant_short}</span></div>'
+        '<div class="sub">Orchestration Engine</div>'
+        '</div>'
+        '</div>'
+    )
+
+
 def render_sidebar_shell() -> ApiClient:
     """Renders the IWO2-parity sidebar: identity block → dev-auth picker
     → (the st.navigation widget will be injected by the caller) →
     user badge + version footer."""
     st.markdown(_CSS, unsafe_allow_html=True)
 
-    # Brand identity
-    st.sidebar.markdown(
-        """
-        <div class="iwo3-brand">
-          <div class="mark">🧭</div>
-          <div>
-            <div class="name">AIDEN_IWO3</div>
-            <div class="sub">Orchestration Engine</div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    # Reserve a slot at the top of the sidebar so the identity block
+    # can render ABOVE the dev-auth picker while still reading the
+    # tenant the picker selected (R-015: "AIDEN_IWO3 | <tenant>" must
+    # reflect the currently active tenant).
+    brand_slot = st.sidebar.empty()
 
     # Dev-auth picker (replaced by real auth in Loop 9+).
     with st.sidebar.expander("Dev auth", expanded=False):
@@ -293,9 +339,12 @@ def render_sidebar_shell() -> ApiClient:
     st.session_state["iwo3_current_user_id"] = user_id
     st.session_state["iwo3_current_user_role"] = role
     st.session_state["iwo3_current_tenant_id"] = client_id
-    st.session_state["iwo3_current_tenant_label"] = TENANT_LABELS.get(
-        client_id, client_id
-    )
+    tenant_label = TENANT_LABELS.get(client_id, client_id)
+    st.session_state["iwo3_current_tenant_label"] = tenant_label
+
+    # Now fill the reserved brand slot — tenant is known.
+    tenant_short = tenant_label.split("|", 1)[-1].strip() or tenant_label
+    brand_slot.markdown(_brand_block_html(tenant_short), unsafe_allow_html=True)
 
     return api
 
