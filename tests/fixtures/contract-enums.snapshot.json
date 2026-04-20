@@ -1,44 +1,240 @@
 {
   "dbEnums": {
-    "adapter_catalog_status": "{active,beta,deprecated}",
-    "adapter_category": "{design_render,storage,campaign,crm,other}",
-    "adapter_credential_status": "{active,rotation_due,revoked,expired}",
-    "adapter_policy_mode": "{none,approval_required,disallowed}",
-    "artifact_content_class": "{c0,c1,c2,c3}",
-    "artifact_source_type": "{upload,generated,imported}",
-    "client_adapter_config_status": "{active,paused,revoked}",
-    "client_status": "{active,suspended}",
-    "data_source_binding_status": "{active,paused,revoked}",
-    "data_source_connector_type": "{postgres,bigquery,snowflake,sheets,rest_api,custom}",
-    "deployment_mode": "{dedicated_single_client,shared_multi_tenant,hybrid}",
-    "execution_cycle_trigger": "{new,retry,reopen,unblock,watchdog,admin_repair,candidate_request_more}",
-    "external_execution_result_status": "{success,partial,failed,unknown}",
-    "fallback_policy": "{none,allowed_with_approval,allowed}",
-    "manifest_owner": "{drizzle,alembic}",
-    "manifest_source": "{iwo2_parity,iwo3_native}",
-    "membership_role": "{owner,admin,operator,reviewer,viewer,agent_system}",
-    "membership_status": "{active,revoked}",
-    "output_handoff_candidate_status": "{not_candidate,candidate,selected,rejected,finalized}",
-    "output_handoff_status": "{queued,submitted,accepted,completed,failed,cancelled}",
-    "output_kind": "{pptx,pdf,other}",
-    "output_package_kind": "{gamma_pptx,gamma_pdf,sandbox_pptx,sandbox_pdf,email_campaign,drive_upload,crm_mutation,figma_handoff,stitch_handoff,designlab_handoff,generic}",
-    "output_package_status": "{draft,validated,rejected,submitted,delivered,failed,cancelled}",
-    "permission_grant_type": "{allow,deny}",
-    "permission_scope": "{global,tenant,resource}",
-    "prompt_profile_scope": "{client,workflow,wo}",
-    "prompt_profile_status": "{active,archived}",
-    "prompt_version_status": "{draft,published,deprecated}",
-    "render_engine": "{gamma,gamma_basic,sandbox_pptx,sandbox_pdf,designlab}",
-    "repository_binding_status": "{active,paused,revoked}",
-    "repository_connector_type": "{google_drive,dropbox,github,s3,local,custom}",
-    "template_profile_status": "{active,archived}",
-    "user_status": "{active,disabled}",
-    "work_order_priority": "{low,medium,high,critical}",
-    "work_order_status": "{pending,processing,blocked,awaiting_operator,completed,done,failed,deferred,cancelled}",
-    "workflow_execution_status": "{pending,running,completed,failed,cancelled}",
-    "workflow_status": "{active,paused,archived}",
-    "workflow_step_run_status": "{pending,running,completed,failed,skipped}",
-    "workflow_template_status": "{draft,published,deprecated}"
+    "adapter_catalog_status": [
+      "active",
+      "beta",
+      "deprecated"
+    ],
+    "adapter_category": [
+      "design_render",
+      "storage",
+      "campaign",
+      "crm",
+      "other"
+    ],
+    "adapter_credential_status": [
+      "active",
+      "rotation_due",
+      "revoked",
+      "expired"
+    ],
+    "adapter_policy_mode": [
+      "none",
+      "approval_required",
+      "disallowed"
+    ],
+    "artifact_content_class": [
+      "c0",
+      "c1",
+      "c2",
+      "c3"
+    ],
+    "artifact_source_type": [
+      "upload",
+      "generated",
+      "imported"
+    ],
+    "client_adapter_config_status": [
+      "active",
+      "paused",
+      "revoked"
+    ],
+    "client_status": [
+      "active",
+      "suspended"
+    ],
+    "data_source_binding_status": [
+      "active",
+      "paused",
+      "revoked"
+    ],
+    "data_source_connector_type": [
+      "postgres",
+      "bigquery",
+      "snowflake",
+      "sheets",
+      "rest_api",
+      "custom"
+    ],
+    "deployment_mode": [
+      "dedicated_single_client",
+      "shared_multi_tenant",
+      "hybrid"
+    ],
+    "execution_cycle_trigger": [
+      "new",
+      "retry",
+      "reopen",
+      "unblock",
+      "watchdog",
+      "admin_repair",
+      "candidate_request_more"
+    ],
+    "external_execution_result_status": [
+      "success",
+      "partial",
+      "failed",
+      "unknown"
+    ],
+    "fallback_policy": [
+      "none",
+      "allowed_with_approval",
+      "allowed"
+    ],
+    "manifest_owner": [
+      "drizzle",
+      "alembic"
+    ],
+    "manifest_source": [
+      "iwo2_parity",
+      "iwo3_native"
+    ],
+    "membership_role": [
+      "owner",
+      "admin",
+      "operator",
+      "reviewer",
+      "viewer",
+      "agent_system"
+    ],
+    "membership_status": [
+      "active",
+      "revoked"
+    ],
+    "output_handoff_candidate_status": [
+      "not_candidate",
+      "candidate",
+      "selected",
+      "rejected",
+      "finalized"
+    ],
+    "output_handoff_status": [
+      "queued",
+      "submitted",
+      "accepted",
+      "completed",
+      "failed",
+      "cancelled"
+    ],
+    "output_kind": [
+      "pptx",
+      "pdf",
+      "other"
+    ],
+    "output_package_kind": [
+      "gamma_pptx",
+      "gamma_pdf",
+      "sandbox_pptx",
+      "sandbox_pdf",
+      "email_campaign",
+      "drive_upload",
+      "crm_mutation",
+      "figma_handoff",
+      "stitch_handoff",
+      "designlab_handoff",
+      "generic"
+    ],
+    "output_package_status": [
+      "draft",
+      "validated",
+      "rejected",
+      "submitted",
+      "delivered",
+      "failed",
+      "cancelled"
+    ],
+    "permission_grant_type": [
+      "allow",
+      "deny"
+    ],
+    "permission_scope": [
+      "global",
+      "tenant",
+      "resource"
+    ],
+    "prompt_profile_scope": [
+      "client",
+      "workflow",
+      "wo"
+    ],
+    "prompt_profile_status": [
+      "active",
+      "archived"
+    ],
+    "prompt_version_status": [
+      "draft",
+      "published",
+      "deprecated"
+    ],
+    "render_engine": [
+      "gamma",
+      "gamma_basic",
+      "sandbox_pptx",
+      "sandbox_pdf",
+      "designlab"
+    ],
+    "repository_binding_status": [
+      "active",
+      "paused",
+      "revoked"
+    ],
+    "repository_connector_type": [
+      "google_drive",
+      "dropbox",
+      "github",
+      "s3",
+      "local",
+      "custom"
+    ],
+    "template_profile_status": [
+      "active",
+      "archived"
+    ],
+    "user_status": [
+      "active",
+      "disabled"
+    ],
+    "work_order_priority": [
+      "low",
+      "medium",
+      "high",
+      "critical"
+    ],
+    "work_order_status": [
+      "pending",
+      "processing",
+      "blocked",
+      "awaiting_operator",
+      "completed",
+      "done",
+      "failed",
+      "deferred",
+      "cancelled"
+    ],
+    "workflow_execution_status": [
+      "pending",
+      "running",
+      "completed",
+      "failed",
+      "cancelled"
+    ],
+    "workflow_status": [
+      "active",
+      "paused",
+      "archived"
+    ],
+    "workflow_step_run_status": [
+      "pending",
+      "running",
+      "completed",
+      "failed",
+      "skipped"
+    ],
+    "workflow_template_status": [
+      "draft",
+      "published",
+      "deprecated"
+    ]
   },
   "auditEvents": {
     "all": [

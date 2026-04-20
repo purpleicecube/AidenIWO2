@@ -38,9 +38,13 @@ export interface ContractSnapshot {
 export async function loadDbEnums(
   pool: Pool
 ): Promise<Record<string, readonly string[]>> {
+  // array_agg(...)::text[] forces the pg driver to parse as a JS
+  // string[] instead of returning a PG array literal like
+  // "{a,b,c}" (which happens when the element type is `name`,
+  // which is what pg_enum.enumlabel actually is).
   const { rows } = await pool.query<{ typname: string; values: string[] }>(`
     SELECT t.typname,
-           array_agg(e.enumlabel ORDER BY e.enumsortorder) AS values
+           array_agg(e.enumlabel::text ORDER BY e.enumsortorder)::text[] AS values
     FROM pg_type t
     JOIN pg_enum e ON e.enumtypid = t.oid
     JOIN pg_namespace n ON n.oid = t.typnamespace
