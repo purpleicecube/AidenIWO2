@@ -71,6 +71,101 @@ class TransitionResponse(BaseModel):
         populate_by_name = True
 
 
+class WorkOrderMetricsResponse(BaseModel):
+    total: int
+    by_status: dict[str, int]
+    reopened_count: int
+
+
+class CreateWorkOrderRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=240)
+    description: Optional[str] = None
+    type: str = Field("content_brief", max_length=64)
+    priority: str = Field("medium")
+    correlation_id: Optional[str] = Field(None, max_length=128)
+
+
+@router.get(
+    "/metrics",
+    response_model=WorkOrderMetricsResponse,
+    dependencies=[Depends(require_permission_dep("work_order:read"))],
+)
+async def work_order_metrics(
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> WorkOrderMetricsResponse:
+    # By-status counts (tenant-scoped via RLS).
+    by_status_rows = await conn.fetch(
+        """
+        SELECT status::text AS status, count(*)::int AS n
+        FROM work_orders GROUP BY status
+        """
+    )
+    by_status = {r["status"]: r["n"] for r in by_status_rows}
+    total = sum(by_status.values())
+    # Reopened = count of execution_cycles with trigger='reopen'.
+    # lint:bypass-rls-explain="tenant-scoped connection (iwo3_app role + app.current_client_id GUC set) — RLS filters execution_cycles by client_id transparently"
+    rc = await conn.fetchrow(
+        """
+        SELECT count(*)::int AS n FROM execution_cycles
+        WHERE trigger = 'reopen'
+        """
+    )
+    reopened = int(rc["n"]) if rc else 0
+    return WorkOrderMetricsResponse(
+        total=total, by_status=by_status, reopened_count=reopened
+    )
+
+
+@router.post(
+    "",
+    response_model=WorkOrderRow,
+    dependencies=[Depends(require_permission_dep("work_order:create"))],
+)
+async def create_work_order(
+    body: CreateWorkOrderRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> WorkOrderRow:
+    # Validate priority against the enum to surface the error as 422
+    # rather than a Postgres 23514 check-constraint leak.
+    if body.priority not in {"low", "medium", "high", "critical"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "invalid_priority", "priority": body.priority},
+        )
+    row = await conn.fetchrow(
+        """
+        INSERT INTO work_orders
+          (client_id, title, description, type, priority, status,
+           submitted_by_user_id, correlation_id)
+        VALUES ($1::uuid, $2, $3, $4, $5::work_order_priority, 'pending',
+                $6::uuid, $7)
+        RETURNING id::text AS id,
+                  client_id::text AS client_id,
+                  title, description, type,
+                  priority::text AS priority,
+                  status::text AS status,
+                  submitted_by_user_id::text AS submitted_by_user_id,
+                  correlation_id,
+                  created_at::text AS created_at,
+                  updated_at::text AS updated_at
+        """,
+        ctx["client_id"],
+        body.title,
+        body.description,
+        body.type,
+        body.priority,
+        ctx["user_id"],
+        body.correlation_id,
+    )
+    return WorkOrderRow(**dict(row))
+
+
 @router.get(
     "",
     response_model=ListWorkOrdersResponse,

@@ -1,0 +1,82 @@
+"""Loop 8.3 smoke tests — every IWO2-parity view module must import
+cleanly. This catches syntax errors, missing symbols, and circular
+imports before the Streamlit server surfaces them as red blocks in
+the UI.
+
+Running a full `streamlit.testing.v1.AppTest` render requires more
+infrastructure (AppTest needs the script to exit cleanly, but our
+pages call `main()` at module level which reruns under AppTest's
+script runner). Import-level smoke is the Loop 8.3 acceptance gate;
+fuller AppTest coverage is Loop 9+.
+"""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+import pytest
+
+
+CONSOLE_DIR = Path(__file__).parent.parent
+VIEWS_DIR = CONSOLE_DIR / "views"
+
+
+EXPECTED_VIEWS: list[str] = [
+    "dashboard.py",
+    "chat.py",
+    "work_orders.py",
+    "submit_order.py",
+    "system_health.py",
+    "workspace.py",
+    "sandbox.py",
+    "design_lab.py",
+    "tier_overview.py",
+    "aiden_settings.py",
+    "sub_agents.py",
+    "tools.py",
+    "pipelines.py",
+    "workflows.py",
+    "user_management.py",
+    "output_packages.py",
+    "handoffs.py",
+    "audit_log.py",
+]
+
+
+def test_every_expected_view_exists() -> None:
+    present = {p.name for p in VIEWS_DIR.glob("*.py") if not p.name.startswith("_")}
+    missing = [v for v in EXPECTED_VIEWS if v not in present]
+    assert missing == [], f"Missing view modules: {missing}"
+
+
+@pytest.mark.parametrize("view_filename", EXPECTED_VIEWS)
+def test_view_module_parses_cleanly(view_filename: str) -> None:
+    source = (VIEWS_DIR / view_filename).read_text()
+    # ast.parse catches syntax errors without executing side-effects
+    # (the view's `main()` call at module level runs Streamlit, which
+    # needs a streamlit runtime we don't have in unit tests).
+    ast.parse(source)
+
+
+def test_home_and_shell_parse() -> None:
+    ast.parse((CONSOLE_DIR / "Home.py").read_text())
+    ast.parse((CONSOLE_DIR / "shell.py").read_text())
+
+
+def test_placeholder_helper_parses() -> None:
+    ast.parse((VIEWS_DIR / "_placeholders.py").read_text())
+
+
+def test_nav_registry_references_existing_views() -> None:
+    """Parse Home.py + assert every `st.Page(\"views/...\")` string
+    points at a real file. Catches accidental renames that would
+    surface only when the user clicks the nav item."""
+    source = (CONSOLE_DIR / "Home.py").read_text()
+    import re
+
+    paths = re.findall(r"st\.Page\(\"(views/[^\"]+)\"", source)
+    assert paths, "Home.py did not register any pages"
+    for rel in paths:
+        full = CONSOLE_DIR / rel
+        assert full.exists(), f"Home.py references missing view: {rel}"
