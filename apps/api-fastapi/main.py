@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from deps import shutdown_db_pool, startup_db_pool
-from routes import health, tenants
+from routes import health, output_packages, tenants, work_orders, workflows
 
 
 @asynccontextmanager
@@ -41,3 +41,6 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(tenants.router)
+app.include_router(work_orders.router)
+app.include_router(workflows.router)
+app.include_router(output_packages.router)

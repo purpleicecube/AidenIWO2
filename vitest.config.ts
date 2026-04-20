@@ -18,5 +18,13 @@ export default defineConfig({
     ],
     environment: "node",
     globals: false,
+    // R-012 — disable inter-file parallelism. Several integration test
+    // files mutate the same shared tables (permission_grants,
+    // action_audit_log, work_orders) under a single Postgres database;
+    // worker-process concurrency introduces races that are effectively
+    // impossible to scope per-test without burning dedicated fixtures
+    // for every file. Sequential execution is ~2x slower locally but
+    // stays well under 10s and matches CI-single-worker behaviour.
+    fileParallelism: false,
   },
 });

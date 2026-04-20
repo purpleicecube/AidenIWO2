@@ -71,6 +71,7 @@ export const SCOPE_RULE_ALLOWLIST: readonly string[] = [
   "tests/tools/",
   "tools/eslint-plugin-iwo3/",
   "apps/api-fastapi/alembic/",
+  "apps/api-fastapi/tests/", // Loop 7 Phase 7.2+ pytest suite
 ];
 
 export function isPathAllowlistedForScopeRule(relPath: string): boolean {
