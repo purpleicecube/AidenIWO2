@@ -3,14 +3,18 @@
 # the Loop 1 acceptance criteria require. Invoked locally and from
 # .github/workflows/ci.yml.
 #
-# Order (per CODEX Loop 1 Phase 1 review — must match):
+# Order (per CODEX Loop 1 Phase 1 review — must match, with Loop 4
+# Phase 4 adding step 5 `iwo3-lint` before pytest):
 #   1. npm run check          (typecheck)
 #   2. reset-iwo3.sh          (DB to known state)
 #   3. seed-iwo3.sh           (Loop 1 durable rows)
-#   4. npm run test           (Vitest — IWO2 + new IWO3 integration tests)
+#   4. npm run test           (Vitest — IWO2 + new IWO3 integration tests
+#                              + Loop 4 Phase 4 lint rule unit + clean)
 #   5. uv run pytest          (api-fastapi smoke)
 #   6. gitleaks               (secret scan — soft-skipped when CLI absent
 #                              and run separately as gitleaks-action in CI)
+# The `iwo3-lint` rule unit tests + full-repo-clean assertion run inside
+# `npm run test` via the Vitest include pattern `tests/tools/**/*.test.ts`.
 #
 # Preconditions (local):
 #   - Postgres running (see docker-compose.iwo3-postgres.yml or

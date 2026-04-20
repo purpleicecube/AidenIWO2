@@ -179,17 +179,21 @@ async function resolveAdapterCatalogId(
 
 async function updateHandoffStatus(
   client: PoolClient,
+  clientId: string,
   handoffId: string,
   status: string,
   resultPayloadRef: string | null
 ): Promise<void> {
+  // Phase 4.4 lint gate: explicit client_id predicate on every update
+  // to a tenant-scoped table, belt-and-suspenders with the Loop 3 PK
+  // (handoff id) and the Loop 4 Phase 3 RLS policy.
   await client.query(
     `UPDATE output_handoffs
-     SET status = $2::output_handoff_status,
-         result_payload_ref = $3,
+     SET status = $3::output_handoff_status,
+         result_payload_ref = $4,
          updated_at = now()
-     WHERE id = $1`,
-    [handoffId, status, resultPayloadRef]
+     WHERE id = $1 AND client_id = $2`,
+    [handoffId, clientId, status, resultPayloadRef]
   );
 }
 
@@ -343,7 +347,7 @@ export async function dispatchToAdapter(
       externalDestination: null,
       handoffPayloadRef: null,
     });
-    await updateHandoffAdapterId(client, failedHandoffId, adapterCatalogId);
+    await updateHandoffAdapterId(client, input.clientId, failedHandoffId, adapterCatalogId);
     await emitDispatchAudit(client, input, AUDIT_EVENTS.ADAPTER_DISPATCH_FAILED, {
       errorMessage: message,
       stage: "submit",
@@ -357,7 +361,7 @@ export async function dispatchToAdapter(
     externalDestination: submission.externalDestination ?? null,
     handoffPayloadRef: submission.handoffPayloadRef ?? null,
   });
-  await updateHandoffAdapterId(client, handoffId, adapterCatalogId);
+  await updateHandoffAdapterId(client, input.clientId, handoffId, adapterCatalogId);
   await emitDispatchAudit(client, input, AUDIT_EVENTS.ADAPTER_DISPATCH_SUBMITTED, {
     externalReference: submission.externalReference,
     handoffId,
@@ -377,6 +381,7 @@ export async function dispatchToAdapter(
   if (result.status === "success") {
     await updateHandoffStatus(
       client,
+      input.clientId,
       handoffId,
       "completed",
       result.payloadRef ?? null
@@ -395,7 +400,7 @@ export async function dispatchToAdapter(
     };
   }
 
-  await updateHandoffStatus(client, handoffId, "failed", result.payloadRef ?? null);
+  await updateHandoffStatus(client, input.clientId, handoffId, "failed", result.payloadRef ?? null);
   await emitDispatchAudit(client, input, AUDIT_EVENTS.ADAPTER_DISPATCH_FAILED, {
     handoffId,
     errorMessage: result.errorMessage ?? "adapter returned non-success",
@@ -410,13 +415,16 @@ export async function dispatchToAdapter(
 
 async function updateHandoffAdapterId(
   client: PoolClient,
+  clientId: string,
   handoffId: string,
   adapterCatalogId: string
 ): Promise<void> {
+  // Phase 4.4 lint gate: explicit client_id predicate; see
+  // updateHandoffStatus comment.
   await client.query(
     `UPDATE output_handoffs
-     SET adapter_catalog_id = $2, updated_at = now()
-     WHERE id = $1`,
-    [handoffId, adapterCatalogId]
+     SET adapter_catalog_id = $3, updated_at = now()
+     WHERE id = $1 AND client_id = $2`,
+    [handoffId, clientId, adapterCatalogId]
   );
 }
