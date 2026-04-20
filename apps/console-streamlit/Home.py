@@ -32,7 +32,7 @@ def main() -> None:
             st.Page("views/dashboard.py", title="Dashboard", icon="🏠", default=True),
             st.Page("views/chat.py", title="Chat with Aiden", icon="💬"),
             st.Page("views/work_orders.py", title="Work Orders", icon="📋"),
-            st.Page("views/submit_order.py", title="Submit Order", icon="＋"),
+            st.Page("views/submit_order.py", title="Submit Order", icon="➕"),
             st.Page("views/system_health.py", title="System Health", icon="🩺"),
         ],
         "Environments": [

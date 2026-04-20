@@ -165,10 +165,17 @@ def render_sidebar_shell() -> ApiClient:
 
     user_id, _dflt_client, role = SEED_USERS[user_label]
     api = ApiClient(base_url=base_url, user_id=user_id, client_id=client_id)
+    # Widget-owned keys (iwo3_user_label, iwo3_tenant_idx,
+    # iwo3_api_base_url) are NOT writable after the widget is
+    # instantiated — Streamlit enforces that. Derived state goes into
+    # separately-named keys so there's no collision.
     st.session_state["iwo3_api"] = api
-    st.session_state["iwo3_user_label"] = user_label
-    st.session_state["iwo3_user_role"] = role
-    st.session_state["iwo3_tenant_label"] = TENANT_LABELS.get(client_id, client_id)
+    st.session_state["iwo3_current_user_id"] = user_id
+    st.session_state["iwo3_current_user_role"] = role
+    st.session_state["iwo3_current_tenant_id"] = client_id
+    st.session_state["iwo3_current_tenant_label"] = TENANT_LABELS.get(
+        client_id, client_id
+    )
 
     return api
 
@@ -176,9 +183,13 @@ def render_sidebar_shell() -> ApiClient:
 def render_sidebar_footer() -> None:
     """User badge + version footer, rendered AFTER st.navigation has
     injected its own widgets. Mirrors IWO2's bottom-left layout."""
+    # `iwo3_user_label` is a widget-owned key (the Acting-user
+    # selectbox) — reading from it is fine; writing would raise
+    # StreamlitAPIException. Derived state uses separate
+    # `iwo3_current_*` keys populated by render_sidebar_shell().
     user_label = st.session_state.get("iwo3_user_label", "—")
-    role = st.session_state.get("iwo3_user_role", "—")
-    tenant_label = st.session_state.get("iwo3_tenant_label", "—")
+    role = st.session_state.get("iwo3_current_user_role", "—")
+    tenant_label = st.session_state.get("iwo3_current_tenant_label", "—")
     initials = _initials(user_label)
 
     st.sidebar.markdown(
