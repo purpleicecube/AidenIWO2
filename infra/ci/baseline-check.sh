@@ -47,9 +47,15 @@ bash infra/local/seed-iwo3.sh
 echo "[baseline] 4/6  npm run test"
 npm run test
 
-echo "[baseline] 5/6  pytest apps/api-fastapi/tests"
+echo "[baseline] 5/6  pytest apps/api-fastapi/tests + apps/console-streamlit/tests"
 if command -v uv >/dev/null 2>&1; then
   (cd apps/api-fastapi && uv run pytest)
+  # Loop 8 Phase 8.1 adds the Streamlit console; its api_client tests
+  # spin up a FastAPI subprocess and exercise the HTTP surface. Uses
+  # the api-fastapi uv env (httpx + uvicorn already present).
+  if [[ -d apps/console-streamlit/tests ]]; then
+    (cd apps/api-fastapi && uv run pytest ../console-streamlit/tests -v)
+  fi
 else
   echo "[baseline] WARN: uv not installed — skipping pytest."
 fi

@@ -1,0 +1,17 @@
+# IWO3 Operator Console — streamlit theme.
+#
+# Aligned with IWO2 visual language (per CLAUDE.md guidance): deep
+# navy + purple accent on a light lavender base. Lexend SemiBold for
+# headings, Barlow Regular for body. These are the same tokens used
+# by the WS016 DigiFlow Streamlit deck.
+
+[theme]
+base = "light"
+primaryColor = "#8B49E2"
+backgroundColor = "#F3F4FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#091C53"
+font = "sans serif"
+
+[server]
+headless = true
