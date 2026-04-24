@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from deps import shutdown_db_pool, startup_db_pool
 from routes import (
+    adapter_credentials,
     audit_log,
     candidate_review,
     health,
@@ -54,3 +55,4 @@ app.include_router(workflows.router)
 app.include_router(output_packages.router)
 app.include_router(candidate_review.router)
 app.include_router(audit_log.router)
+app.include_router(adapter_credentials.router)

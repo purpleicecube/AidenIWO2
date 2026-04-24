@@ -4,6 +4,7 @@ import {
   varchar,
   text,
   boolean,
+  integer,
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
@@ -19,6 +20,12 @@ import { adapterCatalog } from "./adapter_catalog";
  *   - email_campaign: compose | test_send | send
  *   - figma / stitch / claude_design: generate | publish
  *   - crm: create_record | update_record | delete_record
+ *
+ * Loop 9 Phase 9.1 addition: `poll_timeout_seconds` — how long the
+ * dispatcher will wait before watchdog-expiring a still-processing
+ * dispatch for this action. `NULL` means "use the runtime default"
+ * (Phase 9.3 wires the default + consumption path). Healthy long
+ * renders within the window must NOT trigger watchdog.
  */
 export const adapterActions = pgTable(
   "adapter_actions",
@@ -33,6 +40,7 @@ export const adapterActions = pgTable(
     requiresOutputPackage: boolean("requires_output_package")
       .notNull()
       .default(true),
+    pollTimeoutSeconds: integer("poll_timeout_seconds"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

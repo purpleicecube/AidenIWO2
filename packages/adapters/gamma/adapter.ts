@@ -54,6 +54,8 @@ export class GammaTestDoubleAdapter implements AdapterContract {
       contractVersion: "v0",
       supportedOutputKinds: SUPPORTED_OUTPUT_KINDS,
       supportedActions: SUPPORTED_ACTIONS,
+      // Loop 9 Phase 9.1 — test-double always skips the live gate.
+      isLive: false,
     };
   }
 

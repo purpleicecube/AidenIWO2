@@ -242,12 +242,16 @@
       "adapter_config.disabled",
       "adapter_config.enabled",
       "adapter_config.updated",
+      "adapter_credential.first_invocation_confirmed",
       "adapter_credential.revoked",
       "adapter_credential.rotated",
       "adapter_dispatch.approval_required",
       "adapter_dispatch.completed",
+      "adapter_dispatch.credential_missing",
       "adapter_dispatch.failed",
+      "adapter_dispatch.first_invocation_pending",
       "adapter_dispatch.initiated",
+      "adapter_dispatch.live_disabled",
       "adapter_dispatch.package_invalid",
       "adapter_dispatch.policy_rejected",
       "adapter_dispatch.submitted",
@@ -337,6 +341,15 @@
         "workflow_step_run.completed",
         "execution_cycle.started"
       ],
+      "LOOP_3_PHASE_4_AUDIT_EVENTS": [
+        "adapter_dispatch.initiated",
+        "adapter_dispatch.policy_rejected",
+        "adapter_dispatch.approval_required",
+        "adapter_dispatch.package_invalid",
+        "adapter_dispatch.submitted",
+        "adapter_dispatch.completed",
+        "adapter_dispatch.failed"
+      ],
       "LOOP_3_PHASE_2_AUDIT_EVENTS": [
         "output_package.created",
         "output_package.validated",
@@ -356,15 +369,6 @@
         "adapter_credential.revoked",
         "adapter_policy.created",
         "adapter_policy.updated"
-      ],
-      "LOOP_3_PHASE_4_AUDIT_EVENTS": [
-        "adapter_dispatch.initiated",
-        "adapter_dispatch.policy_rejected",
-        "adapter_dispatch.approval_required",
-        "adapter_dispatch.package_invalid",
-        "adapter_dispatch.submitted",
-        "adapter_dispatch.completed",
-        "adapter_dispatch.failed"
       ],
       "LOOP_4_PHASE_1_AUDIT_EVENTS": [
         "permission.created",
@@ -389,6 +393,12 @@
         "workflow_execution.transitioned",
         "workflow_execution.cancelled",
         "workflow_step_run.transitioned"
+      ],
+      "LOOP_9_PHASE_1_AUDIT_EVENTS": [
+        "adapter_credential.first_invocation_confirmed",
+        "adapter_dispatch.live_disabled",
+        "adapter_dispatch.credential_missing",
+        "adapter_dispatch.first_invocation_pending"
       ]
     }
   },

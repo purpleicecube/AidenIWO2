@@ -1,0 +1,8 @@
+{
+  "isLive": true,
+  "adapterKey": "gamma",
+  "envFlagName": "GAMMA_LIVE_ENABLED",
+  "envFlagValue": "true",
+  "hasCredential": true,
+  "credentialFirstInvocationConfirmedAt": null
+}

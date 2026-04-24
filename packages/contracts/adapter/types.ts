@@ -18,6 +18,21 @@ export interface AdapterDescription {
   contractVersion: string;
   supportedOutputKinds: readonly string[];
   supportedActions: readonly string[];
+  /**
+   * Loop 9 Phase 9.1 — dual first-live-invocation gate.
+   *
+   *   isLive=false     → test-double / fake / local-only adapter.
+   *                      `dispatch_gating.decideLiveGate` allows
+   *                      unconditionally.
+   *   isLive=true      → real outbound service (Gamma live, Drive, CRM
+   *                      etc.). `dispatch_gating.decideLiveGate`
+   *                      enforces envFlag + credential + first-invocation
+   *                      confirmed. An adapter MUST also declare an
+   *                      `envFlagName` when `isLive=true` or the gate
+   *                      fail-closes.
+   */
+  isLive: boolean;
+  envFlagName?: string;
 }
 
 export interface AdapterValidationResult {

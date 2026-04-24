@@ -25,6 +25,7 @@ import { writeAuditRow } from "../audit/writer";
 import { resolveAdapterPolicy } from "./policy_resolver";
 import { PermissionDenied, requirePermission } from "../authz/require_permission";
 import type { AdapterContract } from "./types";
+import { decideLiveGate } from "./dispatch_gating";
 import { gammaTestDouble } from "../../adapters/gamma/adapter";
 import type { OutputPackage } from "../../../db/schema/output_packages";
 
@@ -78,6 +79,11 @@ export type DispatchResult =
   | { status: "approval_required"; reason: string }
   | { status: "package_invalid"; errors: readonly string[] }
   | { status: "adapter_not_found"; adapterKey: string }
+  // Loop 9 Phase 9.1 — dual first-live-invocation gate refusals.
+  // All three refusals happen pre-submit — no outbound call is made.
+  | { status: "live_disabled"; reason: string }
+  | { status: "credential_missing"; reason: string }
+  | { status: "first_invocation_pending"; reason: string }
   | {
       status: "failed";
       handoffId: string | null;
@@ -175,6 +181,37 @@ async function resolveAdapterCatalogId(
     [adapterKey]
   );
   return rows[0]?.id ?? null;
+}
+
+interface AdapterCredentialGateRow {
+  id: string;
+  firstInvocationConfirmedAt: string | null;
+}
+
+async function loadAdapterCredentialForGate(
+  client: PoolClient,
+  params: { clientId: string; adapterCatalogId: string }
+): Promise<AdapterCredentialGateRow | null> {
+  // Phase 4.4 lint gate: explicit client_id predicate on the read alongside
+  // the Loop 4 Phase 3 RLS policy on adapter_credentials.
+  const { rows } = await client.query<{
+    id: string;
+    first_invocation_confirmed_at: string | null;
+  }>(
+    `SELECT id,
+            first_invocation_confirmed_at
+       FROM adapter_credentials
+      WHERE client_id = $1 AND adapter_catalog_id = $2
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [params.clientId, params.adapterCatalogId]
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    firstInvocationConfirmedAt: r.first_invocation_confirmed_at,
+  };
 }
 
 async function updateHandoffStatus(
@@ -318,6 +355,71 @@ export async function dispatchToAdapter(
       { reason: "adapter instance not registered" }
     );
     return { status: "adapter_not_found", adapterKey: input.adapterKey };
+  }
+
+  // Step 3.5 (Loop 9 Phase 9.1) — live-dispatch gate.
+  // Test-doubles (isLive=false) short-circuit inside decideLiveGate
+  // without a credential lookup. Live adapters require:
+  //   - envFlagName declared on describe()
+  //   - process.env[envFlagName] === "true"
+  //   - an adapter_credentials row for (client, adapter) with
+  //     first_invocation_confirmed_at NOT NULL
+  // Refusals emit a phase-locked audit event and return a typed
+  // DispatchResult WITHOUT touching output_handoffs — no outbound
+  // call was made and there is nothing to record as a failed submit.
+  const description = adapter.describe();
+  const envFlagName = description.envFlagName ?? null;
+  const envFlagValue = envFlagName
+    ? process.env[envFlagName] ?? null
+    : null;
+  let credentialRow: AdapterCredentialGateRow | null = null;
+  if (description.isLive) {
+    credentialRow = await loadAdapterCredentialForGate(client, {
+      clientId: input.clientId,
+      adapterCatalogId,
+    });
+  }
+  const gate = decideLiveGate({
+    isLive: description.isLive,
+    adapterKey: input.adapterKey,
+    envFlagName,
+    envFlagValue,
+    hasCredential: credentialRow !== null,
+    credentialFirstInvocationConfirmedAt:
+      credentialRow?.firstInvocationConfirmedAt ?? null,
+  });
+  if (!gate.allow) {
+    const auditMeta = {
+      gate_reason: gate.reason,
+      gate_detail: gate.detail,
+      ...(envFlagName ? { envFlagName } : {}),
+    };
+    switch (gate.reason) {
+      case "live_disabled":
+        await emitDispatchAudit(
+          client,
+          input,
+          AUDIT_EVENTS.ADAPTER_DISPATCH_LIVE_DISABLED,
+          auditMeta
+        );
+        return { status: "live_disabled", reason: gate.detail };
+      case "credential_missing":
+        await emitDispatchAudit(
+          client,
+          input,
+          AUDIT_EVENTS.ADAPTER_DISPATCH_CREDENTIAL_MISSING,
+          auditMeta
+        );
+        return { status: "credential_missing", reason: gate.detail };
+      case "first_invocation_pending":
+        await emitDispatchAudit(
+          client,
+          input,
+          AUDIT_EVENTS.ADAPTER_DISPATCH_FIRST_INVOCATION_PENDING,
+          auditMeta
+        );
+        return { status: "first_invocation_pending", reason: gate.detail };
+    }
   }
 
   // Step 4: validate package

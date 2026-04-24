@@ -1,6 +1,6 @@
 {
-  "id": "5f06779d-8906-4d96-9b68-9a8c70c13f16",
-  "prevId": "112b04ac-713a-425e-8467-df265937ebd8",
+  "id": "ad931a84-5ad9-49db-ad73-f7b18fc4b212",
+  "prevId": "5f06779d-8906-4d96-9b68-9a8c70c13f16",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -273,6 +273,12 @@
           "notNull": true,
           "default": true
         },
+        "poll_timeout_seconds": {
+          "name": "poll_timeout_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -456,6 +462,30 @@
           "primaryKey": false,
           "notNull": false
         },
+        "first_invocation_confirmed_at": {
+          "name": "first_invocation_confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_invocation_confirmed_by_user_id": {
+          "name": "first_invocation_confirmed_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rotated_at": {
+          "name": "rotated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -497,6 +527,19 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "adapter_credentials_first_invocation_confirmed_by_user_id_users_id_fk": {
+          "name": "adapter_credentials_first_invocation_confirmed_by_user_id_users_id_fk",
+          "tableFrom": "adapter_credentials",
+          "tableTo": "users",
+          "columnsFrom": [
+            "first_invocation_confirmed_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },

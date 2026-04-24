@@ -123,6 +123,18 @@ export const AUDIT_EVENTS = {
   WORKFLOW_EXECUTION_TRANSITIONED: "workflow_execution.transitioned",
   WORKFLOW_EXECUTION_CANCELLED: "workflow_execution.cancelled",
   WORKFLOW_STEP_RUN_TRANSITIONED: "workflow_step_run.transitioned",
+
+  // Loop 9 Phase 9.1 — credential + gating foundation. Four events locked
+  // at phase start per IWO3_LOOP_8_3_CODEX_DECISIONS §Q1 (dual gate) + §Q2
+  // (env-injected credentials). `adapter_credential.rotated` already exists
+  // as a Loop 3 Phase 2 event; Phase 9.1 adds the pre-dispatch gating
+  // events + the first-invocation confirmation event.
+  ADAPTER_CREDENTIAL_FIRST_INVOCATION_CONFIRMED:
+    "adapter_credential.first_invocation_confirmed",
+  ADAPTER_DISPATCH_LIVE_DISABLED: "adapter_dispatch.live_disabled",
+  ADAPTER_DISPATCH_CREDENTIAL_MISSING: "adapter_dispatch.credential_missing",
+  ADAPTER_DISPATCH_FIRST_INVOCATION_PENDING:
+    "adapter_dispatch.first_invocation_pending",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -214,4 +226,11 @@ export const LOOP_6_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.WORKFLOW_EXECUTION_TRANSITIONED,
   AUDIT_EVENTS.WORKFLOW_EXECUTION_CANCELLED,
   AUDIT_EVENTS.WORKFLOW_STEP_RUN_TRANSITIONED,
+];
+
+export const LOOP_9_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.ADAPTER_CREDENTIAL_FIRST_INVOCATION_CONFIRMED,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_LIVE_DISABLED,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_CREDENTIAL_MISSING,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_FIRST_INVOCATION_PENDING,
 ];
