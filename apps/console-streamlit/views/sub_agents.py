@@ -1,7 +1,6 @@
 from views._placeholders import render_placeholder
 
 render_placeholder(
-    icon="🤖",
     title="Sub-Agents",
     subtitle="Tier-2 sub-agent registry + per-agent capability + permission scope.",
     deferred_to="Loop 9+",

@@ -1,7 +1,6 @@
 from views._placeholders import render_placeholder
 
 render_placeholder(
-    icon="🧪",
     title="Sandbox",
     subtitle="Isolated environment for testing changes without touching production data.",
     deferred_to="Loop 10+",

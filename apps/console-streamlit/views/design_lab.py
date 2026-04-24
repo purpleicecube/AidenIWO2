@@ -12,12 +12,12 @@ import streamlit as st
 from shell import page_requires_api
 
 
-def _tool_card(icon: str, name: str, status: str, blurb: str) -> None:
+def _tool_card(name: str, status: str, blurb: str) -> None:
     status_chip = "iwo3-chip-ok" if status == "ready" else "iwo3-chip-m"
     st.markdown(
         f"""
         <div class="iwo3-tier-card">
-          <div class="t">{icon} {name} <span class="{status_chip}">{status}</span></div>
+          <div class="t">{name} <span class="{status_chip}">{status}</span></div>
           <div class="d">{blurb}</div>
         </div>
         """,
@@ -43,13 +43,13 @@ def main() -> None:
 
     st.markdown("### Template PPT / PDF production")
     _tool_card(
-        "🎥", "Gamma (live render)",
-        "Loop 10+",
+        "Gamma (live render)",
+        "Loop 9",
         "Authorized Klear template registry lives in the DB; live "
-        "Gamma dispatch is Loop 10 off-test-double.",
+        "Gamma dispatch is Loop 9 off-test-double.",
     )
     _tool_card(
-        "🖨️", "Sandbox PPTX / PDF",
+        "Sandbox PPTX / PDF",
         "Loop 10+",
         "Local fallback for fidelity/privacy-sensitive renders. "
         "Policy-selected per template + client.",
@@ -57,18 +57,18 @@ def main() -> None:
 
     st.markdown("### Design environments")
     _tool_card(
-        "🎨", "Google Stitch",
+        "Google Stitch",
         "Loop 10+",
         "Figma-style design environment; contract-gated adapter lands "
         "alongside the other non-Gamma adapters.",
     )
     _tool_card(
-        "🖌️", "Figma",
+        "Figma",
         "Loop 10+",
         "Future adapter for handing off live Figma artboards.",
     )
     _tool_card(
-        "🤖", "Claude Design Studio",
+        "Claude Design Studio",
         "Loop 10+",
         "Future adapter for Claude-assisted design workflows.",
     )

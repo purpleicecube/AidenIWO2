@@ -1,7 +1,6 @@
 from views._placeholders import render_placeholder
 
 render_placeholder(
-    icon="🗂️",
     title="Workspace",
     subtitle="Per-operator working environment for live work orders.",
     deferred_to="Loop 9+",

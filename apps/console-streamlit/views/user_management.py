@@ -1,7 +1,6 @@
 from views._placeholders import render_placeholder
 
 render_placeholder(
-    icon="👥",
     title="User Management",
     subtitle="User + membership + role + per-user permission grant management.",
     deferred_to="Loop 9+",

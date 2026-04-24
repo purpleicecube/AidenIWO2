@@ -182,19 +182,20 @@ def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
             f'</div>'
         )
         rows_html.append(row)
-    more_link = ""
-    if len(wos) > 8:
-        more_link = f'<span class="link">View all ({len(wos)}) →</span>'
     html = (
         '<div class="iwo3-panel">'
         '<div class="iwo3-section-head">'
         '<span>Recent Work Orders</span>'
-        f'{more_link}'
         '</div>'
         f'{"".join(rows_html)}'
         '</div>'
     )
     st.markdown(html, unsafe_allow_html=True)
+    if st.button(
+        f"View all work orders ({len(wos)}) →",
+        key="dash-view-all-wos",
+    ):
+        st.switch_page("views/work_orders.py")
 
 
 def main() -> None:

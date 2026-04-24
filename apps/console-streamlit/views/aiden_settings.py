@@ -1,7 +1,6 @@
 from views._placeholders import render_placeholder
 
 render_placeholder(
-    icon="⚙️",
     title="Aiden Settings",
     subtitle="Tier-1 policy + routing + decision configuration per tenant.",
     deferred_to="Loop 9+",

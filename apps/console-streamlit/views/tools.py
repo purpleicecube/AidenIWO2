@@ -1,7 +1,6 @@
 from views._placeholders import render_placeholder
 
 render_placeholder(
-    icon="🛠️",
     title="Tools",
     subtitle="MCP servers + internal capabilities available to agents.",
     deferred_to="Loop 9+",

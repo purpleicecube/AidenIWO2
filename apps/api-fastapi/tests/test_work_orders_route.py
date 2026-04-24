@@ -1,4 +1,11 @@
-"""Loop 7 Phase 7.2 — /work_orders route tests."""
+"""Loop 7 Phase 7.2 — /work_orders route tests.
+
+Loop 9 Phase 9.0 extension: direct coverage for
+``GET /work_orders/metrics`` and ``POST /work_orders`` — both back
+user-facing shell surfaces (Dashboard metric cards + Submit Order form)
+and previously lived behind only view-import smoke tests in
+``apps/console-streamlit/tests``.
+"""
 
 from __future__ import annotations
 
@@ -159,6 +166,190 @@ def test_illegal_transition_returns_409() -> None:
         assert r.json()["detail"]["code"] == "illegal_transition"
     finally:
         asyncio.run(_drop_wo(wo_id))
+
+
+@iwo3_db
+def test_metrics_requires_auth() -> None:
+    with TestClient(app) as client:
+        r = client.get("/work_orders/metrics")
+    assert r.status_code == 401
+
+
+@iwo3_db
+def test_metrics_klear_tenant_scoped() -> None:
+    with TestClient(app) as client:
+        r = client.get(
+            "/work_orders/metrics",
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # RLS filters to Klear; FFAI WOs are never counted.
+    assert body["total"] >= 1
+    assert isinstance(body["by_status"], dict)
+    assert body["total"] == sum(body["by_status"].values())
+    assert body["reopened_count"] >= 0
+
+
+@iwo3_db
+def test_metrics_viewer_can_read() -> None:
+    # Viewer has `work_order:read`, so /metrics is allowed.
+    with TestClient(app) as client:
+        r = client.get(
+            "/work_orders/metrics",
+            headers={
+                "X-IWO3-User": KLEAR_VIEWER,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 200, r.text
+    assert "total" in r.json()
+
+
+@iwo3_db
+def test_metrics_counts_grow_after_create() -> None:
+    # Independent read → create → read: total must strictly increase
+    # by 1 and pending must also tick by 1.
+    with TestClient(app) as client:
+        before = client.get(
+            "/work_orders/metrics",
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        ).json()
+        post = client.post(
+            "/work_orders",
+            json={
+                "title": "phase-9.0 metrics delta test",
+                "type": "content_brief",
+                "priority": "medium",
+                "correlation_id": "loop9-phase0-metrics",
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+        assert post.status_code == 200, post.text
+        new_id = post.json()["id"]
+        try:
+            after = client.get(
+                "/work_orders/metrics",
+                headers={
+                    "X-IWO3-User": KLEAR_OPERATOR,
+                    "X-IWO3-Client": KLEAR_CLIENT,
+                },
+            ).json()
+            assert after["total"] == before["total"] + 1
+            assert (
+                after["by_status"].get("pending", 0)
+                == before["by_status"].get("pending", 0) + 1
+            )
+        finally:
+            import asyncio
+
+            asyncio.run(_drop_wo(new_id))
+
+
+@iwo3_db
+def test_create_wo_requires_auth() -> None:
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={"title": "no auth", "type": "content_brief"},
+        )
+    assert r.status_code == 401
+
+
+@iwo3_db
+def test_create_wo_operator_creates_pending() -> None:
+    import asyncio
+
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={
+                "title": "phase-9.0 create-test WO",
+                "description": "Created via POST /work_orders route test.",
+                "type": "content_brief",
+                "priority": "high",
+                "correlation_id": "loop9-phase0-create",
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "pending"
+    assert body["client_id"] == KLEAR_CLIENT
+    assert body["priority"] == "high"
+    assert body["correlation_id"] == "loop9-phase0-create"
+    assert body["submitted_by_user_id"] == KLEAR_OPERATOR
+    asyncio.run(_drop_wo(body["id"]))
+
+
+@iwo3_db
+def test_create_wo_viewer_forbidden() -> None:
+    # Viewer lacks `work_order:create` — must 403.
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={"title": "viewer create denied", "type": "content_brief"},
+            headers={
+                "X-IWO3-User": KLEAR_VIEWER,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "permission_denied"
+
+
+@iwo3_db
+def test_create_wo_invalid_priority_returns_422() -> None:
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={
+                "title": "bad priority",
+                "type": "content_brief",
+                "priority": "urgent",
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 422
+    assert r.json()["detail"]["error"] == "invalid_priority"
+    assert r.json()["detail"]["priority"] == "urgent"
+
+
+@iwo3_db
+def test_create_wo_tenant_scoped() -> None:
+    # Actor is Klear → created WO must be in Klear. Independent sanity
+    # check that `client_id` comes from the actor context, not the body.
+    import asyncio
+
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={"title": "tenant-scope test", "type": "content_brief"},
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["client_id"] == KLEAR_CLIENT
+    assert body["client_id"] != FFAI_CLIENT
+    asyncio.run(_drop_wo(body["id"]))
 
 
 @iwo3_db

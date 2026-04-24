@@ -7,11 +7,11 @@ import streamlit as st
 from shell import page_requires_api
 
 
-def _tier_row(icon: str, tier: str, subtitle: str, body: str) -> None:
+def _tier_row(tier: str, subtitle: str, body: str) -> None:
     st.markdown(
         f"""
         <div class="iwo3-tier-card">
-          <div class="t">{icon} {tier}</div>
+          <div class="t">{tier}</div>
           <div class="d">{subtitle}</div>
         </div>
         """,
@@ -35,7 +35,6 @@ def main() -> None:
         return
 
     _tier_row(
-        "🧠",
         "Tier 1 — Aiden",
         "Policy, routing, decisions",
         "Aiden is the top-level agent that interprets intake, routes work to "
@@ -44,7 +43,6 @@ def main() -> None:
         "content; it decides who should.",
     )
     _tier_row(
-        "🧭",
         "Tier 1.5 — PM Coordination",
         "Workflow orchestration, step coordination",
         "PM Coordination runs between Aiden and the sub-agents. It manages "
@@ -52,7 +50,6 @@ def main() -> None:
         "and is the bridge to the Loop 6 lifecycle state machines.",
     )
     _tier_row(
-        "🤖",
         "Tier 2 — Sub-Agents",
         "Aiden-controlled or independent",
         "Sub-agents execute: content briefs, research, PPT/PDF renders, CRM "

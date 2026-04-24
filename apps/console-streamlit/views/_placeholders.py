@@ -15,7 +15,6 @@ from shell import page_requires_api
 
 
 def render_placeholder(
-    icon: str,
     title: str,
     subtitle: str,
     deferred_to: str,
