@@ -30,6 +30,7 @@ from routes import (
     adapter_credentials,
     aiden,
     audit_log,
+    auth as auth_routes,
     candidate_review,
     channels,
     chat_sessions,
@@ -104,3 +105,4 @@ app.include_router(aiden.router)
 app.include_router(dispatch.router)
 app.include_router(workspace.router)
 app.include_router(chat_sessions.router)
+app.include_router(auth_routes.router)

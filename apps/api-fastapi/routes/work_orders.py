@@ -138,6 +138,34 @@ async def create_work_order(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error": "invalid_priority", "priority": body.priority},
         )
+    # Beta-1 ε.3 / Q8 — chat-driven creates carry a partial UNIQUE on
+    # (client_id, correlation_id) WHERE correlation_id LIKE 'chat:%'
+    # (migration 0016). For chat correlations, look up the existing WO
+    # BEFORE the INSERT to avoid leaving the asyncpg transaction in a
+    # failed state (which would break a post-violation lookup). The
+    # partial-UNIQUE remains the canonical race-safe gate at the DB
+    # layer; this pre-flight is the operator-friendly path.
+    if body.correlation_id and body.correlation_id.startswith("chat:"):
+        existing = await conn.fetchrow(
+            """
+            SELECT id::text AS id, title
+              FROM work_orders
+             WHERE client_id = $1::uuid AND correlation_id = $2
+            """,
+            ctx["client_id"],
+            body.correlation_id,
+        )
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "duplicate_correlation_id",
+                    "correlation_id": body.correlation_id,
+                    "existing_work_order_id": existing["id"],
+                    "existing_title": existing["title"],
+                },
+            )
+
     row = await conn.fetchrow(
         """
         INSERT INTO work_orders

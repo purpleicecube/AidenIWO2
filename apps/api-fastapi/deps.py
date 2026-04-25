@@ -135,24 +135,66 @@ async def get_tenant_scoped_connection(
 # --- User context --------------------------------------------------------
 
 
+def _auth_mode() -> str:
+    """Beta-1 ε.3 / Q2 — auth-mode selector.
+    `dev_bearer` (legacy / local dev): X-IWO3-User + X-IWO3-Client headers.
+    `jwt`        (production): Authorization: Bearer <signed-jwt>.
+    Default = `dev_bearer` to preserve all pre-Beta tests + tooling.
+    Operator opts into JWT mode via env when production-deploying.
+    """
+    return os.environ.get("IWO3_AUTH_MODE", "dev_bearer").strip().lower() or "dev_bearer"
+
+
 async def current_user_context(
     request: Request,
     x_iwo3_user: Annotated[Optional[str], Header(alias="X-IWO3-User")] = None,
     x_iwo3_client: Annotated[
         Optional[str], Header(alias="X-IWO3-Client")
     ] = None,
+    authorization: Annotated[Optional[str], Header(alias="Authorization")] = None,
 ) -> dict:
-    """Dev-only auth. Production auth (Loop 9+) replaces this with a
-    signed token provider.
+    """Auth-mode-aware user context resolver.
+
+    `dev_bearer` mode: X-IWO3-User + X-IWO3-Client headers (the
+    canonical pre-Beta behaviour).
+
+    `jwt` mode: Authorization: Bearer <signed-jwt>; the header takes
+    precedence when both are present so a JWT-authenticated request
+    keeps working even if a stale dev header is included.
 
     Returns ``{"user_id": str, "client_id": str}`` and stashes it on
     ``request.state.user_context`` so tenant-scoped connection deps can
     read it.
     """
+    mode = _auth_mode()
+
+    # JWT mode: signed access token via Authorization header.
+    if mode == "jwt" or (authorization and authorization.startswith("Bearer ")):
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization: Bearer <jwt> header required",
+            )
+        # Lazy import — auth.jwt_tokens is independent of FastAPI.
+        from auth.jwt_tokens import TokenError, decode as jwt_decode
+
+        token = authorization[len("Bearer "):].strip()
+        try:
+            claims = jwt_decode(token, expected_typ="access")
+        except TokenError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "invalid_token", "kind": exc.kind},
+            )
+        ctx = {"user_id": claims["sub"], "client_id": claims["cid"]}
+        request.state.user_context = ctx
+        return ctx
+
+    # dev_bearer mode (default): legacy header pair.
     if not x_iwo3_user or not x_iwo3_client:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="X-IWO3-User and X-IWO3-Client headers required",
+            detail="X-IWO3-User and X-IWO3-Client headers required (or Authorization: Bearer in jwt mode)",
         )
     ctx = {"user_id": x_iwo3_user, "client_id": x_iwo3_client}
     request.state.user_context = ctx
