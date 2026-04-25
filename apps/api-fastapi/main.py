@@ -32,6 +32,7 @@ from routes import (
     audit_log,
     candidate_review,
     channels,
+    chat_sessions,
     dispatch,
     health,
     llm,
@@ -102,3 +103,4 @@ app.include_router(channels.router)
 app.include_router(aiden.router)
 app.include_router(dispatch.router)
 app.include_router(workspace.router)
+app.include_router(chat_sessions.router)

@@ -68,8 +68,29 @@ def test_create_requires_headers() -> None:
 
 
 @iwo3_db
-def test_create_403_for_operator() -> None:
+def test_create_403_for_viewer() -> None:
+    """Beta-1 ε.1 (Q5) split: operator now holds llm_config:write, so the
+    403 wall moved to viewer/reviewer. Viewer carries no llm_config:* keys."""
     with TestClient(app) as client:
+        r = client.post(
+            "/llm/configs",
+            headers=_hdr(KLEAR_VIEWER),
+            json={
+                "agent_role": _new_role(),
+                "display_name": "T",
+                "provider": "groq",
+                "model": "openai/gpt-oss-120b",
+                "credential_ref": "credential_ref:env:GROQ_API_KEY",
+            },
+        )
+    assert r.status_code == 403, r.text
+
+
+@iwo3_db
+def test_delete_403_for_operator_after_rbac_split() -> None:
+    """Beta-1 ε.1 (Q5): operator can WRITE but not DELETE. Architect lock C."""
+    with TestClient(app) as client:
+        # operator can still create
         r = client.post(
             "/llm/configs",
             headers=_hdr(KLEAR_OPERATOR),
@@ -81,7 +102,19 @@ def test_create_403_for_operator() -> None:
                 "credential_ref": "credential_ref:env:GROQ_API_KEY",
             },
         )
-    assert r.status_code == 403, r.text
+        assert r.status_code == 201, r.text
+        cfg_id = r.json()["config"]["id"]
+        # but operator cannot delete
+        rd = client.delete(
+            f"/llm/configs/{cfg_id}",
+            headers=_hdr(KLEAR_OPERATOR),
+        )
+        assert rd.status_code == 403, rd.text
+        # cleanup
+        client.delete(
+            f"/llm/configs/{cfg_id}?hard=true",
+            headers=_hdr(KLEAR_OWNER),
+        )
 
 
 @iwo3_db

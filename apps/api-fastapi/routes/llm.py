@@ -238,7 +238,7 @@ def _validate_provider(provider: str) -> None:
     "/configs",
     response_model=LlmConfigResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_permission_dep("system:admin"))],
+    dependencies=[Depends(require_permission_dep("llm_config:write"))],
 )
 async def create_config(
     body: CreateLlmConfigRequest,
@@ -313,7 +313,7 @@ async def create_config(
 @router.patch(
     "/configs/{config_id}",
     response_model=LlmConfigResponse,
-    dependencies=[Depends(require_permission_dep("system:admin"))],
+    dependencies=[Depends(require_permission_dep("llm_config:write"))],
 )
 async def update_config(
     config_id: str,
@@ -420,7 +420,7 @@ async def update_config(
 @router.delete(
     "/configs/{config_id}",
     response_model=LlmConfigResponse,
-    dependencies=[Depends(require_permission_dep("system:admin"))],
+    dependencies=[Depends(require_permission_dep("llm_config:delete"))],
 )
 async def delete_config(
     config_id: str,
