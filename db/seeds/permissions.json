@@ -523,5 +523,19 @@
     "displayName": "Delete from tenant workspace",
     "description": "Soft-delete folders + artifacts in the tenant workspace tree.",
     "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000076",
+    "permissionKey": "llm_config:write",
+    "displayName": "Edit LLM configs",
+    "description": "Create + update llm_configs rows for this tenant (provider, model, system prompt, enabled flag).",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000077",
+    "permissionKey": "llm_config:delete",
+    "displayName": "Delete LLM configs",
+    "description": "Soft-delete or hard-delete llm_configs rows for this tenant.",
+    "scope": "tenant"
   }
 ]

@@ -146,8 +146,8 @@ describe("Loop 4 Phase 4 — require-tenant-scope-on-client-tables rule", () => 
     ).toBe(false);
   });
 
-  it("covers all 30 tenant-scoped tables (+1 from Pre-Beta Loop δ.1 workspace_folders)", () => {
-    expect(TENANT_SCOPED_TABLES).toHaveLength(30);
+  it("covers all 31 tenant-scoped tables (+1 from Beta-1 ε.1 chat_sessions)", () => {
+    expect(TENANT_SCOPED_TABLES).toHaveLength(31);
     // Spot-check two from each category
     expect(TENANT_SCOPED_TABLES).toContain("work_orders"); // direct
     expect(TENANT_SCOPED_TABLES).toContain("workflow_templates"); // nested

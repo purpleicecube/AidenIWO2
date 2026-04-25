@@ -872,5 +872,10 @@
   { "role": "reviewer",     "permissionKey": "workspace:read"    },
   { "role": "viewer",       "permissionKey": "workspace:read"    },
   { "role": "agent_system", "permissionKey": "workspace:read"    },
-  { "role": "agent_system", "permissionKey": "workspace:write"   }
+  { "role": "agent_system", "permissionKey": "workspace:write"   },
+  { "role": "owner",        "permissionKey": "llm_config:write"  },
+  { "role": "owner",        "permissionKey": "llm_config:delete" },
+  { "role": "admin",        "permissionKey": "llm_config:write"  },
+  { "role": "admin",        "permissionKey": "llm_config:delete" },
+  { "role": "operator",     "permissionKey": "llm_config:write"  }
 ]

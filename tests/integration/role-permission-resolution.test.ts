@@ -24,15 +24,13 @@ const INTRUDER = "00000000-0000-4000-8000-000099000002";
 
 // Expected role-default cardinalities — see db/seeds/role_permissions.json.
 // Values are locked upfront per IWO3_LOOP_4_APPROVAL_DECISIONS §Q1.
-// MegaLoop Alpha α.6 raised the vocabulary by 3 keys (channel_*); Pre-Beta
-// Loop δ.2 raised by another 3 keys (workspace:read/write/delete). Owner +
-// admin get all three workspace keys; operator gets read+write; reviewer +
-// viewer + agent_system get the appropriate subset (see role_permissions
-// JSON for the exact mapping).
+// α.6 +3 channel keys, δ.2 +3 workspace keys, β-1 ε.1 +2 llm_config:write/
+// delete keys per architect Q5. Owner + admin get all keys; operator gets
+// llm_config:write (no delete); reviewer/viewer/agent_system unchanged.
 const EXPECTED_COUNTS = {
-  owner: 75,
-  admin: 73,
-  operator: 31,
+  owner: 77,
+  admin: 75,
+  operator: 32,
   reviewer: 19,
   viewer: 14,
   agent_system: 23,
@@ -45,21 +43,21 @@ describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
     await pool.end();
   });
 
-  it("permissions vocabulary is locked at 75 keys (§Q1 + α.6 channel + δ.2 workspace)", async () => {
+  it("permissions vocabulary is locked at 77 keys (§Q1 + α.6 channel + δ.2 workspace + β-1 ε.1 llm_config CRUD split)", async () => {
     const { rows } = await pool.query<{ count: string }>(
       `SELECT count(*) AS count FROM permissions`
     );
-    expect(Number(rows[0].count)).toBe(75);
+    expect(Number(rows[0].count)).toBe(77);
   });
 
-  it("role_permissions is seeded at 235 rows across the six roles", async () => {
+  it("role_permissions is seeded at 240 rows across the six roles", async () => {
     const { rows } = await pool.query<{ role: string; count: string }>(
       `SELECT role, count(*) AS count FROM role_permissions GROUP BY role ORDER BY role`
     );
     const map = Object.fromEntries(rows.map((r) => [r.role, Number(r.count)]));
     expect(map).toMatchObject(EXPECTED_COUNTS);
     const total = Object.values(map).reduce((a, b) => a + b, 0);
-    expect(total).toBe(235);
+    expect(total).toBe(240);
   });
 
   for (const [userId, role, expected] of [

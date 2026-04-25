@@ -36,6 +36,7 @@ const LOOP_4_VERSION = "iwo3@v0.4.0-loop4";
 const LOOP_9_VERSION = "iwo3@v0.9.0-loop9";
 const ALPHA_VERSION = "iwo3@v0.10.0-alpha";
 const PRE_BETA_DELTA_VERSION = "iwo3@v0.11.0-pre-beta-delta";
+const BETA_1_VERSION = "iwo3@v0.12.0-beta-1";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -88,6 +89,9 @@ const KNOWN_TABLES: ManifestEntry[] = [
 
   // Pre-Beta Loop δ.1 — Workspace folder tree (artifacts table extended in place)
   { name: "workspace_folders",          source: "iwo3_native", sourceVersion: PRE_BETA_DELTA_VERSION, ownedBy: "drizzle", notes: "Pre-Beta Loop δ.1 — per-tenant workspace folder tree; files live in artifacts.workspace_folder_id" },
+
+  // MegaLoop Beta-1 ε.1 — operator-facing cross-session chat persistence (architect Q7 lock)
+  { name: "chat_sessions",              source: "iwo3_native", sourceVersion: BETA_1_VERSION, ownedBy: "drizzle", notes: "MegaLoop Beta-1 ε.1 — per-(operator, tenant) chat session row carrying message history + recent-context JSONB" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

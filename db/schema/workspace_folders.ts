@@ -40,6 +40,15 @@ export const workspaceFolders = pgTable(
       { onDelete: "restrict" }
     ),
     name: varchar("name", { length: 256 }).notNull(),
+    /**
+     * Beta-1 ε.1 / Q11 — per-operator subtree marker.
+     * NULL  → tenant-shared folder (visible to every operator with workspace:read).
+     * non-NULL → per-operator scratch; visible only to the named user
+     * (RLS lets the row through; the route layer further filters by user_id).
+     */
+    ownerUserId: uuid("owner_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdByUserId: uuid("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

@@ -201,6 +201,19 @@ export const AUDIT_EVENTS = {
   WORKSPACE_FILE_MOVED: "file.moved",
   WORKSPACE_FILE_DELETED: "file.deleted",
   WORKSPACE_FILE_SAVED_FROM_OUTPUT: "file.saved_from_output",
+
+  // MegaLoop Beta-1 ε — Production-posture vocabulary lock.
+  // Auth, credential encryption, chat-session continuity, webhook ingress.
+  // Locked here in ε.1 so later phases can emit without re-snapshotting.
+  AUTH_SESSION_STARTED: "auth.session_started",
+  AUTH_SESSION_REFRESHED: "auth.session_refreshed",
+  AUTH_SESSION_ENDED: "auth.session_ended",
+  AUTH_LOGIN_FAILED: "auth.login_failed",
+  CREDENTIAL_ENCRYPTED: "credential.encrypted",
+  CREDENTIAL_ROTATED: "credential.rotated",
+  CHAT_SESSION_UPDATED: "chat_session.updated",
+  WEBHOOK_RECEIVED: "webhook.received",
+  WEBHOOK_SIGNATURE_INVALID: "webhook.signature_invalid",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -348,4 +361,16 @@ export const PRE_BETA_PHASE_DELTA_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.WORKSPACE_FILE_MOVED,
   AUDIT_EVENTS.WORKSPACE_FILE_DELETED,
   AUDIT_EVENTS.WORKSPACE_FILE_SAVED_FROM_OUTPUT,
+];
+
+export const BETA_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.AUTH_SESSION_STARTED,
+  AUDIT_EVENTS.AUTH_SESSION_REFRESHED,
+  AUDIT_EVENTS.AUTH_SESSION_ENDED,
+  AUDIT_EVENTS.AUTH_LOGIN_FAILED,
+  AUDIT_EVENTS.CREDENTIAL_ENCRYPTED,
+  AUDIT_EVENTS.CREDENTIAL_ROTATED,
+  AUDIT_EVENTS.CHAT_SESSION_UPDATED,
+  AUDIT_EVENTS.WEBHOOK_RECEIVED,
+  AUDIT_EVENTS.WEBHOOK_SIGNATURE_INVALID,
 ];

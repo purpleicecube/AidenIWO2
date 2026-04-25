@@ -84,8 +84,8 @@ describeIwo3("Loop 4 Phase 1 — permission-grant override precedence", () => {
       clientId: KLEAR,
     });
     expect(after.permissions.has("audit_log:read")).toBe(true);
-    // Size = operator-31 + 1 override (post-δ.2 workspace bump)
-    expect(after.permissions.size).toBe(32);
+    // Size = operator-32 + 1 override (post-β-1 ε.1 llm_config:write bump)
+    expect(after.permissions.size).toBe(33);
   });
 
   it("deny override removes a permission the role default would grant", async () => {
@@ -109,8 +109,8 @@ describeIwo3("Loop 4 Phase 1 — permission-grant override precedence", () => {
       clientId: KLEAR,
     });
     expect(after.permissions.has("user:invite")).toBe(false);
-    // Size = admin-73 − 1 deny (post-δ.2 workspace bump)
-    expect(after.permissions.size).toBe(72);
+    // Size = admin-75 − 1 deny (post-β-1 ε.1 llm_config CRUD split)
+    expect(after.permissions.size).toBe(74);
   });
 
   it("overrides are tenant-scoped — an allow on Klear does not bleed to FFAI", async () => {
