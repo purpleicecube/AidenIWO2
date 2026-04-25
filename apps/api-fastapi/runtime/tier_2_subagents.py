@@ -457,7 +457,106 @@ async def produce_output_package(
             "title": title,
         },
     )
+
+    # Pre-Beta Loop δ.3 — auto-route the produced output into the
+    # tenant's `Outputs/` workspace folder per architect decision (D).
+    # Failure here is non-fatal: the output package is already
+    # persisted, and the operator can save it manually from the
+    # Output Packages surface. We log and continue.
+    try:
+        outputs_folder_id = await conn.fetchval(
+            """
+            SELECT root_outputs.id::text
+              FROM workspace_folders root
+              JOIN workspace_folders root_outputs
+                ON root_outputs.parent_folder_id = root.id
+               AND root_outputs.deleted_at IS NULL
+               AND root_outputs.name = 'Outputs'
+             WHERE root.client_id = $1::uuid
+               AND root.parent_folder_id IS NULL
+               AND root.name = '/'
+               AND root.deleted_at IS NULL
+            """,
+            client_id,
+        )
+        if outputs_folder_id:
+            artifact_id = await conn.fetchval(
+                """
+                INSERT INTO artifacts
+                  (client_id, source_type, content_class, mime_type,
+                   filename, storage_ref, extracted_text,
+                   workspace_folder_id, metadata, created_by_user_id)
+                VALUES ($1::uuid, 'generated'::artifact_source_type,
+                        'c1'::artifact_content_class, $2, $3, $4, $5,
+                        $6::uuid, $7::jsonb, $8::uuid)
+                RETURNING id::text
+                """,
+                client_id,
+                _mime_for_output_kind(envelope.output_kind),
+                _filename_for_output(title, envelope.output_kind),
+                f"output_package://{pkg_id}",
+                envelope.content_markdown[:200_000],
+                outputs_folder_id,
+                json.dumps({
+                    "outputPackageId": pkg_id,
+                    "outputKind": envelope.output_kind,
+                    "summary": envelope.summary,
+                }),
+                actor_user_id,
+            )
+            await write_audit_row(
+                conn,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                event="file.saved_from_output",
+                target_type="artifact",
+                target_id=artifact_id,
+                metadata={
+                    "outputPackageId": pkg_id,
+                    "workspaceFolderId": outputs_folder_id,
+                    "outputKind": envelope.output_kind,
+                    "title": title,
+                },
+            )
+    except Exception as exc:  # noqa: BLE001 — auto-routing is best-effort
+        # Caller still gets pkg_id; operator can manually save later.
+        import logging
+        logging.getLogger("iwo3.tier_2").warning(
+            "auto-route to workspace failed for pkg=%s tenant=%s: %s",
+            pkg_id, client_id, exc,
+        )
+
     return pkg_id
+
+
+def _mime_for_output_kind(output_kind: str) -> str:
+    """Map output_package_kind → mime hint. Plaintext fallback so
+    workspace previews always render something readable."""
+    return {
+        "gamma_pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "sandbox_pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "gamma_pdf": "application/pdf",
+        "sandbox_pdf": "application/pdf",
+        "email_campaign": "text/markdown",
+        "drive_upload": "text/markdown",
+        "crm_mutation": "application/json",
+        "figma_handoff": "text/markdown",
+        "stitch_handoff": "text/markdown",
+        "designlab_handoff": "text/markdown",
+        "generic": "text/markdown",
+    }.get(output_kind, "text/markdown")
+
+
+def _filename_for_output(title: str, output_kind: str) -> str:
+    base = (title or "output")[:200].strip().replace("/", "_")
+    ext = {
+        "gamma_pptx": ".pptx",
+        "sandbox_pptx": ".pptx",
+        "gamma_pdf": ".pdf",
+        "sandbox_pdf": ".pdf",
+        "crm_mutation": ".json",
+    }.get(output_kind, ".md")
+    return f"{base}{ext}"
 
 
 async def execute_step_run(

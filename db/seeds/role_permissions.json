@@ -860,5 +860,17 @@
   { "role": "operator",  "permissionKey": "channel_auth_code:issue"  },
   { "role": "operator",  "permissionKey": "channel_identity:read"    },
   { "role": "reviewer",  "permissionKey": "channel_identity:read"    },
-  { "role": "agent_system", "permissionKey": "channel_identity:read" }
+  { "role": "agent_system", "permissionKey": "channel_identity:read" },
+  { "role": "owner",        "permissionKey": "workspace:read"    },
+  { "role": "owner",        "permissionKey": "workspace:write"   },
+  { "role": "owner",        "permissionKey": "workspace:delete"  },
+  { "role": "admin",        "permissionKey": "workspace:read"    },
+  { "role": "admin",        "permissionKey": "workspace:write"   },
+  { "role": "admin",        "permissionKey": "workspace:delete"  },
+  { "role": "operator",     "permissionKey": "workspace:read"    },
+  { "role": "operator",     "permissionKey": "workspace:write"   },
+  { "role": "reviewer",     "permissionKey": "workspace:read"    },
+  { "role": "viewer",       "permissionKey": "workspace:read"    },
+  { "role": "agent_system", "permissionKey": "workspace:read"    },
+  { "role": "agent_system", "permissionKey": "workspace:write"   }
 ]

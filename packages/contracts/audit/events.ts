@@ -187,6 +187,20 @@ export const AUDIT_EVENTS = {
   LLM_CONFIG_CREATED: "llm_config.created",
   LLM_CONFIG_UPDATED: "llm_config.updated",
   LLM_CONFIG_DISABLED: "llm_config.disabled",
+
+  // Pre-Beta Loop δ — Workspace mutations (folders + files). 9 events
+  // locked at plan time per architect decision (5). file.saved_from_output
+  // is the audit anchor for the auto-routing path that writes outputs
+  // into the tenant `Outputs/` folder on produce_output_package.
+  WORKSPACE_FOLDER_CREATED: "folder.created",
+  WORKSPACE_FOLDER_RENAMED: "folder.renamed",
+  WORKSPACE_FOLDER_MOVED: "folder.moved",
+  WORKSPACE_FOLDER_DELETED: "folder.deleted",
+  WORKSPACE_FILE_CREATED: "file.created",
+  WORKSPACE_FILE_RENAMED: "file.renamed",
+  WORKSPACE_FILE_MOVED: "file.moved",
+  WORKSPACE_FILE_DELETED: "file.deleted",
+  WORKSPACE_FILE_SAVED_FROM_OUTPUT: "file.saved_from_output",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -322,4 +336,16 @@ export const PRE_BETA_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.LLM_CONFIG_CREATED,
   AUDIT_EVENTS.LLM_CONFIG_UPDATED,
   AUDIT_EVENTS.LLM_CONFIG_DISABLED,
+];
+
+export const PRE_BETA_PHASE_DELTA_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.WORKSPACE_FOLDER_CREATED,
+  AUDIT_EVENTS.WORKSPACE_FOLDER_RENAMED,
+  AUDIT_EVENTS.WORKSPACE_FOLDER_MOVED,
+  AUDIT_EVENTS.WORKSPACE_FOLDER_DELETED,
+  AUDIT_EVENTS.WORKSPACE_FILE_CREATED,
+  AUDIT_EVENTS.WORKSPACE_FILE_RENAMED,
+  AUDIT_EVENTS.WORKSPACE_FILE_MOVED,
+  AUDIT_EVENTS.WORKSPACE_FILE_DELETED,
+  AUDIT_EVENTS.WORKSPACE_FILE_SAVED_FROM_OUTPUT,
 ];

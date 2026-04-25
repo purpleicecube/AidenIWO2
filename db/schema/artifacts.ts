@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { clients } from "./clients";
 import { users } from "./users";
+import { workspaceFolders } from "./workspace_folders";
 
 export const artifactSourceTypeEnum = pgEnum("artifact_source_type", [
   "upload",
@@ -38,6 +39,16 @@ export const artifacts = pgTable(
     storageRef: varchar("storage_ref", { length: 1024 }).notNull(),
     extractedText: text("extracted_text"),
     metadata: jsonb("metadata"),
+    /**
+     * Pre-Beta Loop δ.1 — workspace placement.
+     * NULL = artifact exists tenant-wide but not yet placed in the
+     * workspace tree (e.g. legacy rows). Default for new outputs is
+     * the tenant `Outputs/` folder per architect decision (D).
+     */
+    workspaceFolderId: uuid("workspace_folder_id").references(
+      () => workspaceFolders.id,
+      { onDelete: "set null" }
+    ),
     createdByUserId: uuid("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

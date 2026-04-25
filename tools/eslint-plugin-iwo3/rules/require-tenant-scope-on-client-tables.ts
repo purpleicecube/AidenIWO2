@@ -54,6 +54,7 @@ export const TENANT_SCOPED_TABLES: readonly string[] = [
   "channel_identities",
   "channel_auth_codes",
   "channel_messages",
+  "workspace_folders",
 ];
 
 // Paths where tenant-scope queries are exempt:

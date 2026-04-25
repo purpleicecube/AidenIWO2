@@ -302,6 +302,15 @@
       "data_source_binding.created",
       "data_source_binding.revoked",
       "execution_cycle.started",
+      "file.created",
+      "file.deleted",
+      "file.moved",
+      "file.renamed",
+      "file.saved_from_output",
+      "folder.created",
+      "folder.deleted",
+      "folder.moved",
+      "folder.renamed",
       "llm.budget_exceeded",
       "llm.failed",
       "llm.invoked",
@@ -476,6 +485,17 @@
         "llm_config.created",
         "llm_config.updated",
         "llm_config.disabled"
+      ],
+      "PRE_BETA_PHASE_DELTA_AUDIT_EVENTS": [
+        "folder.created",
+        "folder.renamed",
+        "folder.moved",
+        "folder.deleted",
+        "file.created",
+        "file.renamed",
+        "file.moved",
+        "file.deleted",
+        "file.saved_from_output"
       ]
     }
   },
@@ -551,6 +571,9 @@
     "work_order:create",
     "work_order:read",
     "work_order:submit",
-    "work_order:update"
+    "work_order:update",
+    "workspace:delete",
+    "workspace:read",
+    "workspace:write"
   ]
 }

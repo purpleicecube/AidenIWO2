@@ -785,6 +785,55 @@ async function upsertRolePermissions(
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
+ * Pre-Beta Loop δ.1 — seed each tenant's workspace root + Outputs/.
+ * The migration writes the rows on upgrade, but on a fresh
+ * reset-then-seed install the migration runs before clients exist,
+ * so we re-run the same idempotent INSERTs after clients/users land.
+ *
+ * Both rows are owned by the tenant's first agent_system user
+ * (worker-style); ON CONFLICT on the sibling-name UNIQUE keeps it
+ * idempotent across re-seeds.
+ */
+async function upsertWorkspaceRoots(c: PoolClient): Promise<void> {
+  await c.query(`
+    INSERT INTO workspace_folders (id, client_id, parent_folder_id, name, created_by_user_id)
+    SELECT
+      gen_random_uuid(),
+      cl.id,
+      NULL,
+      '/',
+      (SELECT u.id FROM users u
+         JOIN client_memberships m ON m.user_id = u.id
+                                  AND m.client_id = cl.id
+                                  AND m.role = 'agent_system'
+                                  AND m.status = 'active'
+                                  AND u.status = 'active'
+        ORDER BY u.created_at ASC
+        LIMIT 1)
+    FROM clients cl
+    WHERE cl.status = 'active'::client_status
+      AND EXISTS (SELECT 1 FROM users u
+                    JOIN client_memberships m ON m.user_id = u.id
+                                             AND m.client_id = cl.id
+                                             AND m.role = 'agent_system'
+                                             AND m.status = 'active')
+    ON CONFLICT ON CONSTRAINT workspace_folders_sibling_name_uniq DO NOTHING
+  `);
+  await c.query(`
+    INSERT INTO workspace_folders (id, client_id, parent_folder_id, name, created_by_user_id)
+    SELECT gen_random_uuid(), cl.id, root.id, 'Outputs', root.created_by_user_id
+    FROM clients cl
+    JOIN workspace_folders root ON root.client_id = cl.id
+                              AND root.parent_folder_id IS NULL
+                              AND root.name = '/'
+                              AND root.deleted_at IS NULL
+    WHERE cl.status = 'active'::client_status
+    ON CONFLICT ON CONSTRAINT workspace_folders_sibling_name_uniq DO NOTHING
+  `);
+}
+
+
+/**
  * Pre-Beta β.1 — humanise an agent_role into a display_name when the
  * seed JSON doesn't carry one. Matches the backfill in migration
  * 0012_pre_beta_phase_1_llm_configs_metadata.sql so DBs reset from
@@ -969,6 +1018,7 @@ async function main(): Promise<void> {
     await upsertPermissions(c, permissionsRows);
     await upsertRolePermissions(c, rolePermissionsRows);
     await upsertLlmConfigs(c, llmConfigsRows);
+    await upsertWorkspaceRoots(c);
     await c.query("COMMIT");
 
     const receipt = {

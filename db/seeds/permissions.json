@@ -502,5 +502,26 @@
     "displayName": "Revoke channel identity",
     "description": "Revoke a bound external chat identity so it can no longer act on this tenant.",
     "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000073",
+    "permissionKey": "workspace:read",
+    "displayName": "Read tenant workspace",
+    "description": "List workspace folders + artifacts for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000074",
+    "permissionKey": "workspace:write",
+    "displayName": "Mutate tenant workspace",
+    "description": "Create, rename, move folders + files in the tenant workspace tree.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000075",
+    "permissionKey": "workspace:delete",
+    "displayName": "Delete from tenant workspace",
+    "description": "Soft-delete folders + artifacts in the tenant workspace tree.",
+    "scope": "tenant"
   }
 ]

@@ -39,6 +39,7 @@ from routes import (
     tenants,
     work_orders,
     workflows,
+    workspace,
 )
 from workers.poll_worker import poll_worker_loop
 from workers.telegram_worker import telegram_worker_loop
@@ -100,3 +101,4 @@ app.include_router(llm.router)
 app.include_router(channels.router)
 app.include_router(aiden.router)
 app.include_router(dispatch.router)
+app.include_router(workspace.router)

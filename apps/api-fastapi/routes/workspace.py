@@ -1,0 +1,740 @@
+"""Pre-Beta Loop δ.2 — Workspace CRUD routes.
+
+Operator-facing endpoints for the per-tenant workspace tree:
+
+  GET    /workspace/tree              full folder tree + file counts
+  GET    /workspace/folders/{id}      folder metadata + child folders
+                                      + files inside it
+  POST   /workspace/folders           create folder (parent_folder_id required)
+  PATCH  /workspace/folders/{id}      rename / move (`name` and/or
+                                      `parent_folder_id`)
+  DELETE /workspace/folders/{id}      soft-delete; cascades to children
+                                      via the soft-delete invariant
+  POST   /workspace/files             create empty file (operator-typed
+                                      content) OR upload via multipart
+  PATCH  /workspace/files/{id}        rename / move
+  DELETE /workspace/files/{id}        soft-delete (artifact stays for
+                                      audit; just unlinked from folder)
+
+Storage substrate per architect decision (B): files live in the
+existing `artifacts` table joined via `workspace_folder_id`. Folders
+live in the new `workspace_folders` table. RLS posture mirrors
+`artifacts`.
+
+Audit emissions (locked under PRE_BETA_PHASE_DELTA_AUDIT_EVENTS):
+  folder.created / folder.renamed / folder.moved / folder.deleted
+  file.created / file.renamed / file.moved / file.deleted
+  file.saved_from_output                  ← emitted by tier_2_subagents,
+                                             not this route module.
+
+RBAC:
+  workspace:read    → owner / admin / operator / reviewer / viewer / agent_system
+  workspace:write   → owner / admin / operator / agent_system
+  workspace:delete  → owner / admin
+"""
+
+from __future__ import annotations
+
+import base64
+from typing import Annotated, Any, Optional
+
+import asyncpg
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+
+from authz.audit_writer import write_audit_row
+from deps import (
+    current_user_context,
+    get_tenant_scoped_connection,
+    require_permission_dep,
+)
+
+
+router = APIRouter(prefix="/workspace", tags=["workspace"])
+
+
+# ── Models ────────────────────────────────────────────────────────────
+
+
+class WorkspaceFolder(BaseModel):
+    id: str
+    parent_folder_id: Optional[str] = None
+    name: str
+    created_at: str
+    updated_at: str
+    is_root: bool
+
+
+class WorkspaceFile(BaseModel):
+    id: str
+    workspace_folder_id: Optional[str] = None
+    filename: Optional[str] = None
+    mime_type: Optional[str] = None
+    source_type: str
+    content_class: str
+    storage_ref: str
+    created_at: str
+    updated_at: str
+
+
+class WorkspaceTree(BaseModel):
+    folders: list[WorkspaceFolder]
+    files: list[WorkspaceFile]
+
+
+class FolderListResponse(BaseModel):
+    folder: WorkspaceFolder
+    children: list[WorkspaceFolder]
+    files: list[WorkspaceFile]
+
+
+class CreateFolderRequest(BaseModel):
+    parent_folder_id: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1, max_length=256)
+
+
+class UpdateFolderRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=256)
+    parent_folder_id: Optional[str] = None
+
+
+class CreateFileRequest(BaseModel):
+    workspace_folder_id: str = Field(..., min_length=1)
+    filename: str = Field(..., min_length=1, max_length=512)
+    mime_type: str = Field("text/plain", max_length=128)
+    content_text: Optional[str] = Field(None, max_length=200_000)
+    content_b64: Optional[str] = Field(None, max_length=4_000_000)
+
+
+class UpdateFileRequest(BaseModel):
+    filename: Optional[str] = Field(None, min_length=1, max_length=512)
+    workspace_folder_id: Optional[str] = None
+
+
+class FolderResponse(BaseModel):
+    folder: WorkspaceFolder
+
+
+class FileResponse(BaseModel):
+    file: WorkspaceFile
+
+
+# ── Helpers ───────────────────────────────────────────────────────────
+
+
+def _folder_from_row(row: asyncpg.Record) -> WorkspaceFolder:
+    return WorkspaceFolder(
+        id=row["id"],
+        parent_folder_id=row["parent_folder_id"],
+        name=row["name"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        is_root=row["parent_folder_id"] is None,
+    )
+
+
+def _file_from_row(row: asyncpg.Record) -> WorkspaceFile:
+    return WorkspaceFile(
+        id=row["id"],
+        workspace_folder_id=row["workspace_folder_id"],
+        filename=row["filename"],
+        mime_type=row["mime_type"],
+        source_type=row["source_type"],
+        content_class=row["content_class"],
+        storage_ref=row["storage_ref"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+async def _ensure_folder_exists(
+    conn: asyncpg.Connection, folder_id: str
+) -> asyncpg.Record:
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT id::text             AS id,
+                   parent_folder_id::text AS parent_folder_id,
+                   name,
+                   client_id::text     AS client_id,
+                   created_at::text    AS created_at,
+                   updated_at::text    AS updated_at
+              FROM workspace_folders
+             WHERE id = $1::uuid AND deleted_at IS NULL
+            """,
+            folder_id,
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_folder_id", "value": folder_id},
+        )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "folder_not_found", "id": folder_id},
+        )
+    return row
+
+
+async def _ensure_file_exists(
+    conn: asyncpg.Connection, file_id: str
+) -> asyncpg.Record:
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT id::text                AS id,
+                   workspace_folder_id::text AS workspace_folder_id,
+                   filename,
+                   mime_type,
+                   source_type::text       AS source_type,
+                   content_class::text     AS content_class,
+                   storage_ref,
+                   created_at::text        AS created_at,
+                   updated_at::text        AS updated_at
+              FROM artifacts
+             WHERE id = $1::uuid
+            """,
+            file_id,
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_file_id", "value": file_id},
+        )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "file_not_found", "id": file_id},
+        )
+    return row
+
+
+async def _detect_cycle(
+    conn: asyncpg.Connection,
+    *,
+    folder_id: str,
+    new_parent_id: str,
+) -> bool:
+    """Return True if making new_parent_id the parent of folder_id would
+    create a cycle (i.e. new_parent_id is folder_id itself or one of its
+    descendants)."""
+    if folder_id == new_parent_id:
+        return True
+    cur = new_parent_id
+    for _ in range(64):  # reasonable depth ceiling
+        row = await conn.fetchrow(
+            """
+            SELECT parent_folder_id::text AS parent_folder_id
+              FROM workspace_folders
+             WHERE id = $1::uuid AND deleted_at IS NULL
+            """,
+            cur,
+        )
+        if row is None:
+            return False
+        if row["parent_folder_id"] is None:
+            return False
+        if row["parent_folder_id"] == folder_id:
+            return True
+        cur = row["parent_folder_id"]
+    return True  # pathological depth → reject
+
+
+# ── Tree + folder reads ──────────────────────────────────────────────
+
+
+@router.get(
+    "/tree",
+    response_model=WorkspaceTree,
+    dependencies=[Depends(require_permission_dep("workspace:read"))],
+)
+async def get_workspace_tree(
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> WorkspaceTree:
+    folder_rows = await conn.fetch(
+        """
+        SELECT id::text             AS id,
+               parent_folder_id::text AS parent_folder_id,
+               name,
+               created_at::text    AS created_at,
+               updated_at::text    AS updated_at
+          FROM workspace_folders
+         WHERE deleted_at IS NULL
+         ORDER BY (parent_folder_id IS NOT NULL),  -- root first
+                  parent_folder_id NULLS FIRST,
+                  name
+        """,
+    )
+    file_rows = await conn.fetch(
+        """
+        SELECT id::text                AS id,
+               workspace_folder_id::text AS workspace_folder_id,
+               filename,
+               mime_type,
+               source_type::text       AS source_type,
+               content_class::text     AS content_class,
+               storage_ref,
+               created_at::text        AS created_at,
+               updated_at::text        AS updated_at
+          FROM artifacts
+         WHERE workspace_folder_id IS NOT NULL
+         ORDER BY filename
+        """,
+    )
+    return WorkspaceTree(
+        folders=[_folder_from_row(r) for r in folder_rows],
+        files=[_file_from_row(r) for r in file_rows],
+    )
+
+
+@router.get(
+    "/folders/{folder_id}",
+    response_model=FolderListResponse,
+    dependencies=[Depends(require_permission_dep("workspace:read"))],
+)
+async def get_folder_contents(
+    folder_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FolderListResponse:
+    folder = await _ensure_folder_exists(conn, folder_id)
+    children = await conn.fetch(
+        """
+        SELECT id::text             AS id,
+               parent_folder_id::text AS parent_folder_id,
+               name,
+               created_at::text    AS created_at,
+               updated_at::text    AS updated_at
+          FROM workspace_folders
+         WHERE parent_folder_id = $1::uuid AND deleted_at IS NULL
+         ORDER BY name
+        """,
+        folder_id,
+    )
+    files = await conn.fetch(
+        """
+        SELECT id::text                AS id,
+               workspace_folder_id::text AS workspace_folder_id,
+               filename,
+               mime_type,
+               source_type::text       AS source_type,
+               content_class::text     AS content_class,
+               storage_ref,
+               created_at::text        AS created_at,
+               updated_at::text        AS updated_at
+          FROM artifacts
+         WHERE workspace_folder_id = $1::uuid
+         ORDER BY filename
+        """,
+        folder_id,
+    )
+    return FolderListResponse(
+        folder=_folder_from_row(folder),
+        children=[_folder_from_row(r) for r in children],
+        files=[_file_from_row(r) for r in files],
+    )
+
+
+# ── Folder mutations ─────────────────────────────────────────────────
+
+
+@router.post(
+    "/folders",
+    response_model=FolderResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission_dep("workspace:write"))],
+)
+async def create_folder(
+    body: CreateFolderRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FolderResponse:
+    parent = await _ensure_folder_exists(conn, body.parent_folder_id)
+    try:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO workspace_folders
+              (client_id, parent_folder_id, name, created_by_user_id)
+            VALUES ($1::uuid, $2::uuid, $3, $4::uuid)
+            RETURNING id::text             AS id,
+                      parent_folder_id::text AS parent_folder_id,
+                      name,
+                      created_at::text    AS created_at,
+                      updated_at::text    AS updated_at
+            """,
+            ctx["client_id"],
+            body.parent_folder_id,
+            body.name,
+            ctx["user_id"],
+        )
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "folder_name_conflict",
+                "parent_folder_id": body.parent_folder_id,
+                "name": body.name,
+            },
+        )
+
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="folder.created",
+        target_type="workspace_folder",
+        target_id=row["id"],
+        metadata={
+            "name": body.name,
+            "parentFolderId": body.parent_folder_id,
+        },
+    )
+    return FolderResponse(folder=_folder_from_row(row))
+
+
+@router.patch(
+    "/folders/{folder_id}",
+    response_model=FolderResponse,
+    dependencies=[Depends(require_permission_dep("workspace:write"))],
+)
+async def update_folder(
+    folder_id: str,
+    body: UpdateFolderRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FolderResponse:
+    folder = await _ensure_folder_exists(conn, folder_id)
+    if folder["parent_folder_id"] is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "cannot_modify_tenant_root"},
+        )
+
+    sets: list[str] = []
+    args: list[Any] = []
+    event = "folder.renamed"
+    metadata: dict[str, Any] = {"folderId": folder_id}
+
+    if body.name is not None and body.name != folder["name"]:
+        args.append(body.name)
+        sets.append(f"name = ${len(args)}")
+        metadata["oldName"] = folder["name"]
+        metadata["newName"] = body.name
+    if (
+        body.parent_folder_id is not None
+        and body.parent_folder_id != folder["parent_folder_id"]
+    ):
+        # Validate target parent + cycle.
+        await _ensure_folder_exists(conn, body.parent_folder_id)
+        if await _detect_cycle(
+            conn,
+            folder_id=folder_id,
+            new_parent_id=body.parent_folder_id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "move_would_create_cycle"},
+            )
+        args.append(body.parent_folder_id)
+        sets.append(f"parent_folder_id = ${len(args)}::uuid")
+        metadata["oldParentFolderId"] = folder["parent_folder_id"]
+        metadata["newParentFolderId"] = body.parent_folder_id
+        event = "folder.moved"
+
+    if not sets:
+        return FolderResponse(folder=_folder_from_row(folder))
+
+    sets.append("updated_at = now()")
+    args.append(folder_id)
+
+    # lint:bypass-rls-explain="workspace_folders is RLS-FORCED (migration 0014); route runs on tenant-scoped connection so cross-tenant ids are invisible. WHERE id alone is safe."
+    sql = f"""
+        UPDATE workspace_folders
+           SET {', '.join(sets)}
+         WHERE id = ${len(args)}::uuid AND deleted_at IS NULL
+        RETURNING id::text             AS id,
+                  parent_folder_id::text AS parent_folder_id,
+                  name,
+                  created_at::text    AS created_at,
+                  updated_at::text    AS updated_at
+    """
+    try:
+        row = await conn.fetchrow(sql, *args)
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "folder_name_conflict"},
+        )
+
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event=event,
+        target_type="workspace_folder",
+        target_id=row["id"],
+        metadata=metadata,
+    )
+    return FolderResponse(folder=_folder_from_row(row))
+
+
+@router.delete(
+    "/folders/{folder_id}",
+    response_model=FolderResponse,
+    dependencies=[Depends(require_permission_dep("workspace:delete"))],
+)
+async def delete_folder(
+    folder_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FolderResponse:
+    folder = await _ensure_folder_exists(conn, folder_id)
+    if folder["parent_folder_id"] is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "cannot_delete_tenant_root"},
+        )
+
+    # lint:bypass-rls-explain="workspace_folders is RLS-FORCED; route runs on tenant-scoped connection. WHERE id is safe."
+    row = await conn.fetchrow(
+        """
+        UPDATE workspace_folders
+           SET deleted_at = now(), updated_at = now()
+         WHERE id = $1::uuid AND deleted_at IS NULL
+        RETURNING id::text             AS id,
+                  parent_folder_id::text AS parent_folder_id,
+                  name,
+                  created_at::text    AS created_at,
+                  updated_at::text    AS updated_at
+        """,
+        folder_id,
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "folder_not_found_or_already_deleted"},
+        )
+
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="folder.deleted",
+        target_type="workspace_folder",
+        target_id=row["id"],
+        metadata={"name": row["name"]},
+    )
+    return FolderResponse(folder=_folder_from_row(row))
+
+
+# ── File mutations ───────────────────────────────────────────────────
+
+
+@router.post(
+    "/files",
+    response_model=FileResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission_dep("workspace:write"))],
+)
+async def create_file(
+    body: CreateFileRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FileResponse:
+    """Create a workspace file. Either `content_text` (utf-8 plaintext)
+    or `content_b64` (base64-encoded binary) — empty file allowed."""
+    await _ensure_folder_exists(conn, body.workspace_folder_id)
+
+    # Resolve storage. Two paths:
+    #   - content_text → store inline in `extracted_text`; storage_ref
+    #     becomes a sentinel URI ("inline://<uuid>" decoded later).
+    #   - content_b64  → decode + store inline as a base64 string
+    #     prefixed with "b64:". Filesystem storage is Beta scope.
+    extracted_text: Optional[str] = None
+    storage_ref = "inline://workspace"
+    if body.content_text is not None:
+        extracted_text = body.content_text
+    elif body.content_b64:
+        try:
+            base64.b64decode(body.content_b64, validate=True)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "invalid_content_b64"},
+            )
+        # We don't decode-and-re-encode — just keep the original.
+        extracted_text = "b64:" + body.content_b64
+
+    row = await conn.fetchrow(
+        """
+        INSERT INTO artifacts
+          (client_id, source_type, content_class, mime_type, filename,
+           storage_ref, extracted_text, workspace_folder_id,
+           created_by_user_id)
+        VALUES ($1::uuid, 'upload'::artifact_source_type,
+                'c1'::artifact_content_class, $2, $3, $4, $5,
+                $6::uuid, $7::uuid)
+        RETURNING id::text                AS id,
+                  workspace_folder_id::text AS workspace_folder_id,
+                  filename,
+                  mime_type,
+                  source_type::text       AS source_type,
+                  content_class::text     AS content_class,
+                  storage_ref,
+                  created_at::text        AS created_at,
+                  updated_at::text        AS updated_at
+        """,
+        ctx["client_id"],
+        body.mime_type,
+        body.filename,
+        storage_ref,
+        extracted_text,
+        body.workspace_folder_id,
+        ctx["user_id"],
+    )
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="file.created",
+        target_type="artifact",
+        target_id=row["id"],
+        metadata={
+            "filename": body.filename,
+            "mimeType": body.mime_type,
+            "workspaceFolderId": body.workspace_folder_id,
+        },
+    )
+    return FileResponse(file=_file_from_row(row))
+
+
+@router.patch(
+    "/files/{file_id}",
+    response_model=FileResponse,
+    dependencies=[Depends(require_permission_dep("workspace:write"))],
+)
+async def update_file(
+    file_id: str,
+    body: UpdateFileRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FileResponse:
+    f = await _ensure_file_exists(conn, file_id)
+    sets: list[str] = []
+    args: list[Any] = []
+    event = "file.renamed"
+    metadata: dict[str, Any] = {"fileId": file_id}
+
+    if body.filename is not None and body.filename != f["filename"]:
+        args.append(body.filename)
+        sets.append(f"filename = ${len(args)}")
+        metadata["oldFilename"] = f["filename"]
+        metadata["newFilename"] = body.filename
+    if (
+        body.workspace_folder_id is not None
+        and body.workspace_folder_id != f["workspace_folder_id"]
+    ):
+        await _ensure_folder_exists(conn, body.workspace_folder_id)
+        args.append(body.workspace_folder_id)
+        sets.append(f"workspace_folder_id = ${len(args)}::uuid")
+        metadata["oldFolderId"] = f["workspace_folder_id"]
+        metadata["newFolderId"] = body.workspace_folder_id
+        event = "file.moved"
+
+    if not sets:
+        return FileResponse(file=_file_from_row(f))
+
+    sets.append("updated_at = now()")
+    args.append(file_id)
+    # lint:bypass-rls-explain="artifacts is RLS-FORCED (migration 0006); the route runs on get_tenant_scoped_connection so cross-tenant artifact ids are invisible at row-visibility level. WHERE id alone is sufficient because RLS rejects out-of-tenant rows before UPDATE fires."
+    sql = f"""
+        UPDATE artifacts
+           SET {', '.join(sets)}
+         WHERE id = ${len(args)}::uuid
+        RETURNING id::text                AS id,
+                  workspace_folder_id::text AS workspace_folder_id,
+                  filename,
+                  mime_type,
+                  source_type::text       AS source_type,
+                  content_class::text     AS content_class,
+                  storage_ref,
+                  created_at::text        AS created_at,
+                  updated_at::text        AS updated_at
+    """
+    row = await conn.fetchrow(sql, *args)
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event=event,
+        target_type="artifact",
+        target_id=row["id"],
+        metadata=metadata,
+    )
+    return FileResponse(file=_file_from_row(row))
+
+
+@router.delete(
+    "/files/{file_id}",
+    response_model=FileResponse,
+    dependencies=[Depends(require_permission_dep("workspace:delete"))],
+)
+async def delete_file(
+    file_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FileResponse:
+    """Soft-delete: unlink from workspace tree (set workspace_folder_id
+    to NULL) so it stops surfacing in workspace queries. The artifact
+    row itself stays intact for audit. Hard-delete is operator-explicit
+    Beta scope."""
+    f = await _ensure_file_exists(conn, file_id)
+    # lint:bypass-rls-explain="artifacts is RLS-FORCED; route runs on tenant-scoped connection. WHERE id alone is safe because RLS rejects out-of-tenant ids."
+    row = await conn.fetchrow(
+        """
+        UPDATE artifacts
+           SET workspace_folder_id = NULL, updated_at = now()
+         WHERE id = $1::uuid
+        RETURNING id::text                AS id,
+                  workspace_folder_id::text AS workspace_folder_id,
+                  filename,
+                  mime_type,
+                  source_type::text       AS source_type,
+                  content_class::text     AS content_class,
+                  storage_ref,
+                  created_at::text        AS created_at,
+                  updated_at::text        AS updated_at
+        """,
+        file_id,
+    )
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="file.deleted",
+        target_type="artifact",
+        target_id=row["id"],
+        metadata={
+            "filename": f["filename"],
+            "previousFolderId": f["workspace_folder_id"],
+        },
+    )
+    return FileResponse(file=_file_from_row(row))
