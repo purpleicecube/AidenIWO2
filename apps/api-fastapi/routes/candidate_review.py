@@ -125,7 +125,7 @@ async def reject_candidate_route(
 
 
 from deps import require_permission_dep  # noqa: E402 — grouped for Phase 9.4
-from adapter.gamma_poll import poll_gamma_handoff  # noqa: E402
+from adapter.poll_registry import poll_handoff_via_registry  # noqa: E402
 
 
 class PollHandoffRequest(BaseModel):
@@ -162,7 +162,7 @@ async def poll_handoff_route(
     (Streamlit Design Lab, scheduled poll jobs) can react without
     special-casing HTTP codes. `handoff_not_found` is the one 404.
     """
-    outcome = await poll_gamma_handoff(
+    outcome = await poll_handoff_via_registry(
         conn,
         handoff_id=handoff_id,
         client_id=ctx["client_id"],

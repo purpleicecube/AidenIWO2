@@ -30,6 +30,13 @@ import httpx
 from adapter.gamma_request_shape import parse_gamma_poll_response
 from authz.audit_writer import write_audit_row
 from llm.credentials import LlmCredentialError, resolve_credential
+from wo_wf.transitions import (
+    IllegalTransition,
+    PermissionDenied as WoPermissionDenied,
+    RowNotFound as WoRowNotFound,
+    transition_work_order,
+    watchdog_expire_work_order,
+)
 
 
 DEFAULT_POLL_TIMEOUT_SECONDS = 600  # 10 minutes; adapter_actions override
@@ -75,6 +82,8 @@ async def _load_handoff_for_poll(
                h.last_poll_at,
                h.poll_count,
                h.output_package_id::text      AS output_package_id,
+               h.work_order_id::text          AS work_order_id,
+               h.workflow_id::text            AS workflow_id,
                cat.adapter_key,
                (
                  SELECT MAX(poll_timeout_seconds)
@@ -338,12 +347,25 @@ async def poll_gamma_handoff(
                 "pollCount": next_count,
             },
         )
+        # MegaLoop Alpha α.1 — WO terminal cascade.
+        # If the handoff belongs to a single-WO (no workflow_execution),
+        # cascade the WO to `completed`. Workflow-bound WOs are left to
+        # PM Tier 1.5 to advance once all step handoffs resolve.
+        cascade_msg = await _maybe_cascade_wo_completed(
+            conn,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            work_order_id=row["work_order_id"],
+            output_package_id=row["output_package_id"],
+            handoff_id=handoff_id,
+        )
         return PollOutcome(
             kind="completed",
             handoff_id=handoff_id,
             external_reference=row["external_reference"],
             result_payload_ref=payload_ref,
             poll_count=next_count,
+            detail=cascade_msg,
         )
 
     if parsed.status == "failed":
@@ -366,6 +388,17 @@ async def poll_gamma_handoff(
                 "errorMessage": parsed.error_message,
                 "stage": "poll",
             },
+        )
+        # MegaLoop Alpha α.1 — WO terminal cascade on adapter failure.
+        # Workflow-bound WOs left to PM. Single-WO failures move the
+        # parent WO to `blocked` via the Loop 6 watchdog helper.
+        cascade_msg = await _maybe_cascade_wo_blocked(
+            conn,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            work_order_id=row["work_order_id"],
+            handoff_id=handoff_id,
+            reason=parsed.error_message or "adapter returned failed",
         )
         return PollOutcome(
             kind="failed",
@@ -397,3 +430,149 @@ async def poll_gamma_handoff(
         poll_count=next_count,
         elapsed_seconds=elapsed,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# MegaLoop Alpha α.1 — WO terminal cascade
+# ──────────────────────────────────────────────────────────────────────
+
+
+async def _is_workflow_bound(
+    conn: asyncpg.Connection, client_id: str, work_order_id: Optional[str]
+) -> bool:
+    """A WO is workflow-bound if any output_handoff for it carries a
+    workflow_id. PM Tier 1.5 owns these; we don't cascade them."""
+    if not work_order_id:
+        return False
+    return bool(
+        await conn.fetchval(
+            """
+            SELECT 1
+              FROM output_handoffs
+             WHERE work_order_id = $1
+               AND client_id = $2
+               AND workflow_id IS NOT NULL
+             LIMIT 1
+            """,
+            work_order_id,
+            client_id,
+        )
+    )
+
+
+async def _wo_current_status(
+    conn: asyncpg.Connection, client_id: str, work_order_id: str
+) -> Optional[str]:
+    return await conn.fetchval(
+        """
+        SELECT status::text
+          FROM work_orders
+         WHERE id = $1 AND client_id = $2
+        """,
+        work_order_id,
+        client_id,
+    )
+
+
+async def _maybe_cascade_wo_completed(
+    conn: asyncpg.Connection,
+    *,
+    client_id: str,
+    actor_user_id: Optional[str],
+    work_order_id: Optional[str],
+    output_package_id: Optional[str],
+    handoff_id: str,
+) -> Optional[str]:
+    """Run after a handoff transitions to `completed`. Cascade the parent
+    WO to `completed` if eligible. Returns a short status message for
+    the PollOutcome.detail field; None if no cascade was attempted."""
+    if not work_order_id or not actor_user_id:
+        return None
+    if await _is_workflow_bound(conn, client_id, work_order_id):
+        return "wo_cascade_skipped: workflow_bound (PM owns)"
+
+    current = await _wo_current_status(conn, client_id, work_order_id)
+    if current != "processing":
+        return f"wo_cascade_skipped: wo_status={current}"
+
+    try:
+        await transition_work_order(
+            conn,
+            work_order_id=work_order_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            to="completed",
+            reason=f"handoff {handoff_id} completed",
+        )
+        return "wo_cascaded_to_completed"
+    except WoPermissionDenied:
+        # Fail-soft: handoff is already completed; missing perm just
+        # means operator must transition manually. Audit the gap.
+        await write_audit_row(
+            conn,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            event="authz.denied",
+            target_type="work_order",
+            target_id=work_order_id,
+            metadata={
+                "permission": "work_order:update",
+                "decision_reason": "wo_cascade_blocked_no_permission",
+                "handoffId": handoff_id,
+            },
+        )
+        return "wo_cascade_skipped: permission_denied"
+    except IllegalTransition:
+        return "wo_cascade_skipped: illegal_transition_from_current"
+    except WoRowNotFound:
+        return "wo_cascade_skipped: wo_not_found"
+
+
+async def _maybe_cascade_wo_blocked(
+    conn: asyncpg.Connection,
+    *,
+    client_id: str,
+    actor_user_id: Optional[str],
+    work_order_id: Optional[str],
+    handoff_id: str,
+    reason: str,
+) -> Optional[str]:
+    """Run after a handoff transitions to `failed`. Push the parent WO
+    to `blocked` via the Loop 6 watchdog helper if eligible."""
+    if not work_order_id or not actor_user_id:
+        return None
+    if await _is_workflow_bound(conn, client_id, work_order_id):
+        return "wo_cascade_skipped: workflow_bound (PM owns)"
+
+    current = await _wo_current_status(conn, client_id, work_order_id)
+    if current != "processing":
+        return f"wo_cascade_skipped: wo_status={current}"
+
+    try:
+        await watchdog_expire_work_order(
+            conn,
+            work_order_id=work_order_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            reason=f"handoff {handoff_id} failed: {reason[:150]}",
+        )
+        return "wo_cascaded_to_blocked"
+    except WoPermissionDenied:
+        await write_audit_row(
+            conn,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            event="authz.denied",
+            target_type="work_order",
+            target_id=work_order_id,
+            metadata={
+                "permission": "work_order:update",
+                "decision_reason": "wo_cascade_blocked_no_permission",
+                "handoffId": handoff_id,
+            },
+        )
+        return "wo_cascade_skipped: permission_denied"
+    except IllegalTransition:
+        return "wo_cascade_skipped: illegal_transition_from_current"
+    except WoRowNotFound:
+        return "wo_cascade_skipped: wo_not_found"
