@@ -179,6 +179,14 @@ export const AUDIT_EVENTS = {
   CHANNEL_MESSAGE_FAILED: "channel_message.failed",
   CHANNEL_MESSAGE_SEND_QUEUED: "channel_message.send_queued",
   CHANNEL_MESSAGE_SENT: "channel_message.sent",
+
+  // Pre-Beta β.2 — LLM config CRUD. Operator-initiated mutations to
+  // `llm_configs` rows. Created/updated/disabled distinguish so audit
+  // forensics can separate provider/model swaps from enabled-toggle
+  // events without parsing metadata diffs.
+  LLM_CONFIG_CREATED: "llm_config.created",
+  LLM_CONFIG_UPDATED: "llm_config.updated",
+  LLM_CONFIG_DISABLED: "llm_config.disabled",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -308,4 +316,10 @@ export const ALPHA_PHASE_A5_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.CHANNEL_MESSAGE_FAILED,
   AUDIT_EVENTS.CHANNEL_MESSAGE_SEND_QUEUED,
   AUDIT_EVENTS.CHANNEL_MESSAGE_SENT,
+];
+
+export const PRE_BETA_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.LLM_CONFIG_CREATED,
+  AUDIT_EVENTS.LLM_CONFIG_UPDATED,
+  AUDIT_EVENTS.LLM_CONFIG_DISABLED,
 ];

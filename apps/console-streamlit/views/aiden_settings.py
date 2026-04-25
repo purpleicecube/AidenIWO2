@@ -44,8 +44,12 @@ def _section_providers(api) -> None:  # noqa: ANN001
             )
 
 
+_PROVIDER_OPTIONS = ["groq", "openrouter", "openai", "anthropic"]
+
+
 def _section_aiden_config(api) -> None:  # noqa: ANN001
-    st.subheader("Aiden (Tier 1) — resolved config")
+    """Pre-Beta β.6 — Aiden Tier 1 inline editor."""
+    st.subheader("Aiden (Tier 1) — configure")
     try:
         configs = api.list_llm_configs()
         can_admin = api.check_permission("system:admin")
@@ -57,43 +61,95 @@ def _section_aiden_config(api) -> None:  # noqa: ANN001
     )
     if aiden is None:
         st.warning(
-            "No `aiden_tier_1` config for this tenant. Run the seed "
-            "loader or insert a config row before using Chat with Aiden."
+            "No `aiden_tier_1` config for this tenant. Add one via the "
+            "Sub-Agents page → New sub-agent before using Chat with Aiden."
         )
         return
-    cols = st.columns([2, 2, 1])
-    with cols[0]:
-        st.markdown(f"**Provider:** `{aiden['provider']}`")
-        st.markdown(f"**Model:** `{aiden['model']}`")
-    with cols[1]:
-        st.markdown(
-            f"**Enabled:** {'✅' if aiden['enabled'] else '⛔'}"
+
+    state, env_name = aiden["credential_state"], aiden.get("env_var_name")
+    cred_label = (
+        f"🟢 ENV `{env_name}` set"
+        if state == "set"
+        else f"⛔ ENV `{env_name}` missing"
+        if state == "missing"
+        else "⛔ credential_ref malformed"
+    )
+    st.caption(f"id `{aiden['id']}` · {cred_label}")
+
+    with st.form("aiden-edit", clear_on_submit=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            provider = st.selectbox(
+                "Provider",
+                _PROVIDER_OPTIONS,
+                index=(
+                    _PROVIDER_OPTIONS.index(aiden["provider"])
+                    if aiden["provider"] in _PROVIDER_OPTIONS
+                    else 0
+                ),
+            )
+            model = st.text_input("Model", value=aiden["model"])
+            base_url = st.text_input(
+                "Base URL (optional)", value=aiden.get("base_url") or ""
+            )
+        with col2:
+            enabled = st.toggle("Enabled", value=aiden["enabled"])
+            credential_ref = st.text_input(
+                "Credential ref (e.g. credential_ref:env:GROQ_API_KEY)",
+                value="",
+                placeholder="leave blank to keep existing",
+            )
+            display_name = st.text_input(
+                "Display name", value=aiden["display_name"]
+            )
+        description = st.text_area(
+            "Description", value=aiden.get("description") or "", height=60
         )
-        st.markdown(
-            f"**System prompt:** "
-            f"{'yes' if aiden['has_system_prompt'] else 'default'}"
+        system_prompt = st.text_area(
+            "System prompt (optional — blank keeps existing)",
+            value="",
+            placeholder="(unchanged)",
+            height=160,
         )
-    with cols[2]:
-        if st.button(
-            "Test connection",
-            key="aiden-test",
-            disabled=not can_admin.allowed,
-            help=(
-                None
-                if can_admin.allowed
-                else f"system:admin required (your role: {can_admin.role})"
-            ),
-        ):
-            with st.spinner("calling provider…"):
-                try:
-                    r = api.test_llm(agent_role="aiden_tier_1")
-                except APIError as err:
-                    st.error(f"❌ {err.status_code} — {err.detail}")
-                    return
+        cols = st.columns([1, 1, 3])
+        with cols[0]:
+            save = st.form_submit_button(
+                "Save", type="primary", disabled=not can_admin.allowed
+            )
+        with cols[1]:
+            test = st.form_submit_button(
+                "Test connection",
+                disabled=not can_admin.allowed,
+            )
+
+    if save:
+        patch = {
+            "provider": provider,
+            "model": model,
+            "base_url": base_url or None,
+            "enabled": enabled,
+            "display_name": display_name,
+            "description": description or None,
+        }
+        if credential_ref.strip():
+            patch["credential_ref"] = credential_ref.strip()
+        if system_prompt.strip():
+            patch["system_prompt"] = system_prompt
+        try:
+            api.update_llm_config(aiden["id"], **patch)
+            st.success("Saved.")
+            st.rerun()
+        except APIError as err:
+            st.error(f"❌ {err.status_code} — {err.detail}")
+    elif test:
+        try:
+            r = api.test_llm(agent_role="aiden_tier_1")
+        except APIError as err:
+            st.error(f"❌ {err.status_code} — {err.detail}")
+        else:
             if r.get("ok"):
                 st.success(
-                    f"✅ {r['provider']}/{r['model']} · "
-                    f"{r['latency_ms']}ms"
+                    f"✅ {r['provider']}/{r['model']} · {r['latency_ms']}ms"
                 )
             else:
                 st.warning(f"⚠️ {r.get('error')}")

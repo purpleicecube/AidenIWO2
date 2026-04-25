@@ -52,6 +52,14 @@ export const llmConfigs = pgTable(
      *   "paul_tier_2"          Tier 2 sub-agent (Paul, deployment)
      */
     agentRole: varchar("agent_role", { length: 64 }).notNull(),
+    /**
+     * Pre-Beta β.1 — sub-agent metadata model v1.
+     * Browser-facing display name (defaults to a humanised form of
+     * `agent_role` at insert time when omitted by the operator).
+     */
+    displayName: varchar("display_name", { length: 160 }).notNull(),
+    /** Optional one-paragraph description shown in the operator console. */
+    description: text("description"),
     provider: varchar("provider", { length: 32 }).notNull(),
     model: varchar("model", { length: 128 }).notNull(),
     /** Override default provider base URL (e.g. self-hosted vLLM). */

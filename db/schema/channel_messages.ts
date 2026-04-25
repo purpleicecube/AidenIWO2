@@ -75,9 +75,16 @@ export const channelMessages = pgTable(
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
   (t) => ({
+    /**
+     * Pre-Beta β.5 — chat-scoped inbound UNIQUE. Telegram (and most
+     * chat APIs) number message ids per chat, not globally; the prior
+     * (channel_kind, external_message_id) scope let chat A's #42 alias
+     * onto chat B's #42 in this column. ADR-028 widens to include
+     * external_chat_id.
+     */
     uniqInboundExternalId: unique(
       "channel_messages_inbound_external_uniq"
-    ).on(t.channelKind, t.externalMessageId),
+    ).on(t.channelKind, t.externalChatId, t.externalMessageId),
     uniqIdempotency: unique("channel_messages_idempotency_uniq").on(
       t.channelKind,
       t.idempotencyKey

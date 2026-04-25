@@ -16,3 +16,7 @@ import os
 
 # Set BEFORE main is imported anywhere downstream.
 os.environ.setdefault("IWO3_POLL_WORKER_DISABLED", "true")
+# Pre-Beta β.4 — same posture for the Telegram worker. Without this,
+# every TestClient(app) would start the polling loop and try to hit
+# Telegram with whatever stale env vars happen to be set.
+os.environ.setdefault("IWO3_TELEGRAM_WORKER_DISABLED", "true")

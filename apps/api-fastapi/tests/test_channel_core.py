@@ -335,3 +335,137 @@ def test_find_active_identity_returns_none_for_unbound() -> None:
             await conn.close()
 
     asyncio.run(run())
+
+
+# ── Pre-Beta β.5 — channel correctness hardening ──────────────────────
+
+
+@iwo3_db
+def test_inbound_uniq_is_chat_scoped_so_message_42_does_not_alias() -> None:
+    """Telegram numbers messages per chat; the inbound UNIQUE must be
+    (channel_kind, external_chat_id, external_message_id) so chat A's
+    message #42 cannot collide with chat B's #42. Pre-β.5 this UPSERTed
+    onto the wrong row."""
+    async def run() -> None:
+        await _cleanup_channel_state()
+        conn = await _connect()
+        try:
+            issued = await issue_auth_code(
+                conn,
+                client_id=KLEAR_CLIENT,
+                issued_by_user_id=KLEAR_OPERATOR,
+                channel_kind="telegram",
+            )
+            bound_a = await consume_auth_code_and_bind(
+                conn, code=issued.code, channel_kind="telegram",
+                external_id="tg_chat_AAA",
+            )
+            issued2 = await issue_auth_code(
+                conn,
+                client_id=KLEAR_CLIENT,
+                issued_by_user_id=KLEAR_OPERATOR,
+                channel_kind="telegram",
+            )
+            bound_b = await consume_auth_code_and_bind(
+                conn, code=issued2.code, channel_kind="telegram",
+                external_id="tg_chat_BBB",
+            )
+
+            inbound_a = await record_inbound_message(
+                conn,
+                client_id=bound_a.client_id,
+                channel_kind="telegram",
+                channel_identity_id=bound_a.identity_id,
+                external_message_id="42",
+                external_chat_id="tg_chat_AAA",
+                payload={"text": "hi from A"},
+                intent="unknown",
+                actor_user_id=bound_a.user_id,
+            )
+            inbound_b = await record_inbound_message(
+                conn,
+                client_id=bound_b.client_id,
+                channel_kind="telegram",
+                channel_identity_id=bound_b.identity_id,
+                external_message_id="42",
+                external_chat_id="tg_chat_BBB",
+                payload={"text": "hi from B"},
+                intent="unknown",
+                actor_user_id=bound_b.user_id,
+            )
+
+            # Distinct rows — pre-β.5 these would have been the SAME id.
+            assert inbound_a.id != inbound_b.id
+            count = await conn.fetchval(
+                """
+                SELECT count(*)
+                  FROM channel_messages
+                 WHERE channel_kind = 'telegram'::channel_kind
+                   AND external_message_id = '42'
+                   AND external_chat_id IN ('tg_chat_AAA', 'tg_chat_BBB')
+                """
+            )
+            assert count == 2
+        finally:
+            await conn.close()
+            await _cleanup_channel_state()
+
+    asyncio.run(run())
+
+
+@iwo3_db
+def test_inbound_replay_within_same_chat_is_idempotent() -> None:
+    """Same (chat, message_id) replays UPSERT onto the same row +
+    bump attempts; this is the desired idempotency for at-least-once
+    delivery from the worker."""
+    async def run() -> None:
+        await _cleanup_channel_state()
+        conn = await _connect()
+        try:
+            issued = await issue_auth_code(
+                conn,
+                client_id=KLEAR_CLIENT,
+                issued_by_user_id=KLEAR_OPERATOR,
+                channel_kind="telegram",
+            )
+            bound = await consume_auth_code_and_bind(
+                conn, code=issued.code, channel_kind="telegram",
+                external_id="tg_chat_REPLAY",
+            )
+
+            first = await record_inbound_message(
+                conn,
+                client_id=bound.client_id,
+                channel_kind="telegram",
+                channel_identity_id=bound.identity_id,
+                external_message_id="999",
+                external_chat_id="tg_chat_REPLAY",
+                payload={"text": "first"},
+                intent="unknown",
+                actor_user_id=bound.user_id,
+            )
+            again = await record_inbound_message(
+                conn,
+                client_id=bound.client_id,
+                channel_kind="telegram",
+                channel_identity_id=bound.identity_id,
+                external_message_id="999",
+                external_chat_id="tg_chat_REPLAY",
+                payload={"text": "second"},
+                intent="unknown",
+                actor_user_id=bound.user_id,
+            )
+            assert first.id == again.id
+            attempts = await conn.fetchval(
+                "SELECT attempts FROM channel_messages WHERE id = $1::uuid",
+                first.id,
+            )
+            # First insert leaves attempts at the default (0); the
+            # UPSERT bumps it to 1. The point is that the replay does
+            # not create a second row.
+            assert attempts >= 1
+        finally:
+            await conn.close()
+            await _cleanup_channel_state()
+
+    asyncio.run(run())

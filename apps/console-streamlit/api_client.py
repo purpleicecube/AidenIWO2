@@ -349,3 +349,40 @@ class ApiClient:
         return self._request(
             "POST", f"/channel/identities/{identity_id}/revoke"
         )
+
+    # ---- Pre-Beta β.2 — LLM config CRUD ----
+
+    def create_llm_config(self, **fields: Any) -> dict[str, Any]:
+        return self._request("POST", "/llm/configs", json=fields)
+
+    def update_llm_config(
+        self, config_id: str, **fields: Any
+    ) -> dict[str, Any]:
+        return self._request(
+            "PATCH", f"/llm/configs/{config_id}", json=fields
+        )
+
+    def delete_llm_config(
+        self, config_id: str, hard: bool = False
+    ) -> dict[str, Any]:
+        params = {"hard": "true"} if hard else None
+        return self._request(
+            "DELETE", f"/llm/configs/{config_id}", params=params
+        )
+
+    # ---- Pre-Beta β.3 — dispatch ----
+
+    def dispatch_work_order(
+        self, wo_id: str, intake_override: Optional[str] = None
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {}
+        if intake_override:
+            body["intake_override"] = intake_override
+        return self._request(
+            "POST", f"/work_orders/{wo_id}/dispatch", json=body
+        )
+
+    def run_next_workflow_step(self, execution_id: str) -> dict[str, Any]:
+        return self._request(
+            "POST", f"/workflows/{execution_id}/run_next_step"
+        )

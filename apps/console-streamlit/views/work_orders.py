@@ -114,6 +114,53 @@ def main() -> None:
                 st.markdown(f"**Created:** {wo.created_at}")
                 st.markdown(f"**Updated:** {wo.updated_at}")
             with col_actions:
+                st.markdown("**Dispatch**")
+                if st.button(
+                    "Run Aiden + Tier 2",
+                    key=f"dispatch-{wo.id}",
+                    help=(
+                        "Aiden Tier 1 classifies; if work_order_brief, "
+                        "Tier 2 produces the deliverable; if "
+                        "workflow_brief, PM Tier 1.5 instantiates the "
+                        "workflow."
+                    ),
+                ):
+                    with st.spinner("dispatching…"):
+                        try:
+                            r = api.dispatch_work_order(wo.id)
+                        except APIError as err:
+                            st.error(
+                                f"❌ {err.status_code} — {err.detail}"
+                            )
+                            r = None
+                    if r:
+                        if r.get("ok"):
+                            kind = r.get("decision_kind")
+                            if kind == "work_order_brief":
+                                st.success(
+                                    f"✅ {kind} → output_package "
+                                    f"`{r.get('output_package_id')}`"
+                                )
+                            elif kind == "workflow_brief":
+                                st.success(
+                                    f"✅ {kind} → execution "
+                                    f"`{r.get('workflow_execution_id')}` "
+                                    f"({len(r.get('step_run_ids') or [])} steps)"
+                                )
+                            else:
+                                st.success(f"✅ {kind}")
+                            st.rerun()
+                        else:
+                            if r.get("decision_kind") == "clarification":
+                                st.warning(
+                                    "❓ Aiden asked: "
+                                    f"{r.get('clarification_question')}"
+                                )
+                            else:
+                                st.warning(
+                                    f"⚠️ {r.get('error')}"
+                                )
+
                 st.markdown("**Transitions**")
                 legal = SAFE_TRANSITIONS.get(wo.status, [])
                 if not legal:

@@ -339,7 +339,7 @@ async def record_inbound_message(
         VALUES ($1::uuid, $2::channel_kind, 'inbound'::channel_message_direction,
                 $3::uuid, $4, $5, $6::jsonb, $7,
                 'received'::channel_message_status, $8)
-        ON CONFLICT (channel_kind, external_message_id)
+        ON CONFLICT (channel_kind, external_chat_id, external_message_id)
         DO UPDATE SET attempts = channel_messages.attempts + 1,
                       payload = EXCLUDED.payload
         RETURNING id::text AS id, intent

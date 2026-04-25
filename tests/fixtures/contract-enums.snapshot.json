@@ -305,6 +305,9 @@
       "llm.budget_exceeded",
       "llm.failed",
       "llm.invoked",
+      "llm_config.created",
+      "llm_config.disabled",
+      "llm_config.updated",
       "llm_provider.connection_tested",
       "output_candidate.rejected",
       "output_candidate.selected",
@@ -468,6 +471,11 @@
         "channel_message.failed",
         "channel_message.send_queued",
         "channel_message.sent"
+      ],
+      "PRE_BETA_PHASE_2_AUDIT_EVENTS": [
+        "llm_config.created",
+        "llm_config.updated",
+        "llm_config.disabled"
       ]
     }
   },

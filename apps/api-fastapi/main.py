@@ -32,6 +32,7 @@ from routes import (
     audit_log,
     candidate_review,
     channels,
+    dispatch,
     health,
     llm,
     output_packages,
@@ -40,6 +41,7 @@ from routes import (
     workflows,
 )
 from workers.poll_worker import poll_worker_loop
+from workers.telegram_worker import telegram_worker_loop
 
 
 log = logging.getLogger("iwo3.main")
@@ -49,16 +51,24 @@ log = logging.getLogger("iwo3.main")
 async def lifespan(app: FastAPI):
     await startup_db_pool()
     worker_task = asyncio.create_task(poll_worker_loop(get_db_pool()))
+    telegram_task = asyncio.create_task(
+        telegram_worker_loop(get_db_pool())
+    )
     try:
         yield
     finally:
-        worker_task.cancel()
-        try:
-            await worker_task
-        except asyncio.CancelledError:
-            pass
-        except Exception as exc:  # noqa: BLE001
-            log.exception("poll_worker shutdown raised: %s", exc)
+        for t in (worker_task, telegram_task):
+            t.cancel()
+        for t, name in (
+            (worker_task, "poll_worker"),
+            (telegram_task, "telegram_worker"),
+        ):
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:  # noqa: BLE001
+                log.exception("%s shutdown raised: %s", name, exc)
         await shutdown_db_pool()
 
 
@@ -89,3 +99,4 @@ app.include_router(adapter_credentials.status_router)
 app.include_router(llm.router)
 app.include_router(channels.router)
 app.include_router(aiden.router)
+app.include_router(dispatch.router)
