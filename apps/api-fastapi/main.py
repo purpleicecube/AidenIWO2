@@ -28,6 +28,7 @@ register_poll_handler("gamma", poll_gamma_handoff)
 from deps import get_db_pool, shutdown_db_pool, startup_db_pool
 from routes import (
     adapter_credentials,
+    aiden,
     audit_log,
     candidate_review,
     channels,
@@ -87,3 +88,4 @@ app.include_router(adapter_credentials.router)
 app.include_router(adapter_credentials.status_router)
 app.include_router(llm.router)
 app.include_router(channels.router)
+app.include_router(aiden.router)

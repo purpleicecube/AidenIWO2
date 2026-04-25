@@ -301,3 +301,51 @@ class ApiClient:
             "GET", "/permissions/check", params={"permission": permission}
         )
         return PermissionDecision(**data)
+
+    # ---- Alpha α.7 — Aiden chat + LLM configs + channel ops ----
+
+    def aiden_chat(self, message: str) -> dict[str, Any]:
+        return self._request("POST", "/aiden/chat", json={"message": message})
+
+    def list_llm_configs(self) -> list[dict[str, Any]]:
+        data = self._request("GET", "/llm/configs")
+        return data["configs"]
+
+    def list_llm_providers(self) -> list[dict[str, Any]]:
+        data = self._request("GET", "/llm/providers")
+        return data["providers"]
+
+    def test_llm(
+        self, *, agent_role: str, user_message: str = "ping"
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/llm/test",
+            json={"agent_role": agent_role, "user_message": user_message},
+        )
+
+    def issue_channel_auth_code(
+        self, *, channel_kind: str, ttl_minutes: int = 15
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/channel/auth_codes",
+            json={"channel_kind": channel_kind, "ttl_minutes": ttl_minutes},
+        )
+
+    def list_channel_identities(
+        self,
+        *,
+        channel_kind: Optional[str] = None,
+        only_active: bool = True,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"only_active": str(only_active).lower()}
+        if channel_kind:
+            params["channel_kind"] = channel_kind
+        data = self._request("GET", "/channel/identities", params=params)
+        return data["identities"]
+
+    def revoke_channel_identity(self, identity_id: str) -> dict[str, Any]:
+        return self._request(
+            "POST", f"/channel/identities/{identity_id}/revoke"
+        )
