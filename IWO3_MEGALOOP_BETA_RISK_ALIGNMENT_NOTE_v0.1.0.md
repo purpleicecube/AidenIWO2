@@ -1,7 +1,11 @@
 # IWO3 MegaLoop Beta — Risk Alignment Note v0.1.0
 
 Date: 2026-04-25
-Status: Draft for CODEX review (optional but recommended companion).
+Status: Draft for CODEX review (optional but recommended companion). Post-architect-feedback edit applied 2026-04-25.
+
+## Edit history
+
+- **2026-04-25 — post-architect-feedback audit:** verified R-032 stays under "Retire" (Beta-1 must-have Q7 closes it). The earlier scope-proposal §E listed R-032 under both "retire" and "carry forward"; that has been corrected in the proposal. This note's R-032 entry was already correct and required no change. R-034 wording verified strict ("carried operational caveat, not a completed drag-drop parity item") and consistent across all four package artifacts.
 Predecessor risk register: `RISK_REGISTER_v0.2.3.md` (post-δ).
 Target risk register: `RISK_REGISTER_v0.3.0.md` (post-Beta).
 

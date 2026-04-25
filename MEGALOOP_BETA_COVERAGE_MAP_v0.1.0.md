@@ -1,7 +1,11 @@
 # MegaLoop Beta — Coverage Map v0.1.0
 
 Date: 2026-04-25
-Status: Draft for CODEX review.
+Status: Draft for CODEX review (post-architect-feedback edit applied 2026-04-25).
+
+## Edit history
+
+- **2026-04-25 — post-architect-feedback:** Section 4 row "Aiden conversation memory" rewritten to make the in-vs-out boundary explicit: operator-facing chat history (per operator+tenant) IS Beta-1 must-have; agent-side cross-WO memory remains GA-deferred. Aligns with the scope proposal's clarified §B language.
 Companion to: `IWO3_MEGALOOP_BETA_SCOPE_PROPOSAL_v0.1.0.md`.
 
 This map shows exactly which roadmap items, deferred ADR items, and open architect questions Beta consumes — and which it intentionally leaves for later.
@@ -42,7 +46,7 @@ Source: `docs/adr/ADR-024_alpha-release-definition.md` § "Deferred to Beta or l
 | Streaming LLM responses | carry to GA | not Beta |
 | Multi-channel identity merging | carry to GA | not Beta |
 | Cost-aware provider arbitration | optional Beta should-have | Q4 default no |
-| Aiden conversation memory | partial via Beta-1 must-have (cross-session context Q7) | richer in Beta-2 |
+| Aiden conversation memory | operator-facing chat history per (operator, tenant) is Beta-1 must-have via Q7; agent-side cross-WO memory (Munninn-style) stays GA-deferred | clarified post-feedback 2026-04-25 |
 
 ## Section 3 — Carried-question coverage
 

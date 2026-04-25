@@ -1,7 +1,14 @@
 # IWO3 MegaLoop Beta — Scope Proposal v0.1.0
 
 Date: 2026-04-25
-Status: Draft for CODEX review.
+Status: Draft for CODEX review (post-architect-feedback edit applied 2026-04-25).
+
+## Edit history
+
+- **2026-04-25 — post-architect-feedback corrections:**
+  - §B: clarified that **operator-facing cross-session chat history is in Beta scope**; only Munninn-style agent-side runtime memory across unrelated WOs stays GA-deferred. Resolves the contradiction CODEX flagged between §B and §C/E/F.
+  - §E: moved **R-032** from "Beta will carry forward" to "Beta will retire" (it was contradictorily listed as both retired by Q7 and carried). Aligns scope proposal with the risk-alignment note.
+  - R-034 wording audited end-to-end; phrasing consistent across all four package artifacts as **carried operational caveat, not a completed drag-drop parity item**.
 Predecessors: `MEGALOOP_ALPHA_RECORD_v0.1.0.md`, `IWO3_ALPHA_CLOSEOUT_GAP_PUSH_RECORD_v0.1.0.md`, `IWO3_PRE_BETA_PRODUCT_SURFACE_REMEDIATION_LOOP_RECORD_v0.1.0.md`.
 Companions (this package): `IWO3_MEGALOOP_BETA_PRESTART_QUESTIONS_v0.1.0.md`, `MEGALOOP_BETA_COVERAGE_MAP_v0.1.0.md`, `IWO3_MEGALOOP_BETA_RISK_ALIGNMENT_NOTE_v0.1.0.md`.
 
@@ -51,7 +58,7 @@ What stays out of Beta scope (deferred to GA / Loop 12+):
 - Multi-region production deployment
 - Streaming LLM responses (still Beta-deferred per ADR-024)
 - Cost-aware provider arbitration **at runtime** (registry shape may land in Beta)
-- Aiden conversation-memory durability beyond per-session
+- **Agent-side runtime memory across unrelated WOs** (Munninn / MemoryAdvisor-style learning where Aiden recalls patterns from prior dispatches without operator prompting) — distinct from operator-facing chat history, which IS Beta scope (see §C must-have "Cross-session chat context durability"). This deferral means Aiden does not learn or maintain implicit cross-WO state; it does mean the operator's chat thread persists per (operator, tenant) so refresh + revisit + follow-up prompts work.
 
 ## C. Scope buckets
 
@@ -116,7 +123,7 @@ Beta relies on these guarantees from prior closures:
 
 What stays caveated (carried into Beta):
 
-- **R-034 — drag-drop activation caveat.** The `streamlit-sortables` import probe activates literal drag-drop only after `uv sync` runs on a network-connected host. Beta does not consume this; carry as operational caveat per architect note.
+- **R-034 — drag-drop activation caveat (carried, not a completed parity item).** The `streamlit-sortables` import probe activates literal drag-drop only after `uv sync` runs on a network-connected host. Beta does not consume this; it stays as a **carried operational caveat per architect 2026-04-25**, visible until literal drag-drop is verified live on a networked host.
 - **R-021 — per-WO LLM ceiling enforced at call-time only.** Beta's must-have "per-tenant ceiling overrides" partially addresses; the timing-window risk remains if not fully redesigned.
 - **R-022 — Telegram offset in-process.** Beta may resolve via a `channel_identities.last_offset` column if it adds value; not gating.
 
@@ -134,6 +141,7 @@ What stays caveated (carried into Beta):
 | R-029 (S2) — `system:admin` only RBAC gate on llm_config CRUD | Same |
 | R-031 (S3) — no persona library | Beta should-have "Aiden persona library" closes this if it ships |
 | R-033 (S3) — client-side idempotency only | Beta must-have "server-side WO idempotency" closes this |
+| R-032 (S3) — chat context in-process Streamlit session state | Beta-1 must-have "Cross-session chat context durability" (Q7) closes this; operator-facing chat history persists per (operator, tenant) in DB |
 | R-035 (S3) — workspace file content not fetchable | Beta must-have "workspace file content fetch route" closes this |
 | R-036 (S3) — workspace soft-deleted folders accumulate | Beta must-have "workspace hard-delete model" closes this |
 
@@ -145,8 +153,7 @@ What stays caveated (carried into Beta):
 | R-023 (S2) — auth-code consume on bypass connection | Architectural by design (cross-tenant lookup); annotated; no Beta change planned |
 | R-026 (S3) — RBAC granularity carried decision | Resolved by Beta must-have if architect chooses fine-grained; otherwise deliberate carry |
 | R-030 (S3) — display_name backfill is heuristic | Cosmetic; new tenants seeded explicitly post-δ |
-| R-032 (S3) — chat context in-process Streamlit session state | Beta must-have "cross-session chat context durability" retires this |
-| **R-034 — drag-drop activation caveat** | **Operational caveat per architect 2026-04-25; not consumed by Beta unless dep install + verification scoped** |
+| **R-034 — drag-drop activation caveat** | **Carried operational caveat per architect 2026-04-25 — not a completed drag-drop parity item. Stays visible in v0.3.0 register until literal drag-drop verified active on a networked host.** |
 
 ## F. Acceptance criteria
 
