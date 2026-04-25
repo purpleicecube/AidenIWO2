@@ -1,0 +1,12 @@
+{
+  "op": "build_request",
+  "input": {
+    "outputKind": "gamma_pptx",
+    "title": "Klear PPTX via primary template",
+    "summary": null,
+    "contentBlocks": {
+      "prompt": "Populate the primary Klear template with Q1 closed-won + RMIS risk panel content."
+    },
+    "templateExternalRef": "g_onfwfqpb52zcws3"
+  }
+}

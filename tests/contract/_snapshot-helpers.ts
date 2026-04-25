@@ -26,6 +26,7 @@ import {
   LOOP_4_PHASE_2_AUDIT_EVENTS,
   LOOP_6_PHASE_1_AUDIT_EVENTS,
   LOOP_9_PHASE_1_AUDIT_EVENTS,
+  LOOP_9_PHASE_2_AUDIT_EVENTS,
 } from "../../packages/contracts/audit/events";
 
 export interface ContractSnapshot {
@@ -79,6 +80,7 @@ export function loadAuditEvents(): ContractSnapshot["auditEvents"] {
       LOOP_4_PHASE_2_AUDIT_EVENTS: [...LOOP_4_PHASE_2_AUDIT_EVENTS],
       LOOP_6_PHASE_1_AUDIT_EVENTS: [...LOOP_6_PHASE_1_AUDIT_EVENTS],
       LOOP_9_PHASE_1_AUDIT_EVENTS: [...LOOP_9_PHASE_1_AUDIT_EVENTS],
+      LOOP_9_PHASE_2_AUDIT_EVENTS: [...LOOP_9_PHASE_2_AUDIT_EVENTS],
     },
   };
 }

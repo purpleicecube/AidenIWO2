@@ -1,0 +1,10 @@
+{
+  "op": "parse_poll",
+  "generationId": "gen_abc123",
+  "input": {
+    "status": "failed",
+    "error": {
+      "message": "template not found"
+    }
+  }
+}

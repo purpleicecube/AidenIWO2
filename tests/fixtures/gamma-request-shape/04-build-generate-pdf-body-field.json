@@ -1,0 +1,12 @@
+{
+  "op": "build_request",
+  "input": {
+    "outputKind": "gamma_pdf",
+    "title": "RMIS ROI brief",
+    "summary": null,
+    "contentBlocks": {
+      "body": "Compose a 6-page RMIS ROI brief using the reconciled Q1 numbers."
+    },
+    "templateExternalRef": null
+  }
+}

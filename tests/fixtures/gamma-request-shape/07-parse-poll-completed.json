@@ -1,0 +1,11 @@
+{
+  "op": "parse_poll",
+  "generationId": "gen_abc123",
+  "input": {
+    "status": "completed",
+    "gammaUrl": "https://gamma.app/docs/gen_abc123",
+    "exportUrls": [
+      "https://export.gamma.app/gen_abc123.pptx"
+    ]
+  }
+}

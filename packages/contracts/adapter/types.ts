@@ -43,9 +43,19 @@ export interface AdapterValidationResult {
 export interface AdapterSubmissionContext {
   /** Informational — the adapter MAY use for logging but MUST NOT require. */
   correlationId?: string;
-  /** Adapter-supplied template override, optional. Used if the package
-   *  doesn't carry its own `template_profile_id`. */
-  templateExternalRef?: string;
+  /**
+   * External template id from the resolved template_profile. Phase 9.2:
+   * the dispatcher joins template_profiles.external_ref and passes it
+   * here so adapters don't re-query the DB.
+   */
+  templateExternalRef?: string | null;
+  /**
+   * Loop 9 Phase 9.2 — `credential_ref:env:*` pointer the dispatcher
+   * resolved from `adapter_credentials.credential_ref`. The adapter
+   * parses this and reads the actual secret from the env at I/O time.
+   * Raw secrets never travel through the dispatcher.
+   */
+  credentialRef?: string | null;
 }
 
 export interface AdapterSubmissionResult {
@@ -65,6 +75,16 @@ export interface AdapterPollResult {
   externalReference: string;
   status: AdapterPollStatus;
   progress?: number;
+}
+
+/**
+ * Loop 9 Phase 9.2 — polling / result-fetch context. Carries the same
+ * `credential_ref:env:*` pointer the dispatcher supplied to `submit()`
+ * so async-path callers (Phase 9.3+) can re-read the credential
+ * without opening a DB connection.
+ */
+export interface AdapterPollContext {
+  credentialRef?: string | null;
 }
 
 export type AdapterExecutionStatus =
@@ -96,7 +116,13 @@ export interface AdapterContract {
     ctx: AdapterSubmissionContext
   ): Promise<AdapterSubmissionResult>;
 
-  pollStatus(externalReference: string): Promise<AdapterPollResult>;
+  pollStatus(
+    externalReference: string,
+    ctx?: AdapterPollContext
+  ): Promise<AdapterPollResult>;
 
-  fetchResult(externalReference: string): Promise<AdapterExecutionResult>;
+  fetchResult(
+    externalReference: string,
+    ctx?: AdapterPollContext
+  ): Promise<AdapterExecutionResult>;
 }

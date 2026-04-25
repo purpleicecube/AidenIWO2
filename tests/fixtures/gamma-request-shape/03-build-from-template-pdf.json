@@ -1,0 +1,12 @@
+{
+  "op": "build_request",
+  "input": {
+    "outputKind": "gamma_pdf",
+    "title": "Claims PDF (w/ overview 26.03.12)",
+    "summary": "Claims PDF export",
+    "contentBlocks": {
+      "inputText": "Render the Claims PDF with the 26.03.12 overview cards and the ROI summary."
+    },
+    "templateExternalRef": "g_122ahx4j0eer8lz"
+  }
+}

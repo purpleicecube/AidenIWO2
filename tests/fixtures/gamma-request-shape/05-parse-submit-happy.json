@@ -1,0 +1,8 @@
+{
+  "op": "parse_submit",
+  "input": {
+    "generationId": "gen_abc123",
+    "gammaUrl": "https://gamma.app/docs/gen_abc123",
+    "extraField": "ignored"
+  }
+}

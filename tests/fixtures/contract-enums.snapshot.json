@@ -247,6 +247,7 @@
       "adapter_credential.rotated",
       "adapter_dispatch.approval_required",
       "adapter_dispatch.completed",
+      "adapter_dispatch.credential_invalid",
       "adapter_dispatch.credential_missing",
       "adapter_dispatch.failed",
       "adapter_dispatch.first_invocation_pending",
@@ -254,6 +255,7 @@
       "adapter_dispatch.live_disabled",
       "adapter_dispatch.package_invalid",
       "adapter_dispatch.policy_rejected",
+      "adapter_dispatch.rate_limited",
       "adapter_dispatch.submitted",
       "adapter_policy.created",
       "adapter_policy.updated",
@@ -399,6 +401,10 @@
         "adapter_dispatch.live_disabled",
         "adapter_dispatch.credential_missing",
         "adapter_dispatch.first_invocation_pending"
+      ],
+      "LOOP_9_PHASE_2_AUDIT_EVENTS": [
+        "adapter_dispatch.credential_invalid",
+        "adapter_dispatch.rate_limited"
       ]
     }
   },

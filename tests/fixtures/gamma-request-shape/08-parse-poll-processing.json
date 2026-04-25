@@ -1,0 +1,8 @@
+{
+  "op": "parse_poll",
+  "generationId": "gen_abc123",
+  "input": {
+    "status": "processing",
+    "progress": 42
+  }
+}

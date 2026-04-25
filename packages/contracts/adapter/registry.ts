@@ -27,20 +27,43 @@ import { PermissionDenied, requirePermission } from "../authz/require_permission
 import type { AdapterContract } from "./types";
 import { decideLiveGate } from "./dispatch_gating";
 import { gammaTestDouble } from "../../adapters/gamma/adapter";
+import { gammaLive } from "../../adapters/gamma/live_adapter";
+import { GammaAdapterError } from "../../adapters/gamma/live_adapter";
 import type { OutputPackage } from "../../../db/schema/output_packages";
 
 // ──────────────────────────────────────────────────────────────────────
 // Registry
 // ──────────────────────────────────────────────────────────────────────
 
+// Loop 9 Phase 9.2 — the Gamma slot is bound to the live adapter only
+// when `GAMMA_LIVE_ENABLED === "true"`. Absent that opt-in we keep the
+// Loop 3 test-double so every Loop 3/4/5/6 test continues to pass with
+// no external network calls. The live-gate in `dispatch_gating.ts` is
+// belt-and-suspenders for the same invariant.
+const gammaAdapter: AdapterContract =
+  process.env.GAMMA_LIVE_ENABLED === "true" ? gammaLive : gammaTestDouble;
+
 const ADAPTER_REGISTRY = new Map<string, AdapterContract>([
-  [gammaTestDouble.adapterKey, gammaTestDouble],
+  [gammaAdapter.adapterKey, gammaAdapter],
   // Loop 10 adds Drive, email_campaign, Figma, Stitch, Claude Design, CRM
   // (each with its own test-double or live implementation).
 ]);
 
 export function getAdapter(adapterKey: string): AdapterContract | null {
   return ADAPTER_REGISTRY.get(adapterKey) ?? null;
+}
+
+/**
+ * Test-only registry override. Lets integration tests swap an adapter
+ * instance (e.g. a `GammaLiveAdapter` constructed with a mock fetch)
+ * without reloading the module. Pass `null` to remove the key.
+ */
+export function __registerAdapterForTest(
+  key: string,
+  adapter: AdapterContract | null
+): void {
+  if (adapter === null) ADAPTER_REGISTRY.delete(key);
+  else ADAPTER_REGISTRY.set(key, adapter);
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -84,6 +107,12 @@ export type DispatchResult =
   | { status: "live_disabled"; reason: string }
   | { status: "credential_missing"; reason: string }
   | { status: "first_invocation_pending"; reason: string }
+  // Loop 9 Phase 9.2 — live Gamma submit-time refusals.
+  // `credential_invalid` = Gamma rejected the key (401/403); distinct
+  // from the pre-dispatch `credential_missing` (no DB row).
+  // `rate_limited` = Gamma returned 429.
+  | { status: "credential_invalid"; reason: string }
+  | { status: "rate_limited"; reason: string }
   | {
       status: "failed";
       handoffId: string | null;
@@ -185,6 +214,7 @@ async function resolveAdapterCatalogId(
 
 interface AdapterCredentialGateRow {
   id: string;
+  credentialRef: string;
   firstInvocationConfirmedAt: string | null;
 }
 
@@ -196,9 +226,11 @@ async function loadAdapterCredentialForGate(
   // the Loop 4 Phase 3 RLS policy on adapter_credentials.
   const { rows } = await client.query<{
     id: string;
+    credential_ref: string;
     first_invocation_confirmed_at: string | null;
   }>(
     `SELECT id,
+            credential_ref,
             first_invocation_confirmed_at
        FROM adapter_credentials
       WHERE client_id = $1 AND adapter_catalog_id = $2
@@ -210,8 +242,23 @@ async function loadAdapterCredentialForGate(
   if (!r) return null;
   return {
     id: r.id,
+    credentialRef: r.credential_ref,
     firstInvocationConfirmedAt: r.first_invocation_confirmed_at,
   };
+}
+
+async function resolveTemplateExternalRef(
+  client: PoolClient,
+  params: { clientId: string; templateProfileId: string | null }
+): Promise<string | null> {
+  if (!params.templateProfileId) return null;
+  const { rows } = await client.query<{ external_ref: string | null }>(
+    `SELECT external_ref
+       FROM template_profiles
+      WHERE id = $1 AND client_id = $2`,
+    [params.templateProfileId, params.clientId]
+  );
+  return rows[0]?.external_ref ?? null;
 }
 
 async function updateHandoffStatus(
@@ -435,12 +482,67 @@ export async function dispatchToAdapter(
   }
 
   // Step 5 + 6: submit + record handoff
+  // Loop 9 Phase 9.2: thread the resolved credential_ref and the
+  // template_profile.external_ref into the adapter submission context
+  // so live adapters don't re-query the DB. Test-double ignores both.
+  const templateExternalRef = await resolveTemplateExternalRef(client, {
+    clientId: input.clientId,
+    templateProfileId: input.outputPackage.templateProfileId,
+  });
   let submission;
   try {
     submission = await adapter.submit(input.outputPackage, {
       correlationId: input.correlationId,
+      templateExternalRef,
+      credentialRef: credentialRow?.credentialRef ?? null,
     });
   } catch (err) {
+    // Loop 9 Phase 9.2 — live adapters throw typed GammaAdapterError.
+    // Map credential_invalid / rate_limited to the phase-locked audit
+    // events so the log captures WHY a submit failed, not just "failed".
+    if (err instanceof GammaAdapterError) {
+      if (err.kind === "credential_invalid") {
+        await emitDispatchAudit(
+          client,
+          input,
+          AUDIT_EVENTS.ADAPTER_DISPATCH_CREDENTIAL_INVALID,
+          {
+            stage: "submit",
+            http_status: err.httpStatus,
+            detail: err.message,
+          }
+        );
+        return { status: "credential_invalid", reason: err.message };
+      }
+      if (err.kind === "rate_limited") {
+        await emitDispatchAudit(
+          client,
+          input,
+          AUDIT_EVENTS.ADAPTER_DISPATCH_RATE_LIMITED,
+          {
+            stage: "submit",
+            http_status: err.httpStatus,
+            detail: err.message,
+          }
+        );
+        return { status: "rate_limited", reason: err.message };
+      }
+      if (err.kind === "package_invalid") {
+        await emitDispatchAudit(
+          client,
+          input,
+          AUDIT_EVENTS.ADAPTER_DISPATCH_PACKAGE_INVALID,
+          {
+            stage: "submit",
+            detail: err.message,
+          }
+        );
+        return {
+          status: "package_invalid",
+          errors: (err.body ?? err.message).split("; "),
+        };
+      }
+    }
     const message = err instanceof Error ? err.message : String(err);
     // Record a failed handoff for auditability.
     const failedHandoffId = await recordHandoff(client, input, {
@@ -469,8 +571,11 @@ export async function dispatchToAdapter(
     handoffId,
   });
 
-  // Step 7: fetch result (test-double returns immediately)
-  const result = await adapter.fetchResult(submission.externalReference);
+  // Step 7: fetch result (test-double returns immediately; live adapters
+  // re-read the same credential_ref we threaded into submit above).
+  const result = await adapter.fetchResult(submission.externalReference, {
+    credentialRef: credentialRow?.credentialRef ?? null,
+  });
   await recordResult(
     client,
     handoffId,

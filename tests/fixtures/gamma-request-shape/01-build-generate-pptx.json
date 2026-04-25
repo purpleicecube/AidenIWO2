@@ -1,0 +1,12 @@
+{
+  "op": "build_request",
+  "input": {
+    "outputKind": "gamma_pptx",
+    "title": "Klear 3M GTM v0.3.6",
+    "summary": "Executive deck for Brij review",
+    "contentBlocks": {
+      "prompt": "Produce a 12-slide executive summary of the 3M GTM plan covering pipeline build, closed-won, and ramp visualization."
+    },
+    "templateExternalRef": null
+  }
+}

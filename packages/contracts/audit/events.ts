@@ -135,6 +135,15 @@ export const AUDIT_EVENTS = {
   ADAPTER_DISPATCH_CREDENTIAL_MISSING: "adapter_dispatch.credential_missing",
   ADAPTER_DISPATCH_FIRST_INVOCATION_PENDING:
     "adapter_dispatch.first_invocation_pending",
+
+  // Loop 9 Phase 9.2 — live Gamma submit-time outcomes. Two events
+  // distinguish submit-time auth / quota failures from the pre-dispatch
+  // gate events above. `credential_invalid` = Gamma rejected the key
+  // at the HTTP layer (401/403), separate from `credential_missing`
+  // (no adapter_credentials row existed at all).
+  ADAPTER_DISPATCH_CREDENTIAL_INVALID:
+    "adapter_dispatch.credential_invalid",
+  ADAPTER_DISPATCH_RATE_LIMITED: "adapter_dispatch.rate_limited",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -233,4 +242,9 @@ export const LOOP_9_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.ADAPTER_DISPATCH_LIVE_DISABLED,
   AUDIT_EVENTS.ADAPTER_DISPATCH_CREDENTIAL_MISSING,
   AUDIT_EVENTS.ADAPTER_DISPATCH_FIRST_INVOCATION_PENDING,
+];
+
+export const LOOP_9_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.ADAPTER_DISPATCH_CREDENTIAL_INVALID,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_RATE_LIMITED,
 ];
