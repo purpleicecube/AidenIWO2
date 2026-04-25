@@ -80,7 +80,7 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     const snap = loadSnapshot();
     expect(Object.keys(snap.dbEnums).length).toBe(44);
     expect(snap.auditEvents.all.length).toBe(88);
-    expect(snap.permissionKeys.length).toBe(69);
+    expect(snap.permissionKeys.length).toBe(72);
     // Every locked per-loop array carries the right shape.
     expect(snap.auditEvents.byLoop.LOOP_2_AUDIT_EVENTS.length).toBe(12);
     expect(snap.auditEvents.byLoop.LOOP_3_PHASE_1_AUDIT_EVENTS.length).toBe(13);

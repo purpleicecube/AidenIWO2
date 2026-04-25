@@ -850,5 +850,15 @@
   {
     "role": "agent_system",
     "permissionKey": "external_execution_result:create"
-  }
+  },
+  { "role": "owner",     "permissionKey": "channel_auth_code:issue"  },
+  { "role": "owner",     "permissionKey": "channel_identity:read"    },
+  { "role": "owner",     "permissionKey": "channel_identity:revoke"  },
+  { "role": "admin",     "permissionKey": "channel_auth_code:issue"  },
+  { "role": "admin",     "permissionKey": "channel_identity:read"    },
+  { "role": "admin",     "permissionKey": "channel_identity:revoke"  },
+  { "role": "operator",  "permissionKey": "channel_auth_code:issue"  },
+  { "role": "operator",  "permissionKey": "channel_identity:read"    },
+  { "role": "reviewer",  "permissionKey": "channel_identity:read"    },
+  { "role": "agent_system", "permissionKey": "channel_identity:read" }
 ]

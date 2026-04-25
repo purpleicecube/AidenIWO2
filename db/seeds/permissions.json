@@ -481,5 +481,26 @@
     "displayName": "Read audit log",
     "description": "Read action_audit_log rows for this tenant.",
     "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000070",
+    "permissionKey": "channel_auth_code:issue",
+    "displayName": "Issue channel auth code",
+    "description": "Generate a one-time /start binding code for an external chat channel (Telegram, Slack, etc).",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000071",
+    "permissionKey": "channel_identity:read",
+    "displayName": "Read channel identities",
+    "description": "List bound channel identities (chat IDs) for this tenant.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000072",
+    "permissionKey": "channel_identity:revoke",
+    "displayName": "Revoke channel identity",
+    "description": "Revoke a bound external chat identity so it can no longer act on this tenant.",
+    "scope": "tenant"
   }
 ]

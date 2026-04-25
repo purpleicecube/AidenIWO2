@@ -24,13 +24,17 @@ const INTRUDER = "00000000-0000-4000-8000-000099000002";
 
 // Expected role-default cardinalities — see db/seeds/role_permissions.json.
 // Values are locked upfront per IWO3_LOOP_4_APPROVAL_DECISIONS §Q1.
+// MegaLoop Alpha α.6 raised the vocabulary by 3 keys (channel:auth_code:issue,
+// channel:identity:read, channel:identity:revoke) and added 10 role-permission
+// rows: owner+admin get all 3, operator gets 2 (issue+read), reviewer +
+// agent_system get 1 (read). viewer is intentionally untouched.
 const EXPECTED_COUNTS = {
-  owner: 69,
-  admin: 67,
-  operator: 27,
-  reviewer: 17,
+  owner: 72,
+  admin: 70,
+  operator: 29,
+  reviewer: 18,
   viewer: 13,
-  agent_system: 20,
+  agent_system: 21,
 } as const;
 
 describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
@@ -40,21 +44,21 @@ describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
     await pool.end();
   });
 
-  it("permissions vocabulary is locked at 69 keys (§Q1 lock_upfront)", async () => {
+  it("permissions vocabulary is locked at 72 keys (§Q1 lock_upfront + α.6 channel layer)", async () => {
     const { rows } = await pool.query<{ count: string }>(
       `SELECT count(*) AS count FROM permissions`
     );
-    expect(Number(rows[0].count)).toBe(69);
+    expect(Number(rows[0].count)).toBe(72);
   });
 
-  it("role_permissions is seeded at 213 rows across the six roles", async () => {
+  it("role_permissions is seeded at 223 rows across the six roles", async () => {
     const { rows } = await pool.query<{ role: string; count: string }>(
       `SELECT role, count(*) AS count FROM role_permissions GROUP BY role ORDER BY role`
     );
     const map = Object.fromEntries(rows.map((r) => [r.role, Number(r.count)]));
     expect(map).toMatchObject(EXPECTED_COUNTS);
     const total = Object.values(map).reduce((a, b) => a + b, 0);
-    expect(total).toBe(213);
+    expect(total).toBe(223);
   });
 
   for (const [userId, role, expected] of [
