@@ -161,6 +161,12 @@ export const AUDIT_EVENTS = {
   ADAPTER_DISPATCH_POLLING: "adapter_dispatch.polling",
   ADAPTER_DISPATCH_WATCHDOG_EXPIRED_STALE_POLL:
     "adapter_dispatch.watchdog_expired_stale_poll",
+
+  // MegaLoop Alpha α.2 — LLM runtime. Token-budget circuit breaker
+  // fires per Stage A §A7 (per-call 8192 default, per-WO 50K ceiling).
+  // Companion events `llm.invoked` + `llm.failed` already exist from
+  // Loop 9 Phase 9.3.
+  LLM_BUDGET_EXCEEDED: "llm.budget_exceeded",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -275,4 +281,8 @@ export const LOOP_9_PHASE_3_AUDIT_EVENTS: readonly AuditEvent[] = [
 export const LOOP_9_PHASE_4_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.ADAPTER_DISPATCH_POLLING,
   AUDIT_EVENTS.ADAPTER_DISPATCH_WATCHDOG_EXPIRED_STALE_POLL,
+];
+
+export const ALPHA_PHASE_A2_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.LLM_BUDGET_EXCEEDED,
 ];

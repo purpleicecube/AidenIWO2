@@ -267,6 +267,7 @@
       "data_source_binding.created",
       "data_source_binding.revoked",
       "execution_cycle.started",
+      "llm.budget_exceeded",
       "llm.failed",
       "llm.invoked",
       "llm_provider.connection_tested",
@@ -419,6 +420,9 @@
       "LOOP_9_PHASE_4_AUDIT_EVENTS": [
         "adapter_dispatch.polling",
         "adapter_dispatch.watchdog_expired_stale_poll"
+      ],
+      "ALPHA_PHASE_A2_AUDIT_EVENTS": [
+        "llm.budget_exceeded"
       ]
     }
   },
