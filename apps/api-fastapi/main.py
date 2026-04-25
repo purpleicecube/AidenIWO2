@@ -39,6 +39,7 @@ from routes import (
     llm,
     output_packages,
     tenants,
+    webhooks,
     work_orders,
     workflows,
     workspace,
@@ -106,3 +107,4 @@ app.include_router(dispatch.router)
 app.include_router(workspace.router)
 app.include_router(chat_sessions.router)
 app.include_router(auth_routes.router)
+app.include_router(webhooks.router)
