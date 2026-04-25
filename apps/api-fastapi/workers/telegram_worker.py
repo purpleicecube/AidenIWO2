@@ -361,6 +361,15 @@ async def _process_update(
     await _handle_bound_inbound(pool, adapter, update=update)
 
 
+# Public alias for the webhook ingress. Beta-1.5 ε.5 architect-flagged
+# fix: the webhook route MUST hand verified updates into the same
+# persistence/dispatch pipeline as the long-poll worker — otherwise
+# operators who disable the worker for production lose inbound
+# processing entirely. The webhook constructs a TelegramAdapter from
+# the resolved tenant's env_var and calls this entry point.
+process_telegram_update = _process_update
+
+
 async def _process_tenant(
     pool: asyncpg.Pool, client_id: str, designation: str
 ) -> int:

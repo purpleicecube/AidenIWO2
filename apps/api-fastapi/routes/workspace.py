@@ -157,6 +157,7 @@ async def _ensure_folder_exists(
                    parent_folder_id::text AS parent_folder_id,
                    name,
                    client_id::text     AS client_id,
+                   owner_user_id::text AS owner_user_id,
                    created_at::text    AS created_at,
                    updated_at::text    AS updated_at
               FROM workspace_folders
@@ -255,6 +256,10 @@ async def get_workspace_tree(
         asyncpg.Connection, Depends(get_tenant_scoped_connection)
     ],
 ) -> WorkspaceTree:
+    # Beta-1.5 ε.5 / Q11 architect-flagged fix:
+    # Per-operator scratch folders (owner_user_id IS NOT NULL) must be
+    # visible only to their owner. Tenant-shared folders (owner_user_id
+    # IS NULL) remain visible to every tenant member with workspace:read.
     folder_rows = await conn.fetch(
         """
         SELECT id::text             AS id,
@@ -264,26 +269,36 @@ async def get_workspace_tree(
                updated_at::text    AS updated_at
           FROM workspace_folders
          WHERE deleted_at IS NULL
+           AND (owner_user_id IS NULL OR owner_user_id = $1::uuid)
          ORDER BY (parent_folder_id IS NOT NULL),  -- root first
                   parent_folder_id NULLS FIRST,
                   name
         """,
+        ctx["user_id"],
     )
+    # Files inherit visibility from their containing folder. EXISTS
+    # subquery is RLS-tenant-scoped via the same connection, so we
+    # only need to additionally enforce the per-operator filter on
+    # the parent folder.
     file_rows = await conn.fetch(
         """
-        SELECT id::text                AS id,
-               workspace_folder_id::text AS workspace_folder_id,
-               filename,
-               mime_type,
-               source_type::text       AS source_type,
-               content_class::text     AS content_class,
-               storage_ref,
-               created_at::text        AS created_at,
-               updated_at::text        AS updated_at
-          FROM artifacts
-         WHERE workspace_folder_id IS NOT NULL
-         ORDER BY filename
+        SELECT a.id::text                AS id,
+               a.workspace_folder_id::text AS workspace_folder_id,
+               a.filename,
+               a.mime_type,
+               a.source_type::text       AS source_type,
+               a.content_class::text     AS content_class,
+               a.storage_ref,
+               a.created_at::text        AS created_at,
+               a.updated_at::text        AS updated_at
+          FROM artifacts a
+          JOIN workspace_folders wf ON wf.id = a.workspace_folder_id
+         WHERE a.workspace_folder_id IS NOT NULL
+           AND wf.deleted_at IS NULL
+           AND (wf.owner_user_id IS NULL OR wf.owner_user_id = $1::uuid)
+         ORDER BY a.filename
         """,
+        ctx["user_id"],
     )
     return WorkspaceTree(
         folders=[_folder_from_row(r) for r in folder_rows],
@@ -304,6 +319,17 @@ async def get_folder_contents(
     ],
 ) -> FolderListResponse:
     folder = await _ensure_folder_exists(conn, folder_id)
+    # Beta-1.5 ε.5 / Q11 — block other operators from listing
+    # someone else's per-operator scratch folder by id, and filter
+    # children + files by the same predicate.
+    if (
+        folder["owner_user_id"]
+        and folder["owner_user_id"] != ctx["user_id"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "folder_not_found", "id": folder_id},
+        )
     children = await conn.fetch(
         """
         SELECT id::text             AS id,
@@ -313,26 +339,32 @@ async def get_folder_contents(
                updated_at::text    AS updated_at
           FROM workspace_folders
          WHERE parent_folder_id = $1::uuid AND deleted_at IS NULL
+           AND (owner_user_id IS NULL OR owner_user_id = $2::uuid)
          ORDER BY name
         """,
         folder_id,
+        ctx["user_id"],
     )
     files = await conn.fetch(
         """
-        SELECT id::text                AS id,
-               workspace_folder_id::text AS workspace_folder_id,
-               filename,
-               mime_type,
-               source_type::text       AS source_type,
-               content_class::text     AS content_class,
-               storage_ref,
-               created_at::text        AS created_at,
-               updated_at::text        AS updated_at
-          FROM artifacts
-         WHERE workspace_folder_id = $1::uuid
-         ORDER BY filename
+        SELECT a.id::text                AS id,
+               a.workspace_folder_id::text AS workspace_folder_id,
+               a.filename,
+               a.mime_type,
+               a.source_type::text       AS source_type,
+               a.content_class::text     AS content_class,
+               a.storage_ref,
+               a.created_at::text        AS created_at,
+               a.updated_at::text        AS updated_at
+          FROM artifacts a
+          JOIN workspace_folders wf ON wf.id = a.workspace_folder_id
+         WHERE a.workspace_folder_id = $1::uuid
+           AND wf.deleted_at IS NULL
+           AND (wf.owner_user_id IS NULL OR wf.owner_user_id = $2::uuid)
+         ORDER BY a.filename
         """,
         folder_id,
+        ctx["user_id"],
     )
     return FolderListResponse(
         folder=_folder_from_row(folder),

@@ -401,6 +401,89 @@ def test_folder_hard_delete_cascades() -> None:
 
 
 @iwo3_db
+def test_per_operator_scratch_folder_isolation_in_tree() -> None:
+    """Beta-1.5 ε.5 / Q11 architect fix #3: per-operator scratch
+    folders (owner_user_id IS NOT NULL) must be visible only to their
+    owner. Direct DB write to set owner_user_id since there's no
+    backend route for that yet (Beta-1.5 UI surface adds the create
+    path)."""
+    import asyncio
+    import asyncpg
+
+    async def insert_scratch(owner_user_id: str, name: str) -> str:
+        conn = await asyncpg.connect(
+            dsn=os.environ["IWO3_DATABASE_URL"]
+        )
+        try:
+            root_id = await conn.fetchval(
+                """
+                SELECT id::text FROM workspace_folders
+                 WHERE client_id = $1::uuid
+                   AND parent_folder_id IS NULL
+                   AND deleted_at IS NULL
+                """,
+                KLEAR_CLIENT,
+            )
+            return await conn.fetchval(
+                """
+                INSERT INTO workspace_folders
+                  (client_id, parent_folder_id, name, owner_user_id,
+                   created_by_user_id)
+                VALUES ($1::uuid, $2::uuid, $3, $4::uuid, $4::uuid)
+                RETURNING id::text
+                """,
+                KLEAR_CLIENT,
+                root_id,
+                name,
+                owner_user_id,
+            )
+        finally:
+            await conn.close()
+
+    async def cleanup(folder_id: str) -> None:
+        conn = await asyncpg.connect(
+            dsn=os.environ["IWO3_DATABASE_URL"]
+        )
+        try:
+            await conn.execute(
+                "DELETE FROM workspace_folders WHERE id = $1::uuid",
+                folder_id,
+            )
+        finally:
+            await conn.close()
+
+    name_a = _new_name("scratch_owner")
+    name_b = _new_name("scratch_oper")
+    fid_owner = asyncio.run(insert_scratch(KLEAR_OWNER, name_a))
+    fid_operator = asyncio.run(insert_scratch(KLEAR_OPERATOR, name_b))
+    try:
+        with TestClient(app) as client:
+            r_owner = client.get(
+                "/workspace/tree", headers=_hdr(KLEAR_OWNER)
+            )
+            owner_ids = {f["id"] for f in r_owner.json()["folders"]}
+            assert fid_owner in owner_ids
+            assert fid_operator not in owner_ids
+
+            r_op = client.get(
+                "/workspace/tree", headers=_hdr(KLEAR_OPERATOR)
+            )
+            op_ids = {f["id"] for f in r_op.json()["folders"]}
+            assert fid_operator in op_ids
+            assert fid_owner not in op_ids
+
+            # Direct GET on the foreign scratch folder returns 404.
+            r_foreign = client.get(
+                f"/workspace/folders/{fid_owner}",
+                headers=_hdr(KLEAR_OPERATOR),
+            )
+            assert r_foreign.status_code == 404, r_foreign.text
+    finally:
+        asyncio.run(cleanup(fid_owner))
+        asyncio.run(cleanup(fid_operator))
+
+
+@iwo3_db
 def test_get_folder_contents_returns_children_and_files() -> None:
     with TestClient(app) as client:
         outputs = _outputs_id(client)
