@@ -112,10 +112,58 @@ def _group_audit_rows(rows: list[Any]) -> dict[str, list[Any]]:
     return grouped
 
 
+_STATUS_EMOJI = {
+    "pending": "🟡",
+    "processing": "🔵",
+    "blocked": "🔴",
+    "awaiting_operator": "🟠",
+    "deferred": "⚪",
+    "completed": "🟢",
+    "done": "🟢",
+    "failed": "❌",
+    "cancelled": "⚫",
+}
+
+
+def _state_chip(status: str) -> str:
+    return f"{_STATUS_EMOJI.get(status, '⚫')} `{status}`"
+
+
+def _aiden_decision_card(audit_rows: list[Any]) -> None:
+    """Surface the most recent Aiden Tier-1 decision at the top of the
+    Lifecycle tab so operators can see what Aiden chose without reading
+    every row. Returns silently if no Aiden invocation exists yet."""
+    aiden = next(
+        (
+            r for r in audit_rows
+            if r.action == "llm.invoked"
+            and (r.metadata.get("agentRole") or "").startswith("aiden_")
+        ),
+        None,
+    )
+    if aiden is None:
+        return
+    md = aiden.metadata
+    decision = md.get("decisionKind") or "(unknown)"
+    provider = md.get("provider") or "-"
+    model = md.get("model") or "-"
+    tokens = md.get("totalTokens")
+    latency = md.get("latencyMs")
+    st.markdown("**Aiden decided**")
+    st.markdown(
+        f"`{decision}` via **{provider}** / `{model}`"
+        + (f" · {latency}ms" if latency else "")
+        + (f" · {tokens} tokens" if tokens else "")
+    )
+
+
 def _render_lifecycle(wo: Any, audit_rows: list[Any]) -> None:
     if not audit_rows:
         st.caption("No audit evidence yet for this work order.")
         return
+
+    _aiden_decision_card(audit_rows)
+    st.markdown(f"**Current state:** {_state_chip(wo.status)}")
 
     st.markdown("**What happened**")
     for row in audit_rows[:6]:
@@ -278,13 +326,29 @@ def main() -> None:
 
     statuses = sorted({wo.status for wo in wos})
     status_filter = st.multiselect("Status", options=statuses, default=statuses)
-    filtered = [wo for wo in wos if wo.status in status_filter]
-    st.caption(f"Showing {len(filtered)} / {len(wos)} work orders")
+
+    # Optional focus from chat → "Open Work Order" or from output_packages.
+    focus_id = st.session_state.pop("work_orders_focus_id", None)
+    if focus_id:
+        st.info(
+            "Showing the work order opened from another surface. The expander "
+            "is open by default; clear status filters above if it doesn't "
+            "appear (it may be in a status you've filtered out)."
+        )
+
+    # Sort newest first so chat-created WOs surface at the top.
+    def _sort_key(wo):
+        return (wo.created_at or "", wo.id)
+
+    wos_sorted = sorted(wos, key=_sort_key, reverse=True)
+    filtered = [wo for wo in wos_sorted if wo.status in status_filter]
+    st.caption(f"Showing {len(filtered)} / {len(wos)} work orders (latest first)")
 
     for wo in filtered:
+        is_focused = bool(focus_id and wo.id == focus_id)
         with st.expander(
-            f"**{wo.title}** — `{wo.status}` · priority `{wo.priority}`",
-            expanded=False,
+            f"**{wo.title}** — {_state_chip(wo.status)} · priority `{wo.priority}`",
+            expanded=is_focused,
         ):
             col_meta, col_actions = st.columns([2, 1])
             with col_meta:

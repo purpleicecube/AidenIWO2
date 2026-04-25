@@ -13,29 +13,37 @@ Scope: dev / staging environment; production posture is Beta (see ADR-024).
 
 ## First-boot
 
+Bring up Postgres + reset/seed once, then use the combined runner for
+day-to-day operation. Alpha closeout γ.6 added a single entry point
+(`scripts/iwo3.sh`) so operators don't have to remember two commands.
+
 ```
-# 1. Bring up Postgres
+# 1. Bring up Postgres (one-time per host).
 docker compose -f infra/local/docker-compose.iwo3-postgres.yml up -d
 
-# 2. Apply migrations + seed (idempotent)
+# 2. Apply migrations + seed (idempotent; rerun any time you need a clean DB).
 IWO3_DATABASE_URL=postgresql://iwo3:iwo3@localhost:5434/aiden_iwo3 \
-  npx tsx infra/local/apply-migrations.ts
+  bash infra/local/reset-iwo3.sh
 IWO3_DATABASE_URL=postgresql://iwo3:iwo3@localhost:5434/aiden_iwo3 \
-  npx tsx infra/local/seed-loader.ts
+  bash infra/local/seed-iwo3.sh
 
-# 3. Start the FastAPI runtime
-cd apps/api-fastapi && \
-  IWO3_DATABASE_URL=postgresql://iwo3:iwo3@localhost:5434/aiden_iwo3 \
-  GROQ_API_KEY=... \
-  OPENROUTER_API_KEY=... \
-  TELEGRAM_BOT_TOKEN_KLEAR_AI=... \
-  .venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+# 3. Bring up FastAPI + Streamlit together. Sources .env transparently.
+bash scripts/iwo3.sh up
 
-# 4. Start the Streamlit operator console
-cd apps/console-streamlit && \
-  IWO3_API_BASE_URL=http://localhost:8000 \
-  .venv/bin/streamlit run Home.py --server.port 8501
+# Other commands:
+bash scripts/iwo3.sh status    # report ports + PIDs
+bash scripts/iwo3.sh down      # stop both
+bash scripts/iwo3.sh restart   # boring + repeatable
 ```
+
+Env loading order (run-iwo3-api.sh): `VS_AIDEN_IWO2/.env` first
+(carries the live LLM keys), then `VS_AIDEN_IWO3/.env` (DB URL +
+worker flags). Either file is optional; missing keys produce a
+warning and downstream flows return `credential_missing`.
+
+For Telegram: also export `TELEGRAM_BOT_TOKEN_<TENANT>` and unset
+`IWO3_TELEGRAM_WORKER_DISABLED` before `up` — see § "Telegram setup
+per tenant" below.
 
 ## Telegram setup per tenant
 
