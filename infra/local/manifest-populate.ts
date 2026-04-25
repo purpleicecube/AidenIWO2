@@ -34,6 +34,7 @@ const LOOP_2_VERSION = "iwo3@v0.2.0-loop2";
 const LOOP_3_VERSION = "iwo3@v0.3.0-loop3";
 const LOOP_4_VERSION = "iwo3@v0.4.0-loop4";
 const LOOP_9_VERSION = "iwo3@v0.9.0-loop9";
+const ALPHA_VERSION = "iwo3@v0.10.0-alpha";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -78,6 +79,11 @@ const KNOWN_TABLES: ManifestEntry[] = [
 
   // Loop 9 Phase 9.3 — LLM Foundation
   { name: "llm_configs",                source: "iwo3_native", sourceVersion: LOOP_9_VERSION, ownedBy: "drizzle", notes: "Loop 9 Phase 9.3 — per-tenant per-role LLM provider/model/credential binding (ADR-021)" },
+
+  // MegaLoop Alpha α.5 — channel layer (Telegram-first)
+  { name: "channel_identities",         source: "iwo3_native", sourceVersion: ALPHA_VERSION, ownedBy: "drizzle", notes: "MegaLoop Alpha α.5 — chat_id ↔ user_id ↔ client_id binding via /start auth-code flow" },
+  { name: "channel_auth_codes",         source: "iwo3_native", sourceVersion: ALPHA_VERSION, ownedBy: "drizzle", notes: "MegaLoop Alpha α.5 — one-time codes consumed by channel adapter to bind external principals" },
+  { name: "channel_messages",           source: "iwo3_native", sourceVersion: ALPHA_VERSION, ownedBy: "drizzle", notes: "MegaLoop Alpha α.5 — inbound + outbound channel message log (outbox = pending outbound rows)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

@@ -51,6 +51,9 @@ export const TENANT_SCOPED_TABLES: readonly string[] = [
   "external_execution_results",
   "permission_grants",
   "llm_configs",
+  "channel_identities",
+  "channel_auth_codes",
+  "channel_messages",
 ];
 
 // Paths where tenant-scope queries are exempt:

@@ -34,6 +34,33 @@
       "generated",
       "imported"
     ],
+    "channel_auth_code_status": [
+      "pending",
+      "consumed",
+      "expired",
+      "revoked"
+    ],
+    "channel_identity_status": [
+      "active",
+      "revoked"
+    ],
+    "channel_kind": [
+      "telegram",
+      "slack",
+      "email",
+      "sms"
+    ],
+    "channel_message_direction": [
+      "inbound",
+      "outbound"
+    ],
+    "channel_message_status": [
+      "received",
+      "processed",
+      "failed",
+      "pending",
+      "sent"
+    ],
     "client_adapter_config_status": [
       "active",
       "paused",
@@ -264,6 +291,14 @@
       "artifact.deleted",
       "artifact.uploaded",
       "authz.denied",
+      "channel_auth_code.issued",
+      "channel_identity.bound",
+      "channel_identity.revoked",
+      "channel_message.failed",
+      "channel_message.processed",
+      "channel_message.received",
+      "channel_message.send_queued",
+      "channel_message.sent",
       "data_source_binding.created",
       "data_source_binding.revoked",
       "execution_cycle.started",
@@ -423,6 +458,16 @@
       ],
       "ALPHA_PHASE_A2_AUDIT_EVENTS": [
         "llm.budget_exceeded"
+      ],
+      "ALPHA_PHASE_A5_AUDIT_EVENTS": [
+        "channel_auth_code.issued",
+        "channel_identity.bound",
+        "channel_identity.revoked",
+        "channel_message.received",
+        "channel_message.processed",
+        "channel_message.failed",
+        "channel_message.send_queued",
+        "channel_message.sent"
       ]
     }
   },

@@ -167,6 +167,18 @@ export const AUDIT_EVENTS = {
   // Companion events `llm.invoked` + `llm.failed` already exist from
   // Loop 9 Phase 9.3.
   LLM_BUDGET_EXCEEDED: "llm.budget_exceeded",
+
+  // MegaLoop Alpha α.5 — channel layer. Eight events covering inbound
+  // + outbound message lifecycle + identity binding via /start auth
+  // code (Stage A §B5/§B6/§B7).
+  CHANNEL_AUTH_CODE_ISSUED: "channel_auth_code.issued",
+  CHANNEL_IDENTITY_BOUND: "channel_identity.bound",
+  CHANNEL_IDENTITY_REVOKED: "channel_identity.revoked",
+  CHANNEL_MESSAGE_RECEIVED: "channel_message.received",
+  CHANNEL_MESSAGE_PROCESSED: "channel_message.processed",
+  CHANNEL_MESSAGE_FAILED: "channel_message.failed",
+  CHANNEL_MESSAGE_SEND_QUEUED: "channel_message.send_queued",
+  CHANNEL_MESSAGE_SENT: "channel_message.sent",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -285,4 +297,15 @@ export const LOOP_9_PHASE_4_AUDIT_EVENTS: readonly AuditEvent[] = [
 
 export const ALPHA_PHASE_A2_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.LLM_BUDGET_EXCEEDED,
+];
+
+export const ALPHA_PHASE_A5_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.CHANNEL_AUTH_CODE_ISSUED,
+  AUDIT_EVENTS.CHANNEL_IDENTITY_BOUND,
+  AUDIT_EVENTS.CHANNEL_IDENTITY_REVOKED,
+  AUDIT_EVENTS.CHANNEL_MESSAGE_RECEIVED,
+  AUDIT_EVENTS.CHANNEL_MESSAGE_PROCESSED,
+  AUDIT_EVENTS.CHANNEL_MESSAGE_FAILED,
+  AUDIT_EVENTS.CHANNEL_MESSAGE_SEND_QUEUED,
+  AUDIT_EVENTS.CHANNEL_MESSAGE_SENT,
 ];

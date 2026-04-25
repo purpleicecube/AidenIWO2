@@ -146,8 +146,8 @@ describe("Loop 4 Phase 4 — require-tenant-scope-on-client-tables rule", () => 
     ).toBe(false);
   });
 
-  it("covers all 26 tenant-scoped tables (+1 from Loop 9 Phase 9.3)", () => {
-    expect(TENANT_SCOPED_TABLES).toHaveLength(26);
+  it("covers all 29 tenant-scoped tables (+3 from MegaLoop Alpha α.5 channel layer)", () => {
+    expect(TENANT_SCOPED_TABLES).toHaveLength(29);
     // Spot-check two from each category
     expect(TENANT_SCOPED_TABLES).toContain("work_orders"); // direct
     expect(TENANT_SCOPED_TABLES).toContain("workflow_templates"); // nested

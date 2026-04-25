@@ -106,6 +106,26 @@ WorkflowStatus = Literal['active', 'paused', 'archived']
 WorkflowStepRunStatus = Literal['pending', 'running', 'completed', 'failed', 'skipped']
 WorkflowTemplateStatus = Literal['draft', 'published', 'deprecated']
 
+# MegaLoop Alpha α.5 — channel layer enums
+CHANNEL_KIND: Final[tuple[str, ...]] = ('telegram', 'slack', 'email', 'sms')
+CHANNEL_IDENTITY_STATUS: Final[tuple[str, ...]] = ('active', 'revoked')
+CHANNEL_AUTH_CODE_STATUS: Final[tuple[str, ...]] = (
+    'pending', 'consumed', 'expired', 'revoked'
+)
+CHANNEL_MESSAGE_DIRECTION: Final[tuple[str, ...]] = ('inbound', 'outbound')
+CHANNEL_MESSAGE_STATUS: Final[tuple[str, ...]] = (
+    'received', 'processed', 'failed', 'pending', 'sent'
+)
+ChannelKind = Literal['telegram', 'slack', 'email', 'sms']
+ChannelIdentityStatus = Literal['active', 'revoked']
+ChannelAuthCodeStatus = Literal[
+    'pending', 'consumed', 'expired', 'revoked'
+]
+ChannelMessageDirection = Literal['inbound', 'outbound']
+ChannelMessageStatus = Literal[
+    'received', 'processed', 'failed', 'pending', 'sent'
+]
+
 # --- Registry — enables run-time introspection and the parity CLI ---
 
 ALL_ENUMS: Final[dict[str, tuple[str, ...]]] = {
@@ -114,6 +134,11 @@ ALL_ENUMS: Final[dict[str, tuple[str, ...]]] = {
     'adapter_credential_status': ADAPTER_CREDENTIAL_STATUS,
     'adapter_policy_mode': ADAPTER_POLICY_MODE,
     'artifact_content_class': ARTIFACT_CONTENT_CLASS,
+    'channel_auth_code_status': CHANNEL_AUTH_CODE_STATUS,
+    'channel_identity_status': CHANNEL_IDENTITY_STATUS,
+    'channel_kind': CHANNEL_KIND,
+    'channel_message_direction': CHANNEL_MESSAGE_DIRECTION,
+    'channel_message_status': CHANNEL_MESSAGE_STATUS,
     'artifact_source_type': ARTIFACT_SOURCE_TYPE,
     'client_adapter_config_status': CLIENT_ADAPTER_CONFIG_STATUS,
     'client_status': CLIENT_STATUS,

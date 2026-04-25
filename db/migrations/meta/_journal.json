@@ -57,6 +57,13 @@
       "when": 1777086722384,
       "tag": "0009_loop9_phase4_async_polling",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777120355323,
+      "tag": "0010_alpha_phase_5_channel_layer",
+      "breakpoints": true
     }
   ]
 }

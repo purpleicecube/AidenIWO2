@@ -36,3 +36,11 @@ export * from "./external_execution_results";
 export * from "./permissions";
 export * from "./role_permissions";
 export * from "./permission_grants";
+
+// Loop 9 Phase 9.3 — LLM Foundation
+export * from "./llm_configs";
+
+// MegaLoop Alpha α.5 — Channel layer (Telegram-first)
+export * from "./channel_identities";
+export * from "./channel_auth_codes";
+export * from "./channel_messages";

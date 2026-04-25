@@ -68,9 +68,9 @@ describeIfPython("Loop 5 Phase 5.2 — TS / Python enum parity", () => {
     }
   });
 
-  it("Python enum count matches expected Loop 1-4 baseline (39)", () => {
+  it("Python enum count matches expected baseline through Alpha α.5 (44)", () => {
     const result = runPythonEnumDump();
     if (!result.ok) throw new Error(result.error);
-    expect(Object.keys(result.payload.enums).length).toBe(39);
+    expect(Object.keys(result.payload.enums).length).toBe(44);
   });
 });
