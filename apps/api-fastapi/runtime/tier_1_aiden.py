@@ -104,6 +104,45 @@ Rules:
 """
 
 
+# Hard-locked output contract appended to whatever persona prompt the
+# operator stores in `llm_configs.system_prompt`. Mirrors the
+# tier_2_subagents.TIER_2_OUTPUT_SCHEMA pattern: the persona is
+# operator-tunable, the JSON schema is not. Also satisfies Groq's
+# requirement that the prompt mention "json" whenever response_format
+# is set to json_object.
+AIDEN_OUTPUT_SCHEMA = """
+
+# Output contract (do not deviate)
+
+You MUST respond with a single JSON object matching the IWO3 Aiden
+Tier-1 decision schema. No prose, no markdown fences, just JSON.
+
+{
+  "decision_kind": "work_order_brief" | "workflow_brief" | "clarification",
+  "title": "short human-readable title",
+  "summary": "one-paragraph summary",
+  "work_order_brief": {
+     "assigned_role": "mark_tier_2" | "tom_tier_2" | "hank_tier_2" | "paul_tier_2",
+     "content_blocks": {...},
+     "priority": "low" | "medium" | "high" | "critical"
+  },
+  "workflow_brief":   { "workflow_template_key": "...", "step_inputs": {...} },
+  "clarification":    { "question": "...", "missing_fields": [...] }
+}
+
+Routing hints for `assigned_role`:
+  - mark_tier_2  → marketing / content / copy / brief / written assets
+  - tom_tier_2   → presentations / decks / slides / pptx
+  - hank_tier_2  → web / landing pages / HTML / mini-sites
+  - paul_tier_2  → deployment / publishing / handoff to external systems
+
+NEVER invent a new role. If the request doesn't fit one of those four,
+return decision_kind="clarification" instead.
+
+Only include the brief subobject that matches `decision_kind`.
+"""
+
+
 @dataclass(frozen=True)
 class AidenWorkOrderBrief:
     assigned_role: str
@@ -401,7 +440,10 @@ async def invoke_aiden_tier_1(
             model=cfg.model,
             api_key=api_key,
             base_url=cfg.base_url,
-            system_prompt=cfg.system_prompt or AIDEN_SYSTEM_PROMPT,
+            system_prompt=(
+                (cfg.system_prompt or AIDEN_SYSTEM_PROMPT)
+                + AIDEN_OUTPUT_SCHEMA
+            ),
             user_message=intake_text,
             options=options,
             transport=transport,

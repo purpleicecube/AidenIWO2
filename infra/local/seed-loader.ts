@@ -784,10 +784,42 @@ async function upsertRolePermissions(
 // Upsert helpers — Loop 9 Phase 9.3
 // ──────────────────────────────────────────────────────────────────────────
 
+/**
+ * Pre-Beta β.1 — humanise an agent_role into a display_name when the
+ * seed JSON doesn't carry one. Matches the backfill in migration
+ * 0012_pre_beta_phase_1_llm_configs_metadata.sql so DBs reset from
+ * scratch land in the same shape as DBs migrated forward.
+ */
+function defaultDisplayName(agentRole: string): string {
+  const lookup: Record<string, string> = {
+    aiden_tier_1: "Aiden (Tier 1)",
+    pm_tier_15: "PM (Tier 1.5)",
+    mark_tier_2: "Mark (Tier 2 — content)",
+    tom_tier_2: "Tom (Tier 2 — decks)",
+    hank_tier_2: "Hank (Tier 2 — web)",
+    paul_tier_2: "Paul (Tier 2 — deployment)",
+  };
+  if (lookup[agentRole]) return lookup[agentRole];
+  return agentRole
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+
 interface SeedLlmConfig {
   id: string;
   clientId: string;
   agentRole: string;
+  /**
+   * Pre-Beta β.1 — sub-agent metadata model v1 fields.
+   * `displayName` is NOT NULL on the table; the seed loader derives a
+   * humanised default from `agentRole` if the JSON omits it (mirrors
+   * the migration 0012 backfill so old seed files keep loading).
+   */
+  displayName?: string;
+  description?: string | null;
   provider: string;
   model: string;
   baseUrl: string | null;
@@ -805,12 +837,15 @@ async function upsertLlmConfigs(
   for (const r of rows) {
     await c.query(
       `INSERT INTO llm_configs
-         (id, client_id, agent_role, provider, model, base_url,
-          credential_ref, system_prompt, options, enabled, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
+         (id, client_id, agent_role, display_name, description,
+          provider, model, base_url, credential_ref, system_prompt,
+          options, enabled, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13)
        ON CONFLICT (id) DO UPDATE SET
          client_id = EXCLUDED.client_id,
          agent_role = EXCLUDED.agent_role,
+         display_name = EXCLUDED.display_name,
+         description = EXCLUDED.description,
          provider = EXCLUDED.provider,
          model = EXCLUDED.model,
          base_url = EXCLUDED.base_url,
@@ -824,6 +859,8 @@ async function upsertLlmConfigs(
         r.id,
         r.clientId,
         r.agentRole,
+        r.displayName ?? defaultDisplayName(r.agentRole),
+        r.description ?? null,
         r.provider,
         r.model,
         r.baseUrl,

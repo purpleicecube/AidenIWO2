@@ -72,3 +72,64 @@ def test_aiden_chat_returns_credential_missing_when_groq_key_unset() -> None:
     finally:
         if saved is not None:
             os.environ["GROQ_API_KEY"] = saved
+
+
+@iwo3_db
+def test_aiden_chat_shortcuts_capability_prompt_without_llm() -> None:
+    saved = os.environ.pop("GROQ_API_KEY", None)
+    try:
+        with TestClient(app) as client:
+            r = client.post(
+                "/aiden/chat",
+                json={"message": "what do you do"},
+                headers=_hdr(KLEAR_OPERATOR),
+            )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["ok"] is True
+        assert body["decision_kind"] == "assistant_reply"
+        assert "assistant_reply" in body
+        assert "what I can do".lower() in body["assistant_reply"]["headline"].lower()
+    finally:
+        if saved is not None:
+            os.environ["GROQ_API_KEY"] = saved
+
+
+@iwo3_db
+def test_aiden_chat_shortcuts_web_access_prompt_without_llm() -> None:
+    saved = os.environ.pop("GROQ_API_KEY", None)
+    try:
+        with TestClient(app) as client:
+            r = client.post(
+                "/aiden/chat",
+                json={"message": "can you search the web"},
+                headers=_hdr(KLEAR_OPERATOR),
+            )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["ok"] is True
+        assert body["decision_kind"] == "assistant_reply"
+        assert "web access" in body["assistant_reply"]["headline"].lower()
+    finally:
+        if saved is not None:
+            os.environ["GROQ_API_KEY"] = saved
+
+
+@iwo3_db
+def test_aiden_chat_shortcuts_workspace_status_prompt_without_llm() -> None:
+    saved = os.environ.pop("GROQ_API_KEY", None)
+    try:
+        with TestClient(app) as client:
+            r = client.post(
+                "/aiden/chat",
+                json={"message": "what is the status of this workspace"},
+                headers=_hdr(KLEAR_OPERATOR),
+            )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["ok"] is True
+        assert body["decision_kind"] == "assistant_reply"
+        assert "status" in body["assistant_reply"]["headline"].lower()
+    finally:
+        if saved is not None:
+            os.environ["GROQ_API_KEY"] = saved

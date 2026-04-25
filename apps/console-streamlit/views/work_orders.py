@@ -8,6 +8,10 @@ requirePermission is still the authoritative gate.
 
 from __future__ import annotations
 
+import json
+from collections import defaultdict
+from typing import Any
+
 import streamlit as st
 
 from api_client import APIError
@@ -37,6 +41,153 @@ PERM_FOR_TRANSITION: dict[str, str] = {
     "cancelled": "work_order:cancel",
     "deferred": "work_order:update",
 }
+
+
+def _ts(ts: str | None) -> str:
+    if not ts:
+        return "-"
+    return ts.replace("T", " ").replace("+00:00", " UTC")
+
+
+def _metadata_work_order_id(metadata: dict[str, Any]) -> str | None:
+    return (
+        metadata.get("workOrderId")
+        or metadata.get("work_order_id")
+        or metadata.get("work_orderId")
+    )
+
+
+def _audit_summary(action: str, metadata: dict[str, Any]) -> str:
+    if action == "llm.invoked":
+        role = metadata.get("agentRole") or "unknown-role"
+        decision = metadata.get("decisionKind") or "decision"
+        provider = metadata.get("provider") or "unknown-provider"
+        model = metadata.get("model") or "unknown-model"
+        total = metadata.get("totalTokens")
+        token_note = f" ({total} tokens)" if total else ""
+        return (
+            f"{role} via {provider}/{model} produced `{decision}`{token_note}."
+        )
+    if action == "llm.failed":
+        role = metadata.get("agentRole") or "unknown-role"
+        kind = metadata.get("kind") or "failure"
+        detail = metadata.get("detail") or "No detail recorded."
+        return f"{role} failed with `{kind}`: {detail}"
+    if action == "workflow_execution.started":
+        template = metadata.get("templateKey") or "unknown-template"
+        steps = metadata.get("stepCount")
+        step_note = f" with {steps} planned steps" if steps else ""
+        return f"PM started workflow `{template}`{step_note}."
+    if action == "output_package.created":
+        kind = metadata.get("outputKind") or "output"
+        title = metadata.get("title") or "Untitled package"
+        return f"Created output package `{title}` of kind `{kind}`."
+    if action.startswith("adapter_dispatch."):
+        handoff_id = metadata.get("handoffId") or "-"
+        external = metadata.get("externalReference") or "-"
+        stage = action.removeprefix("adapter_dispatch.")
+        return (
+            f"Adapter handoff `{handoff_id}` is `{stage}`"
+            f" (external ref: `{external}`)."
+        )
+    if action == "work_order.transitioned":
+        return (
+            f"Work order moved to `{metadata.get('to') or '-'}`"
+            f" from `{metadata.get('from') or '-'}`."
+        )
+    reason = metadata.get("reason")
+    if reason:
+        return reason
+    return "Raw audit metadata available below."
+
+
+def _group_audit_rows(rows: list[Any]) -> dict[str, list[Any]]:
+    grouped: dict[str, list[Any]] = defaultdict(list)
+    for row in rows:
+        wo_id = row.target_id if row.target_type == "work_order" else None
+        if not wo_id:
+            wo_id = _metadata_work_order_id(row.metadata)
+        if wo_id:
+            grouped[wo_id].append(row)
+    return grouped
+
+
+def _render_lifecycle(wo: Any, audit_rows: list[Any]) -> None:
+    if not audit_rows:
+        st.caption("No audit evidence yet for this work order.")
+        return
+
+    st.markdown("**What happened**")
+    for row in audit_rows[:6]:
+        st.markdown(
+            f"- `{_ts(row.created_at)}` · **{row.action}** — "
+            f"{_audit_summary(row.action, row.metadata)}"
+        )
+
+    latest_invocation = next(
+        (row for row in audit_rows if row.action == "llm.invoked"), None
+    )
+    if latest_invocation is not None:
+        md = latest_invocation.metadata
+        cols = st.columns(4)
+        cols[0].metric("Latest role", md.get("agentRole") or "-")
+        cols[1].metric("Decision/output", md.get("decisionKind") or "-")
+        cols[2].metric("Provider", md.get("provider") or "-")
+        cols[3].metric("Tokens", str(md.get("totalTokens") or "-"))
+
+
+def _render_outputs(packages: list[Any], handoffs_by_package: dict[str, list[Any]]) -> None:
+    if not packages:
+        st.caption("No output packages have been created for this work order yet.")
+        return
+
+    for pkg in packages:
+        st.markdown(
+            f"**{pkg.title}** · `{pkg.output_kind}` · `{pkg.status}`"
+        )
+        st.caption(f"Package `{pkg.id}` · created {_ts(pkg.created_at)}")
+        handoffs = handoffs_by_package.get(pkg.id, [])
+        if not handoffs:
+            st.caption("No handoffs linked to this package yet.")
+            continue
+        for handoff in handoffs:
+            st.markdown(
+                f"- Handoff `{handoff.id}` · status `{handoff.status}` · "
+                f"candidate `{handoff.candidate_status}`"
+            )
+            extra = []
+            if handoff.external_destination:
+                extra.append(f"destination `{handoff.external_destination}`")
+            if handoff.external_reference:
+                extra.append(f"external ref `{handoff.external_reference}`")
+            if handoff.created_at:
+                extra.append(f"created {_ts(handoff.created_at)}")
+            if extra:
+                st.caption(" · ".join(extra))
+
+
+def _render_audit_panel(wo_id: str, audit_rows: list[Any]) -> None:
+    if st.button("Open full Audit Log page", key=f"audit-page-{wo_id}"):
+        st.session_state["audit_log_work_order_filter"] = wo_id
+        st.switch_page("views/audit_log.py")
+
+    if not audit_rows:
+        st.caption("No audit rows recorded yet.")
+        return
+
+    for row in audit_rows:
+        with st.expander(
+            f"{_ts(row.created_at)} · {row.action}",
+            expanded=False,
+        ):
+            st.markdown(_audit_summary(row.action, row.metadata))
+            st.markdown(
+                f"**Target:** `{row.target_type or '-'} / {row.target_id or '-'}`"
+            )
+            st.code(
+                json.dumps(row.metadata, indent=2, default=str),
+                language="json",
+            )
 
 
 def _transition_button(api, wo_id: str, from_status: str, to_status: str) -> None:
@@ -87,6 +238,38 @@ def main() -> None:
         st.error(f"❌ {err.status_code} — {err.detail}")
         return
 
+    try:
+        all_packages = api.list_output_packages()
+    except APIError:
+        all_packages = []
+
+    try:
+        all_handoffs = api.list_output_handoffs()
+    except APIError:
+        all_handoffs = []
+
+    audit_allowed = False
+    audit_rows: list[Any] = []
+    try:
+        if api.check_permission("audit_log:read").allowed:
+            audit_allowed = True
+            audit_rows = api.list_audit_log(limit=300)
+    except APIError:
+        audit_allowed = False
+        audit_rows = []
+
+    packages_by_wo: dict[str, list[Any]] = defaultdict(list)
+    for pkg in all_packages:
+        if pkg.work_order_id:
+            packages_by_wo[pkg.work_order_id].append(pkg)
+
+    handoffs_by_package: dict[str, list[Any]] = defaultdict(list)
+    for handoff in all_handoffs:
+        if handoff.output_package_id:
+            handoffs_by_package[handoff.output_package_id].append(handoff)
+
+    audit_by_wo = _group_audit_rows(audit_rows)
+
     if not wos:
         st.info("No work orders in this tenant yet.")
         if st.button("＋ Create one"):
@@ -107,12 +290,13 @@ def main() -> None:
             with col_meta:
                 st.markdown(f"**ID:** `{wo.id}`")
                 st.markdown(f"**Type:** `{wo.type}`")
+                st.markdown(f"**Submitted by:** `{wo.submitted_by_user_id or '-'}`")
                 if wo.description:
                     st.markdown(f"**Description:** {wo.description}")
                 if wo.correlation_id:
                     st.markdown(f"**Correlation:** `{wo.correlation_id}`")
-                st.markdown(f"**Created:** {wo.created_at}")
-                st.markdown(f"**Updated:** {wo.updated_at}")
+                st.markdown(f"**Created:** {_ts(wo.created_at)}")
+                st.markdown(f"**Updated:** {_ts(wo.updated_at)}")
             with col_actions:
                 st.markdown("**Dispatch**")
                 if st.button(
@@ -167,6 +351,22 @@ def main() -> None:
                     st.caption(f"_Terminal — no transitions out of `{wo.status}`._")
                 for target in legal:
                     _transition_button(api, wo.id, wo.status, target)
+
+            related_audit = audit_by_wo.get(wo.id, [])
+            related_packages = packages_by_wo.get(wo.id, [])
+            tabs = st.tabs(["Lifecycle", "Outputs", "Audit"])
+            with tabs[0]:
+                _render_lifecycle(wo, related_audit)
+            with tabs[1]:
+                _render_outputs(related_packages, handoffs_by_package)
+            with tabs[2]:
+                if audit_allowed:
+                    _render_audit_panel(wo.id, related_audit)
+                else:
+                    st.caption(
+                        "Audit details are available on the Audit Log page for "
+                        "roles that hold `audit_log:read`."
+                    )
 
 
 main()

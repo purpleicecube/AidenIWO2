@@ -33,7 +33,12 @@ def main() -> None:
         )
         return
 
-    wo_filter = st.text_input("Filter by work_order_id (optional)")
+    default_filter = st.session_state.pop("audit_log_work_order_filter", "")
+    wo_filter = st.text_input(
+        "Filter by work_order_id (optional)", value=default_filter
+    )
+    if default_filter:
+        st.caption(f"Prefiltered from Work Orders for `{default_filter}`.")
     limit = st.slider("Limit", 10, 500, 50, 10)
 
     try:

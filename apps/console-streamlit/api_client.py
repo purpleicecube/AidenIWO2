@@ -77,9 +77,11 @@ class OutputPackageRow(BaseModel):
     model_config = ConfigDict(extra="allow")
     id: str
     client_id: str
+    work_order_id: Optional[str] = None
     output_kind: str
     title: str
     status: str
+    created_at: Optional[str] = None
 
 
 class OutputHandoffRow(BaseModel):
@@ -87,9 +89,12 @@ class OutputHandoffRow(BaseModel):
     id: str
     client_id: str
     output_package_id: Optional[str] = None
+    external_destination: Optional[str] = None
+    external_reference: Optional[str] = None
     status: str
     candidate_status: str
     candidate_group_id: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 class AuditRow(BaseModel):
