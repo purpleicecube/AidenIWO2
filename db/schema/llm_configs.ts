@@ -1,0 +1,81 @@
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  jsonb,
+  boolean,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
+import { clients } from "./clients";
+
+/**
+ * Loop 9 Phase 9.3 — per-tenant LLM configuration keyed on a string
+ * `role`. The IWO2 lineage's "global LlmSettings + per-sub-agent
+ * override" pattern reshapes to a multi-tenant table where each row
+ * is one (client, role) binding. Resolution at call time:
+ *
+ *   prompt_profile.llm_*  (when set, highest priority)
+ *   ↓ falls through to
+ *   llm_configs (client_id, agent_role)              ← this table
+ *   ↓ falls through to
+ *   llm_configs (client_id, "aiden_tier_1")          ← tenant default
+ *   ↓ falls through to
+ *   429 / no_llm_configured                          ← fail-closed
+ *
+ * Raw API keys are NEVER stored here. `credential_ref` follows the
+ * same `credential_ref:env:NAME` discipline as `adapter_credentials`
+ * (IWO3_LOOP_8_3_CODEX_DECISIONS §Q2).
+ *
+ * Provider values mirror IWO2's lineup (`server/llm-client.ts`):
+ *   "groq", "openrouter", "openai", "anthropic"
+ * Phase 9.3 ships with `groq` + `openrouter` enabled. Anthropic stays
+ * as a known value for forward-compat without a Phase 9.3 client.
+ */
+export const llmConfigs = pgTable(
+  "llm_configs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /**
+     * Free-form role key. Convention:
+     *   "aiden_tier_1"         tenant Aiden default (mandatory; this row
+     *                          is the fallback every other resolution
+     *                          eventually hits)
+     *   "pm_tier_15"           Tier 1.5 PM coordinator
+     *   "mark_tier_2"          Tier 2 sub-agent named Mark (content)
+     *   "tom_tier_2"           Tier 2 sub-agent (Tom, decks)
+     *   "hank_tier_2"          Tier 2 sub-agent (Hank, web builds)
+     *   "paul_tier_2"          Tier 2 sub-agent (Paul, deployment)
+     */
+    agentRole: varchar("agent_role", { length: 64 }).notNull(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    model: varchar("model", { length: 128 }).notNull(),
+    /** Override default provider base URL (e.g. self-hosted vLLM). */
+    baseUrl: varchar("base_url", { length: 256 }),
+    credentialRef: varchar("credential_ref", { length: 256 }).notNull(),
+    systemPrompt: text("system_prompt"),
+    /** Provider-specific knobs: temperature, max_tokens, top_p, ... */
+    options: jsonb("options"),
+    enabled: boolean("enabled").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniqClientRole: unique("llm_configs_client_role_uniq").on(
+      t.clientId,
+      t.agentRole
+    ),
+  })
+);
+
+export type LlmConfig = typeof llmConfigs.$inferSelect;
+export type NewLlmConfig = typeof llmConfigs.$inferInsert;

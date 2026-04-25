@@ -1,0 +1,93 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000091000001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "aiden_tier_1",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "baseUrl": null,
+    "credentialRef": "credential_ref:env:GROQ_API_KEY",
+    "systemPrompt": "You are Aiden, the Tier 1 orchestration agent for IWO3. You interpret intake, classify it as work order or workflow, enforce policy (RBAC, candidate-review, approval gates), and own the final call on external sends. You do not render content yourself; you decide who should.",
+    "options": { "temperature": 0.3 },
+    "enabled": true,
+    "notes": "Tenant default for Klear.ai (matches IWO2 lineage)."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000091000002",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "pm_tier_15",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "baseUrl": null,
+    "credentialRef": "credential_ref:env:GROQ_API_KEY",
+    "systemPrompt": "You are PM Coordinator (Tier 1.5). You sequence workflow_executions, manage step coordination, and bridge Aiden's policy decisions to Tier 2 sub-agents.",
+    "options": { "temperature": 0.2 },
+    "enabled": true,
+    "notes": "Klear PM Alpha equivalent."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000091000003",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "mark_tier_2",
+    "provider": "openrouter",
+    "model": "qwen/qwen3-coder",
+    "baseUrl": null,
+    "credentialRef": "credential_ref:env:OPENROUTER_API_KEY",
+    "systemPrompt": "You are Mark, Tier 2 marketing/content sub-agent for IWO3. You produce content briefs, marketing copy, and messaging artifacts. Use markdown.",
+    "options": { "temperature": 0.4 },
+    "enabled": true,
+    "notes": "Klear Mark — content production."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000091000004",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "tom_tier_2",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "baseUrl": null,
+    "credentialRef": "credential_ref:env:GROQ_API_KEY",
+    "systemPrompt": "You are Tom, Tier 2 deck-builder sub-agent for IWO3. You produce structured presentation content blocks for Gamma rendering.",
+    "options": { "temperature": 0.3 },
+    "enabled": true,
+    "notes": "Klear Tom — deck production."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000091000005",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "hank_tier_2",
+    "provider": "openrouter",
+    "model": "qwen/qwen3-coder",
+    "baseUrl": null,
+    "credentialRef": "credential_ref:env:OPENROUTER_API_KEY",
+    "systemPrompt": "You are Hank, Tier 2 web-builder sub-agent for IWO3. You produce HTML, landing pages, and mini-sites. Use semantic markup.",
+    "options": { "temperature": 0.3 },
+    "enabled": true,
+    "notes": "Klear Hank — web builds."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000091000006",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "paul_tier_2",
+    "provider": "groq",
+    "model": "moonshotai/kimi-k2-instruct",
+    "baseUrl": null,
+    "credentialRef": "credential_ref:env:GROQ_API_KEY",
+    "systemPrompt": "You are Paul, Tier 2 deployment sub-agent for IWO3. You execute the final deployment step in workflows: publishing, packaging, and external handoffs.",
+    "options": { "temperature": 0.2 },
+    "enabled": true,
+    "notes": "Klear Paul — deployment."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000092000001",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "agentRole": "aiden_tier_1",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "baseUrl": null,
+    "credentialRef": "credential_ref:env:GROQ_API_KEY",
+    "systemPrompt": "You are Aiden, the Tier 1 orchestration agent for IWO3 / FreedomForge.AI deployment.",
+    "options": { "temperature": 0.3 },
+    "enabled": true,
+    "notes": "Tenant default for FreedomForge.AI."
+  }
+]

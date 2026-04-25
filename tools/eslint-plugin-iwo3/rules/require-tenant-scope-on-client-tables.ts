@@ -50,6 +50,7 @@ export const TENANT_SCOPED_TABLES: readonly string[] = [
   "output_handoffs",
   "external_execution_results",
   "permission_grants",
+  "llm_configs",
 ];
 
 // Paths where tenant-scope queries are exempt:

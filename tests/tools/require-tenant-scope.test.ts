@@ -146,14 +146,15 @@ describe("Loop 4 Phase 4 — require-tenant-scope-on-client-tables rule", () => 
     ).toBe(false);
   });
 
-  it("covers all 25 tenant-scoped tables", () => {
-    expect(TENANT_SCOPED_TABLES).toHaveLength(25);
+  it("covers all 26 tenant-scoped tables (+1 from Loop 9 Phase 9.3)", () => {
+    expect(TENANT_SCOPED_TABLES).toHaveLength(26);
     // Spot-check two from each category
     expect(TENANT_SCOPED_TABLES).toContain("work_orders"); // direct
     expect(TENANT_SCOPED_TABLES).toContain("workflow_templates"); // nested
     expect(TENANT_SCOPED_TABLES).toContain("clients"); // special
     expect(TENANT_SCOPED_TABLES).toContain("users"); // special
     expect(TENANT_SCOPED_TABLES).toContain("permission_grants"); // Loop 4
+    expect(TENANT_SCOPED_TABLES).toContain("llm_configs"); // Loop 9 Phase 9.3
     // Tenant-agnostic tables MUST NOT be in the list
     expect(TENANT_SCOPED_TABLES).not.toContain("permissions");
     expect(TENANT_SCOPED_TABLES).not.toContain("role_permissions");

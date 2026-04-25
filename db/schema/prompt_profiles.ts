@@ -8,6 +8,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { clients } from "./clients";
 
+// Loop 9 Phase 9.3 — LLM bindings live in the separate `llm_configs`
+// table (see `db/schema/llm_configs.ts`) keyed by (client, agent_role).
+// prompt_profiles stay focused on prompt content + scope; the runtime
+// joins llm_configs at call time.
+
 export const promptProfileScopeEnum = pgEnum("prompt_profile_scope", [
   "client",
   "workflow",

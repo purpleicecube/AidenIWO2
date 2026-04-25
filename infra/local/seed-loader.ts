@@ -781,6 +781,63 @@ async function upsertRolePermissions(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Upsert helpers — Loop 9 Phase 9.3
+// ──────────────────────────────────────────────────────────────────────────
+
+interface SeedLlmConfig {
+  id: string;
+  clientId: string;
+  agentRole: string;
+  provider: string;
+  model: string;
+  baseUrl: string | null;
+  credentialRef: string;
+  systemPrompt: string | null;
+  options: unknown | null;
+  enabled: boolean;
+  notes: string | null;
+}
+
+async function upsertLlmConfigs(
+  c: PoolClient,
+  rows: SeedLlmConfig[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO llm_configs
+         (id, client_id, agent_role, provider, model, base_url,
+          credential_ref, system_prompt, options, enabled, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
+       ON CONFLICT (id) DO UPDATE SET
+         client_id = EXCLUDED.client_id,
+         agent_role = EXCLUDED.agent_role,
+         provider = EXCLUDED.provider,
+         model = EXCLUDED.model,
+         base_url = EXCLUDED.base_url,
+         credential_ref = EXCLUDED.credential_ref,
+         system_prompt = EXCLUDED.system_prompt,
+         options = EXCLUDED.options,
+         enabled = EXCLUDED.enabled,
+         notes = EXCLUDED.notes,
+         updated_at = now()`,
+      [
+        r.id,
+        r.clientId,
+        r.agentRole,
+        r.provider,
+        r.model,
+        r.baseUrl,
+        r.credentialRef,
+        r.systemPrompt,
+        JSON.stringify(r.options ?? null),
+        r.enabled,
+        r.notes,
+      ]
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Entry
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -845,6 +902,11 @@ async function main(): Promise<void> {
     "db/seeds/role_permissions.json"
   );
 
+  // Loop 9 Phase 9.3
+  const llmConfigsRows = loadJson<SeedLlmConfig[]>(
+    "db/seeds/llm_configs.json"
+  );
+
   const pool = new Pool({ connectionString: url });
   const c = await pool.connect();
   try {
@@ -869,6 +931,7 @@ async function main(): Promise<void> {
     await upsertAdapterActionPolicies(c, adapterActionPoliciesRows);
     await upsertPermissions(c, permissionsRows);
     await upsertRolePermissions(c, rolePermissionsRows);
+    await upsertLlmConfigs(c, llmConfigsRows);
     await c.query("COMMIT");
 
     const receipt = {
@@ -893,6 +956,7 @@ async function main(): Promise<void> {
         adapter_action_policies: adapterActionPoliciesRows.length,
         permissions: permissionsRows.length,
         role_permissions: rolePermissionsRows.length,
+        llm_configs: llmConfigsRows.length,
       },
       sources: {
         clients: "db/seeds/clients.json",
@@ -914,6 +978,7 @@ async function main(): Promise<void> {
         adapter_action_policies: "db/seeds/adapter_action_policies.json",
         permissions: "db/seeds/permissions.json",
         role_permissions: "db/seeds/role_permissions.json",
+        llm_configs: "db/seeds/llm_configs.json",
       },
     };
     writeFileSync(

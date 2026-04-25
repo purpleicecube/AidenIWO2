@@ -144,6 +144,14 @@ export const AUDIT_EVENTS = {
   ADAPTER_DISPATCH_CREDENTIAL_INVALID:
     "adapter_dispatch.credential_invalid",
   ADAPTER_DISPATCH_RATE_LIMITED: "adapter_dispatch.rate_limited",
+
+  // Loop 9 Phase 9.3 — LLM Foundation. Three events: invocation
+  // success/failure + provider connection-test result. Per CODEX
+  // guidance, llmProvider + llmModel travel in metadata so audit
+  // forensics can replay which model produced which content.
+  LLM_INVOKED: "llm.invoked",
+  LLM_FAILED: "llm.failed",
+  LLM_PROVIDER_CONNECTION_TESTED: "llm_provider.connection_tested",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -247,4 +255,10 @@ export const LOOP_9_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
 export const LOOP_9_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.ADAPTER_DISPATCH_CREDENTIAL_INVALID,
   AUDIT_EVENTS.ADAPTER_DISPATCH_RATE_LIMITED,
+];
+
+export const LOOP_9_PHASE_3_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.LLM_INVOKED,
+  AUDIT_EVENTS.LLM_FAILED,
+  AUDIT_EVENTS.LLM_PROVIDER_CONNECTION_TESTED,
 ];

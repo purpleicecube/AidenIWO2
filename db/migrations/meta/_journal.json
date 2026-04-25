@@ -43,6 +43,13 @@
       "when": 1777064464654,
       "tag": "0007_loop9_phase1_credential_gating",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777085118257,
+      "tag": "0008_loop9_phase3_llm_configs",
+      "breakpoints": true
     }
   ]
 }

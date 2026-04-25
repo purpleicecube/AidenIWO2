@@ -17,6 +17,7 @@ from routes import (
     audit_log,
     candidate_review,
     health,
+    llm,
     output_packages,
     tenants,
     work_orders,
@@ -56,3 +57,4 @@ app.include_router(output_packages.router)
 app.include_router(candidate_review.router)
 app.include_router(audit_log.router)
 app.include_router(adapter_credentials.router)
+app.include_router(llm.router)

@@ -33,6 +33,7 @@ const LOOP_1_VERSION = "iwo3@v0.1.0-loop1";
 const LOOP_2_VERSION = "iwo3@v0.2.0-loop2";
 const LOOP_3_VERSION = "iwo3@v0.3.0-loop3";
 const LOOP_4_VERSION = "iwo3@v0.4.0-loop4";
+const LOOP_9_VERSION = "iwo3@v0.9.0-loop9";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -74,6 +75,9 @@ const KNOWN_TABLES: ManifestEntry[] = [
   { name: "permissions",                source: "iwo3_native", sourceVersion: LOOP_4_VERSION, ownedBy: "drizzle", notes: "Loop 4 Phase 1 — locked-upfront permission vocabulary (ADR-014)" },
   { name: "role_permissions",           source: "iwo3_native", sourceVersion: LOOP_4_VERSION, ownedBy: "drizzle", notes: "Loop 4 Phase 1 — six-role default permission mapping (ADR-014)" },
   { name: "permission_grants",          source: "iwo3_native", sourceVersion: LOOP_4_VERSION, ownedBy: "drizzle", notes: "Loop 4 Phase 1 — per-user (user,client) allow/deny override (ADR-014)" },
+
+  // Loop 9 Phase 9.3 — LLM Foundation
+  { name: "llm_configs",                source: "iwo3_native", sourceVersion: LOOP_9_VERSION, ownedBy: "drizzle", notes: "Loop 9 Phase 9.3 — per-tenant per-role LLM provider/model/credential binding (ADR-021)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

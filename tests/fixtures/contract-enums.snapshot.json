@@ -265,6 +265,9 @@
       "data_source_binding.created",
       "data_source_binding.revoked",
       "execution_cycle.started",
+      "llm.failed",
+      "llm.invoked",
+      "llm_provider.connection_tested",
       "output_candidate.rejected",
       "output_candidate.selected",
       "output_handoff.completed",
@@ -405,6 +408,11 @@
       "LOOP_9_PHASE_2_AUDIT_EVENTS": [
         "adapter_dispatch.credential_invalid",
         "adapter_dispatch.rate_limited"
+      ],
+      "LOOP_9_PHASE_3_AUDIT_EVENTS": [
+        "llm.invoked",
+        "llm.failed",
+        "llm_provider.connection_tested"
       ]
     }
   },
