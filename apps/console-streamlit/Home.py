@@ -13,15 +13,19 @@ on every rerender.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
 from shell import render_sidebar_shell, render_sidebar_footer
+
+_FAVICON = Path(__file__).parent / "assets" / "favicon.png"
 
 
 def main() -> None:
     st.set_page_config(
         page_title="AIDEN IWO3",
-        page_icon="🧭",
+        page_icon=str(_FAVICON) if _FAVICON.exists() else "🧭",
         layout="wide",
         initial_sidebar_state="expanded",
         menu_items={"Get help": None, "Report a bug": None, "About": None},
