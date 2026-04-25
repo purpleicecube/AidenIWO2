@@ -152,6 +152,15 @@ export const AUDIT_EVENTS = {
   LLM_INVOKED: "llm.invoked",
   LLM_FAILED: "llm.failed",
   LLM_PROVIDER_CONNECTION_TESTED: "llm_provider.connection_tested",
+
+  // Loop 9 Phase 9.4 — async polling. Poll-state events are distinct
+  // from submit-time events: a healthy long render emits many
+  // `polling` rows before a terminal `completed`. Watchdog firing
+  // on stale poll is its own event so forensics can separate
+  // "adapter-side failure" from "our timeout policy tripped".
+  ADAPTER_DISPATCH_POLLING: "adapter_dispatch.polling",
+  ADAPTER_DISPATCH_WATCHDOG_EXPIRED_STALE_POLL:
+    "adapter_dispatch.watchdog_expired_stale_poll",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -261,4 +270,9 @@ export const LOOP_9_PHASE_3_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.LLM_INVOKED,
   AUDIT_EVENTS.LLM_FAILED,
   AUDIT_EVENTS.LLM_PROVIDER_CONNECTION_TESTED,
+];
+
+export const LOOP_9_PHASE_4_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.ADAPTER_DISPATCH_POLLING,
+  AUDIT_EVENTS.ADAPTER_DISPATCH_WATCHDOG_EXPIRED_STALE_POLL,
 ];

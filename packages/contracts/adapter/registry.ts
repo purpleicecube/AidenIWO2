@@ -113,6 +113,15 @@ export type DispatchResult =
   // `rate_limited` = Gamma returned 429.
   | { status: "credential_invalid"; reason: string }
   | { status: "rate_limited"; reason: string }
+  // Loop 9 Phase 9.4 (scope §3.4) — async polling in progress.
+  // Submit succeeded but adapter is still rendering. Handoff stays in
+  // `submitted` with poll-state metadata; callers advance via
+  // `pollHandoffStatus` / `POST /output_handoffs/{id}/poll`.
+  | {
+      status: "pending_poll";
+      handoffId: string;
+      externalReference: string;
+    }
   | {
       status: "failed";
       handoffId: string | null;
@@ -576,6 +585,37 @@ export async function dispatchToAdapter(
   const result = await adapter.fetchResult(submission.externalReference, {
     credentialRef: credentialRow?.credentialRef ?? null,
   });
+
+  // Loop 9 Phase 9.4 (scope §3.4) — async polling fork.
+  // `unknown` means the adapter submitted successfully but the artifact
+  // is still rendering. WO stays in `processing`; handoff stays in
+  // `submitted` with poll-state metadata. Subsequent polls advance it
+  // via `pollHandoffStatus()` + `POST /output_handoffs/{id}/poll`. The
+  // dispatcher emits `adapter_dispatch.polling` here so audit captures
+  // the first poll attempt made at submit-time.
+  if (result.status === "unknown") {
+    await updateHandoffPollState(client, input.clientId, handoffId, {
+      lastPollStatus: "pending",
+      pollCountIncrement: 1,
+    });
+    await emitDispatchAudit(
+      client,
+      input,
+      AUDIT_EVENTS.ADAPTER_DISPATCH_POLLING,
+      {
+        handoffId,
+        externalReference: submission.externalReference,
+        pollCount: 1,
+        stage: "submit_poll",
+      }
+    );
+    return {
+      status: "pending_poll",
+      handoffId,
+      externalReference: submission.externalReference,
+    };
+  }
+
   await recordResult(
     client,
     handoffId,
@@ -620,6 +660,33 @@ export async function dispatchToAdapter(
   };
 }
 
+async function updateHandoffPollState(
+  client: PoolClient,
+  clientId: string,
+  handoffId: string,
+  fields: {
+    lastPollStatus: string;
+    pollCountIncrement?: number;
+  }
+): Promise<void> {
+  // Phase 4.4 lint gate: explicit client_id predicate on the update
+  // alongside the Loop 4 Phase 3 RLS policy on output_handoffs.
+  await client.query(
+    `UPDATE output_handoffs
+        SET last_poll_status = $3,
+            last_poll_at = now(),
+            poll_count = poll_count + $4,
+            updated_at = now()
+      WHERE id = $1 AND client_id = $2`,
+    [
+      handoffId,
+      clientId,
+      fields.lastPollStatus,
+      fields.pollCountIncrement ?? 0,
+    ]
+  );
+}
+
 async function updateHandoffAdapterId(
   client: PoolClient,
   clientId: string,
@@ -634,4 +701,363 @@ async function updateHandoffAdapterId(
      WHERE id = $1 AND client_id = $2`,
     [handoffId, clientId, adapterCatalogId]
   );
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Loop 9 Phase 9.4 — async polling
+// ──────────────────────────────────────────────────────────────────────
+
+const DEFAULT_POLL_TIMEOUT_SECONDS = 600; // 10 minutes; adapter_actions.poll_timeout_seconds overrides
+
+export type PollHandoffResult =
+  | {
+      status: "completed";
+      handoffId: string;
+      externalReference: string;
+      resultPayloadRef: string | null;
+    }
+  | {
+      status: "pending";
+      handoffId: string;
+      pollCount: number;
+      externalReference: string;
+    }
+  | {
+      status: "failed";
+      handoffId: string;
+      errorMessage: string;
+    }
+  | {
+      status: "watchdog_expired";
+      handoffId: string;
+      reason: string;
+      secondsSinceLastPoll: number;
+    }
+  | { status: "handoff_not_found"; handoffId: string }
+  | {
+      status: "handoff_not_pollable";
+      handoffId: string;
+      currentStatus: string;
+    }
+  | {
+      status: "adapter_not_found";
+      handoffId: string;
+      adapterKey: string | null;
+    };
+
+export interface PollHandoffInput {
+  handoffId: string;
+  clientId: string;
+  actorUserId: string | null;
+  /**
+   * When provided, the dispatcher treats this as "now" for watchdog
+   * calculations. Tests use this to simulate elapsed time without
+   * sleeping; production callers leave it undefined to use the DB
+   * clock via `now()`.
+   */
+  nowOverride?: Date;
+  /**
+   * When set, the poll treats `last_poll_at` as older than the
+   * per-action timeout regardless of the wall clock. Tests use this
+   * to simulate a stale poll watchdog without time travel. If both
+   * `nowOverride` and `forceStaleWatchdog` are set, the latter wins.
+   */
+  forceStaleWatchdog?: boolean;
+}
+
+interface HandoffPollRow {
+  id: string;
+  client_id: string;
+  status: string;
+  external_reference: string | null;
+  adapter_catalog_id: string | null;
+  last_poll_at: Date | null;
+  poll_count: number;
+  work_order_id: string | null;
+  output_package_id: string | null;
+  adapter_key: string | null;
+  poll_timeout_seconds: number | null;
+}
+
+async function loadHandoffForPoll(
+  client: PoolClient,
+  handoffId: string,
+  clientId: string
+): Promise<HandoffPollRow | null> {
+  // Phase 4.4 lint gate: explicit client_id predicate + RLS belt.
+  const { rows } = await client.query<HandoffPollRow>(
+    `SELECT h.id,
+            h.client_id,
+            h.status::text                  AS status,
+            h.external_reference,
+            h.adapter_catalog_id,
+            h.last_poll_at,
+            h.poll_count,
+            h.work_order_id,
+            h.output_package_id,
+            cat.adapter_key,
+            (
+              SELECT MAX(poll_timeout_seconds)
+                FROM adapter_actions
+               WHERE adapter_catalog_id = h.adapter_catalog_id
+            )                                AS poll_timeout_seconds
+       FROM output_handoffs h
+  LEFT JOIN adapter_catalog cat ON cat.id = h.adapter_catalog_id
+      WHERE h.id = $1 AND h.client_id = $2`,
+    [handoffId, clientId]
+  );
+  return rows[0] ?? null;
+}
+
+async function loadCredentialRefForHandoff(
+  client: PoolClient,
+  clientId: string,
+  adapterCatalogId: string
+): Promise<string | null> {
+  const { rows } = await client.query<{ credential_ref: string }>(
+    `SELECT credential_ref
+       FROM adapter_credentials
+      WHERE client_id = $1 AND adapter_catalog_id = $2
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [clientId, adapterCatalogId]
+  );
+  return rows[0]?.credential_ref ?? null;
+}
+
+function emitPollAudit(
+  client: PoolClient,
+  clientId: string,
+  actorUserId: string | null,
+  handoffId: string,
+  outputPackageId: string | null,
+  event: (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS],
+  extra: Record<string, unknown>
+): Promise<unknown> {
+  return writeAuditRow(client, {
+    clientId,
+    actorUserId,
+    event,
+    targetType: "adapter_dispatch",
+    targetId: outputPackageId ?? handoffId,
+    metadata: { handoffId, ...extra },
+  });
+}
+
+/**
+ * Loop 9 Phase 9.4 (scope §3.4) — poll one handoff and advance its
+ * lifecycle. Safe to call from the POST /output_handoffs/{id}/poll
+ * route or a scheduled job. Emits phase-locked audit events for
+ * polling / completion / failure / watchdog.
+ *
+ * Semantics (Darrel §Q3):
+ *   - Poll state lives on the handoff; WO stays `processing`.
+ *   - Completed/failed transitions cascade to the parent WO via Loop 6
+ *     helpers ONLY at terminal events. Healthy long renders don't
+ *     touch WO status.
+ *   - Stale poll beyond `adapter_actions.poll_timeout_seconds` fires
+ *     the watchdog: handoff→failed, audit `watchdog_expired_stale_poll`,
+ *     WO transitions via `watchdogExpireWorkOrder` if still processing.
+ */
+export async function pollHandoffStatus(
+  client: PoolClient,
+  input: PollHandoffInput
+): Promise<PollHandoffResult> {
+  const row = await loadHandoffForPoll(
+    client,
+    input.handoffId,
+    input.clientId
+  );
+  if (!row) {
+    return { status: "handoff_not_found", handoffId: input.handoffId };
+  }
+  if (row.status !== "submitted") {
+    return {
+      status: "handoff_not_pollable",
+      handoffId: input.handoffId,
+      currentStatus: row.status,
+    };
+  }
+  if (!row.adapter_catalog_id || !row.adapter_key || !row.external_reference) {
+    return {
+      status: "adapter_not_found",
+      handoffId: input.handoffId,
+      adapterKey: row.adapter_key ?? null,
+    };
+  }
+
+  const adapter = getAdapter(row.adapter_key);
+  if (!adapter) {
+    return {
+      status: "adapter_not_found",
+      handoffId: input.handoffId,
+      adapterKey: row.adapter_key,
+    };
+  }
+
+  // Watchdog pre-check. If the handoff has been pending past the
+  // per-action timeout (or the caller force-triggers watchdog), mark
+  // failed without contacting the adapter. Protects against runaway
+  // costs + hung renders.
+  const pollTimeout =
+    row.poll_timeout_seconds ?? DEFAULT_POLL_TIMEOUT_SECONDS;
+  const now = input.nowOverride ?? new Date();
+  const lastPoll = row.last_poll_at ?? new Date(0);
+  const elapsedSeconds = Math.floor(
+    (now.getTime() - lastPoll.getTime()) / 1000
+  );
+  const stale = input.forceStaleWatchdog === true
+    ? true
+    : elapsedSeconds > pollTimeout;
+  if (stale) {
+    await updateHandoffStatus(
+      client,
+      input.clientId,
+      input.handoffId,
+      "failed",
+      null
+    );
+    await updateHandoffPollState(client, input.clientId, input.handoffId, {
+      lastPollStatus: "watchdog_expired",
+      pollCountIncrement: 0,
+    });
+    await emitPollAudit(
+      client,
+      input.clientId,
+      input.actorUserId,
+      input.handoffId,
+      row.output_package_id,
+      AUDIT_EVENTS.ADAPTER_DISPATCH_WATCHDOG_EXPIRED_STALE_POLL,
+      {
+        pollCount: row.poll_count,
+        pollTimeoutSeconds: pollTimeout,
+        elapsedSeconds,
+        forced: input.forceStaleWatchdog === true,
+      }
+    );
+    return {
+      status: "watchdog_expired",
+      handoffId: input.handoffId,
+      reason: `no fresh poll within ${pollTimeout}s (elapsed=${elapsedSeconds}s)`,
+      secondsSinceLastPoll: elapsedSeconds,
+    };
+  }
+
+  const credentialRef = await loadCredentialRefForHandoff(
+    client,
+    input.clientId,
+    row.adapter_catalog_id
+  );
+  const result = await adapter.fetchResult(row.external_reference, {
+    credentialRef,
+  });
+
+  const nextPollCount = row.poll_count + 1;
+
+  if (result.status === "success") {
+    await recordResult(
+      client,
+      input.handoffId,
+      result.status,
+      result.payloadRef ?? null,
+      result.errorMessage ?? null,
+      result.metadata ?? {}
+    );
+    await updateHandoffStatus(
+      client,
+      input.clientId,
+      input.handoffId,
+      "completed",
+      result.payloadRef ?? null
+    );
+    await updateHandoffPollState(client, input.clientId, input.handoffId, {
+      lastPollStatus: "completed",
+      pollCountIncrement: 1,
+    });
+    await emitPollAudit(
+      client,
+      input.clientId,
+      input.actorUserId,
+      input.handoffId,
+      row.output_package_id,
+      AUDIT_EVENTS.ADAPTER_DISPATCH_COMPLETED,
+      {
+        externalReference: row.external_reference,
+        pollCount: nextPollCount,
+      }
+    );
+    return {
+      status: "completed",
+      handoffId: input.handoffId,
+      externalReference: row.external_reference,
+      resultPayloadRef: result.payloadRef ?? null,
+    };
+  }
+
+  if (result.status === "failed") {
+    await recordResult(
+      client,
+      input.handoffId,
+      result.status,
+      result.payloadRef ?? null,
+      result.errorMessage ?? null,
+      result.metadata ?? {}
+    );
+    await updateHandoffStatus(
+      client,
+      input.clientId,
+      input.handoffId,
+      "failed",
+      result.payloadRef ?? null
+    );
+    await updateHandoffPollState(client, input.clientId, input.handoffId, {
+      lastPollStatus: "failed",
+      pollCountIncrement: 1,
+    });
+    await emitPollAudit(
+      client,
+      input.clientId,
+      input.actorUserId,
+      input.handoffId,
+      row.output_package_id,
+      AUDIT_EVENTS.ADAPTER_DISPATCH_FAILED,
+      {
+        externalReference: row.external_reference,
+        pollCount: nextPollCount,
+        errorMessage: result.errorMessage ?? "adapter returned failed",
+        stage: "poll",
+      }
+    );
+    return {
+      status: "failed",
+      handoffId: input.handoffId,
+      errorMessage: result.errorMessage ?? "adapter returned failed",
+    };
+  }
+
+  // Still pending. Record the poll, keep the handoff in `submitted`.
+  await updateHandoffPollState(client, input.clientId, input.handoffId, {
+    lastPollStatus: "pending",
+    pollCountIncrement: 1,
+  });
+  await emitPollAudit(
+    client,
+    input.clientId,
+    input.actorUserId,
+    input.handoffId,
+    row.output_package_id,
+    AUDIT_EVENTS.ADAPTER_DISPATCH_POLLING,
+    {
+      externalReference: row.external_reference,
+      pollCount: nextPollCount,
+      pollTimeoutSeconds: pollTimeout,
+      elapsedSeconds,
+    }
+  );
+  return {
+    status: "pending",
+    handoffId: input.handoffId,
+    pollCount: nextPollCount,
+    externalReference: row.external_reference,
+  };
 }

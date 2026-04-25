@@ -110,6 +110,17 @@ class PermissionDecision(BaseModel):
     role: Optional[str] = None
 
 
+class AdapterStatus(BaseModel):
+    adapter_key: str
+    status: str  # live_confirmed | pending_confirmation | disabled | credential_missing
+    env_flag_name: Optional[str] = None
+    env_flag_enabled: bool
+    credential_id: Optional[str] = None
+    credential_ref: Optional[str] = None
+    first_invocation_confirmed_at: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class WorkOrderMetrics(BaseModel):
     model_config = ConfigDict(extra="allow")
     total: int
@@ -185,6 +196,12 @@ class ApiClient:
     def work_order_metrics(self) -> WorkOrderMetrics:
         data = self._request("GET", "/work_orders/metrics")
         return WorkOrderMetrics(**data)
+
+    # ---- Loop 9 Phase 9.5 — adapter status (Design Lab) ----
+
+    def get_adapter_status(self, adapter_key: str) -> AdapterStatus:
+        data = self._request("GET", f"/adapter_status/{adapter_key}")
+        return AdapterStatus(**data)
 
     def create_work_order(
         self,

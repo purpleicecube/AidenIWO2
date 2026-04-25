@@ -195,11 +195,19 @@ describeIwo3("Loop 9 Phase 9.2 — GammaLiveAdapter dispatcher integration", () 
         actorUserId: KLEAR_OPERATOR,
         workOrderId: KLEAR_WO,
       });
-      // Live adapter returns status "unknown" on fetchResult because
-      // the mock's GET returns the same 200 generationId body (no
-      // status="completed"), so the adapter treats it as pending. We
-      // verify the submit step succeeded — handoff was created.
-      expect(["completed", "failed"].includes(result.status)).toBe(true);
+      // The mock GET returns the same 200 submit body (no status
+      // field), which the adapter normalises to "unknown". Under
+      // Phase 9.4 that legitimately means "render in flight" and
+      // dispatch returns `pending_poll`; subsequent polls advance.
+      // Anything else (completed/failed) would also be acceptable
+      // here — the primary assertion is that submit succeeded and
+      // we have a handoffId.
+      expect(
+        ["pending_poll", "completed", "failed"].includes(result.status)
+      ).toBe(true);
+      if ("handoffId" in result) {
+        expect(typeof result.handoffId).toBe("string");
+      }
       await client.query("COMMIT");
     } finally {
       client.release();

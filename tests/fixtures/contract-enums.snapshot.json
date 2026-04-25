@@ -255,8 +255,10 @@
       "adapter_dispatch.live_disabled",
       "adapter_dispatch.package_invalid",
       "adapter_dispatch.policy_rejected",
+      "adapter_dispatch.polling",
       "adapter_dispatch.rate_limited",
       "adapter_dispatch.submitted",
+      "adapter_dispatch.watchdog_expired_stale_poll",
       "adapter_policy.created",
       "adapter_policy.updated",
       "artifact.deleted",
@@ -413,6 +415,10 @@
         "llm.invoked",
         "llm.failed",
         "llm_provider.connection_tested"
+      ],
+      "LOOP_9_PHASE_4_AUDIT_EVENTS": [
+        "adapter_dispatch.polling",
+        "adapter_dispatch.watchdog_expired_stale_poll"
       ]
     }
   },

@@ -1,22 +1,22 @@
-"""Loop 9 Phase 9.1 — adapter credential administration routes.
+"""Loop 9 Phase 9.1 + 9.5 — adapter credential + status routes.
 
 POST /adapter_credentials/{id}/confirm_first_invocation
-  Body: {notes?: str}
-  Permission: adapter_credential:rotate (admin-only per Loop 4).
+  Phase 9.1. Gated by adapter_credential:rotate (admin-only per Loop 4).
   Idempotent: setting first_invocation_confirmed_at twice is a no-op
   and returns the existing state without writing a second audit row.
 
-This route is the operator control for the primary leg of the dual
-first-live-invocation gate (IWO3_LOOP_8_3_CODEX_DECISIONS §Q1). The
-secondary leg is the env flag GAMMA_LIVE_ENABLED (or adapter-specific
-equivalent), read inside the dispatcher.
+GET /adapter_status/{adapter_key}
+  Phase 9.5 (scope §3.5). Returns the 4-state Design Lab status for
+  the active tenant: live_confirmed | pending_confirmation | disabled
+  | credential_missing. Gated by client:read.
 
-Candidate-review is deliberately NOT used here — candidate-review
-governs artifact choice, not outbound-service authorization.
+Candidate-review is deliberately NOT used for outbound-service
+authorization — it governs artifact choice only (Darrel §Q1 lockdown).
 """
 
 from __future__ import annotations
 
+import os
 from typing import Annotated, Optional
 
 import asyncpg
@@ -149,4 +149,123 @@ async def confirm_first_invocation(
         first_invocation_confirmed_by_user_id=updated["confirmed_by"] or "",
         already_confirmed=False,
         notes=updated["notes"],
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Loop 9 Phase 9.5 — adapter status (Design Lab wiring)
+# ──────────────────────────────────────────────────────────────────────
+
+
+status_router = APIRouter(prefix="/adapter_status", tags=["adapter_status"])
+
+
+# Per-adapter env flag names (mirror AdapterDescription.envFlagName in TS).
+# Add live adapters here as they ship. Sandbox PPTX/PDF (Loop 10) will
+# register via the same map.
+ADAPTER_ENV_FLAGS = {
+    "gamma": "GAMMA_LIVE_ENABLED",
+}
+
+
+class AdapterStatusResponse(BaseModel):
+    adapter_key: str
+    status: str  # live_confirmed | pending_confirmation | disabled | credential_missing
+    env_flag_name: Optional[str] = None
+    env_flag_enabled: bool
+    credential_id: Optional[str] = None
+    credential_ref: Optional[str] = None
+    first_invocation_confirmed_at: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@status_router.get(
+    "/{adapter_key}",
+    response_model=AdapterStatusResponse,
+    dependencies=[Depends(require_permission_dep("client:read"))],
+)
+async def get_adapter_status(
+    adapter_key: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> AdapterStatusResponse:
+    """Design Lab-facing live status per (tenant, adapter).
+
+    4-state resolution (Darrel §Q1 dual gate):
+      live_confirmed          env flag true AND credential row exists
+                              AND first_invocation_confirmed_at not null
+      pending_confirmation    env flag true AND credential row exists
+                              AND first_invocation_confirmed_at null
+      credential_missing      credential row absent for this tenant
+      disabled                env flag unset / false (regardless of DB)
+
+    env_flag_name is null for adapters without a live gate (not in
+    ADAPTER_ENV_FLAGS). Those are reported as live_confirmed when a
+    credential row exists — Sandbox PPTX/PDF (Loop 10) may land this way.
+    """
+    env_flag_name = ADAPTER_ENV_FLAGS.get(adapter_key)
+    env_flag_value = os.environ.get(env_flag_name or "", "")
+    env_enabled = env_flag_value == "true"
+
+    row = await conn.fetchrow(
+        """
+        SELECT ac.id::text                                    AS id,
+               ac.credential_ref,
+               ac.first_invocation_confirmed_at::text          AS confirmed_at,
+               ac.notes                                        AS notes
+          FROM adapter_credentials ac
+          JOIN adapter_catalog cat ON cat.id = ac.adapter_catalog_id
+         WHERE ac.client_id = $1 AND cat.adapter_key = $2
+         ORDER BY ac.created_at DESC
+         LIMIT 1
+        """,
+        ctx["client_id"],
+        adapter_key,
+    )
+
+    if env_flag_name and not env_enabled:
+        return AdapterStatusResponse(
+            adapter_key=adapter_key,
+            status="disabled",
+            env_flag_name=env_flag_name,
+            env_flag_enabled=False,
+            credential_id=row["id"] if row else None,
+            credential_ref=row["credential_ref"] if row else None,
+            first_invocation_confirmed_at=(
+                row["confirmed_at"] if row else None
+            ),
+            notes=row["notes"] if row else None,
+        )
+
+    if row is None:
+        return AdapterStatusResponse(
+            adapter_key=adapter_key,
+            status="credential_missing",
+            env_flag_name=env_flag_name,
+            env_flag_enabled=env_enabled,
+        )
+
+    if env_flag_name and row["confirmed_at"] is None:
+        return AdapterStatusResponse(
+            adapter_key=adapter_key,
+            status="pending_confirmation",
+            env_flag_name=env_flag_name,
+            env_flag_enabled=env_enabled,
+            credential_id=row["id"],
+            credential_ref=row["credential_ref"],
+            first_invocation_confirmed_at=None,
+            notes=row["notes"],
+        )
+
+    return AdapterStatusResponse(
+        adapter_key=adapter_key,
+        status="live_confirmed",
+        env_flag_name=env_flag_name,
+        env_flag_enabled=env_enabled,
+        credential_id=row["id"],
+        credential_ref=row["credential_ref"],
+        first_invocation_confirmed_at=row["confirmed_at"],
+        notes=row["notes"],
     )

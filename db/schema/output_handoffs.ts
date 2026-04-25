@@ -4,6 +4,7 @@ import {
   varchar,
   jsonb,
   timestamp,
+  integer,
   pgEnum,
   index,
 } from "drizzle-orm/pg-core";
@@ -101,6 +102,19 @@ export const outputHandoffs = pgTable(
     selectedByUserId: uuid("selected_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    // Loop 9 Phase 9.4 — async polling state.
+    // WO stays in `processing` while the adapter is legitimately
+    // rendering. These columns track per-handoff poll cadence so the
+    // watchdog can distinguish "healthy long render" from "stale poll"
+    // (Darrel §Q3 disambiguation + IWO3_LOOP_9_SCOPE_PROPOSAL §3.4).
+    //
+    //   last_poll_status  "pending" | "running" | "completed" | "failed"
+    //                     (null before first poll)
+    //   last_poll_at      timestamp of most recent poll
+    //   poll_count        monotonic counter; 0 before first poll
+    lastPollStatus: varchar("last_poll_status", { length: 32 }),
+    lastPollAt: timestamp("last_poll_at", { withTimezone: true }),
+    pollCount: integer("poll_count").notNull().default(0),
     metadata: jsonb("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

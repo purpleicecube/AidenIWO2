@@ -117,3 +117,70 @@ async def reject_candidate_route(
     except (PermissionDenied, CandidateNotEligible, CandidateHandoffNotFound) as err:
         raise _handle_errors(err, handoff_id)
     return RejectCandidateResponse(**result)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Loop 9 Phase 9.4 — async polling
+# ──────────────────────────────────────────────────────────────────────
+
+
+from deps import require_permission_dep  # noqa: E402 — grouped for Phase 9.4
+from adapter.gamma_poll import poll_gamma_handoff  # noqa: E402
+
+
+class PollHandoffRequest(BaseModel):
+    force_stale_watchdog: bool = False
+
+
+class PollHandoffResponseModel(BaseModel):
+    status: str
+    handoff_id: str
+    detail: Optional[str] = None
+    poll_count: Optional[int] = None
+    external_reference: Optional[str] = None
+    result_payload_ref: Optional[str] = None
+    elapsed_seconds: Optional[int] = None
+    current_status: Optional[str] = None
+
+
+@router.post(
+    "/output_handoffs/{handoff_id}/poll",
+    response_model=PollHandoffResponseModel,
+    dependencies=[Depends(require_permission_dep("output_package:submit"))],
+)
+async def poll_handoff_route(
+    handoff_id: str,
+    body: PollHandoffRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> PollHandoffResponseModel:
+    """Advance one handoff's polling lifecycle (Phase 9.4 scope §3.4).
+
+    Non-404 outcomes return 200 with a typed `status` field so callers
+    (Streamlit Design Lab, scheduled poll jobs) can react without
+    special-casing HTTP codes. `handoff_not_found` is the one 404.
+    """
+    outcome = await poll_gamma_handoff(
+        conn,
+        handoff_id=handoff_id,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        force_stale_watchdog=body.force_stale_watchdog,
+    )
+    if outcome.kind == "handoff_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "handoff_id": handoff_id},
+        )
+    return PollHandoffResponseModel(
+        status=outcome.kind,
+        handoff_id=outcome.handoff_id,
+        detail=outcome.detail,
+        poll_count=outcome.poll_count,
+        external_reference=outcome.external_reference,
+        result_payload_ref=outcome.result_payload_ref,
+        elapsed_seconds=outcome.elapsed_seconds,
+        current_status=outcome.current_status,
+    )
