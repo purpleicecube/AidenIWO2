@@ -429,5 +429,14 @@ class ApiClient:
         data = self._request("GET", "/llm/personas")
         return data["personas"]
 
+    def get_workspace_tree(self) -> dict[str, Any]:
+        return self._request("GET", "/workspace/tree")
+
+    def get_workspace_folder(self, folder_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/workspace/folders/{folder_id}")
+
+    def get_workspace_file_content(self, file_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/workspace/files/{file_id}/content")
+
     def create_or_get_scratch_folder(self) -> dict[str, Any]:
         return self._request("POST", "/workspace/folders/scratch")
