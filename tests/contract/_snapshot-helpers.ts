@@ -34,6 +34,7 @@ import {
   PRE_BETA_PHASE_2_AUDIT_EVENTS,
   PRE_BETA_PHASE_DELTA_AUDIT_EVENTS,
   BETA_PHASE_1_AUDIT_EVENTS,
+  BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS,
 } from "../../packages/contracts/audit/events";
 
 export interface ContractSnapshot {
@@ -95,6 +96,9 @@ export function loadAuditEvents(): ContractSnapshot["auditEvents"] {
       PRE_BETA_PHASE_2_AUDIT_EVENTS: [...PRE_BETA_PHASE_2_AUDIT_EVENTS],
       PRE_BETA_PHASE_DELTA_AUDIT_EVENTS: [...PRE_BETA_PHASE_DELTA_AUDIT_EVENTS],
       BETA_PHASE_1_AUDIT_EVENTS: [...BETA_PHASE_1_AUDIT_EVENTS],
+      BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS: [
+        ...BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS,
+      ],
     },
   };
 }

@@ -214,6 +214,12 @@ export const AUDIT_EVENTS = {
   CHAT_SESSION_UPDATED: "chat_session.updated",
   WEBHOOK_RECEIVED: "webhook.received",
   WEBHOOK_SIGNATURE_INVALID: "webhook.signature_invalid",
+
+  // MegaLoop Beta-1.5 phase 2 — UI-tail completion. One new event for
+  // tenant-settings mutation (Q1 ceiling editor); the encryption-at-rest
+  // path reuses CREDENTIAL_ENCRYPTED above (locked in ε.1 anticipating
+  // this phase).
+  CLIENT_SETTINGS_UPDATED: "client.settings_updated",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -373,4 +379,8 @@ export const BETA_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.CHAT_SESSION_UPDATED,
   AUDIT_EVENTS.WEBHOOK_RECEIVED,
   AUDIT_EVENTS.WEBHOOK_SIGNATURE_INVALID,
+];
+
+export const BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.CLIENT_SETTINGS_UPDATED,
 ];

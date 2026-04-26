@@ -6,7 +6,18 @@ import {
   text,
   timestamp,
   pgEnum,
+  customType,
 } from "drizzle-orm/pg-core";
+
+// Beta-1.5 phase 2 / Q15 — bytea column for encrypted credentials.
+// Drizzle has no native bytea; customType avoids requiring `@types/node`
+// (Buffer) in this slice by typing the value as `unknown`. Actual bytes
+// flow through asyncpg on the Python read path.
+const bytea = customType<{ data: unknown }>({
+  dataType() {
+    return "bytea";
+  },
+});
 import { clients } from "./clients";
 import { adapterCatalog } from "./adapter_catalog";
 import { users } from "./users";
@@ -55,6 +66,13 @@ export const adapterCredentials = pgTable("adapter_credentials", {
   ).references(() => users.id, { onDelete: "set null" }),
   rotatedAt: timestamp("rotated_at", { withTimezone: true }),
   notes: text("notes"),
+  // Beta-1.5 phase 2 / Q15 — encrypted-at-rest credential triplet.
+  // NULL in all three slots = env-injection only (Beta-1 default).
+  // Set together when operator rotates a credential into encrypted
+  // storage. See runtime/credentials_crypto.resolve_encrypted_or_env.
+  encryptedValue: bytea("encrypted_value"),
+  encryptionAlgo: varchar("encryption_algo", { length: 64 }),
+  encryptedAt: timestamp("encrypted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

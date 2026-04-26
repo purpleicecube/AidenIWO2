@@ -391,3 +391,43 @@ class ApiClient:
         return self._request(
             "POST", f"/workflows/{execution_id}/run_next_step"
         )
+
+    # ---- Beta-1 ε.2 — operator chat persistence ----
+
+    def get_my_chat_session(self) -> dict[str, Any]:
+        return self._request("GET", "/chat_sessions/me")
+
+    def put_my_chat_session(
+        self, *, messages: list[dict[str, Any]], context: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._request(
+            "PUT",
+            "/chat_sessions/me",
+            json={"messages": messages, "context": context},
+        )
+
+    def clear_my_chat_session(self) -> dict[str, Any]:
+        return self._request("DELETE", "/chat_sessions/me")
+
+    # ---- Beta-1.5 phase 2 — tenant settings + personas + scratch ----
+
+    def get_my_tenant_settings(self) -> dict[str, Any]:
+        return self._request("GET", "/tenants/me/settings")
+
+    def update_my_tenant_settings(
+        self,
+        *,
+        llm_per_wo_ceiling: Optional[int] = None,
+        revert_to_default: bool = False,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"revert_to_default": revert_to_default}
+        if llm_per_wo_ceiling is not None:
+            body["llm_per_wo_ceiling"] = llm_per_wo_ceiling
+        return self._request("PATCH", "/tenants/me/settings", json=body)
+
+    def list_personas(self) -> list[dict[str, Any]]:
+        data = self._request("GET", "/llm/personas")
+        return data["personas"]
+
+    def create_or_get_scratch_folder(self) -> dict[str, Any]:
+        return self._request("POST", "/workspace/folders/scratch")

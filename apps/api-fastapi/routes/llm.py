@@ -655,3 +655,58 @@ async def test_llm(
         completion_chars=result.completion_chars,
         sample=result.text[:200] if result.text else None,
     )
+
+
+# ── Beta-1.5 phase 2 / Q6 — persona library (read-only) ──────────────
+
+
+class PersonaRow(BaseModel):
+    id: str
+    profile_key: str
+    display_name: str
+    scope: str
+    status: str
+    created_at: str
+    updated_at: str
+
+
+class PersonasResponse(BaseModel):
+    personas: list[PersonaRow]
+
+
+@router.get(
+    "/personas",
+    response_model=PersonasResponse,
+    dependencies=[Depends(require_permission_dep("client:read"))],
+)
+async def list_personas(
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> PersonasResponse:
+    """Beta-1.5 phase 2 / Q6 — read-only persona library.
+
+    Architect Q6 lock: reuse `prompt_profiles` rather than minting a
+    new table. Status `active` rows are surfaced; archived rows stay
+    hidden from the UI but remain in the table for audit forensics.
+    Versioning + override application stay on the existing Loop 2
+    surfaces.
+    """
+    rows = await conn.fetch(
+        """
+        SELECT id::text          AS id,
+               profile_key,
+               display_name,
+               scope::text       AS scope,
+               status::text      AS status,
+               created_at::text  AS created_at,
+               updated_at::text  AS updated_at
+          FROM prompt_profiles
+         WHERE status = 'active'
+         ORDER BY scope, profile_key
+        """
+    )
+    return PersonasResponse(
+        personas=[PersonaRow(**dict(r)) for r in rows]
+    )

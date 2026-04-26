@@ -63,6 +63,9 @@ class WorkspaceFolder(BaseModel):
     created_at: str
     updated_at: str
     is_root: bool
+    # Beta-1.5 phase 2 / Q11 — surface per-operator scratch ownership so
+    # the UI can chip "your scratch" without a second round-trip.
+    owner_user_id: Optional[str] = None
 
 
 class WorkspaceFile(BaseModel):
@@ -123,6 +126,12 @@ class FileResponse(BaseModel):
 
 
 def _folder_from_row(row: asyncpg.Record) -> WorkspaceFolder:
+    # owner_user_id may be absent on rows from the tree query that
+    # didn't select it; default to None.
+    try:
+        owner = row["owner_user_id"]
+    except (KeyError, IndexError):
+        owner = None
     return WorkspaceFolder(
         id=row["id"],
         parent_folder_id=row["parent_folder_id"],
@@ -130,6 +139,7 @@ def _folder_from_row(row: asyncpg.Record) -> WorkspaceFolder:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         is_root=row["parent_folder_id"] is None,
+        owner_user_id=owner,
     )
 
 
@@ -265,6 +275,7 @@ async def get_workspace_tree(
         SELECT id::text             AS id,
                parent_folder_id::text AS parent_folder_id,
                name,
+               owner_user_id::text AS owner_user_id,
                created_at::text    AS created_at,
                updated_at::text    AS updated_at
           FROM workspace_folders
@@ -374,6 +385,132 @@ async def get_folder_contents(
 
 
 # ── Folder mutations ─────────────────────────────────────────────────
+
+
+@router.post(
+    "/folders/scratch",
+    response_model=FolderResponse,
+    dependencies=[Depends(require_permission_dep("workspace:write"))],
+)
+async def create_or_get_scratch_folder(
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> FolderResponse:
+    """Beta-1.5 phase 2 / Q11 — idempotent per-operator scratch folder.
+
+    The first call materialises a folder under the tenant root with
+    ``owner_user_id = ctx.user_id`` and a stable name (`Scratch (you)`).
+    Subsequent calls return the existing row. Foreign-scratch
+    visibility is already filtered server-side by the tree query.
+    """
+    root = await conn.fetchrow(
+        """
+        SELECT id::text AS id
+          FROM workspace_folders
+         WHERE deleted_at IS NULL
+           AND parent_folder_id IS NULL
+           AND owner_user_id IS NULL
+         LIMIT 1
+        """
+    )
+    if root is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "tenant_workspace_root_missing"},
+        )
+
+    existing = await conn.fetchrow(
+        """
+        SELECT id::text             AS id,
+               parent_folder_id::text AS parent_folder_id,
+               name,
+               owner_user_id::text AS owner_user_id,
+               deleted_at,
+               created_at::text    AS created_at,
+               updated_at::text    AS updated_at
+          FROM workspace_folders
+         WHERE owner_user_id = $1::uuid
+           AND parent_folder_id = $2::uuid
+         ORDER BY created_at
+         LIMIT 1
+        """,
+        ctx["user_id"],
+        root["id"],
+    )
+    if existing is not None and existing["deleted_at"] is None:
+        return FolderResponse(folder=_folder_from_row(existing))
+    if existing is not None and existing["deleted_at"] is not None:
+        # Soft-deleted scratch exists; restore it. Preserves any prior
+        # contents (subfolders, files) the operator left behind, and
+        # avoids the (client_id, parent_folder_id, name) UNIQUE
+        # collision that a fresh INSERT would trigger.
+        # lint:bypass-rls-explain="workspace_folders is RLS-FORCED on tenant-scoped connection."
+        row = await conn.fetchrow(
+            """
+            UPDATE workspace_folders
+               SET deleted_at = NULL, updated_at = now()
+             WHERE id = $1::uuid
+            RETURNING id::text             AS id,
+                      parent_folder_id::text AS parent_folder_id,
+                      name,
+                      owner_user_id::text AS owner_user_id,
+                      created_at::text    AS created_at,
+                      updated_at::text    AS updated_at
+            """,
+            existing["id"],
+        )
+        await write_audit_row(
+            conn,
+            client_id=ctx["client_id"],
+            actor_user_id=ctx["user_id"],
+            event="folder.created",
+            target_type="workspace_folder",
+            target_id=row["id"],
+            metadata={
+                "name": row["name"],
+                "parentFolderId": root["id"],
+                "ownerUserId": ctx["user_id"],
+                "scope": "per_operator_scratch",
+                "restoredFromSoftDelete": True,
+            },
+        )
+        return FolderResponse(folder=_folder_from_row(row))
+
+    row = await conn.fetchrow(
+        """
+        INSERT INTO workspace_folders
+          (client_id, parent_folder_id, name, owner_user_id,
+           created_by_user_id)
+        VALUES ($1::uuid, $2::uuid, $3, $4::uuid, $4::uuid)
+        RETURNING id::text             AS id,
+                  parent_folder_id::text AS parent_folder_id,
+                  name,
+                  owner_user_id::text AS owner_user_id,
+                  created_at::text    AS created_at,
+                  updated_at::text    AS updated_at
+        """,
+        ctx["client_id"],
+        root["id"],
+        "Scratch (you)",
+        ctx["user_id"],
+    )
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="folder.created",
+        target_type="workspace_folder",
+        target_id=row["id"],
+        metadata={
+            "name": row["name"],
+            "parentFolderId": root["id"],
+            "ownerUserId": ctx["user_id"],
+            "scope": "per_operator_scratch",
+        },
+    )
+    return FolderResponse(folder=_folder_from_row(row))
 
 
 @router.post(

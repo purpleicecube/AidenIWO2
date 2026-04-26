@@ -77,7 +77,11 @@ def _files_by_folder(files: list[dict]) -> dict[str, list[dict]]:
 
 
 def _folder_label(folder: dict) -> str:
-    return "📁 /" if folder.get("is_root") else f"📁 {folder['name']}"
+    if folder.get("is_root"):
+        return "📁 /"
+    if folder.get("owner_user_id"):
+        return f"🗒️ {folder['name']}"
+    return f"📁 {folder['name']}"
 
 
 def _file_emoji(mime: Optional[str]) -> str:
@@ -542,11 +546,56 @@ def main() -> None:
             cur = by_id.get(cur.get("parent_folder_id")) if cur.get("parent_folder_id") else None
         crumbs.reverse()
         st.markdown(f"### {' / '.join(crumbs)}")
+        owner_chip = (
+            " · 🗒️ **per-operator scratch (visible only to you)**"
+            if selected.get("owner_user_id")
+            else ""
+        )
         st.caption(
             f"Folder id `{selected['id'][:8]}…` · "
             f"created {_ts(selected.get('created_at'))} · "
             f"sortables {'✅' if _SORTABLES_AVAILABLE else 'fallback (move via dropdown)'}"
+            f"{owner_chip}"
         )
+
+        # Beta-1.5 phase 2 / Q11 — create-or-jump-to per-operator scratch.
+        # If the operator already has a scratch folder, show a deep-link;
+        # otherwise show a single-button create.
+        existing_scratch = next(
+            (
+                f for f in folders
+                if f.get("owner_user_id") and f.get("parent_folder_id") == root_id
+            ),
+            None,
+        )
+        scratch_cols = st.columns([2, 5])
+        with scratch_cols[0]:
+            if existing_scratch is not None:
+                if st.button(
+                    "🗒️ Open my scratch",
+                    key="workspace-open-scratch",
+                    disabled=existing_scratch["id"] == selected_id,
+                ):
+                    st.session_state[_SS_FOCUS_FOLDER] = existing_scratch["id"]
+                    st.rerun()
+            else:
+                if st.button(
+                    "🗒️ Create my scratch folder",
+                    key="workspace-create-scratch",
+                    disabled=not can_write,
+                ):
+                    try:
+                        resp = api.create_or_get_scratch_folder()
+                        st.session_state[_SS_FOCUS_FOLDER] = resp["folder"]["id"]
+                        st.success("Scratch folder ready.")
+                        st.rerun()
+                    except APIError as err:
+                        st.error(f"❌ {err.status_code} — {err.detail}")
+        with scratch_cols[1]:
+            st.caption(
+                "Per-operator scratch folders are private — only you "
+                "see them in the tree. Other tenant members get their own."
+            )
 
         children = sorted(
             children_map.get(selected_id, []), key=lambda f: f["name"]

@@ -304,6 +304,7 @@
       "channel_message.send_queued",
       "channel_message.sent",
       "chat_session.updated",
+      "client.settings_updated",
       "credential.encrypted",
       "credential.rotated",
       "data_source_binding.created",
@@ -516,6 +517,9 @@
         "chat_session.updated",
         "webhook.received",
         "webhook.signature_invalid"
+      ],
+      "BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS": [
+        "client.settings_updated"
       ]
     }
   },

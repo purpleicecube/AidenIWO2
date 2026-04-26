@@ -1,19 +1,16 @@
 """Aiden Settings — MegaLoop Alpha α.7 live wiring.
+   Beta-1.5 phase 2 — adds tenant ceiling + persona library sections.
 
-Three sections (each backed by real API calls — no placeholders):
-
+Five sections:
   1. Provider availability         GET /llm/providers
   2. Resolved Tier-1 LLM config    GET /llm/configs (filtered to aiden_tier_1)
                                    + POST /llm/test connection check
-  3. Channel auth-code issuance    POST /channel/auth_codes per Stage A § B7
+  3. Tenant LLM ceiling (Q1)       GET /tenants/me/settings
+                                   + PATCH /tenants/me/settings (admin)
+  4. Persona library (Q6)          GET /llm/personas (read-only)
+  5. Channel auth-code issuance    POST /channel/auth_codes per Stage A § B7
                                    + GET  /channel/identities live list
                                    + POST /channel/identities/{id}/revoke
-
-Operators bring up a Telegram bot for this tenant by:
-  (a) Issuing an auth code here.
-  (b) DM the tenant's Telegram bot with `/start <code>`.
-  (c) The polling worker consumes the code, binds the chat, and the
-      identity appears in the list below.
 """
 
 from __future__ import annotations
@@ -155,6 +152,106 @@ def _section_aiden_config(api) -> None:  # noqa: ANN001
                 st.warning(f"⚠️ {r.get('error')}")
 
 
+def _section_tenant_ceiling(api) -> None:  # noqa: ANN001
+    """Beta-1.5 phase 2 / Q1 — admin-gated per-tenant LLM ceiling editor."""
+    st.subheader("Per-tenant LLM ceiling (Q1)")
+    try:
+        settings = api.get_my_tenant_settings()
+        can_admin = api.check_permission("system:admin")
+    except APIError as err:
+        st.error(f"❌ {err.status_code} — {err.detail}")
+        return
+
+    current = int(settings["llm_per_wo_ceiling"])
+    is_default = bool(settings["llm_per_wo_ceiling_is_default"])
+    cmin = int(settings.get("ceiling_min", 1_000))
+    cmax = int(settings.get("ceiling_max", 1_000_000))
+
+    chip = "⚙️ platform default" if is_default else "🟢 tenant override"
+    st.caption(
+        f"`{settings['designation']}` · {chip} · "
+        f"current ceiling **{current:,}** tokens "
+        f"(allowed range {cmin:,}–{cmax:,})"
+    )
+
+    if not can_admin.allowed:
+        st.caption(
+            f"_Read-only — `system:admin` required to change "
+            f"(your role: {can_admin.role})._"
+        )
+        return
+
+    with st.form("tenant-ceiling-edit", clear_on_submit=False):
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            new_value = st.number_input(
+                "New per-WO ceiling (tokens)",
+                min_value=cmin,
+                max_value=cmax,
+                value=current,
+                step=1_000,
+            )
+        with col2:
+            revert = st.checkbox(
+                "Revert to platform default",
+                value=False,
+                help=(
+                    "Clear the tenant override and fall back to "
+                    "DEFAULT_PER_WO_CEILING."
+                ),
+            )
+        save = st.form_submit_button("Save", type="primary")
+    if save:
+        try:
+            if revert:
+                api.update_my_tenant_settings(revert_to_default=True)
+                st.success("Reverted to platform default.")
+            else:
+                api.update_my_tenant_settings(
+                    llm_per_wo_ceiling=int(new_value)
+                )
+                st.success(f"Saved. New ceiling = {int(new_value):,} tokens.")
+            st.rerun()
+        except APIError as err:
+            st.error(f"❌ {err.status_code} — {err.detail}")
+
+
+def _section_persona_library(api) -> None:  # noqa: ANN001
+    """Beta-1.5 phase 2 / Q6 — read-only persona library backed by
+    `prompt_profiles`. Editing happens through the existing prompt-
+    profile CRUD; this section is for visibility + scope at a glance."""
+    st.subheader("Persona library (Q6)")
+    try:
+        personas = api.list_personas()
+    except APIError as err:
+        st.error(f"❌ {err.status_code} — {err.detail}")
+        return
+    if not personas:
+        st.caption(
+            "No active personas (prompt_profiles) for this tenant. "
+            "Create one via the Sub-Agents → Personas surface."
+        )
+        return
+
+    by_scope: dict[str, list[dict]] = {}
+    for p in personas:
+        by_scope.setdefault(p["scope"], []).append(p)
+    for scope in ("client", "workflow", "wo"):
+        rows = by_scope.get(scope) or []
+        if not rows:
+            continue
+        st.markdown(f"**Scope: `{scope}`**")
+        for p in rows:
+            st.markdown(
+                f"- **{p['display_name']}** · `{p['profile_key']}` "
+                f"· `{p['status']}`"
+            )
+    st.caption(
+        f"_{len(personas)} active persona(s). Reads `prompt_profiles` — "
+        "editing flows through the existing prompt-profile surfaces._"
+    )
+
+
 def _section_auth_codes(api) -> None:  # noqa: ANN001
     st.subheader("Channel auth codes (Stage A § B7)")
     can_issue = None
@@ -266,6 +363,10 @@ def main() -> None:
     _section_providers(api)
     st.divider()
     _section_aiden_config(api)
+    st.divider()
+    _section_tenant_ceiling(api)
+    st.divider()
+    _section_persona_library(api)
     st.divider()
     _section_auth_codes(api)
 

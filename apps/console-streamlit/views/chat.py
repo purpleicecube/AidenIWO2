@@ -1,4 +1,5 @@
 """Chat with Aiden — Alpha closeout γ.1+γ.2.
+   Beta-1.5 phase 2 — cross-session persistence wired to /chat_sessions/me.
 
 Sends operator messages to `POST /aiden/chat`, renders the decision
 inline, and lets the operator promote a brief into a real WO directly
@@ -12,6 +13,13 @@ WO/package/handoff in `iwo3_chat_context` so:
 Idempotency: Streamlit's button rerun model can fire the same callback
 twice on quick double-clicks; `iwo3_chat_promoted` keys per-action so a
 second click is a no-op with an explanatory caption.
+
+Persistence (Beta-1.5 phase 2 / Q7):
+  GET /chat_sessions/me on first render hydrates messages + context.
+  PUT /chat_sessions/me on every successful turn / promote / clear so
+  refreshing the page or coming back tomorrow lands on the same thread.
+  If the API is unavailable, the page falls back to session-state-only
+  (the Alpha γ behaviour) so chat still works in offline dev.
 """
 
 from __future__ import annotations
@@ -31,6 +39,65 @@ from shell import page_requires_api
 _MESSAGES_KEY = "iwo3_chat_messages"
 _CONTEXT_KEY = "iwo3_chat_context"
 _PROMOTED_KEY = "iwo3_chat_promoted"
+_HYDRATED_KEY = "iwo3_chat_hydrated_session_id"
+_PERSIST_DISABLED_KEY = "iwo3_chat_persist_disabled"
+
+
+# ── Beta-1.5 phase 2 — server-side persistence helpers ───────────────
+
+
+def _hydrate_from_server(api) -> None:  # noqa: ANN001
+    """Load /chat_sessions/me into session_state on first render.
+
+    Marks the session as hydrated by id so subsequent reruns within
+    the same Streamlit session don't re-fetch. If the call fails
+    (API unreachable, RBAC denial), we fall back to session-state-only
+    and surface a non-blocking caption so the operator knows.
+    """
+    if st.session_state.get(_HYDRATED_KEY):
+        return
+    try:
+        session = api.get_my_chat_session()
+    except APIError:
+        st.session_state[_PERSIST_DISABLED_KEY] = True
+        if _MESSAGES_KEY not in st.session_state:
+            st.session_state[_MESSAGES_KEY] = _seed_messages()
+        return
+
+    persisted_msgs = session.get("messages") or []
+    persisted_ctx = session.get("context") or {}
+    # Empty server state = first-ever visit; seed a welcome message and
+    # keep the session marked hydrated so we don't loop on every rerun.
+    st.session_state[_MESSAGES_KEY] = (
+        list(persisted_msgs) if persisted_msgs else _seed_messages()
+    )
+    st.session_state[_CONTEXT_KEY] = persisted_ctx
+    st.session_state[_HYDRATED_KEY] = session.get("id") or "hydrated"
+
+
+def _persist_to_server(api) -> None:  # noqa: ANN001
+    """PUT current state to /chat_sessions/me. Best-effort; the chat
+    keeps working if the API is unavailable.
+
+    Strips Streamlit-side ephemeral keys (e.g. `reply` carries pydantic
+    objects from the API client; we keep only the raw dict)."""
+    if st.session_state.get(_PERSIST_DISABLED_KEY):
+        return
+    msgs = st.session_state.get(_MESSAGES_KEY) or []
+    ctx = st.session_state.get(_CONTEXT_KEY) or {}
+    try:
+        api.put_my_chat_session(messages=msgs, context=ctx)
+    except APIError:
+        st.session_state[_PERSIST_DISABLED_KEY] = True
+
+
+def _clear_on_server(api) -> None:  # noqa: ANN001
+    if st.session_state.get(_PERSIST_DISABLED_KEY):
+        return
+    try:
+        api.clear_my_chat_session()
+    except APIError:
+        st.session_state[_PERSIST_DISABLED_KEY] = True
 
 
 def _seed_messages() -> list[dict[str, Any]]:
@@ -399,6 +466,7 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
                     key_seed=f"{idx}-create",
                 )
                 st.session_state[_MESSAGES_KEY] = messages
+                _persist_to_server(api)
                 st.rerun()
             except APIError as err:
                 # Unwind the guard so the operator can retry after fixing
@@ -419,6 +487,7 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
                     key_seed=f"{idx}-run",
                 )
                 st.session_state[_MESSAGES_KEY] = messages
+                _persist_to_server(api)
                 st.rerun()
             except APIError as err:
                 promoted_set.discard(f"run-{idx}")
@@ -445,8 +514,10 @@ def main() -> None:
     if api is None:
         return
 
-    if _MESSAGES_KEY not in st.session_state:
-        st.session_state[_MESSAGES_KEY] = _seed_messages()
+    # Beta-1.5 phase 2 / Q7 — pull server-persisted history on first
+    # render. After hydrate, every successful turn writes back via
+    # _persist_to_server so a refresh / new tab continues the thread.
+    _hydrate_from_server(api)
 
     messages: list[dict[str, Any]] = st.session_state[_MESSAGES_KEY]
 
@@ -486,6 +557,7 @@ def main() -> None:
                 }
             )
             st.session_state[_MESSAGES_KEY] = messages
+            _persist_to_server(api)
             st.rerun()
 
         reply = None
@@ -507,13 +579,22 @@ def main() -> None:
             }
         )
         st.session_state[_MESSAGES_KEY] = messages
+        _persist_to_server(api)
         st.rerun()
 
     if st.button("Clear history", key="chat-clear"):
         st.session_state[_MESSAGES_KEY] = _seed_messages()
         st.session_state[_CONTEXT_KEY] = {}
         st.session_state[_PROMOTED_KEY] = set()
+        _clear_on_server(api)
         st.rerun()
+
+    if st.session_state.get(_PERSIST_DISABLED_KEY):
+        st.caption(
+            "💡 Cross-session persistence offline — chat will not be "
+            "saved when you refresh. Verify the FastAPI runtime is "
+            "reachable and you have client:read."
+        )
 
 
 main()
