@@ -49,6 +49,7 @@ from llm.providers import (
     call_openai_compatible,
     callable_providers,
     known_providers,
+    list_openai_compatible_models,
 )
 
 
@@ -90,6 +91,107 @@ async def list_providers() -> ListProvidersResponse:
         for name in known_providers()
     ]
     return ListProvidersResponse(providers=providers)
+
+
+# ── /llm/models ───────────────────────────────────────────────────────
+#
+# Architect-lock §5 exception (approved 2026-04-26): IWO2 has
+# `GET /api/llm-settings/models?provider=X` driving its ModelSelector
+# component. The Aiden Settings page needs the same data to populate
+# the Model dropdown. This route is the IWO3 equivalent — same response
+# shape, multi-tenant credential resolution.
+#
+# Lookup: pick any enabled `llm_configs` row in this tenant for the
+# requested provider, resolve its `credential_ref:env:NAME` to the
+# runtime API key, and proxy to the provider's `/models` endpoint.
+# When no config exists for that provider, or the env var is unset,
+# return `keyConfigured=false` with an empty list (not an error) — the
+# caller will fall back to manual text entry, matching IWO2.
+
+
+class ProviderModel(BaseModel):
+    id: str
+    name: str
+    contextWindow: Optional[int] = None
+    owned_by: Optional[str] = None
+
+
+class ListModelsResponse(BaseModel):
+    provider: str
+    keyConfigured: bool
+    models: list[ProviderModel]
+    error: Optional[str] = None
+
+
+@router.get(
+    "/models",
+    response_model=ListModelsResponse,
+    dependencies=[Depends(require_permission_dep("client:read"))],
+)
+async def list_provider_models(
+    provider: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> ListModelsResponse:
+    if provider not in known_providers():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "unknown_provider", "provider": provider},
+        )
+    if provider not in callable_providers():
+        return ListModelsResponse(
+            provider=provider,
+            keyConfigured=False,
+            models=[],
+            error="provider_not_callable_in_phase_9_3",
+        )
+
+    row = await conn.fetchrow(
+        """
+        SELECT credential_ref, base_url
+          FROM llm_configs
+         WHERE client_id = $1
+           AND provider = $2
+           AND enabled = true
+         ORDER BY agent_role
+         LIMIT 1
+        """,
+        ctx["client_id"],
+        provider,
+    )
+    if row is None:
+        return ListModelsResponse(
+            provider=provider, keyConfigured=False, models=[]
+        )
+
+    try:
+        api_key = resolve_credential(row["credential_ref"])
+    except LlmCredentialError:
+        return ListModelsResponse(
+            provider=provider, keyConfigured=False, models=[]
+        )
+
+    try:
+        raw_models = list_openai_compatible_models(
+            provider=provider,
+            api_key=api_key,
+            base_url=row["base_url"],
+        )
+    except LlmProviderError as exc:
+        return ListModelsResponse(
+            provider=provider,
+            keyConfigured=True,
+            models=[],
+            error=f"{exc.kind}: {exc}",
+        )
+
+    return ListModelsResponse(
+        provider=provider,
+        keyConfigured=True,
+        models=[ProviderModel(**m) for m in raw_models],
+    )
 
 
 class ConfigListItem(BaseModel):

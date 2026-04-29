@@ -139,6 +139,95 @@ def _map_http_error(
     )
 
 
+def list_openai_compatible_models(
+    *,
+    provider: str,
+    api_key: str,
+    base_url: Optional[str],
+    timeout_seconds: float = 15.0,
+    transport: Optional[httpx.BaseTransport] = None,
+) -> list[dict[str, Any]]:
+    """List available models from an OpenAI-compatible /models endpoint.
+
+    Returns a normalized list of `{id, name, contextWindow?, owned_by?}`
+    dicts, alphabetically sorted by id. Mirrors IWO2's
+    ``GET /api/llm-settings/models`` behavior (server/llm-settings-routes.ts).
+
+    Architect-lock §5 exception (approved 2026-04-26): adds a backend
+    surface that IWO3 lacked but IWO2 had — required for visual parity
+    of the model picker on the Aiden Settings page.
+
+    `transport` is an httpx test escape hatch (httpx.MockTransport).
+    """
+    if provider not in _PHASE_9_3_CALLABLE:
+        raise LlmProviderError(
+            "provider_not_callable",
+            f"provider {provider} is registered but not callable in Phase 9.3",
+            provider=provider,
+        )
+
+    cfg = get_provider_config(provider)
+    url = (base_url or cfg.default_base_url).rstrip("/") + "/models"
+
+    try:
+        with httpx.Client(timeout=timeout_seconds, transport=transport) as cli:
+            resp = cli.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+            )
+    except httpx.HTTPError as exc:
+        raise LlmProviderError(
+            "network_error",
+            f"{provider} /models request failed: {exc}",
+            provider=provider,
+        )
+
+    if resp.status_code != 200:
+        raise _map_http_error(provider, resp.status_code, resp.text)
+
+    try:
+        data = resp.json()
+    except ValueError:
+        raise LlmProviderError(
+            "response_invalid",
+            f"{provider} /models returned non-JSON body",
+            http_status=resp.status_code,
+            provider=provider,
+        )
+
+    raw = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(raw, list):
+        raise LlmProviderError(
+            "response_invalid",
+            f"{provider} /models response missing data array",
+            http_status=resp.status_code,
+            provider=provider,
+        )
+
+    out: list[dict[str, Any]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        model_id = entry.get("id")
+        if not isinstance(model_id, str) or not model_id:
+            continue
+        item: dict[str, Any] = {"id": model_id, "name": model_id}
+        owned_by = entry.get("owned_by")
+        if isinstance(owned_by, str):
+            item["owned_by"] = owned_by
+        # Groq + OpenRouter expose `context_window`; OpenAI does not.
+        ctx = entry.get("context_window") or entry.get("context_length")
+        if isinstance(ctx, int):
+            item["contextWindow"] = ctx
+        out.append(item)
+
+    out.sort(key=lambda m: m["id"].lower())
+    return out
+
+
 def call_openai_compatible(
     *,
     provider: str,
