@@ -265,6 +265,23 @@ def _api_from_session() -> ApiClient:
     return st.session_state["iwo3_api"]
 
 
+def clear_auth_session() -> None:
+    """Clear all auth/session-owned Streamlit keys and return to the
+    public landing page."""
+    for key in [
+        "iwo3_api",
+        "iwo3_logged_in",
+        "iwo3_auth_mode",
+        "iwo3_refresh_token",
+        "iwo3_current_user_id",
+        "iwo3_current_user_role",
+        "iwo3_current_user_label",
+        "iwo3_current_tenant_id",
+        "iwo3_current_tenant_label",
+    ]:
+        st.session_state.pop(key, None)
+
+
 def _brand_block_html(tenant_short: str) -> str:
     """IWO2-style identity block: blue square with white layers SVG +
     'AIDEN_IWO3 | <tenant>' headline + 'Orchestration Engine' subtitle."""
@@ -301,7 +318,32 @@ def render_sidebar_shell() -> ApiClient:
     # reflect the currently active tenant).
     brand_slot = st.sidebar.empty()
 
-    # Dev-auth picker (replaced by real auth in Loop 9+).
+    if st.session_state.get("iwo3_logged_in") and "iwo3_api" in st.session_state:
+        api = st.session_state["iwo3_api"]
+        tenant_label = st.session_state.get(
+            "iwo3_current_tenant_label", "IWO | Klear.ai"
+        )
+        tenant_short = tenant_label.split("|", 1)[-1].strip() or tenant_label
+        brand_slot.markdown(_brand_block_html(tenant_short), unsafe_allow_html=True)
+
+        with st.sidebar.expander("Session", expanded=False):
+            auth_mode = st.session_state.get("iwo3_auth_mode", "jwt")
+            if auth_mode == "dev_quick":
+                st.caption("Local dev quick-login session.")
+            else:
+                st.caption("Signed in session.")
+            if st.button("Sign out", use_container_width=True, key="iwo3_sign_out"):
+                refresh_token = st.session_state.get("iwo3_refresh_token")
+                try:
+                    if refresh_token:
+                        api.logout(refresh_token=refresh_token)
+                except APIError:
+                    pass
+                clear_auth_session()
+                st.rerun()
+        return api
+
+    # Dev-auth picker fallback for direct page work or legacy dev mode.
     with st.sidebar.expander("Dev auth", expanded=False):
         base_url = st.text_input(
             "API base URL",
@@ -352,11 +394,10 @@ def render_sidebar_shell() -> ApiClient:
 def render_sidebar_footer() -> None:
     """User badge + version footer, rendered AFTER st.navigation has
     injected its own widgets. Mirrors IWO2's bottom-left layout."""
-    # `iwo3_user_label` is a widget-owned key (the Acting-user
-    # selectbox) — reading from it is fine; writing would raise
-    # StreamlitAPIException. Derived state uses separate
-    # `iwo3_current_*` keys populated by render_sidebar_shell().
-    user_label = st.session_state.get("iwo3_user_label", "—")
+    user_label = st.session_state.get(
+        "iwo3_current_user_label",
+        st.session_state.get("iwo3_user_label", "—"),
+    )
     role = st.session_state.get("iwo3_current_user_role", "—")
     tenant_label = st.session_state.get("iwo3_current_tenant_label", "—")
     initials = _initials(user_label)
@@ -379,8 +420,63 @@ def render_sidebar_footer() -> None:
 def page_requires_api() -> Optional[ApiClient]:
     """View helper — resolves the ApiClient or renders a guiding
     message if the shell never ran (e.g., a view script invoked
-    directly)."""
+    directly).
+
+    Also paints a fixed top-right `← Dashboard` home affordance on every
+    authenticated page so operators can return to the Dashboard from
+    anywhere without hunting the sidebar."""
     api = st.session_state.get("iwo3_api")
     if api is None:
         st.info("Open **Dashboard** first — the shell sets the auth context.")
+        return api
+    _render_top_right_home_link()
     return api
+
+
+def _render_top_right_home_link() -> None:
+    """Fixed top-right `← Dashboard` link rendered on every
+    authenticated page. The HTML anchor navigates via Streamlit's
+    multipage routing (Dashboard is `default=True`, served at both
+    `/` and `/Dashboard`). target=_self keeps the same tab so session
+    state survives the navigation."""
+    st.markdown(
+        """
+        <style>
+          .iwo3-home-link {
+            position: fixed;
+            top: 0.85rem;
+            right: 1.1rem;
+            z-index: 1000;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.84rem;
+            font-weight: 500;
+            color: #1E5F91;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 0.4rem 0.85rem;
+            text-decoration: none;
+            transition: border-color 150ms ease, background 150ms ease;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+          }
+          .iwo3-home-link:hover {
+            background: #f8fafc;
+            border-color: #1E5F91;
+            color: #1E5F91;
+          }
+          .iwo3-home-link svg { display: block; }
+        </style>
+        <a class="iwo3-home-link" href="/Dashboard" target="_self">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <path d="M9 22V12h6v10"/>
+          </svg>
+          Dashboard
+        </a>
+        """,
+        unsafe_allow_html=True,
+    )

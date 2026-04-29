@@ -140,17 +140,30 @@ class ApiClient:
         base_url: str = DEFAULT_BASE_URL,
         user_id: Optional[str] = None,
         client_id: Optional[str] = None,
+        access_token: Optional[str] = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._headers: dict[str, str] = {}
-        if user_id:
-            self._headers["X-IWO3-User"] = user_id
-        if client_id:
-            self._headers["X-IWO3-Client"] = client_id
+        if access_token:
+            self.set_bearer_token(access_token)
+        else:
+            if user_id:
+                self._headers["X-IWO3-User"] = user_id
+            if client_id:
+                self._headers["X-IWO3-Client"] = client_id
 
     def set_auth(self, user_id: str, client_id: str) -> None:
+        self._headers.pop("Authorization", None)
         self._headers["X-IWO3-User"] = user_id
         self._headers["X-IWO3-Client"] = client_id
+
+    def set_bearer_token(self, access_token: str) -> None:
+        self._headers.pop("X-IWO3-User", None)
+        self._headers.pop("X-IWO3-Client", None)
+        self._headers["Authorization"] = f"Bearer {access_token}"
+
+    def clear_auth(self) -> None:
+        self._headers.clear()
 
     def _request(
         self,
@@ -187,6 +200,27 @@ class ApiClient:
     def list_tenants(self) -> list[TenantMembership]:
         data = self._request("GET", "/tenants")
         return [TenantMembership(**t) for t in data["tenants"]]
+
+    def login(
+        self, *, email: str, password: str, client_id: str
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/auth/login",
+            json={
+                "email": email,
+                "password": password,
+                "client_id": client_id,
+            },
+        )
+
+    def logout(self, *, refresh_token: Optional[str] = None) -> dict[str, Any]:
+        payload = (
+            {"refresh_token": refresh_token}
+            if refresh_token
+            else {}
+        )
+        return self._request("POST", "/auth/logout", json=payload)
 
     # ---- work_orders ----
 
@@ -319,6 +353,15 @@ class ApiClient:
     def list_llm_providers(self) -> list[dict[str, Any]]:
         data = self._request("GET", "/llm/providers")
         return data["providers"]
+
+    def list_provider_models(self, *, provider: str) -> dict[str, Any]:
+        """GET /llm/models?provider=X.
+
+        Returns `{provider, keyConfigured, models, error?}`. Empty
+        models with keyConfigured=false means the caller should fall
+        back to manual text input — matches IWO2's ModelSelector.
+        """
+        return self._request("GET", "/llm/models", params={"provider": provider})
 
     def test_llm(
         self, *, agent_role: str, user_message: str = "ping"
