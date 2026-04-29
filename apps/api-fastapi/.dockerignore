@@ -1,0 +1,12 @@
+# Build context exclusions for apps/api-fastapi/Dockerfile.
+# Note: Dockerfile is built from REPO ROOT, so this .dockerignore lives
+# alongside the Dockerfile but only affects the api-fastapi subtree.
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.venv/
+**/*.pyc
+**/.env
+**/.env.local
+**/.coverage

@@ -1,0 +1,8 @@
+# Streamlit Cloud deploy manifest — MegaLoop Hosting Foundation ζ.5.
+# Streamlit Cloud reads this from the same directory as the entry file
+# (Home.py). Mirrors apps/console-streamlit/pyproject.toml dependencies.
+# Keep in sync with pyproject.toml.
+streamlit>=1.40.0
+httpx>=0.28.0
+pydantic>=2.9.0
+streamlit-sortables>=0.4.0
