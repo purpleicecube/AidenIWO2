@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -395,7 +396,15 @@ def _set_jwt_session(
 
 
 def _render_public_landing() -> None:
-    base_url = st.session_state.get("iwo3_api_base_url", "http://127.0.0.1:8000")
+    # Initial base_url for the public landing page must come from
+    # IWO3_API_BASE_URL when running in a hosted environment (Streamlit
+    # Cloud, Render, etc.) — session_state is empty before first sign-in,
+    # so the env var is the only signal pointing at the real API host.
+    # Local-dev fallback stays at 127.0.0.1:8000.
+    base_url = st.session_state.get(
+        "iwo3_api_base_url",
+        os.environ.get("IWO3_API_BASE_URL", "http://127.0.0.1:8000"),
+    )
     st.markdown(_LANDING_CSS, unsafe_allow_html=True)
     st.markdown(
         (
