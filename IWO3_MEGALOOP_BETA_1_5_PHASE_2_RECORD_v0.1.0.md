@@ -18,7 +18,7 @@ Beta-1 + Beta-1.5 ε.5 closed the architect's HIGH/MED gaps. Four documented car
 | 4 | Q7 chat persistence wire-up | A (chat_sessions table) | Streamlit chat.py reads/writes /chat_sessions/me |
 | 5 | Q11 per-operator scratch UI | A (per-operator subtree) | "Create my scratch" button + visible chip in tree |
 
-All five are now shipped. R-045 (encrypted-at-rest deferred) is **mitigated** — the code path exists with a graceful fallback to Beta-1 env-injection. R-031 partial → fully retired (UI tail closed). The pynacl operational caveat remains until the operator runs `uv add pynacl` on a networked host.
+All five are now shipped. R-045 (encrypted-at-rest deferred) is **retired 2026-04-29** (A4 working-version activation): pynacl 1.6.2 installed, `IWO3_CRYPTO_MASTER_KEY` set in `/home/virgina/VS_AIDEN_IWO3/.env`, FastAPI restarted on :5500, runtime verification (is_available True + encrypt/decrypt round-trip + per-tenant HKDF isolation) all pass. R-031 partial → fully retired (UI tail closed).
 
 ## Phase-2 ship summary
 
@@ -64,7 +64,7 @@ CHECK (
 
 NULL in all three slots = env-injection only (Beta-1 default). Non-NULL = encrypted-at-rest active. The runtime resolver `resolve_encrypted_or_env(...)` prefers the encrypted blob when present, falls through to env-injection otherwise. **Never silently downgrades.**
 
-### Offline-sandbox graceful fallback (R-045 → mitigating)
+### Offline-sandbox graceful fallback (R-045 retired 2026-04-29; fallback retained)
 
 The module imports cleanly even when pynacl is absent:
 
@@ -209,14 +209,11 @@ streamlit: 24 passed, 3 skipped (unchanged)
 
 - **R-031** (partial → full) — UI tail closed: chat persistence wired, ceiling editor live, persona library surfaced, scratch UI shipped.
 - **R-046** — already retired in ε.5; mentioned for traceability.
-
-### Mitigated (deferred → mitigated)
-
-- **R-045** Encrypted-at-rest deferred → **mitigated**. Code path exists with graceful fallback. Operator must `uv add pynacl` + set `IWO3_CRYPTO_MASTER_KEY` to activate. Same R-034 pattern. Stays mitigating until an operator confirms it on a networked host.
+- **R-045** Encrypted-at-rest deferred → **retired 2026-04-29** (post-phase-2, A4 working-version activation). pynacl 1.6.2 installed via `uv add pynacl`; `IWO3_CRYPTO_MASTER_KEY` (32-byte hex) set in `/home/virgina/VS_AIDEN_IWO3/.env` with master-key copy of record at `VS_PDOE/+8PGITHUB/00_Secrets/iwo3_crypto_master_key.txt` (gitignored, chmod 600); FastAPI restarted on :5500 with `--env-file`. Standalone runtime verification: `is_available()` True, encrypt/decrypt round-trip OK, cross-tenant decrypt fails with `CryptoCorrupt` (HKDF isolation enforced).
 
 ### Activated (dormant → mitigating)
 
-- **R-038** Encryption-key derivation SPOF — activates with R-045 mitigation. The HKDF approach scopes per-tenant blast radius but `IWO3_CRYPTO_MASTER_KEY` loss is still unrecoverable. Operator runbook documents this explicitly.
+- **R-038** Encryption-key derivation SPOF — activated in earnest by R-045 retire. The HKDF approach scopes per-tenant blast radius but `IWO3_CRYPTO_MASTER_KEY` loss is still unrecoverable. Mitigation: master-key copy of record stored at `VS_PDOE/+8PGITHUB/00_Secrets/iwo3_crypto_master_key.txt` (gitignored, chmod 600). Operator must back up off-machine; the on-machine copy is not a backup. Operator runbook documents rotation in a brief downtime window.
 
 ### Carry-forward (unchanged)
 
@@ -227,7 +224,7 @@ streamlit: 24 passed, 3 skipped (unchanged)
 
 ## Posture statement
 
-Beta-1 + Beta-1.5 phase 1 (ε.5) + Beta-1.5 phase 2 together form the **completed Production Posture baseline.** The webhook → dispatch path is end-to-end; audit telemetry that mitigations rely on is real; per-operator scratch backend and UI both isolate; encrypted-at-rest credentials have a code path waiting on a single operator step; and every Q1–Q15 architect-locked outcome has either shipped end-to-end or is mitigated with a documented next-action.
+Beta-1 + Beta-1.5 phase 1 (ε.5) + Beta-1.5 phase 2 together form the **completed Production Posture baseline.** The webhook → dispatch path is end-to-end; audit telemetry that mitigations rely on is real; per-operator scratch backend and UI both isolate; encrypted-at-rest credentials are **active and verified** (R-045 retired 2026-04-29 via A4 working-version activation); and every Q1–Q15 architect-locked outcome has shipped end-to-end.
 
 **Beta-2 (Capability Expansion) opens cleanly from this baseline** — Slack adapter, Sandbox PPTX/PDF, Tool/MCP registry, Aiden conversational v2 — per architect Q12/Q14 lock.
 
@@ -241,9 +238,9 @@ Beta-1 + Beta-1.5 phase 1 (ε.5) + Beta-1.5 phase 2 together form the **complete
 - [x] Q11 — scratch endpoint idempotent + soft-delete restore; "Create my scratch" + "Open my scratch" both work; cross-operator invisibility tested.
 - [x] CI green: pytest 248/1 skipped, vitest 581/0, streamlit 24/3.
 - [x] Audit vocabulary lock — `client.settings_updated` added; `BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS` array + snapshot delta committed.
-- [ ] Operator activates pynacl on networked host (R-045 final retire).
+- [x] Operator activates pynacl on networked host (R-045 final retire) — **completed 2026-04-29 via A4 working-version activation**.
 - [ ] Architect acceptance of Beta-1.5 phase 2 → Beta-2 authorization.
 
 ## Recommendation to CODEX
 
-**Accept Beta-1 + Beta-1.5 phase 1 + Beta-1.5 phase 2 together as the completed Production Posture baseline.** Authorize Beta-2 (Capability Expansion) on acceptance. R-045 stays mitigating until the operator runs `uv add pynacl` on a networked host; that is a one-command step, not blocking.
+**Accept Beta-1 + Beta-1.5 phase 1 + Beta-1.5 phase 2 together as the completed Production Posture baseline.** Authorize Beta-2 (Capability Expansion) on acceptance. R-045 retired 2026-04-29 (post-phase-2, A4 working-version activation): pynacl installed, master key set, runtime verified.

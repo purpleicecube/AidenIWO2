@@ -6,7 +6,7 @@ Closeout: MegaLoop Beta-1 + Beta-1.5 phase 1 (ε.5) + Beta-1.5 phase 2 — compl
 
 ## Posture statement
 
-Beta-1 + Beta-1.5 phase 1 + Beta-1.5 phase 2 together form the **completed Production Posture baseline**. All 12 must-have architect Q's (Q1–Q12) ship end-to-end; Q13/Q14 are deferred-as-locked (Slack adapter to Beta-2); Q4 is deferred-as-locked. Q15 has a code path with graceful offline fallback awaiting one operator command (`uv add pynacl` + `IWO3_CRYPTO_MASTER_KEY`) to retire R-045 finally.
+Beta-1 + Beta-1.5 phase 1 + Beta-1.5 phase 2 together form the **completed Production Posture baseline**. All 12 must-have architect Q's (Q1–Q12) ship end-to-end; Q13/Q14 are deferred-as-locked (Slack adapter to Beta-2); Q4 is deferred-as-locked. Q15 **retired 2026-04-29** (A4 working-version activation): pynacl 1.6.2 installed, `IWO3_CRYPTO_MASTER_KEY` set in `apps/api-fastapi/.env` (master-key copy of record at `VS_PDOE/+8PGITHUB/00_Secrets/iwo3_crypto_master_key.txt`), `is_available()` True, encrypt/decrypt round-trip + per-tenant HKDF isolation verified.
 
 ## Active risks (post-Beta-1.5 phase 2)
 
@@ -44,22 +44,16 @@ Architectural exception: `/auth/login` looks up users by email **before** the te
 
 **Mitigation:** Single 401 response for all failure modes (`{"error":"invalid_credentials"}`) — no email-existence oracle. Audit `auth.login_failed` rows show the attempted email + tenant for forensics.
 
-### R-045 [S2] Encrypted-at-rest credentials — **mitigated** (was deferred)
+### R-038 [S2] Encryption-key derivation single-point-of-failure — **mitigating**
 
-Q15 code path shipped at Beta-1.5 phase 2: `runtime/credentials_crypto.py` (NaCl SecretBox + per-tenant HKDF-SHA256), migration 0018 adds `encrypted_value (bytea) + encryption_algo + encrypted_at` triplet on `adapter_credentials`, `resolve_encrypted_or_env` prefers blob and falls through to env-injection (never silently downgrades). The module imports cleanly without pynacl; encrypt/decrypt raise `CryptoUnavailable` with operator-actionable message.
+Activated in earnest by R-045 retire (2026-04-29). Lost `IWO3_CRYPTO_MASTER_KEY` = unrecoverable encrypted credentials. The HKDF-SHA256 per-tenant derivation scopes blast radius (a tenant-key compromise doesn't unlock other tenants), but master-key loss has no recovery path.
 
-**Final retire condition:** operator activates on a networked host with `cd apps/api-fastapi && uv add pynacl` + sets `IWO3_CRYPTO_MASTER_KEY` (32-byte hex(64) or base64(44)). Same R-034 pattern — one operator command. Recommend Beta-2 phase 0 covers the retire + ADR-030 (Q15 architecture).
+**Mitigation:** Master-key copy of record stored at `VS_PDOE/+8PGITHUB/00_Secrets/iwo3_crypto_master_key.txt` (gitignored, chmod 600). Operator must back up off-machine (password manager, encrypted USB, or paper in a safe) — the on-machine copy is not a backup. Operator runbook documents rotation in a brief downtime window (new master key → re-encrypt credentials → swap env var). Documented in `runtime/credentials_crypto.py` docstring + `IWO3_MEGALOOP_BETA_1_5_PHASE_2_RECORD_v0.1.0.md` § Q15.
 
-### R-038 [S2] Encryption-key derivation single-point-of-failure — **mitigating** (was dormant)
-
-Activated alongside R-045 mitigation. Lost `IWO3_CRYPTO_MASTER_KEY` = unrecoverable encrypted credentials. The HKDF-SHA256 per-tenant derivation scopes blast radius (a tenant-key compromise doesn't unlock other tenants), but master-key loss has no recovery path.
-
-**Mitigation:** Operator runbook documents rotation in a brief downtime window (new master key → re-encrypt credentials → swap env var). Documented in `runtime/credentials_crypto.py` docstring + `IWO3_MEGALOOP_BETA_1_5_PHASE_2_RECORD_v0.1.0.md` § Q15.
-
-## Retired in Beta-1 + Beta-1.5 (11 risks)
+## Retired in Beta-1 + Beta-1.5 (12 risks)
 
 | Risk | Closed by |
-|---|---|
+| --- | --- |
 | R-021 (S1) | Q1 per-tenant LLM ceiling override (backend ε.3 + UI editor phase 2) |
 | R-024 (S2) | `/health/channels` surfaces resolution status to the operator |
 | R-026 (S3) | Q5 RBAC granularity |
@@ -72,16 +66,17 @@ Activated alongside R-045 mitigation. Lost `IWO3_CRYPTO_MASTER_KEY` = unrecovera
 | R-035 (S3) | Q9 workspace content fetch endpoint |
 | R-036 (S3) | Q10 workspace hard-delete (folder cascade + file remove) |
 | R-046 (NEW + retired) | Architect-flagged ε.5 gaps: webhook dispatch, signature_invalid audit, scratch isolation |
+| R-045 (S2) | **Retired 2026-04-29 (A4 working-version activation):** `uv add pynacl` (1.6.2 installed); `IWO3_CRYPTO_MASTER_KEY` set in `/home/virgina/VS_AIDEN_IWO3/.env` (master-key copy of record at `VS_PDOE/+8PGITHUB/00_Secrets/iwo3_crypto_master_key.txt`); FastAPI restarted on :5500 with `--env-file`; standalone verification confirms `is_available()` True, encrypt → 71-byte blob, decrypt round-trip OK, cross-tenant decrypt fails with `CryptoCorrupt` (HKDF isolation enforced). |
 
 ## Cardinality summary
 
-- **Active:** 9 (R-022, R-023, R-030, R-034, R-037, R-038, R-039, R-044, R-045)
-- **Retired this loop:** 12 (10 from Beta-1, 1 from ε.5, R-031 fully retired in phase 2)
-- **State changes this loop:** R-045 deferred → mitigated; R-038 dormant → mitigating
-- **Final retire condition outstanding:** R-045 (one operator command)
+- **Active:** 8 (R-022, R-023, R-030, R-034, R-037, R-038, R-039, R-044)
+- **Retired this loop:** 13 (10 from Beta-1, 1 from ε.5, R-031 fully retired in phase 2, R-045 retired post-phase-2 on 2026-04-29)
+- **State changes this loop:** R-045 deferred → mitigated → **retired**; R-038 dormant → mitigating
+- **Final retire condition outstanding:** none
 
 ## Process notes
 
 - This is the **final** v0.3.0 register; v0.3.0_partial superseded.
-- v0.4.0 expected at MegaLoop Beta-2 (Capability Expansion) closeout. Beta-2 phase 0 should cover R-045 final retire + ADR-030 (Q15 crypto architecture).
+- v0.4.0 expected at MegaLoop Beta-2 (Capability Expansion) closeout. Beta-2 phase 0 may still cover ADR-030 (Q15 crypto architecture documentation); R-045 final retire is no longer a Beta-2 prerequisite.
 - R-034 stays carried until operator confirms drag-drop on a networked host. Independent of R-045.

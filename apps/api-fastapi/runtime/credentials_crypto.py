@@ -69,7 +69,7 @@ def algo_tag() -> str:
 def is_available() -> bool:
     """True iff pynacl is importable AND a usable master key is set.
 
-    Operators can probe this from /health/credential_crypto without
+    Callers (dispatch path, ad-hoc probes) can use this without
     triggering a full encrypt. A False return means dispatch falls back
     to env-injection (the Beta-1 default), not that the runtime breaks.
     """
