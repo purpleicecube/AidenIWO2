@@ -32,9 +32,15 @@ tags = ["iwo3", "fixtures"]
   stopwords = ["credential_ref:"]
 
 [allowlist]
-description = "Allow Gamma template IDs — they are not secrets"
+description = "Allow Gamma template IDs and IWO3_* env-var-name string literals"
 regexes = [
+  # Gamma template IDs — operational identifiers, not credentials
   '''g_[a-z0-9]{15,}''',
+  # IWO3_* env var NAMES referenced as string literals in source
+  # (e.g. SIGNING_KEY_ENV_VAR = "IWO3_JWT_SIGNING_KEY"). The all-caps
+  # IWO3_* shape is an identifier, not secret material. Real key values
+  # are mixed case + symbols and never match this anchored pattern.
+  '''^IWO3_[A-Z0-9_]+$''',
 ]
 
 paths = [
