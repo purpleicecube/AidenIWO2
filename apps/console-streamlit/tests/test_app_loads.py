@@ -56,29 +56,14 @@ def test_home_renders_without_streamlit_api_exception() -> None:
         )
 
 
-def test_render_sidebar_shell_derived_keys_use_distinct_names() -> None:
-    """Guard the naming convention — widget keys and derived-state
-    keys must be disjoint. A future refactor that re-collides them
-    would trip this on any AppTest run."""
+def test_home_renders_public_landing_before_auth() -> None:
+    """Unauthenticated Home.py should present the landing-page login
+    surface instead of auto-seeding a dev-auth session."""
     at = AppTest.from_file(str(CONSOLE_DIR / "Home.py"), default_timeout=20)
     at.run()
 
-    # Widget keys — these are Streamlit-owned; their values persist
-    # across reruns but are not writeable post-instantiation.
-    widget_keys = {"iwo3_user_label", "iwo3_tenant_idx", "iwo3_api_base_url"}
-    # Derived keys — application-owned; we write these every render.
-    derived_keys = {
-        "iwo3_api",
-        "iwo3_current_user_id",
-        "iwo3_current_user_role",
-        "iwo3_current_tenant_id",
-        "iwo3_current_tenant_label",
-    }
-
-    overlap = widget_keys & derived_keys
-    assert not overlap, f"Widget/derived key collision: {overlap}"
-
-    # Derived keys must be present after render_sidebar_shell ran.
     ss = at.session_state
-    missing = [k for k in derived_keys if k not in ss]
-    assert missing == [], f"Derived session keys missing after shell render: {missing}"
+    assert "iwo3_api" not in ss
+    assert "iwo3_logged_in" not in ss
+    assert "iwo3_login_email" in ss
+    assert "iwo3_login_password" in ss
