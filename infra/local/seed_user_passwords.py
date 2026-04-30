@@ -32,7 +32,7 @@ import sys
 from getpass import getpass
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 API_DIR = REPO_ROOT / "apps" / "api-fastapi"
 sys.path.insert(0, str(API_DIR))
 
