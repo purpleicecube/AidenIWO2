@@ -29,6 +29,7 @@ Scope guard: the resolver never rewrites Aiden's `assigned_role` or
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -183,8 +184,21 @@ def _norm(text: str) -> str:
 
 
 def _label_from_contract(content_contract: Any, profile_key: str) -> str:
-    if isinstance(content_contract, dict):
-        label = content_contract.get("label")
+    """Return the human-readable label from `content_contract.label`.
+
+    asyncpg returns jsonb columns as JSON-encoded strings by default
+    (no codec set in this project), so we accept both pre-parsed dicts
+    and raw string payloads. Falls back to `profile_key` if the
+    content_contract is missing, malformed, or has no label field.
+    """
+    parsed: Any = content_contract
+    if isinstance(parsed, str):
+        try:
+            parsed = json.loads(parsed)
+        except (json.JSONDecodeError, TypeError):
+            return profile_key
+    if isinstance(parsed, dict):
+        label = parsed.get("label")
         if isinstance(label, str) and label.strip():
             return label.strip()
     return profile_key

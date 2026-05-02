@@ -231,3 +231,33 @@ def test_parametrized_klear_matches(intake: str, expected_key: str) -> None:
     assert result.kind == "matched"
     assert result.match is not None
     assert result.match.profile_key == expected_key
+
+
+# ── content_contract jsonb-string handling ───────────────────────────
+
+
+def test_label_decoded_from_jsonb_string_payload() -> None:
+    """asyncpg returns jsonb columns as JSON-encoded strings by default.
+    `_label_from_contract` must decode the string before reading
+    `label`; otherwise the chat-side display falls back to profile_key
+    and operators never see the human-readable template name."""
+    from runtime.template_resolver import _label_from_contract
+
+    # Pre-parsed dict (TS / drizzle-style)
+    assert (
+        _label_from_contract({"label": "Klear.ai primary PPTX template"}, "k")
+        == "Klear.ai primary PPTX template"
+    )
+    # Raw JSON string (asyncpg default)
+    assert (
+        _label_from_contract(
+            '{"label": "Klear.ai primary PPTX template"}', "k"
+        )
+        == "Klear.ai primary PPTX template"
+    )
+    # Malformed JSON string falls back
+    assert _label_from_contract("{not json", "fallback") == "fallback"
+    # None falls back
+    assert _label_from_contract(None, "fallback") == "fallback"
+    # Dict without label falls back
+    assert _label_from_contract({"other": "x"}, "fallback") == "fallback"
