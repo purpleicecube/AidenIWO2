@@ -32,6 +32,68 @@ iwo3_db = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def _gamma_live_gate_satisfied() -> "object":
+    """Live-gate the dispatcher for the duration of every test in this
+    module: GAMMA_LIVE_ENABLED=true + a fake credential env var + a fresh
+    klear gamma adapter_credentials row with first_invocation_confirmed_at
+    set. Mirrors the test_poll_registry pattern. Without this, the seeded
+    aiden_iwo3 DB has no adapter_credentials row at all (the seed loader
+    does not populate it) and the live gate refuses every dispatch."""
+    if not os.environ.get("IWO3_DATABASE_URL"):
+        yield
+        return
+
+    prior_live = os.environ.get("GAMMA_LIVE_ENABLED")
+    prior_key = os.environ.get("GAMMA_REGISTRY_TEST_KEY")
+    os.environ["GAMMA_LIVE_ENABLED"] = "true"
+    os.environ["GAMMA_REGISTRY_TEST_KEY"] = "fake-test-key-not-real"
+
+    async def _seed_cred() -> None:
+        conn = await asyncpg.connect(dsn=os.environ["IWO3_DATABASE_URL"])
+        try:
+            catalog_id = await conn.fetchval(
+                "SELECT id FROM adapter_catalog WHERE adapter_key = 'gamma'"
+            )
+            await conn.execute(
+                "DELETE FROM adapter_credentials "
+                "WHERE client_id = $1 AND adapter_catalog_id = $2",
+                KLEAR_CLIENT,
+                catalog_id,
+            )
+            await conn.execute(
+                """
+                INSERT INTO adapter_credentials
+                  (client_id, adapter_catalog_id, credential_ref, status,
+                   first_invocation_confirmed_at,
+                   first_invocation_confirmed_by_user_id)
+                VALUES ($1, $2, 'credential_ref:env:GAMMA_REGISTRY_TEST_KEY',
+                        'active', now(), $3)
+                """,
+                KLEAR_CLIENT,
+                catalog_id,
+                KLEAR_OPERATOR,
+            )
+        finally:
+            await conn.close()
+
+    asyncio.run(_seed_cred())
+    try:
+        yield
+    finally:
+        # Restore env; leave the credential row in place — fresh per test
+        # via the upsert above, and other tests (poll_registry) re-create
+        # it as needed.
+        if prior_live is None:
+            os.environ.pop("GAMMA_LIVE_ENABLED", None)
+        else:
+            os.environ["GAMMA_LIVE_ENABLED"] = prior_live
+        if prior_key is None:
+            os.environ.pop("GAMMA_REGISTRY_TEST_KEY", None)
+        else:
+            os.environ["GAMMA_REGISTRY_TEST_KEY"] = prior_key
+
+
 # ────────── Fixtures: package + handoff lifecycle helpers ──────────
 
 

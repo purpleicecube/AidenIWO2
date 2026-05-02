@@ -20,3 +20,7 @@ os.environ.setdefault("IWO3_POLL_WORKER_DISABLED", "true")
 # every TestClient(app) would start the polling loop and try to hit
 # Telegram with whatever stale env vars happen to be set.
 os.environ.setdefault("IWO3_TELEGRAM_WORKER_DISABLED", "true")
+# Beta-2 phase 0.2 — auto-dispatch worker. Same discipline: keep the
+# 30s-tick worker out of pytest TestClient lifespans so it doesn't
+# move pending → processing on rows other tests are exercising.
+os.environ.setdefault("IWO3_WO_DISPATCH_WORKER_DISABLED", "true")
