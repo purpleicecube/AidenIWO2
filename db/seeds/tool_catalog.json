@@ -243,9 +243,9 @@
     "id": "00000000-0000-4000-8000-0000c0000010",
     "toolKey": "stitch_design",
     "displayName": "Stitch Design (MCP)",
-    "description": "Dispatch a design action to the Stitch MCP server (Eta.2 Worker I lands runnable handler).",
+    "description": "Dispatch a design action to the Stitch MCP server. action='list_tools' enumerates the catalog; action=<tool-name> + payload invokes a specific tool.",
     "category": "design",
-    "runtimeStatus": "mcp",
+    "runtimeStatus": "runnable",
     "argsSchema": {
       "type": "object",
       "properties": {
@@ -265,7 +265,7 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "stitch-design",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — registered as MCP; runnable handler ships in Eta.2."
+    "notes": "Loop Eta phase 1.1 — runnable handler shipped (Worker I): runtime/tools/stitch_mcp.py + GET /tools/stitch_design/test_connection. STITCH_MCP_COMMAND env var routes to the stdio MCP proxy (default in IWO2: node server/stitch-mcp-proxy.mjs)."
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000011",

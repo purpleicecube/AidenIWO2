@@ -613,3 +613,21 @@ class ApiClient:
             f"/llm/configs/{llm_config_id}/tool_history",
             params={"limit": limit},
         )
+
+    # ── Loop Eta phase 1.1 — Stitch MCP runtime probe ────────────────
+
+    def test_stitch_connection(self) -> dict[str, Any]:
+        """GET /tools/stitch_design/test_connection.
+
+        Opens the Stitch MCP stdio session, enumerates the server's
+        tool catalog, closes the session, and returns
+        ``{ok, server_name, tool_count, latency_ms, sample_tool_names}``
+        on success. On any failure (config_missing, spawn_failed,
+        handshake_failed, timeout) the route returns 503 + a JSON body
+        with ``ok=false, error, kind``; this helper surfaces that body
+        through the standard ``APIError`` path so callers can decide
+        whether to retry or surface the diagnostic verbatim.
+        """
+        return self._request(
+            "GET", "/tools/stitch_design/test_connection"
+        )

@@ -40,6 +40,7 @@ from routes import (
     output_packages,
     template_profiles,
     tenants,
+    tools as tools_routes,
     webhooks,
     work_orders,
     workflows,
@@ -109,6 +110,7 @@ app.include_router(adapter_credentials.router)
 app.include_router(adapter_credentials.status_router)
 app.include_router(llm.router)
 app.include_router(llm.tool_catalog_router)
+app.include_router(tools_routes.router)
 app.include_router(channels.router)
 app.include_router(aiden.router)
 app.include_router(dispatch.router)
