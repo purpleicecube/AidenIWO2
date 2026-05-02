@@ -1519,6 +1519,118 @@ async def get_sub_agent_tools(
     )
 
 
+# ── GET /llm/configs/{id}/tool_history — scoped runtime history ───────
+
+
+class SubAgentToolHistoryEntry(BaseModel):
+    action: str
+    tool_name: Optional[str] = None
+    work_order_id: Optional[str] = None
+    iteration_index: Optional[int] = None
+    detail: Optional[str] = None
+    result_size_chars: Optional[int] = None
+    created_at: str
+    metadata: dict[str, Any]
+
+
+class SubAgentToolHistoryResponse(BaseModel):
+    llm_config_id: str
+    agent_role: str
+    entries: list[SubAgentToolHistoryEntry]
+
+
+@router.get(
+    "/configs/{config_id}/tool_history",
+    response_model=SubAgentToolHistoryResponse,
+    dependencies=[Depends(require_permission_dep("audit_log:read"))],
+)
+async def list_sub_agent_tool_history(
+    config_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+    limit: int = 25,
+) -> SubAgentToolHistoryResponse:
+    """Return recent runtime tool events for one llm_config.
+
+    Scope is deliberately narrow: only Tier 2 runtime events carrying
+    metadata.llm_config_id are included. This backs the Sub-Agents UI's
+    per-agent Tool History tab without exposing the full tenant audit
+    surface in that modal.
+    """
+    try:
+        cfg = await conn.fetchrow(
+            """
+            SELECT id::text AS id, agent_role
+              FROM llm_configs
+             WHERE id = $1::uuid
+            """,
+            config_id,
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_config_id", "value": config_id},
+        )
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "llm_config_not_found", "id": config_id},
+        )
+
+    rows = await conn.fetch(
+        """
+        SELECT action,
+               metadata,
+               created_at::text AS created_at
+          FROM action_audit_log
+         WHERE client_id = $1::uuid
+           AND metadata->>'llm_config_id' = $2
+           AND action LIKE 'sub_agent.tool_%'
+         ORDER BY created_at DESC, id DESC
+         LIMIT $3
+        """,
+        ctx["client_id"],
+        config_id,
+        max(1, min(limit, 100)),
+    )
+
+    def _to_dict(md: Any) -> dict[str, Any]:
+        if md is None:
+            return {}
+        if isinstance(md, dict):
+            return md
+        if isinstance(md, str):
+            try:
+                return json.loads(md)
+            except (TypeError, ValueError):
+                return {}
+        return {}
+
+    entries: list[SubAgentToolHistoryEntry] = []
+    for row in rows:
+        md = _to_dict(row["metadata"])
+        entries.append(
+            SubAgentToolHistoryEntry(
+                action=row["action"],
+                tool_name=md.get("tool_name"),
+                work_order_id=md.get("work_order_id"),
+                iteration_index=md.get("iteration_index"),
+                detail=md.get("detail"),
+                result_size_chars=md.get("result_size_chars"),
+                created_at=row["created_at"],
+                metadata=md,
+            )
+        )
+
+    return SubAgentToolHistoryResponse(
+        llm_config_id=cfg["id"],
+        agent_role=cfg["agent_role"],
+        entries=entries,
+    )
+
+
 # ── PUT /llm/configs/{id}/tools/{tool_key} — toggle assignment ─────────
 
 

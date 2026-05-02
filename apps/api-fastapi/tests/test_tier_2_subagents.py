@@ -2,7 +2,7 @@
 
 Covers:
   - invoke_tier_2 happy path: parses envelope, emits llm.invoked
-  - normalize_tier_2_role accepts mark/tom/hank/paul + their _tier_2 forms
+  - normalize_tier_2_role accepts every seeded Tier 2 role + aliases
   - Tier2RoleUnknown for an unknown role
   - Tier2OutputMalformed when LLM returns garbage
   - execute_step_run end-to-end: step_run pending → running → completed
@@ -65,7 +65,12 @@ SAMPLE_ENVELOPE = json.dumps({
 
 
 def test_normalize_role_accepts_short_and_long_forms() -> None:
+    assert normalize_tier_2_role("jamie") == "jamie_tier_2"
     assert normalize_tier_2_role("mark") == "mark_tier_2"
+    assert normalize_tier_2_role("nyx") == "nyx_tier_2"
+    assert normalize_tier_2_role("polaris") == "polaris_tier_2"
+    assert normalize_tier_2_role("darla") == "darla_tier_2"
+    assert normalize_tier_2_role("sop_master") == "sop_master_tier_2"
     assert normalize_tier_2_role("tom_tier_2") == "tom_tier_2"
     assert normalize_tier_2_role("hank") == "hank_tier_2"
     assert normalize_tier_2_role("paul") == "paul_tier_2"
@@ -96,6 +101,33 @@ def test_invoke_tier_2_happy_path() -> None:
                 assert "Klear weekly brief" in env.content_markdown
                 assert env.output_kind == "generic"
                 assert env.metadata.get("sections") == 6
+            finally:
+                await conn.close()
+        finally:
+            del os.environ["OPENROUTER_API_KEY"]
+
+    asyncio.run(run())
+
+
+@iwo3_db
+def test_invoke_tier_2_happy_path_for_darla() -> None:
+    async def run() -> None:
+        os.environ["OPENROUTER_API_KEY"] = "test-key"
+        try:
+            conn = await _connect()
+            try:
+                env = await invoke_tier_2(
+                    conn,
+                    role="darla",
+                    intake_text="Review the landing page visual hierarchy",
+                    content_blocks={"prompt": "go"},
+                    work_order_id=None,
+                    client_id=KLEAR_CLIENT,
+                    actor_user_id=KLEAR_OPERATOR,
+                    transport=_ok_transport(SAMPLE_ENVELOPE),
+                )
+                assert "Klear weekly brief" in env.content_markdown
+                assert env.output_kind == "generic"
             finally:
                 await conn.close()
         finally:

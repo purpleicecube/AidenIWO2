@@ -595,3 +595,21 @@ class ApiClient:
             f"/llm/configs/{llm_config_id}/tools/{tool_key}",
             json=body,
         )
+
+    def get_sub_agent_tool_history(
+        self,
+        llm_config_id: str,
+        *,
+        limit: int = 25,
+    ) -> dict[str, Any]:
+        """GET /llm/configs/{id}/tool_history.
+
+        Returns recent runtime tool events scoped to one llm_config.
+        This is narrower than the global audit log and intended for the
+        Sub-Agents modal's Tool History tab.
+        """
+        return self._request(
+            "GET",
+            f"/llm/configs/{llm_config_id}/tool_history",
+            params={"limit": limit},
+        )

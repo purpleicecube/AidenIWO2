@@ -2,8 +2,8 @@
 
 What changed from Pre-Beta β.6:
   * Card-grid layout that scales to all 11 IWO2-parity sub-agents
-    (1 aiden_tier_1 + 1 pm_tier_15 + 4 IWO2-Tier-2 imports + 3 parity
-    approximations + 2 net-new).
+    (1 aiden_tier_1 + 1 pm_tier_15 + 6 imported Tier-2 roles + 3
+    parity approximations).
   * Provenance badge per card (extracted_from_iwo2_live = green,
     extracted_from_iwo2_static = blue, authored_parity_approximation
     = amber, authored_net_new = violet, otherwise "unknown").
@@ -11,8 +11,8 @@ What changed from Pre-Beta β.6:
     checkbox grid; each toggle hits PUT /llm/configs/{id}/tools/{key}.
   * Runtime Tools tab — chips listing currently-runnable + assigned
     + enabled tools (mirrors IWO2 RuntimeToolsSummary).
-  * Tool History tab — stub. Spec says "leave a stub" until a
-    structured agent-tool-history endpoint exists.
+  * Tool History tab — real per-agent runtime tool-call history backed
+    by GET /llm/configs/{id}/tool_history.
   * RBAC banner per write surface (llm_config:write for prompt/connection
     edits, sub_agent_tool:assign for Tool Access toggles).
 
@@ -542,24 +542,82 @@ def _render_runtime_tools_tab(
 # ── tool history (6) ──────────────────────────────────────────────────
 
 
-def _render_tool_history_tab(cfg: dict[str, Any]) -> None:
+def _render_tool_history_tab(
+    api,  # noqa: ANN001
+    cfg: dict[str, Any],
+    *,
+    can_read_audit: bool,
+) -> None:
     """Section 6 — Tool History.
 
-    The loop spec explicitly authorises a stub here:
-    "The history table is OPTIONAL for this loop — leave a stub
-    'Coming soon' if the API isn't easy to query."
-
-    A structured per-agent tool-call history endpoint does not exist
-    yet (action_audit_log holds the data but is not exposed scoped to
-    a single sub-agent). Will be wired once the audit query surface
-    grows.
+    Shows recent runtime tool-call audit scoped to one llm_config.
+    History is runtime-only: grants/revokes stay in the global audit
+    log; this tab focuses on calls, denials, failures, and cap events.
     """
-    st.info(
-        "**Tool History — coming soon.** Per-agent tool-call history "
-        "lands when the audit log gains a `target_id=llm_config` filter. "
-        f"Today, see the global Audit Log page filtered by "
-        f"`agent_role={cfg['agent_role']}` for adjacent visibility."
+    if not can_read_audit:
+        st.info(
+            "Tool History requires `audit_log:read`. Ask an admin to "
+            "grant audit visibility for this tenant."
+        )
+        return
+
+    try:
+        bundle = api.get_sub_agent_tool_history(cfg["id"], limit=25)
+    except APIError as err:
+        st.error(
+            f"Could not load tool history: {err.status_code} — {err.detail}"
+        )
+        return
+
+    entries = bundle.get("entries", [])
+    if not entries:
+        st.caption(
+            "No runtime tool events for this sub-agent yet. Once the "
+            "agent executes assigned tools, recent calls and denials "
+            "will appear here."
+        )
+        return
+
+    tool_counts: dict[str, int] = {}
+    for entry in entries:
+        tool_name = entry.get("tool_name") or "cap_event"
+        tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
+
+    st.caption(
+        f"{len(entries)} recent runtime event(s) for "
+        f"`{bundle.get('agent_role', cfg['agent_role'])}`."
     )
+
+    chip_html = " ".join(
+        f'<span style="display:inline-block; background:#DBEAFE; '
+        f'color:#1E40AF; padding:3px 10px; border-radius:9999px; '
+        f'font-size:0.76rem; font-weight:600; margin:2px 4px 2px 0;">'
+        f'{tool_name} × {count}'
+        f"</span>"
+        for tool_name, count in sorted(
+            tool_counts.items(), key=lambda kv: (-kv[1], kv[0])
+        )
+    )
+    st.markdown(chip_html, unsafe_allow_html=True)
+
+    for entry in entries[:10]:
+        action = entry.get("action", "sub_agent.tool_unknown")
+        tool_name = entry.get("tool_name") or "n/a"
+        wo_id = entry.get("work_order_id") or "—"
+        iteration = entry.get("iteration_index")
+        detail = entry.get("detail") or ""
+        result_size = entry.get("result_size_chars")
+        bits = [f"`{action}`", f"tool `{tool_name}`", f"WO `{wo_id}`"]
+        if iteration is not None:
+            bits.append(f"iter `{iteration}`")
+        if result_size is not None:
+            bits.append(f"result chars `{result_size}`")
+        st.markdown(
+            f"**{entry.get('created_at', '')[:19]}** — "
+            + " · ".join(bits)
+        )
+        if detail:
+            st.caption(detail)
 
 
 # ── version history (preserved from β.6) ──────────────────────────────
@@ -781,6 +839,7 @@ def main() -> None:
         configs = api.list_llm_configs()
         can_admin = api.check_permission("llm_config:write")
         can_assign = api.check_permission("sub_agent_tool:assign")
+        can_read_audit = api.check_permission("audit_log:read")
     except APIError as err:
         st.error(f"❌ {err.status_code} — {err.detail}")
         return
@@ -855,7 +914,11 @@ def main() -> None:
                         with tabs[2]:
                             _render_runtime_tools_tab(api, cfg)
                         with tabs[3]:
-                            _render_tool_history_tab(cfg)
+                            _render_tool_history_tab(
+                                api,
+                                cfg,
+                                can_read_audit=can_read_audit.allowed,
+                            )
                         with tabs[4]:
                             _render_history_tab(
                                 api, cfg, can_admin.allowed

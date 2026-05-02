@@ -6,9 +6,9 @@ These tests pin down the structural contract of the rebuilt
   * The module parses cleanly (the same gate every other view honours).
   * The expected internal helpers are present (renderers for the six
     IWO2-style sections, plus the preserved tabs).
-  * The role-label table covers all 11 IWO2-parity sub-agents
-    (1 Tier-1 + 1 Tier-1.5 + 4 Tier-2 imports + 3 parity approximations
-    + 2 net-new) so a typo can't silently leave a card unlabelled.
+  * The role-label table covers all 11 seeded sub-agents
+    (1 Tier-1 + 1 Tier-1.5 + 6 imported Tier-2 roles + 3 parity
+    approximations) so a typo can't silently leave a card unlabelled.
   * The provenance label table covers every documented provenance
     value plus the unknown fallback.
 
@@ -61,7 +61,7 @@ def test_section_renderers_present() -> None:
         "_render_edit_form",  # sections 2 + 3 — persona + connection
         "_render_tool_access_tab",  # section 4 — tool access grid
         "_render_runtime_tools_tab",  # section 5 — runtime chips
-        "_render_tool_history_tab",  # section 6 — stub
+        "_render_tool_history_tab",  # section 6 — runtime history
         "_render_history_tab",  # preserved — version log
         "_render_test_tab",  # preserved — connection test
         "_render_disable_tab",  # preserved — soft-delete
@@ -77,7 +77,7 @@ def test_role_labels_cover_all_eleven_seeded_roles() -> None:
     """All 11 seeded agent_role keys must appear in `_ROLE_LABELS`.
 
     Pulled from db/seeds/llm_configs.json: the 1 Tier-1, 1 Tier-1.5,
-    7 Tier-2 IWO2-parity, and 2 net-new agents.
+    6 imported Tier-2 roles, and 3 parity approximations.
     """
     expected_roles = {
         "aiden_tier_1",
@@ -162,5 +162,5 @@ def test_six_iwo2_sections_referenced_in_main() -> None:
     assert '"Tool Access"' in source
     # Runtime Tools chips tab.
     assert '"Runtime"' in source
-    # Tool History stub tab.
+    # Tool History tab.
     assert '"Tool History"' in source

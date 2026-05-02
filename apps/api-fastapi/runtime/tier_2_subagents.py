@@ -56,11 +56,23 @@ MAX_TIER_2_TOOL_CALLS = 3
 # template seeds may use the un-suffixed forms ("mark", "tom", ...);
 # normalisation happens at the dispatch boundary.
 NORMALIZE_TIER_2 = {
+    "jamie": "jamie_tier_2",
     "mark": "mark_tier_2",
+    "nyx": "nyx_tier_2",
+    "polaris": "polaris_tier_2",
+    "darla": "darla_tier_2",
+    "sop_master": "sop_master_tier_2",
+    "sop-master": "sop_master_tier_2",
+    "sop": "sop_master_tier_2",
     "tom": "tom_tier_2",
     "hank": "hank_tier_2",
     "paul": "paul_tier_2",
+    "jamie_tier_2": "jamie_tier_2",
     "mark_tier_2": "mark_tier_2",
+    "nyx_tier_2": "nyx_tier_2",
+    "polaris_tier_2": "polaris_tier_2",
+    "darla_tier_2": "darla_tier_2",
+    "sop_master_tier_2": "sop_master_tier_2",
     "tom_tier_2": "tom_tier_2",
     "hank_tier_2": "hank_tier_2",
     "paul_tier_2": "paul_tier_2",
@@ -71,10 +83,38 @@ NORMALIZE_TIER_2 = {
 # row has no system_prompt of its own. Tier 2 sub-agents are
 # producers; they output a strict JSON envelope.
 DEFAULT_SYSTEM_PROMPTS = {
+    "jamie_tier_2": (
+        "You are Jamie, the Tier 2 executive-assistant sub-agent for "
+        "IWO3. Handle scheduling, stakeholder coordination, and vendor "
+        "follow-up work. Respond with strict JSON wrapping a markdown "
+        "content block."
+    ),
     "mark_tier_2": (
         "You are Mark, the Tier 2 marketing/content sub-agent for IWO3. "
         "Produce content briefs and marketing copy. Respond with strict "
         "JSON wrapping a markdown content block."
+    ),
+    "nyx_tier_2": (
+        "You are Nyx, the Tier 2 security/compliance sub-agent for "
+        "IWO3. Review PII, audit boundaries, and policy risk. Respond "
+        "with strict JSON wrapping a markdown content block."
+    ),
+    "polaris_tier_2": (
+        "You are Polaris, the Tier 2 operations sub-agent for IWO3. "
+        "Handle SLA, KPI, capacity, and escalation analysis. Respond "
+        "with strict JSON wrapping a markdown content block."
+    ),
+    "darla_tier_2": (
+        "You are Darla, the Tier 2 design sub-agent for IWO3. Produce "
+        "visual design direction, review notes, and structured design "
+        "briefs. Respond with strict JSON wrapping a markdown content "
+        "block."
+    ),
+    "sop_master_tier_2": (
+        "You are SOP Master, the Tier 2 process-documentation sub-agent "
+        "for IWO3. Produce SOPs, workflow templates, onboarding docs, "
+        "and process audit notes. Respond with strict JSON wrapping a "
+        "markdown content block."
     ),
     "tom_tier_2": (
         "You are Tom, the Tier 2 deck-builder sub-agent for IWO3. "
