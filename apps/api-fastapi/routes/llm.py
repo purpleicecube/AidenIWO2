@@ -212,6 +212,12 @@ class ConfigListItem(BaseModel):
     has_system_prompt: bool
     credential_state: str  # "set" | "missing" | "malformed"
     env_var_name: Optional[str] = None
+    # Loop Eta phase 0 — surface the metadata jsonb so the Sub-Agents UI
+    # can render the prompt_provenance badge ∈ {extracted_from_iwo2_live,
+    # extracted_from_iwo2_static, authored_parity_approximation,
+    # authored_net_new}. Field is optional; older rows without metadata
+    # show "unknown" in the UI.
+    metadata: Optional[dict[str, Any]] = None
 
 
 class ListConfigsResponse(BaseModel):
@@ -220,6 +226,13 @@ class ListConfigsResponse(BaseModel):
 
 def _row_to_list_item(row: asyncpg.Record) -> ConfigListItem:
     state, env_name = _credential_state_for_ref(row["credential_ref"])
+    raw_meta = row["metadata"] if "metadata" in row.keys() else None
+    if isinstance(raw_meta, str):
+        # asyncpg returns jsonb as text by default; parse to a dict.
+        try:
+            raw_meta = json.loads(raw_meta)
+        except (TypeError, ValueError):
+            raw_meta = None
     return ConfigListItem(
         id=row["id"],
         agent_role=row["agent_role"],
@@ -232,6 +245,7 @@ def _row_to_list_item(row: asyncpg.Record) -> ConfigListItem:
         has_system_prompt=row["has_system_prompt"],
         credential_state=state,
         env_var_name=env_name,
+        metadata=raw_meta,
     )
 
 
@@ -257,6 +271,7 @@ async def list_configs(
                base_url,
                credential_ref,
                enabled,
+               metadata,
                (system_prompt IS NOT NULL AND length(system_prompt) > 0)
                                     AS has_system_prompt
           FROM llm_configs
