@@ -243,6 +243,38 @@ export const AUDIT_EVENTS = {
   LLM_CONFIG_ROLLED_BACK:    "llm_config.rolled_back",      // rollback action
   LLM_CONFIG_BULK_APPLIED:   "llm_config.bulk_applied",     // batch apply summary (Phase 3)
   LLM_CONFIG_PREVIEWED:      "llm_config.previewed",        // in-memory candidate-prompt invoke (Phase 4)
+
+  // Beta-2 phase 0.4.1 backfill — Aiden Tier 1 tool-call execution. These
+  // events were emitted in code (apps/api-fastapi/runtime/aiden_tools.py
+  // execute_tool) since 2026-05-01 but never registered in the vocabulary.
+  // Loop Eta phase 0 lock catches them up alongside the new Tier 2 events
+  // so the full Aiden + sub-agent tool surface is honest in audit.
+  AIDEN_TOOL_CALLED: "aiden.tool_called",
+  AIDEN_TOOL_FAILED: "aiden.tool_failed",
+
+  // Loop Eta phase 0 — tool catalog lifecycle.
+  TOOL_CATALOG_REGISTERED: "tool_catalog.registered",
+  TOOL_CATALOG_UPDATED:    "tool_catalog.updated",
+  TOOL_CATALOG_DISABLED:   "tool_catalog.disabled",
+
+  // Loop Eta phase 0 — sub-agent tool assignment lifecycle.
+  SUB_AGENT_TOOL_GRANTED:  "sub_agent.tool_granted",
+  SUB_AGENT_TOOL_REVOKED:  "sub_agent.tool_revoked",
+
+  // Loop Eta phase 0 — Tier 2 tool-call -> execute -> re-invoke loop.
+  // Distinct from aiden.tool_* (Tier 1 introspection) so audit forensics
+  // can separate orchestrator tool use from sub-agent tool use without
+  // parsing metadata.
+  SUB_AGENT_TOOL_CALLED:        "sub_agent.tool_called",
+  SUB_AGENT_TOOL_FAILED:        "sub_agent.tool_failed",
+  SUB_AGENT_TOOL_UNAUTHORIZED:  "sub_agent.tool_unauthorized",
+  SUB_AGENT_TOOL_CAP_REACHED:   "sub_agent.tool_cap_reached",
+
+  // Loop Eta phase 0 — MCP session lifecycle. Stitch is the first MCP
+  // server but the events are MCP-generic.
+  MCP_SESSION_OPENED:    "mcp.session_opened",
+  MCP_SESSION_CLOSED:    "mcp.session_closed",
+  MCP_CONNECTION_TESTED: "mcp.connection_tested",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -423,3 +455,43 @@ export const BETA_2_PHASE_0_3_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.LLM_CONFIG_BULK_APPLIED,
   AUDIT_EVENTS.LLM_CONFIG_PREVIEWED,
 ];
+
+// Beta-2 phase 0.4.1 — backfill of Aiden Tier 1 tool-call events that
+// the runtime has been emitting since 2026-05-01 without a vocabulary lock.
+export const BETA_2_PHASE_0_4_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.AIDEN_TOOL_CALLED,
+  AUDIT_EVENTS.AIDEN_TOOL_FAILED,
+];
+
+// Loop Eta phase 0 — tool catalog, sub-agent tool assignment, Tier 2 tool
+// execution, MCP session lifecycle. Twelve events locked at phase start
+// per IWO3_LOOP_ETA_SCOPE_PROPOSAL §7.
+export const LOOP_ETA_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.TOOL_CATALOG_REGISTERED,
+  AUDIT_EVENTS.TOOL_CATALOG_UPDATED,
+  AUDIT_EVENTS.TOOL_CATALOG_DISABLED,
+  AUDIT_EVENTS.SUB_AGENT_TOOL_GRANTED,
+  AUDIT_EVENTS.SUB_AGENT_TOOL_REVOKED,
+  AUDIT_EVENTS.SUB_AGENT_TOOL_CALLED,
+  AUDIT_EVENTS.SUB_AGENT_TOOL_FAILED,
+  AUDIT_EVENTS.SUB_AGENT_TOOL_UNAUTHORIZED,
+  AUDIT_EVENTS.SUB_AGENT_TOOL_CAP_REACHED,
+  AUDIT_EVENTS.MCP_SESSION_OPENED,
+  AUDIT_EVENTS.MCP_SESSION_CLOSED,
+  AUDIT_EVENTS.MCP_CONNECTION_TESTED,
+];
+
+// Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs
+// row, persisted in `metadata.prompt_provenance` jsonb field. Carried in
+// `llm_config_versions.change_reason` on the v1 snapshot for forensic
+// reconstruction. Locked here so contract tests can assert the four-value
+// vocabulary upfront without relying on row inspection.
+export const LOOP_ETA_PROMPT_PROVENANCE = {
+  EXTRACTED_FROM_IWO2_LIVE: "extracted_from_iwo2_live",
+  EXTRACTED_FROM_IWO2_STATIC: "extracted_from_iwo2_static",
+  AUTHORED_PARITY_APPROXIMATION: "authored_parity_approximation",
+  AUTHORED_NET_NEW: "authored_net_new",
+} as const;
+
+export type LoopEtaPromptProvenance =
+  (typeof LOOP_ETA_PROMPT_PROVENANCE)[keyof typeof LOOP_ETA_PROMPT_PROVENANCE];

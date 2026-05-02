@@ -32,13 +32,19 @@ const INTRUDER = "00000000-0000-4000-8000-000099000002";
 // Beta-2 phase 0.2 (2026-04-30): +1 row — agent_system gains
 // `work_order:submit` so the auto-dispatch worker can transition
 // pending → processing under its system actor.
+// Loop Eta phase 0 (2026-05-02): +4 keys — tool_catalog:read,
+// tool_catalog:write, sub_agent_tool:read, sub_agent_tool:assign.
+// Reads granted to all six roles; writes (tool_catalog:write +
+// sub_agent_tool:assign) granted to owner + admin only.
+//   owner +4 → 82, admin +4 → 80, operator +2 → 35,
+//   reviewer +2 → 21, viewer +2 → 17, agent_system +2 → 27.
 const EXPECTED_COUNTS = {
-  owner: 78,
-  admin: 76,
-  operator: 33,
-  reviewer: 19,
-  viewer: 15,
-  agent_system: 25,
+  owner: 82,
+  admin: 80,
+  operator: 35,
+  reviewer: 21,
+  viewer: 17,
+  agent_system: 27,
 } as const;
 
 describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
@@ -48,21 +54,21 @@ describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
     await pool.end();
   });
 
-  it("permissions vocabulary is locked at 78 keys (§Q1 + α.6 channel + δ.2 workspace + β-1 ε.1 llm_config CRUD split + β-2.0.1 template_profile:read)", async () => {
+  it("permissions vocabulary is locked at 82 keys (§Q1 + α.6 channel + δ.2 workspace + β-1 ε.1 llm_config CRUD split + β-2.0.1 template_profile:read + Loop Eta tool_catalog/sub_agent_tool x4)", async () => {
     const { rows } = await pool.query<{ count: string }>(
       `SELECT count(*) AS count FROM permissions`
     );
-    expect(Number(rows[0].count)).toBe(78);
+    expect(Number(rows[0].count)).toBe(82);
   });
 
-  it("role_permissions is seeded at 246 rows across the six roles", async () => {
+  it("role_permissions is seeded at 262 rows across the six roles", async () => {
     const { rows } = await pool.query<{ role: string; count: string }>(
       `SELECT role, count(*) AS count FROM role_permissions GROUP BY role ORDER BY role`
     );
     const map = Object.fromEntries(rows.map((r) => [r.role, Number(r.count)]));
     expect(map).toMatchObject(EXPECTED_COUNTS);
     const total = Object.values(map).reduce((a, b) => a + b, 0);
-    expect(total).toBe(246);
+    expect(total).toBe(262);
   });
 
   for (const [userId, role, expected] of [

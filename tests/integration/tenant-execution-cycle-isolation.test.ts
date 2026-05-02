@@ -32,9 +32,14 @@ describeIwo3("Loop 3 Phase 1 — tenant execution-cycle isolation", () => {
   });
 
   beforeEach(async () => {
-    // Clean Phase-1 test rows only.
+    // Clean Phase-1 test rows + any leftover cycles on the WO IDs this
+    // test owns (Beta-2 phase 0.2 introduced the auto_dispatch worker
+    // that may have created untagged rows on these WOs in earlier runs).
     await pool.query(
-      `DELETE FROM execution_cycles WHERE metadata->>'test_marker' = 'wo-execution-cycle-isolation'`
+      `DELETE FROM execution_cycles
+        WHERE metadata->>'test_marker' = 'wo-execution-cycle-isolation'
+           OR work_order_id IN ($1::uuid, $2::uuid)`,
+      [KLEAR_WO, FFAI_WO]
     );
   });
 

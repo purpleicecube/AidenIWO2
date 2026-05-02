@@ -126,6 +126,26 @@ ChannelMessageStatus = Literal[
     'received', 'processed', 'failed', 'pending', 'sent'
 ]
 
+# Loop Eta phase 0 — tool catalog + sub-agent tools
+TOOL_CATEGORY: Final[tuple[str, ...]] = (
+    'search', 'document', 'rendering', 'design', 'data', 'ops',
+    'introspection', 'skill_only',
+)
+TOOL_RUNTIME_STATUS: Final[tuple[str, ...]] = (
+    'runnable', 'skill_only', 'mcp', 'planned',
+)
+TOOL_DEFAULT_TIER: Final[tuple[str, ...]] = (
+    'tier_1', 'tier_2', 'either',
+)
+ToolCategory = Literal[
+    'search', 'document', 'rendering', 'design', 'data', 'ops',
+    'introspection', 'skill_only',
+]
+ToolRuntimeStatus = Literal[
+    'runnable', 'skill_only', 'mcp', 'planned',
+]
+ToolDefaultTier = Literal['tier_1', 'tier_2', 'either']
+
 # --- Registry — enables run-time introspection and the parity CLI ---
 
 ALL_ENUMS: Final[dict[str, tuple[str, ...]]] = {
@@ -173,4 +193,8 @@ ALL_ENUMS: Final[dict[str, tuple[str, ...]]] = {
     'workflow_status': WORKFLOW_STATUS,
     'workflow_step_run_status': WORKFLOW_STEP_RUN_STATUS,
     'workflow_template_status': WORKFLOW_TEMPLATE_STATUS,
+    # Loop Eta phase 0
+    'tool_category': TOOL_CATEGORY,
+    'tool_default_tier': TOOL_DEFAULT_TIER,
+    'tool_runtime_status': TOOL_RUNTIME_STATUS,
 }

@@ -544,5 +544,33 @@
     "displayName": "Read template profiles",
     "description": "Read tenant-scoped template_profiles. Beta-2 phase 0.1 — populates the Submit Order template selector.",
     "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000079",
+    "permissionKey": "tool_catalog:read",
+    "displayName": "Read tool catalog",
+    "description": "Read the tenant-agnostic tool_catalog rows. Loop Eta phase 0 — populates the Sub-Agents Tool Access checkbox grid.",
+    "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000080",
+    "permissionKey": "tool_catalog:write",
+    "displayName": "Write tool catalog",
+    "description": "Create, update, or disable tool_catalog rows. Loop Eta phase 0 — admin-only metadata management.",
+    "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000081",
+    "permissionKey": "sub_agent_tool:read",
+    "displayName": "Read sub-agent tool assignments",
+    "description": "Read sub_agent_tools rows for this tenant. Loop Eta phase 0 — required by GET /llm/configs/{id}/tools.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000082",
+    "permissionKey": "sub_agent_tool:assign",
+    "displayName": "Assign tools to sub-agents",
+    "description": "Toggle sub_agent_tools rows for this tenant. Loop Eta phase 0 — drives PUT /llm/configs/{id}/tools/{tool_key}.",
+    "scope": "tenant"
   }
 ]

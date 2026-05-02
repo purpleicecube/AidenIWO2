@@ -44,3 +44,7 @@ export * from "./llm_configs";
 export * from "./channel_identities";
 export * from "./channel_auth_codes";
 export * from "./channel_messages";
+
+// Loop Eta — global tool catalog + per-(tenant, llm_config) tool assignments
+export * from "./tool_catalog";
+export * from "./sub_agent_tools";

@@ -68,6 +68,14 @@ export const llmConfigs = pgTable(
     systemPrompt: text("system_prompt"),
     /** Provider-specific knobs: temperature, max_tokens, top_p, ... */
     options: jsonb("options"),
+    /**
+     * Loop Eta — per-row metadata. First consumer:
+     *   metadata.prompt_provenance ∈
+     *     'extracted_from_iwo2_live' | 'extracted_from_iwo2_static' |
+     *     'authored_parity_approximation' | 'authored_net_new'
+     * carries IWO2-parity provenance per IWO3_LOOP_ETA_SCOPE_PROPOSAL §1.
+     */
+    metadata: jsonb("metadata"),
     enabled: boolean("enabled").notNull().default(true),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })

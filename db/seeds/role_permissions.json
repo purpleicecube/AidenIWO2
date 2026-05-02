@@ -883,5 +883,21 @@
   { "role": "operator",     "permissionKey": "template_profile:read" },
   { "role": "agent_system", "permissionKey": "template_profile:read" },
   { "role": "viewer",       "permissionKey": "template_profile:read" },
-  { "role": "agent_system", "permissionKey": "work_order:submit"     }
+  { "role": "agent_system", "permissionKey": "work_order:submit"     },
+  { "role": "owner",        "permissionKey": "tool_catalog:read"      },
+  { "role": "owner",        "permissionKey": "tool_catalog:write"     },
+  { "role": "owner",        "permissionKey": "sub_agent_tool:read"    },
+  { "role": "owner",        "permissionKey": "sub_agent_tool:assign"  },
+  { "role": "admin",        "permissionKey": "tool_catalog:read"      },
+  { "role": "admin",        "permissionKey": "tool_catalog:write"     },
+  { "role": "admin",        "permissionKey": "sub_agent_tool:read"    },
+  { "role": "admin",        "permissionKey": "sub_agent_tool:assign"  },
+  { "role": "operator",     "permissionKey": "tool_catalog:read"      },
+  { "role": "operator",     "permissionKey": "sub_agent_tool:read"    },
+  { "role": "reviewer",     "permissionKey": "tool_catalog:read"      },
+  { "role": "reviewer",     "permissionKey": "sub_agent_tool:read"    },
+  { "role": "viewer",       "permissionKey": "tool_catalog:read"      },
+  { "role": "viewer",       "permissionKey": "sub_agent_tool:read"    },
+  { "role": "agent_system", "permissionKey": "tool_catalog:read"      },
+  { "role": "agent_system", "permissionKey": "sub_agent_tool:read"    }
 ]

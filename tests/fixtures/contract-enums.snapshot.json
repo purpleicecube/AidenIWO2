@@ -218,6 +218,27 @@
       "active",
       "archived"
     ],
+    "tool_category": [
+      "search",
+      "document",
+      "rendering",
+      "design",
+      "data",
+      "ops",
+      "introspection",
+      "skill_only"
+    ],
+    "tool_default_tier": [
+      "tier_1",
+      "tier_2",
+      "either"
+    ],
+    "tool_runtime_status": [
+      "runnable",
+      "skill_only",
+      "mcp",
+      "planned"
+    ],
     "user_status": [
       "active",
       "disabled"
@@ -289,6 +310,8 @@
       "adapter_dispatch.watchdog_expired_stale_poll",
       "adapter_policy.created",
       "adapter_policy.updated",
+      "aiden.tool_called",
+      "aiden.tool_failed",
       "artifact.deleted",
       "artifact.uploaded",
       "auth.login_failed",
@@ -332,6 +355,9 @@
       "llm_config.updated",
       "llm_config.versioned",
       "llm_provider.connection_tested",
+      "mcp.connection_tested",
+      "mcp.session_closed",
+      "mcp.session_opened",
       "output_candidate.rejected",
       "output_candidate.selected",
       "output_handoff.completed",
@@ -355,7 +381,16 @@
       "repository_binding.revoked",
       "role_permission.granted",
       "role_permission.revoked",
+      "sub_agent.tool_called",
+      "sub_agent.tool_cap_reached",
+      "sub_agent.tool_failed",
+      "sub_agent.tool_granted",
+      "sub_agent.tool_revoked",
+      "sub_agent.tool_unauthorized",
       "tier_1_5.requested_output_honored",
+      "tool_catalog.disabled",
+      "tool_catalog.registered",
+      "tool_catalog.updated",
       "webhook.received",
       "webhook.signature_invalid",
       "work_order.archived",
@@ -417,15 +452,6 @@
         "workflow_step_run.completed",
         "execution_cycle.started"
       ],
-      "LOOP_3_PHASE_4_AUDIT_EVENTS": [
-        "adapter_dispatch.initiated",
-        "adapter_dispatch.policy_rejected",
-        "adapter_dispatch.approval_required",
-        "adapter_dispatch.package_invalid",
-        "adapter_dispatch.submitted",
-        "adapter_dispatch.completed",
-        "adapter_dispatch.failed"
-      ],
       "LOOP_3_PHASE_2_AUDIT_EVENTS": [
         "output_package.created",
         "output_package.validated",
@@ -445,6 +471,15 @@
         "adapter_credential.revoked",
         "adapter_policy.created",
         "adapter_policy.updated"
+      ],
+      "LOOP_3_PHASE_4_AUDIT_EVENTS": [
+        "adapter_dispatch.initiated",
+        "adapter_dispatch.policy_rejected",
+        "adapter_dispatch.approval_required",
+        "adapter_dispatch.package_invalid",
+        "adapter_dispatch.submitted",
+        "adapter_dispatch.completed",
+        "adapter_dispatch.failed"
       ],
       "LOOP_4_PHASE_1_AUDIT_EVENTS": [
         "permission.created",
@@ -545,6 +580,24 @@
         "llm_config.rolled_back",
         "llm_config.bulk_applied",
         "llm_config.previewed"
+      ],
+      "BETA_2_PHASE_0_4_AUDIT_EVENTS": [
+        "aiden.tool_called",
+        "aiden.tool_failed"
+      ],
+      "LOOP_ETA_AUDIT_EVENTS": [
+        "tool_catalog.registered",
+        "tool_catalog.updated",
+        "tool_catalog.disabled",
+        "sub_agent.tool_granted",
+        "sub_agent.tool_revoked",
+        "sub_agent.tool_called",
+        "sub_agent.tool_failed",
+        "sub_agent.tool_unauthorized",
+        "sub_agent.tool_cap_reached",
+        "mcp.session_opened",
+        "mcp.session_closed",
+        "mcp.connection_tested"
       ]
     }
   },
@@ -600,8 +653,12 @@
     "repository_binding:delete",
     "repository_binding:read",
     "repository_binding:update",
+    "sub_agent_tool:assign",
+    "sub_agent_tool:read",
     "system:admin",
     "template_profile:read",
+    "tool_catalog:read",
+    "tool_catalog:write",
     "user:invite",
     "user:read",
     "user:revoke",

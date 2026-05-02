@@ -38,6 +38,7 @@ const ALPHA_VERSION = "iwo3@v0.10.0-alpha";
 const PRE_BETA_DELTA_VERSION = "iwo3@v0.11.0-pre-beta-delta";
 const BETA_1_VERSION = "iwo3@v0.12.0-beta-1";
 const BETA_2_PHASE_0_3_VERSION = "iwo3@v0.13.0-beta-2-phase-0.3";
+const LOOP_ETA_VERSION = "iwo3@v0.14.0-loop-eta";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -96,6 +97,10 @@ const KNOWN_TABLES: ManifestEntry[] = [
 
   // Beta-2 phase 0.3 — versioned llm_configs history (CODEX universal-slice Phase 1)
   { name: "llm_config_versions",        source: "iwo3_native", sourceVersion: BETA_2_PHASE_0_3_VERSION, ownedBy: "drizzle", notes: "Beta-2 phase 0.3.1 — full-row snapshot per llm_configs mutation; rollback = pick prior + write new mutation; immutable (iwo3_app SELECT+INSERT only)" },
+
+  // Loop Eta phase 0 — global tool catalog + per-(tenant, llm_config) tool assignments
+  { name: "tool_catalog",               source: "iwo3_native", sourceVersion: LOOP_ETA_VERSION, ownedBy: "drizzle", notes: "Loop Eta phase 0 — tenant-agnostic tool registry; metadata + runtime_status only, executable handlers live in apps/api-fastapi/runtime/aiden_tools.py" },
+  { name: "sub_agent_tools",            source: "iwo3_native", sourceVersion: LOOP_ETA_VERSION, ownedBy: "drizzle", notes: "Loop Eta phase 0 — per-(client, llm_config, tool_key) assignment row; FORCE RLS; soft-revoke via enabled=false" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked
