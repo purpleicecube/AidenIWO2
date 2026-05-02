@@ -18,6 +18,7 @@ import asyncpg
 import pytest
 from fastapi.testclient import TestClient
 
+from authz.audit_writer import write_audit_row
 from main import app
 
 
@@ -94,19 +95,16 @@ async def _seed_history_rows() -> None:
             ),
         ]
         for client_id, actor_user_id, action, target_type, target_id, md in rows:
-            await conn.execute(
-                """
-                INSERT INTO action_audit_log
-                  (client_id, actor_user_id, action,
-                   target_type, target_id, metadata)
-                VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb)
-                """,
-                client_id,
-                actor_user_id,
-                action,
-                target_type,
-                target_id,
-                json.dumps(md),
+            # Use the canonical Python audit writer instead of raw INSERT
+            # so the Phase 4.4 `no-raw-audit-insert` lint rule stays clean.
+            await write_audit_row(
+                conn,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                event=action,
+                target_type=target_type,
+                target_id=target_id,
+                metadata=md,
             )
     finally:
         await conn.close()
