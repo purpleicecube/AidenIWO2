@@ -877,6 +877,48 @@ interface SeedLlmConfig {
   options: unknown | null;
   enabled: boolean;
   notes: string | null;
+  /**
+   * Loop Eta phase 0 — `metadata` jsonb field added by migration 0022.
+   * Carries `prompt_provenance` per IWO3_LOOP_ETA_SCOPE_PROPOSAL §1
+   * and any other per-row metadata. Optional in the JSON; loader
+   * stringifies null when absent.
+   */
+  metadata?: unknown | null;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Loop Eta Phase 0 — tool_catalog + sub_agent_tools shapes
+// ──────────────────────────────────────────────────────────────────────────
+
+interface SeedToolCatalog {
+  id: string;
+  toolKey: string;
+  displayName: string;
+  description: string;
+  category: string;
+  runtimeStatus: string;
+  argsSchema: unknown;
+  handlerRef: string | null;
+  defaultTier: string;
+  iwo2Origin: string | null;
+  enabled: boolean;
+  notes: string | null;
+}
+
+interface SeedSubAgentTool {
+  /**
+   * Loop Eta phase 0 — assignments reference `(clientId, agentRole, toolKey)`.
+   * The loader resolves `agentRole` → `llm_config_id` via JOIN against
+   * llm_configs at insert time, mirroring how role_permissions resolves
+   * permission_key → permission_id. Keeps the seed JSON readable and
+   * decoupled from the synthetic UUIDs.
+   */
+  clientId: string;
+  agentRole: string;
+  toolKey: string;
+  enabled: boolean;
+  grantedByUserId: string | null;
+  notes: string | null;
 }
 
 async function upsertLlmConfigs(
@@ -888,8 +930,8 @@ async function upsertLlmConfigs(
       `INSERT INTO llm_configs
          (id, client_id, agent_role, display_name, description,
           provider, model, base_url, credential_ref, system_prompt,
-          options, enabled, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13)
+          options, enabled, notes, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14::jsonb)
        ON CONFLICT (id) DO UPDATE SET
          client_id = EXCLUDED.client_id,
          agent_role = EXCLUDED.agent_role,
@@ -903,6 +945,7 @@ async function upsertLlmConfigs(
          options = EXCLUDED.options,
          enabled = EXCLUDED.enabled,
          notes = EXCLUDED.notes,
+         metadata = EXCLUDED.metadata,
          updated_at = now()`,
       [
         r.id,
@@ -917,6 +960,94 @@ async function upsertLlmConfigs(
         r.systemPrompt,
         JSON.stringify(r.options ?? null),
         r.enabled,
+        r.notes,
+        JSON.stringify(r.metadata ?? null),
+      ]
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Upsert helpers — Loop Eta Phase 0
+// ──────────────────────────────────────────────────────────────────────────
+
+async function upsertToolCatalog(
+  c: PoolClient,
+  rows: SeedToolCatalog[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO tool_catalog
+         (id, tool_key, display_name, description, category,
+          runtime_status, args_schema, handler_ref, default_tier,
+          iwo2_origin, enabled, notes)
+       VALUES ($1, $2, $3, $4, $5::tool_category, $6::tool_runtime_status,
+               $7::jsonb, $8, $9::tool_default_tier, $10, $11, $12)
+       ON CONFLICT (tool_key) DO UPDATE SET
+         display_name = EXCLUDED.display_name,
+         description = EXCLUDED.description,
+         category = EXCLUDED.category,
+         runtime_status = EXCLUDED.runtime_status,
+         args_schema = EXCLUDED.args_schema,
+         handler_ref = EXCLUDED.handler_ref,
+         default_tier = EXCLUDED.default_tier,
+         iwo2_origin = EXCLUDED.iwo2_origin,
+         enabled = EXCLUDED.enabled,
+         notes = EXCLUDED.notes,
+         updated_at = now()`,
+      [
+        r.id,
+        r.toolKey,
+        r.displayName,
+        r.description,
+        r.category,
+        r.runtimeStatus,
+        JSON.stringify(r.argsSchema ?? {}),
+        r.handlerRef,
+        r.defaultTier,
+        r.iwo2Origin,
+        r.enabled,
+        r.notes,
+      ]
+    );
+  }
+}
+
+/**
+ * sub_agent_tools assignments — resolves agent_role → llm_config_id via
+ * JOIN at insert time, the same idempotent pattern role_permissions uses
+ * for permission_key → permission_id. Keeps the seed JSON readable and
+ * decoupled from the synthetic UUID space of llm_configs.
+ *
+ * sub_agent_tools is RLS-FORCEd, so we set app.current_client_id per row
+ * before the INSERT. iwo3_app is the connection role here; it is NOT
+ * BYPASSRLS, so the GUC is required.
+ */
+async function upsertSubAgentTools(
+  c: PoolClient,
+  rows: SeedSubAgentTool[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(`SELECT set_config('app.current_client_id', $1, true)`, [
+      r.clientId,
+    ]);
+    await c.query(
+      `INSERT INTO sub_agent_tools
+         (client_id, llm_config_id, tool_key, enabled, granted_by_user_id, notes)
+       SELECT $1::uuid, lc.id, $3, $4, $5::uuid, $6
+       FROM llm_configs lc
+       WHERE lc.client_id = $1::uuid
+         AND lc.agent_role = $2
+       ON CONFLICT ON CONSTRAINT sub_agent_tools_unique_per_config_tool DO UPDATE SET
+         enabled = EXCLUDED.enabled,
+         granted_by_user_id = EXCLUDED.granted_by_user_id,
+         notes = EXCLUDED.notes`,
+      [
+        r.clientId,
+        r.agentRole,
+        r.toolKey,
+        r.enabled,
+        r.grantedByUserId,
         r.notes,
       ]
     );
@@ -962,6 +1093,9 @@ async function main(): Promise<void> {
   );
   const llmConfigsRows = loadJson<SeedLlmConfig[]>(
     "db/seeds/llm_configs.json"
+  );
+  const toolCatalogRows = loadJson<SeedToolCatalog[]>(
+    "db/seeds/tool_catalog.json"
   );
 
   // Operational seeds — held when scope=reference.
@@ -1013,6 +1147,12 @@ async function main(): Promise<void> {
         "db/seeds/adapter_action_policies.json"
       );
 
+  // Loop Eta phase 0 — sub_agent_tools is operational (per-tenant, per-llm_config).
+  // Held when scope=reference; loaded otherwise.
+  const subAgentToolsRows = referenceOnly
+    ? []
+    : loadJson<SeedSubAgentTool[]>("db/seeds/sub_agent_tools.json");
+
   const pool = new Pool({ connectionString: url });
   const c = await pool.connect();
   try {
@@ -1038,6 +1178,10 @@ async function main(): Promise<void> {
     await upsertPermissions(c, permissionsRows);
     await upsertRolePermissions(c, rolePermissionsRows);
     await upsertLlmConfigs(c, llmConfigsRows);
+    // Loop Eta phase 0 — tool_catalog is tenant-agnostic (always loaded);
+    // sub_agent_tools is per-tenant operational (held when scope=reference).
+    await upsertToolCatalog(c, toolCatalogRows);
+    await upsertSubAgentTools(c, subAgentToolsRows);
     await upsertWorkspaceRoots(c);
     await c.query("COMMIT");
 
@@ -1065,6 +1209,8 @@ async function main(): Promise<void> {
         permissions: permissionsRows.length,
         role_permissions: rolePermissionsRows.length,
         llm_configs: llmConfigsRows.length,
+        tool_catalog: toolCatalogRows.length,
+        sub_agent_tools: subAgentToolsRows.length,
       },
       sources: {
         clients: "db/seeds/clients.json",
@@ -1087,6 +1233,8 @@ async function main(): Promise<void> {
         permissions: "db/seeds/permissions.json",
         role_permissions: "db/seeds/role_permissions.json",
         llm_configs: "db/seeds/llm_configs.json",
+        tool_catalog: "db/seeds/tool_catalog.json",
+        sub_agent_tools: "db/seeds/sub_agent_tools.json",
       },
     };
     writeFileSync(

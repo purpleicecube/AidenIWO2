@@ -1,1 +1,242 @@
-[]
+[
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "aiden_tier_1",
+    "toolKey": "runtime_health",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "aiden_tier_1",
+    "toolKey": "work_order_counts",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "aiden_tier_1",
+    "toolKey": "recent_work_orders",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "mark_tier_2",
+    "toolKey": "web_search_brave",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "mark_tier_2",
+    "toolKey": "web_search_perplexity",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "mark_tier_2",
+    "toolKey": "web_scrape",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "mark_tier_2",
+    "toolKey": "pdf_extract_text",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "mark_tier_2",
+    "toolKey": "gamma_render",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "mark_tier_2",
+    "toolKey": "markdown_to_pptx",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "tom_tier_2",
+    "toolKey": "gamma_render",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "tom_tier_2",
+    "toolKey": "markdown_to_pptx",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "hank_tier_2",
+    "toolKey": "web_scrape",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "hank_tier_2",
+    "toolKey": "web_search_brave",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "hank_tier_2",
+    "toolKey": "stitch_design",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "paul_tier_2",
+    "toolKey": "csv_validate",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "paul_tier_2",
+    "toolKey": "http_health_probe",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "jamie_tier_2",
+    "toolKey": "pdf_extract_text",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "jamie_tier_2",
+    "toolKey": "web_search_ddg",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "nyx_tier_2",
+    "toolKey": "web_search_brave",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "nyx_tier_2",
+    "toolKey": "web_search_perplexity",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "polaris_tier_2",
+    "toolKey": "csv_validate",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "polaris_tier_2",
+    "toolKey": "http_health_probe",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "polaris_tier_2",
+    "toolKey": "web_search_ddg",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "darla_tier_2",
+    "toolKey": "stitch_design",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "darla_tier_2",
+    "toolKey": "web_search_brave",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "darla_tier_2",
+    "toolKey": "web_scrape",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "darla_tier_2",
+    "toolKey": "pdf_extract_text",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "sop_master_tier_2",
+    "toolKey": "pdf_extract_text",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "sop_master_tier_2",
+    "toolKey": "csv_validate",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  },
+  {
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "agentRole": "sop_master_tier_2",
+    "toolKey": "web_search_ddg",
+    "enabled": true,
+    "grantedByUserId": null,
+    "notes": "Loop Eta phase 0 default seed"
+  }
+]
