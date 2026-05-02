@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Literal, Optional
 
 import asyncpg
 
@@ -250,6 +250,43 @@ class ToolExecutionError(Exception):
         self.detail = detail
 
 
+async def check_sub_agent_tool_assignment(
+    conn: asyncpg.Connection,
+    *,
+    llm_config_id: str,
+    tool_key: str,
+) -> bool:
+    """Loop Eta — pre-execution authz for Tier 2 tool calls.
+
+    Returns True only if BOTH the assignment row and the catalog row are
+    enabled AND the catalog row's `runtime_status='runnable'`. Catalog
+    rows with `runtime_status` of `mcp`, `skill_only`, or `planned` are
+    refused — those are not invocable from this surface in this loop.
+
+    Caller (Tier 2 runtime) writes the `sub_agent.tool_unauthorized`
+    audit row when this returns False; this helper has no side effects."""
+    row = await conn.fetchrow(
+        """
+        SELECT sat.enabled               AS sat_enabled,
+               tc.enabled                AS tc_enabled,
+               tc.runtime_status::text   AS rt_status
+          FROM sub_agent_tools sat
+          JOIN tool_catalog tc ON tc.tool_key = sat.tool_key
+         WHERE sat.llm_config_id = $1::uuid
+           AND sat.tool_key = $2
+        """,
+        llm_config_id,
+        tool_key,
+    )
+    if not row:
+        return False
+    return bool(
+        row["sat_enabled"]
+        and row["tc_enabled"]
+        and row["rt_status"] == "runnable"
+    )
+
+
 async def execute_tool(
     conn: asyncpg.Connection,
     *,
@@ -258,9 +295,20 @@ async def execute_tool(
     client_id: str,
     actor_user_id: str,
     work_order_id: str | None = None,
+    event_prefix: Literal["aiden", "sub_agent"] = "aiden",
+    agent_role: Optional[str] = None,
+    llm_config_id: Optional[str] = None,
+    iteration_index: Optional[int] = None,
 ) -> dict[str, Any]:
     """Execute one tool, write the audit row, return the result. Caller
-    owns the surrounding transaction + decides what to do with errors."""
+    owns the surrounding transaction + decides what to do with errors.
+
+    `event_prefix` controls audit event naming so Tier 1 (Aiden) and
+    Tier 2 (sub-agents) can both share this entry point while keeping
+    `aiden.tool_*` and `sub_agent.tool_*` distinct in the audit log.
+    Tier 2 callers also pass `agent_role`, `llm_config_id`, and
+    `iteration_index` so audit forensics can trace which sub-agent
+    made which call on which iteration of the tool-call loop."""
     tool = TOOL_REGISTRY.get(tool_name)
     if tool is None:
         raise ToolNotFoundError(
@@ -268,38 +316,47 @@ async def execute_tool(
             f"available: {sorted(TOOL_REGISTRY.keys())}"
         )
 
+    failed_event = f"{event_prefix}.tool_failed"
+    called_event = f"{event_prefix}.tool_called"
+
+    def _meta_base() -> dict[str, Any]:
+        meta: dict[str, Any] = {
+            "tool_name": tool_name,
+            "args": args,
+            "work_order_id": work_order_id,
+        }
+        if event_prefix == "sub_agent":
+            meta["agent_role"] = agent_role
+            meta["llm_config_id"] = llm_config_id
+            meta["iteration_index"] = iteration_index
+        return meta
+
     try:
         result = await tool.handler(conn, dict(args or {}), client_id)
     except Exception as exc:  # noqa: BLE001
+        meta = _meta_base()
+        meta["kind"] = type(exc).__name__
+        meta["detail"] = str(exc)[:500]
         await write_audit_row(
             conn,
             client_id=client_id,
             actor_user_id=actor_user_id,
-            event="aiden.tool_failed",
+            event=failed_event,
             target_type="aiden_tool",
             target_id=tool_name,
-            metadata={
-                "tool_name": tool_name,
-                "args": args,
-                "kind": type(exc).__name__,
-                "detail": str(exc)[:500],
-                "work_order_id": work_order_id,
-            },
+            metadata=meta,
         )
         raise ToolExecutionError(tool_name, type(exc).__name__, str(exc))
 
+    meta = _meta_base()
+    meta["result_size_chars"] = len(json.dumps(result, default=str))
     await write_audit_row(
         conn,
         client_id=client_id,
         actor_user_id=actor_user_id,
-        event="aiden.tool_called",
+        event=called_event,
         target_type="aiden_tool",
         target_id=tool_name,
-        metadata={
-            "tool_name": tool_name,
-            "args": args,
-            "result_size_chars": len(json.dumps(result, default=str)),
-            "work_order_id": work_order_id,
-        },
+        metadata=meta,
     )
     return result

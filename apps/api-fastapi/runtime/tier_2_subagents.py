@@ -28,7 +28,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 
 import asyncpg
 
@@ -43,6 +43,13 @@ from runtime.budgets import (
 
 
 TIER_2_CONTRACT_VERSION = "v1.alpha"
+
+
+# Loop Eta — Tier 2 tool-call cap. After 3 tool round-trips the runtime
+# injects a "[TOOL CAP REACHED]" prompt fragment and re-invokes once
+# with tool_call disabled in the schema, forcing the LLM to compose a
+# final envelope using whatever data it has gathered so far.
+MAX_TIER_2_TOOL_CALLS = 3
 
 
 # Roles that are always known to be Tier 2 in IWO3. Legacy
@@ -86,18 +93,63 @@ DEFAULT_SYSTEM_PROMPTS = {
     ),
 }
 
-TIER_2_OUTPUT_SCHEMA = """
+TIER_2_OUTPUT_SCHEMA_BASE = """
+You must respond with a strict JSON object. You have TWO modes — pick
+exactly one per response by setting `decision_kind`:
+
+decision_kind="tool_call" — when you need runtime data (recent work
+orders, work-order counts, runtime health, search results, etc.) before
+you can compose the final deliverable. The runtime executes the tool,
+feeds the result back in your next turn, then you compose the final
+content_envelope. NEVER fabricate runtime data. NEVER claim you "looked
+up" or "checked" anything — call the tool, then answer.
+
+decision_kind="content_envelope" — DEFAULT. When you have everything you
+need to produce the deliverable.
+
+Schema:
+
+{
+  "decision_kind": "content_envelope" | "tool_call",
+  "content_envelope": {
+    "content_markdown": "the deliverable, as markdown",
+    "summary": "one-line summary of what you produced",
+    "output_kind": "gamma_pptx | gamma_pdf | generic",
+    "metadata": { ... sub-agent specific fields ... }
+  },
+  "tool_call": {
+    "tool_name": "<one of the tools assigned to you>",
+    "args": { ... }
+  }
+}
+
+Only include the subobject matching `decision_kind`. Output JSON ONLY,
+no commentary, no markdown fences.
+"""
+
+
+TIER_2_OUTPUT_SCHEMA_NO_TOOL_CALL = """
 You must respond with a strict JSON object of the form:
 
 {
-  "content_markdown": "the deliverable, as markdown",
-  "summary": "one-line summary of what you produced",
-  "output_kind": "gamma_pptx | gamma_pdf | generic",
-  "metadata": { ... sub-agent specific fields ... }
+  "decision_kind": "content_envelope",
+  "content_envelope": {
+    "content_markdown": "the deliverable, as markdown",
+    "summary": "one-line summary of what you produced",
+    "output_kind": "gamma_pptx | gamma_pdf | generic",
+    "metadata": { ... sub-agent specific fields ... }
+  }
 }
 
-Output JSON ONLY. No commentary, no fences.
+You have already exhausted your tool-call budget for this work order;
+do NOT request another tool. Compose the final deliverable using
+whatever runtime data you have already gathered. Output JSON ONLY,
+no commentary, no fences.
 """
+
+# Back-compat: legacy callers / docs may still reference the original
+# constant name. Resolves to the dual-mode schema (tool_call enabled).
+TIER_2_OUTPUT_SCHEMA = TIER_2_OUTPUT_SCHEMA_BASE
 
 
 @dataclass(frozen=True)
@@ -106,6 +158,24 @@ class Tier2OutputEnvelope:
     summary: str
     output_kind: str
     metadata: dict
+
+
+@dataclass(frozen=True)
+class Tier2ToolCall:
+    """Loop Eta — a Tier 2 sub-agent requests one tool execution before
+    composing its final content_envelope. The runtime executes the tool
+    against the tenant-scoped connection and re-invokes the sub-agent
+    with the tool result injected into intake_text. Cap of
+    MAX_TIER_2_TOOL_CALLS round-trips per Tier 2 invocation."""
+
+    tool_name: str
+    args: dict
+
+
+# Discriminated-union return shape for the single-round-trip helper.
+# `invoke_tier_2` (the public API) loops over this until it gets an
+# envelope or hits the tool cap.
+Tier2Decision = Union[Tier2OutputEnvelope, Tier2ToolCall]
 
 
 @dataclass(frozen=True)
@@ -152,7 +222,17 @@ def normalize_tier_2_role(role: str) -> str:
     return norm
 
 
-def _parse_envelope(raw_text: str) -> Tier2OutputEnvelope:
+def _parse_decision(raw_text: str) -> Tier2Decision:
+    """Parse a Tier 2 LLM response into either a Tier2OutputEnvelope
+    (final deliverable) or a Tier2ToolCall (intermediate runtime lookup).
+
+    Accepts three shapes for backward compatibility with the pre-Loop-Eta
+    contract:
+      1. {"decision_kind": "content_envelope", "content_envelope": {...}}
+      2. {"decision_kind": "tool_call", "tool_call": {...}}
+      3. Legacy bare envelope: {"content_markdown": ..., "summary": ...,
+         "output_kind": ..., "metadata": ...}  (no decision_kind wrapper)
+    """
     body = raw_text.strip()
     if body.startswith("```"):
         lines = body.splitlines()
@@ -167,6 +247,39 @@ def _parse_envelope(raw_text: str) -> Tier2OutputEnvelope:
         raise Tier2OutputMalformed(
             f"json decode failed: {exc}; first 200 chars: {body[:200]!r}"
         )
+
+    kind = data.get("decision_kind")
+
+    # Loop Eta — discriminated-union shape.
+    if kind == "tool_call":
+        sub = data.get("tool_call")
+        if not isinstance(sub, dict):
+            raise Tier2OutputMalformed(
+                "decision_kind=tool_call but tool_call subobject missing"
+            )
+        tn = sub.get("tool_name")
+        if not isinstance(tn, str) or not tn.strip():
+            raise Tier2OutputMalformed("tool_call.tool_name missing or empty")
+        ta = sub.get("args", {})
+        if not isinstance(ta, dict):
+            ta = {}
+        return Tier2ToolCall(tool_name=tn.strip(), args=ta)
+
+    if kind == "content_envelope":
+        sub = data.get("content_envelope")
+        if not isinstance(sub, dict):
+            raise Tier2OutputMalformed(
+                "decision_kind=content_envelope but content_envelope subobject missing"
+            )
+        return _parse_envelope_subobject(sub)
+
+    # Legacy bare-envelope shape (pre-Loop-Eta): the body itself is the
+    # envelope. Preserves compatibility with existing tests + any
+    # operator system_prompt that hasn't been re-rendered.
+    return _parse_envelope_subobject(data)
+
+
+def _parse_envelope_subobject(data: dict) -> Tier2OutputEnvelope:
     md = data.get("content_markdown")
     if not isinstance(md, str) or not md.strip():
         raise Tier2OutputMalformed("content_markdown missing or empty")
@@ -190,6 +303,17 @@ def _parse_envelope(raw_text: str) -> Tier2OutputEnvelope:
     )
 
 
+# Back-compat alias for any external import. New code should use
+# `_parse_decision`.
+def _parse_envelope(raw_text: str) -> Tier2OutputEnvelope:
+    decision = _parse_decision(raw_text)
+    if isinstance(decision, Tier2ToolCall):
+        raise Tier2OutputMalformed(
+            "expected content_envelope but got tool_call decision"
+        )
+    return decision
+
+
 async def _emit_tier2_invoked(
     conn: asyncpg.Connection,
     *,
@@ -203,6 +327,7 @@ async def _emit_tier2_invoked(
     role: str,
     output_kind: str,
     output_package_id: Optional[str],
+    decision_kind: str = "content_envelope",
 ) -> None:
     await write_audit_row(
         conn,
@@ -220,7 +345,7 @@ async def _emit_tier2_invoked(
             "totalTokens": prompt_tokens + completion_tokens,
             "latencyMs": latency_ms,
             "workOrderId": work_order_id,
-            "decisionKind": "content_envelope",
+            "decisionKind": decision_kind,
             "outputKind": output_kind,
             "outputPackageId": output_package_id,
             "contractVersion": TIER_2_CONTRACT_VERSION,
@@ -260,6 +385,124 @@ async def _emit_tier2_failed(
     )
 
 
+async def _invoke_tier_2_once(
+    conn: asyncpg.Connection,
+    *,
+    cfg: EffectiveLlmConfig,
+    api_key: str,
+    norm_role: str,
+    intake_text: str,
+    content_blocks: dict,
+    work_order_id: Optional[str],
+    client_id: str,
+    actor_user_id: Optional[str],
+    disable_tool_call: bool,
+    transport=None,
+) -> Tier2Decision:
+    """Single Tier 2 round-trip. Returns either an envelope (final
+    deliverable) or a tool_call (intermediate). The looping wrapper
+    `invoke_tier_2` calls this repeatedly until it gets an envelope or
+    hits MAX_TIER_2_TOOL_CALLS.
+
+    `disable_tool_call=True` swaps in the no-tool-call schema so the
+    LLM is forced to compose a final envelope (used after the cap is
+    reached)."""
+    schema = (
+        TIER_2_OUTPUT_SCHEMA_NO_TOOL_CALL
+        if disable_tool_call
+        else TIER_2_OUTPUT_SCHEMA_BASE
+    )
+    system_prompt = (
+        cfg.system_prompt or DEFAULT_SYSTEM_PROMPTS.get(norm_role, "")
+    ) + schema
+
+    user_msg = json.dumps(
+        {"intake_text": intake_text, "content_blocks": content_blocks}
+    )
+
+    options = dict(cfg.options or {})
+    options.setdefault("max_tokens", resolve_max_tokens(cfg.options))
+    options.setdefault("response_format", {"type": "json_object"})
+
+    started = time.monotonic()
+    try:
+        result = call_openai_compatible(
+            provider=cfg.provider,
+            model=cfg.model,
+            api_key=api_key,
+            base_url=cfg.base_url,
+            system_prompt=system_prompt,
+            user_message=user_msg,
+            options=options,
+            transport=transport,
+        )
+    except LlmProviderError as exc:
+        await _emit_tier2_failed(
+            conn,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            work_order_id=work_order_id,
+            cfg=cfg,
+            role=norm_role,
+            kind=exc.kind,
+            detail=str(exc),
+            http_status=exc.http_status,
+        )
+        raise Tier2Error(exc.kind, str(exc))
+
+    latency_ms = int((time.monotonic() - started) * 1000)
+
+    try:
+        decision = _parse_decision(result.text)
+    except Tier2OutputMalformed as exc:
+        await _emit_tier2_failed(
+            conn,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            work_order_id=work_order_id,
+            cfg=cfg,
+            role=norm_role,
+            kind="malformed_output",
+            detail=str(exc),
+        )
+        raise
+
+    raw = result.raw or {}
+    usage = raw.get("usage") if isinstance(raw, dict) else None
+    if isinstance(usage, dict):
+        prompt_t = int(usage.get("prompt_tokens") or 0)
+        completion_t = int(usage.get("completion_tokens") or 0)
+    else:
+        prompt_t = result.prompt_chars // 4
+        completion_t = result.completion_chars // 4
+
+    decision_kind_label = (
+        "tool_call" if isinstance(decision, Tier2ToolCall)
+        else "content_envelope"
+    )
+    output_kind_label = (
+        decision.output_kind
+        if isinstance(decision, Tier2OutputEnvelope)
+        else "tool_call"
+    )
+    await _emit_tier2_invoked(
+        conn,
+        client_id=client_id,
+        actor_user_id=actor_user_id,
+        work_order_id=work_order_id,
+        cfg=cfg,
+        prompt_tokens=prompt_t,
+        completion_tokens=completion_t,
+        latency_ms=latency_ms,
+        role=norm_role,
+        output_kind=output_kind_label,
+        output_package_id=None,
+        decision_kind=decision_kind_label,
+    )
+
+    return decision
+
+
 async def invoke_tier_2(
     conn: asyncpg.Connection,
     *,
@@ -271,9 +514,25 @@ async def invoke_tier_2(
     actor_user_id: Optional[str],
     transport=None,
 ) -> Tier2OutputEnvelope:
-    """Run a single Tier 2 LLM call. Does NOT persist output_package
-    or emit audit on its own — `produce_output_package` is the wrapper
-    that persists. Used by both the WO direct path and the
+    """Run a Tier 2 sub-agent end-to-end, including up to
+    MAX_TIER_2_TOOL_CALLS tool round-trips before composing the final
+    envelope.
+
+    Each tool round-trip:
+      1. Pre-execution authz via `check_sub_agent_tool_assignment`.
+         Unauthorized → `sub_agent.tool_unauthorized` audit + the
+         denial message is appended to intake for the next turn.
+      2. Authorized → `execute_tool(event_prefix='sub_agent', ...)`
+         which writes `sub_agent.tool_called` (or `sub_agent.tool_failed`)
+         and returns the tool result.
+      3. Tool result is appended to intake for the next turn.
+
+    After cap reached: writes `sub_agent.tool_cap_reached`, re-invokes
+    once with the no-tool-call schema, and returns whatever envelope the
+    LLM composes.
+
+    Does NOT persist output_package on its own — `produce_output_package`
+    is the wrapper that persists. Used by both the WO direct path and the
     workflow_step_run advancement path.
 
     Returns the parsed envelope. Raises Tier2Error subclass on failure.
@@ -315,86 +574,168 @@ async def invoke_tier_2(
         )
         raise Tier2Error("credential_missing", str(exc))
 
-    system_prompt = (
-        cfg.system_prompt
-        or DEFAULT_SYSTEM_PROMPTS.get(norm_role, "")
-    ) + TIER_2_OUTPUT_SCHEMA
-
-    user_msg = json.dumps(
-        {"intake_text": intake_text, "content_blocks": content_blocks}
+    # Loop Eta — tool-call → execute → re-invoke loop. Local imports
+    # avoid runtime → aiden_tools import cycle at module-load time.
+    from runtime.aiden_tools import (  # noqa: PLC0415
+        ToolExecutionError,
+        ToolNotFoundError,
+        check_sub_agent_tool_assignment,
+        execute_tool,
     )
 
-    options = dict(cfg.options or {})
-    options.setdefault("max_tokens", resolve_max_tokens(cfg.options))
-    options.setdefault("response_format", {"type": "json_object"})
+    current_intake = intake_text
+    calls_made = 0
 
-    started = time.monotonic()
-    try:
-        result = call_openai_compatible(
-            provider=cfg.provider,
-            model=cfg.model,
+    while True:
+        disable_tool_call = calls_made >= MAX_TIER_2_TOOL_CALLS
+        decision = await _invoke_tier_2_once(
+            conn,
+            cfg=cfg,
             api_key=api_key,
-            base_url=cfg.base_url,
-            system_prompt=system_prompt,
-            user_message=user_msg,
-            options=options,
+            norm_role=norm_role,
+            intake_text=current_intake,
+            content_blocks=content_blocks,
+            work_order_id=work_order_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            disable_tool_call=disable_tool_call,
             transport=transport,
         )
-    except LlmProviderError as exc:
-        await _emit_tier2_failed(
-            conn,
-            client_id=client_id,
-            actor_user_id=actor_user_id,
-            work_order_id=work_order_id,
-            cfg=cfg,
-            role=norm_role,
-            kind=exc.kind,
-            detail=str(exc),
-            http_status=exc.http_status,
+
+        if isinstance(decision, Tier2OutputEnvelope):
+            return decision
+
+        # decision is a Tier2ToolCall here.
+        tool_call = decision
+
+        if calls_made >= MAX_TIER_2_TOOL_CALLS:
+            # Reached the cap and the LLM ignored the no-tool-call schema.
+            # Force a final-envelope turn by injecting a hard hint and
+            # re-invoking with the same disabled schema.
+            current_intake = (
+                f"{current_intake}\n\n"
+                "[TOOL CAP REACHED — compose final envelope using what "
+                "you have]"
+            )
+            continue
+
+        # We're below the cap — try to execute the tool.
+        calls_made += 1
+
+        # Cap-reached audit fires PROACTIVELY when this round consumed
+        # the last allowed slot, so operators see the cap event exactly
+        # once per WO regardless of whether the LLM complies.
+        if calls_made >= MAX_TIER_2_TOOL_CALLS:
+            await write_audit_row(
+                conn,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                event="sub_agent.tool_cap_reached",
+                target_type="llm_config",
+                target_id=cfg.config_id,
+                metadata={
+                    "agent_role": norm_role,
+                    "llm_config_id": cfg.config_id,
+                    "work_order_id": work_order_id,
+                    "calls_made": calls_made,
+                    "contractVersion": TIER_2_CONTRACT_VERSION,
+                },
+            )
+
+        # Pre-execution authz.
+        try:
+            authorized = await check_sub_agent_tool_assignment(
+                conn,
+                llm_config_id=cfg.config_id,
+                tool_key=tool_call.tool_name,
+            )
+            authz_failure_detail = None
+        except Exception as exc:  # noqa: BLE001 — defensive: schema not migrated, etc.
+            authorized = False
+            authz_failure_detail = f"authz_check_failed: {exc!s}"
+
+        if not authorized:
+            await write_audit_row(
+                conn,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                event="sub_agent.tool_unauthorized",
+                target_type="aiden_tool",
+                target_id=tool_call.tool_name,
+                metadata={
+                    "tool_name": tool_call.tool_name,
+                    "args": tool_call.args,
+                    "agent_role": norm_role,
+                    "llm_config_id": cfg.config_id,
+                    "work_order_id": work_order_id,
+                    "iteration_index": calls_made,
+                    "detail": authz_failure_detail,
+                    "contractVersion": TIER_2_CONTRACT_VERSION,
+                },
+            )
+            current_intake = (
+                f"{current_intake}\n\n"
+                f"[TOOL DENIED — {tool_call.tool_name} not assigned to "
+                f"this agent. Compose your final content_envelope without "
+                f"calling that tool.]"
+            )
+            continue
+
+        try:
+            tool_result = await execute_tool(
+                conn,
+                tool_name=tool_call.tool_name,
+                args=tool_call.args,
+                client_id=client_id,
+                actor_user_id=actor_user_id or "",
+                work_order_id=work_order_id,
+                event_prefix="sub_agent",
+                agent_role=norm_role,
+                llm_config_id=cfg.config_id,
+                iteration_index=calls_made,
+            )
+            tool_result_str = json.dumps(tool_result, default=str, indent=2)
+        except ToolNotFoundError as exc:
+            # `execute_tool` does NOT write an audit row on
+            # ToolNotFoundError (it raises before the handler). Emit
+            # `sub_agent.tool_failed` here so audit forensics capture
+            # every refused round-trip.
+            await write_audit_row(
+                conn,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                event="sub_agent.tool_failed",
+                target_type="aiden_tool",
+                target_id=tool_call.tool_name,
+                metadata={
+                    "tool_name": tool_call.tool_name,
+                    "args": tool_call.args,
+                    "agent_role": norm_role,
+                    "llm_config_id": cfg.config_id,
+                    "work_order_id": work_order_id,
+                    "iteration_index": calls_made,
+                    "kind": "ToolNotFoundError",
+                    "detail": str(exc)[:500],
+                    "contractVersion": TIER_2_CONTRACT_VERSION,
+                },
+            )
+            tool_result_str = (
+                f"[TOOL FAILED — {tool_call.tool_name}: not found in registry]"
+            )
+        except ToolExecutionError as exc:
+            # `execute_tool` already wrote `sub_agent.tool_failed` for
+            # this branch. Just inject the failure into intake.
+            tool_result_str = (
+                f"[TOOL FAILED — {tool_call.tool_name}: "
+                f"{exc.kind}: {exc.detail}]"
+            )
+
+        current_intake = (
+            f"{current_intake}\n\n"
+            f"[TOOL RESULT — {tool_call.tool_name}]\n"
+            f"{tool_result_str}\n"
+            f"[END TOOL RESULT]"
         )
-        raise Tier2Error(exc.kind, str(exc))
-
-    latency_ms = int((time.monotonic() - started) * 1000)
-
-    try:
-        envelope = _parse_envelope(result.text)
-    except Tier2OutputMalformed as exc:
-        await _emit_tier2_failed(
-            conn,
-            client_id=client_id,
-            actor_user_id=actor_user_id,
-            work_order_id=work_order_id,
-            cfg=cfg,
-            role=norm_role,
-            kind="malformed_output",
-            detail=str(exc),
-        )
-        raise
-
-    raw = result.raw or {}
-    usage = raw.get("usage") if isinstance(raw, dict) else None
-    if isinstance(usage, dict):
-        prompt_t = int(usage.get("prompt_tokens") or 0)
-        completion_t = int(usage.get("completion_tokens") or 0)
-    else:
-        prompt_t = result.prompt_chars // 4
-        completion_t = result.completion_chars // 4
-
-    await _emit_tier2_invoked(
-        conn,
-        client_id=client_id,
-        actor_user_id=actor_user_id,
-        work_order_id=work_order_id,
-        cfg=cfg,
-        prompt_tokens=prompt_t,
-        completion_tokens=completion_t,
-        latency_ms=latency_ms,
-        role=norm_role,
-        output_kind=envelope.output_kind,
-        output_package_id=None,
-    )
-
-    return envelope
 
 
 async def produce_output_package(
