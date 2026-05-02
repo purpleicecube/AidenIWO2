@@ -360,3 +360,21 @@ async def execute_tool(
         metadata=meta,
     )
     return result
+
+
+# Loop Eta phase 1.2 / Eta.2 wave 2 — merge per-category Tier 2 handler
+# registries from `runtime/tools/*.py` into TOOL_REGISTRY. Each Worker
+# (F/G/H/I) writes their own sibling module + a `*_TOOLS` dict. The
+# convergence step (these imports + updates) lands at the END of the
+# file so worker modules can `from runtime.aiden_tools import
+# ToolDefinition, ToolExecutionError, ToolNotFoundError` without
+# tripping a partially-initialised-module circular import.
+from .tools.document_rendering import DOCUMENT_RENDERING_TOOLS  # noqa: E402
+from .tools.search import SEARCH_TOOLS  # noqa: E402
+from .tools.data_ops import DATA_OPS_TOOLS  # noqa: E402
+from .tools.stitch_mcp import STITCH_TOOLS  # noqa: E402
+
+TOOL_REGISTRY.update(DOCUMENT_RENDERING_TOOLS)
+TOOL_REGISTRY.update(SEARCH_TOOLS)
+TOOL_REGISTRY.update(DATA_OPS_TOOLS)
+TOOL_REGISTRY.update(STITCH_TOOLS)
