@@ -1,0 +1,11 @@
+{
+  "name": "iwo3-api-vendor",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Bundled Node-side dependencies for the IWO3 FastAPI runtime. The Stitch MCP stdio proxy lives here so Railway/Streamlit-Cloud deploys can spawn it as a child process from Python without needing a sidecar container or a local IWO2 checkout. Versions pinned to the same releases IWO2 ships with so behavior is reproducible.",
+  "type": "module",
+  "dependencies": {
+    "@google/stitch-sdk": "^0.0.3",
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  }
+}
