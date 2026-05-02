@@ -33,8 +33,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from authz.audit_writer import write_audit_row
+from contracts.enums import (
+    ToolCategory,
+    ToolDefaultTier,
+    ToolRuntimeStatus,
+)
 from deps import (
     current_user_context,
+    get_db_connection,
     get_tenant_scoped_connection,
     require_permission_dep,
 )
@@ -1272,3 +1278,371 @@ async def rollback_config(
         },
     )
     return LlmConfigResponse(config=_row_to_list_item(row))
+
+
+# ── Loop Eta phase 1 — tool catalog + sub-agent tool assignments ──────
+#
+# Three endpoints per IWO3_LOOP_ETA_SCOPE_PROPOSAL §4:
+#
+#   GET  /tool_catalog                       — global, tenant-agnostic
+#   GET  /llm/configs/{id}/tools             — catalog joined with assignment
+#   PUT  /llm/configs/{id}/tools/{tool_key}  — toggle enabled (soft revoke)
+#
+# Schema + RBAC + audit events are locked in spine commit c756cda
+# (migration 0022) — see db/schema/tool_catalog.ts +
+# db/schema/sub_agent_tools.ts + packages/contracts/audit/events.ts.
+
+
+# Catalog routes live on a separate router so the prefix is `/tool_catalog`
+# rather than `/llm/tool_catalog`. The router is wired in main.py via
+# `tool_catalog_router` exposed at module level.
+
+tool_catalog_router = APIRouter(prefix="/tool_catalog", tags=["tool_catalog"])
+
+
+class ToolCatalogRow(BaseModel):
+    tool_key: str
+    display_name: str
+    description: str
+    category: ToolCategory
+    runtime_status: ToolRuntimeStatus
+    args_schema: dict[str, Any]
+    default_tier: ToolDefaultTier
+    iwo2_origin: Optional[str] = None
+    enabled: bool
+
+
+class ListToolCatalogResponse(BaseModel):
+    tools: list[ToolCatalogRow]
+
+
+@tool_catalog_router.get(
+    "",
+    response_model=ListToolCatalogResponse,
+    dependencies=[Depends(require_permission_dep("tool_catalog:read"))],
+)
+async def list_tool_catalog(
+    conn: Annotated[asyncpg.Connection, Depends(get_db_connection)],
+    category: Optional[ToolCategory] = None,
+    runtime_status: Optional[ToolRuntimeStatus] = None,
+    default_tier: Optional[ToolDefaultTier] = None,
+    enabled: bool = True,
+) -> ListToolCatalogResponse:
+    """List rows from the global tool_catalog.
+
+    Tenant-agnostic — the catalog has no client_id, no RLS scoping, and
+    `tool_catalog:read` is granted to every membership role. Use the
+    bypass connection (`get_db_connection`) instead of the tenant-scoped
+    one because we do not need RLS for a global registry read, and the
+    bypass path matches the migration's documented intent.
+
+    `enabled=true` by default — set `enabled=false` to inspect retired
+    rows (or any boolean to drop the filter altogether is NOT supported
+    in v1; toggle the param explicitly).
+    """
+    sql = [
+        """
+        SELECT tool_key,
+               display_name,
+               description,
+               category::text       AS category,
+               runtime_status::text AS runtime_status,
+               args_schema,
+               default_tier::text   AS default_tier,
+               iwo2_origin,
+               enabled
+          FROM tool_catalog
+         WHERE 1=1
+        """
+    ]
+    args: list[Any] = []
+    if category is not None:
+        args.append(category)
+        sql.append(f"AND category = ${len(args)}::tool_category")
+    if runtime_status is not None:
+        args.append(runtime_status)
+        sql.append(
+            f"AND runtime_status = ${len(args)}::tool_runtime_status"
+        )
+    if default_tier is not None:
+        args.append(default_tier)
+        sql.append(f"AND default_tier = ${len(args)}::tool_default_tier")
+    args.append(enabled)
+    sql.append(f"AND enabled = ${len(args)}")
+    sql.append("ORDER BY category, default_tier, tool_key")
+    rows = await conn.fetch("\n".join(sql), *args)
+    return ListToolCatalogResponse(
+        tools=[
+            ToolCatalogRow(
+                tool_key=r["tool_key"],
+                display_name=r["display_name"],
+                description=r["description"],
+                category=r["category"],
+                runtime_status=r["runtime_status"],
+                args_schema=(
+                    json.loads(r["args_schema"])
+                    if isinstance(r["args_schema"], str)
+                    else (r["args_schema"] or {})
+                ),
+                default_tier=r["default_tier"],
+                iwo2_origin=r["iwo2_origin"],
+                enabled=r["enabled"],
+            )
+            for r in rows
+        ]
+    )
+
+
+# ── /llm/configs/{id}/tools — assignment surface ───────────────────────
+
+
+class SubAgentToolAssignment(BaseModel):
+    tool_key: str
+    display_name: str
+    category: ToolCategory
+    runtime_status: ToolRuntimeStatus
+    default_tier: ToolDefaultTier
+    iwo2_origin: Optional[str] = None
+    assigned: bool
+    enabled: bool
+    granted_at: Optional[str] = None
+    granted_by_user_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SubAgentToolsResponse(BaseModel):
+    llm_config_id: str
+    agent_role: str
+    tools: list[SubAgentToolAssignment]
+
+
+# `Annotated[..., Depends(require_permission_dep(...))]` does not stack
+# cleanly when both deps need to RUN (only the last takes effect for the
+# Annotated dep). The two RBAC checks are wired via the FastAPI
+# `dependencies=[...]` list on the route decorator, where every
+# Depends in the list executes in order.
+
+# NOTE: spec §4 calls for `llm_config:read` AND `sub_agent_tool:read`,
+# but `llm_config:read` is not a seeded permission key — the vocabulary
+# only mints `llm_config:write` and `llm_config:delete`, and the
+# existing `GET /llm/configs` route gates on `client:read`. We mirror
+# that here: `client:read` (tenant-scoped read capability) +
+# `sub_agent_tool:read` (assignment-specific). Documented deviation.
+_SUB_AGENT_TOOLS_READ_DEPS = [
+    Depends(require_permission_dep("client:read")),
+    Depends(require_permission_dep("sub_agent_tool:read")),
+]
+
+
+@router.get(
+    "/configs/{config_id}/tools",
+    response_model=SubAgentToolsResponse,
+    dependencies=_SUB_AGENT_TOOLS_READ_DEPS,
+)
+async def get_sub_agent_tools(
+    config_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> SubAgentToolsResponse:
+    """Return the full tool_catalog joined with this config's
+    assignment state. Unassigned tools surface with assigned=false,
+    enabled=false so the UI can render a complete grid in one round
+    trip.
+
+    Tenant-scoped via `get_tenant_scoped_connection`; RLS hides
+    cross-tenant llm_configs, so the existence check below returns
+    None for cross-tenant ids and the route 404s.
+    """
+    try:
+        cfg = await conn.fetchrow(
+            """
+            SELECT id::text AS id, agent_role
+              FROM llm_configs
+             WHERE id = $1::uuid
+            """,
+            config_id,
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_config_id", "value": config_id},
+        )
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "llm_config_not_found", "id": config_id},
+        )
+
+    rows = await conn.fetch(
+        """
+        SELECT tc.tool_key,
+               tc.display_name,
+               tc.category::text       AS category,
+               tc.runtime_status::text AS runtime_status,
+               tc.default_tier::text   AS default_tier,
+               tc.iwo2_origin,
+               (sat.id IS NOT NULL)    AS assigned,
+               COALESCE(sat.enabled, false)            AS enabled,
+               sat.granted_at::text    AS granted_at,
+               sat.granted_by_user_id::text AS granted_by_user_id,
+               sat.notes
+          FROM tool_catalog tc
+          LEFT JOIN sub_agent_tools sat
+            ON sat.tool_key = tc.tool_key
+           AND sat.llm_config_id = $1::uuid
+         WHERE tc.enabled = true
+         ORDER BY tc.category, tc.default_tier, tc.tool_key
+        """,
+        config_id,
+    )
+    return SubAgentToolsResponse(
+        llm_config_id=cfg["id"],
+        agent_role=cfg["agent_role"],
+        tools=[SubAgentToolAssignment(**dict(r)) for r in rows],
+    )
+
+
+# ── PUT /llm/configs/{id}/tools/{tool_key} — toggle assignment ─────────
+
+
+class SetSubAgentToolRequest(BaseModel):
+    enabled: bool
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+class SubAgentToolRow(BaseModel):
+    id: str
+    llm_config_id: str
+    tool_key: str
+    enabled: bool
+    granted_at: str
+    granted_by_user_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.put(
+    "/configs/{config_id}/tools/{tool_key}",
+    response_model=SubAgentToolRow,
+    dependencies=[Depends(require_permission_dep("sub_agent_tool:assign"))],
+)
+async def set_sub_agent_tool(
+    config_id: str,
+    tool_key: str,
+    body: SetSubAgentToolRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> SubAgentToolRow:
+    """Upsert a sub_agent_tools row for (tenant, llm_config_id,
+    tool_key). Toggling `enabled=false` is the soft-revoke path — the
+    row stays for history. There is no DELETE endpoint.
+
+    Audit:
+      - `sub_agent.tool_granted` when the new state is enabled=true
+      - `sub_agent.tool_revoked` when the new state is enabled=false
+
+    Both the upsert and the audit row write inside the tenant-scoped
+    transaction opened by `get_tenant_scoped_connection`, so they
+    commit or roll back as a single unit.
+    """
+    # 1. Validate llm_config exists in this tenant. RLS hides
+    #    cross-tenant rows so a missing fetchrow == 404.
+    try:
+        cfg = await conn.fetchrow(
+            """
+            SELECT id::text AS id, agent_role
+              FROM llm_configs
+             WHERE id = $1::uuid
+            """,
+            config_id,
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_config_id", "value": config_id},
+        )
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "llm_config_not_found", "id": config_id},
+        )
+
+    # 2. Validate tool_key exists in the global catalog.
+    catalog_row = await conn.fetchrow(
+        "SELECT tool_key, enabled FROM tool_catalog WHERE tool_key = $1",
+        tool_key,
+    )
+    if catalog_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "tool_not_in_catalog", "tool_key": tool_key},
+        )
+
+    # 3. Read prior assignment state for audit metadata.
+    prior = await conn.fetchrow(
+        """
+        SELECT enabled
+          FROM sub_agent_tools
+         WHERE llm_config_id = $1::uuid AND tool_key = $2
+        """,
+        config_id,
+        tool_key,
+    )
+    prior_enabled = bool(prior["enabled"]) if prior is not None else False
+
+    # 4. Upsert. ON CONFLICT (llm_config_id, tool_key) — the unique
+    #    constraint defined on sub_agent_tools.
+    upserted = await conn.fetchrow(
+        """
+        INSERT INTO sub_agent_tools
+          (client_id, llm_config_id, tool_key, enabled,
+           granted_at, granted_by_user_id, notes)
+        VALUES ($1::uuid, $2::uuid, $3, $4, now(), $5::uuid, $6)
+        ON CONFLICT (llm_config_id, tool_key) DO UPDATE SET
+          enabled            = EXCLUDED.enabled,
+          granted_at         = now(),
+          granted_by_user_id = EXCLUDED.granted_by_user_id,
+          notes              = EXCLUDED.notes
+        RETURNING id::text                  AS id,
+                  llm_config_id::text       AS llm_config_id,
+                  tool_key,
+                  enabled,
+                  granted_at::text          AS granted_at,
+                  granted_by_user_id::text  AS granted_by_user_id,
+                  notes
+        """,
+        ctx["client_id"],
+        config_id,
+        tool_key,
+        body.enabled,
+        ctx["user_id"],
+        body.notes,
+    )
+    assert upserted is not None  # RETURNING after a successful upsert
+
+    # 5. Audit. Locked vocabulary keys per
+    #    packages/contracts/audit/events.ts (LOOP_ETA_AUDIT_EVENTS).
+    audit_event = (
+        "sub_agent.tool_granted"
+        if body.enabled
+        else "sub_agent.tool_revoked"
+    )
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event=audit_event,
+        target_type="sub_agent_tool",
+        target_id=upserted["id"],
+        metadata={
+            "tool_name": tool_key,
+            "llm_config_id": config_id,
+            "agent_role": cfg["agent_role"],
+            "prior_enabled": prior_enabled,
+            "new_enabled": body.enabled,
+        },
+    )
+    return SubAgentToolRow(**dict(upserted))

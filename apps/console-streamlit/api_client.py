@@ -535,3 +535,63 @@ class ApiClient:
 
     def create_or_get_scratch_folder(self) -> dict[str, Any]:
         return self._request("POST", "/workspace/folders/scratch")
+
+    # ---- Loop Eta phase 1 — tool catalog + sub-agent tool assignments ----
+
+    def list_tool_catalog(
+        self,
+        *,
+        category: Optional[str] = None,
+        runtime_status: Optional[str] = None,
+        default_tier: Optional[str] = None,
+        enabled: bool = True,
+    ) -> list[dict[str, Any]]:
+        """GET /tool_catalog. Returns the global tool catalog rows.
+
+        All filters optional. `enabled=True` (default) hides retired
+        tools; pass `enabled=False` to inspect only retired rows.
+        """
+        params: dict[str, Any] = {"enabled": str(enabled).lower()}
+        if category is not None:
+            params["category"] = category
+        if runtime_status is not None:
+            params["runtime_status"] = runtime_status
+        if default_tier is not None:
+            params["default_tier"] = default_tier
+        data = self._request("GET", "/tool_catalog", params=params)
+        return data.get("tools", [])
+
+    def get_sub_agent_tools(self, llm_config_id: str) -> dict[str, Any]:
+        """GET /llm/configs/{id}/tools.
+
+        Returns ``{llm_config_id, agent_role, tools: [...]}`` where each
+        tool row carries both its catalog metadata and the assignment
+        state (`assigned`, `enabled`, `granted_at`, etc.). Unassigned
+        tools surface with ``assigned=false, enabled=false``.
+        """
+        return self._request(
+            "GET", f"/llm/configs/{llm_config_id}/tools"
+        )
+
+    def set_sub_agent_tool(
+        self,
+        llm_config_id: str,
+        tool_key: str,
+        *,
+        enabled: bool,
+        notes: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """PUT /llm/configs/{id}/tools/{tool_key} — toggle assignment.
+
+        Returns the upserted ``sub_agent_tools`` row. Setting
+        ``enabled=False`` is the soft-revoke path (the row stays for
+        history). There is no DELETE endpoint.
+        """
+        body: dict[str, Any] = {"enabled": enabled}
+        if notes is not None:
+            body["notes"] = notes
+        return self._request(
+            "PUT",
+            f"/llm/configs/{llm_config_id}/tools/{tool_key}",
+            json=body,
+        )
