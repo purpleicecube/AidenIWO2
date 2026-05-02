@@ -17,6 +17,7 @@ dependencies = [
   "mcp>=1.27.0",
   "pypdf>=6.10.2",
   "python-pptx>=1.0.2",
+  "beautifulsoup4>=4.14.3",
 ]
 
 [project.optional-dependencies]
