@@ -36,9 +36,15 @@ from deps import (
     require_permission_dep,
 )
 from runtime.budgets import LlmBudgetExceeded
+from runtime.template_resolver import (
+    TemplateResolution,
+    resolve_template_for_client,
+)
 from runtime.tier_1_aiden import (
+    AidenDecision,
     AidenInvocationError,
     AidenNoConfig,
+    AidenWorkOrderBrief,
     invoke_aiden_tier_1,
 )
 
@@ -69,6 +75,88 @@ def _decision_to_payload(dec) -> dict[str, Any]:  # noqa: ANN001
     """Flatten AidenDecision dataclass → JSON-serialisable dict for the
     response model. dataclasses.asdict already nests sub-dataclasses."""
     return dataclasses.asdict(dec)
+
+
+def _choice_to_dict(choice) -> dict[str, Any]:  # noqa: ANN001
+    return {
+        "template_profile_id": choice.template_profile_id,
+        "profile_key": choice.profile_key,
+        "output_kind": choice.output_kind,
+        "engine": choice.engine,
+        "label": choice.label,
+        "external_ref": choice.external_ref,
+    }
+
+
+def _apply_template_resolution(
+    decision: AidenDecision,
+    resolution: TemplateResolution,
+) -> AidenDecision:
+    """Fold a template-resolver result into Aiden's work_order_brief.
+
+    Three cases:
+      matched       → write template_profile_id + identifying metadata.
+      needs_choice  → flag template_choice_required + attach choices so
+                      chat surface can render a picker.
+      no_template   → leave the brief untouched (original behaviour).
+
+    Only mutates work_order_brief decisions. Workflow / clarification /
+    assistant_reply / tool_call decisions pass through unchanged.
+    """
+    if decision.decision_kind != "work_order_brief" or decision.work_order_brief is None:
+        return decision
+
+    brief = decision.work_order_brief
+
+    if resolution.kind == "matched" and resolution.match is not None:
+        new_brief = AidenWorkOrderBrief(
+            assigned_role=brief.assigned_role,
+            content_blocks=brief.content_blocks,
+            priority=brief.priority,
+            template_profile_id=resolution.match.template_profile_id,
+            template_profile_key=resolution.match.profile_key,
+            template_output_kind=resolution.match.output_kind,
+            template_engine=resolution.match.engine,
+            template_label=resolution.match.label,
+            template_match_terms=resolution.matched_terms,
+            template_choice_required=False,
+            template_choices=(),
+        )
+    elif resolution.kind == "needs_choice" and resolution.choices:
+        new_brief = AidenWorkOrderBrief(
+            assigned_role=brief.assigned_role,
+            content_blocks=brief.content_blocks,
+            priority=brief.priority,
+            template_profile_id=None,
+            template_profile_key=None,
+            template_output_kind=resolution.detected_output_kind,
+            template_engine=None,
+            template_label=None,
+            template_match_terms=(),
+            template_choice_required=True,
+            template_choices=tuple(
+                _choice_to_dict(c) for c in resolution.choices
+            ),
+        )
+    else:
+        return decision
+
+    return AidenDecision(
+        decision_kind=decision.decision_kind,
+        title=decision.title,
+        summary=decision.summary,
+        assistant_reply=decision.assistant_reply,
+        tool_call=decision.tool_call,
+        work_order_brief=new_brief,
+        workflow_brief=decision.workflow_brief,
+        clarification=decision.clarification,
+        provider=decision.provider,
+        model=decision.model,
+        latency_ms=decision.latency_ms,
+        prompt_tokens=decision.prompt_tokens,
+        completion_tokens=decision.completion_tokens,
+        total_tokens=decision.total_tokens,
+    )
 
 
 _GREETING_RE = re.compile(
@@ -350,6 +438,25 @@ async def aiden_chat(
                 title=decision.title if decision else None,
                 error=f"followup_invoke_failed: {exc}",
             )
+
+    # Loop Eta post-close — resolve template from operator's intake.
+    # Runs only for work_order_brief decisions; all other decision_kinds
+    # pass through unchanged. Resolver is deterministic + tenant-scoped
+    # via the same RLS-bound connection used above. Failures are
+    # tolerated (template-resolution is best-effort over a pure-LLM
+    # baseline, never blocking).
+    if decision.decision_kind == "work_order_brief":
+        try:
+            resolution = await resolve_template_for_client(
+                conn,
+                client_id=ctx["client_id"],
+                intake_text=body.message,
+            )
+            decision = _apply_template_resolution(decision, resolution)
+        except Exception:  # noqa: BLE001
+            # Never fail the chat over template enrichment. Operator
+            # still gets the brief; Submit Order is the explicit fallback.
+            pass
 
     payload = _decision_to_payload(decision)
     return AidenChatResponse(

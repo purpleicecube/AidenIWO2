@@ -276,6 +276,21 @@ class AidenWorkOrderBrief:
     assigned_role: str
     content_blocks: dict
     priority: str
+    # Loop Eta post-close — template resolver wires these in after Aiden
+    # classifies. Matched template_profile_id flows into the WO's
+    # requested_outputs jsonb so dispatch_gamma_for_package targets the
+    # operator-intended Klear/FFAI template instead of Gamma defaults.
+    # When the operator clearly wants a templated artifact but no single
+    # template scored high enough, `template_choice_required=True` and
+    # `template_choices` carries the candidate list for chat-side pick.
+    template_profile_id: Optional[str] = None
+    template_profile_key: Optional[str] = None
+    template_output_kind: Optional[str] = None
+    template_engine: Optional[str] = None
+    template_label: Optional[str] = None
+    template_match_terms: tuple[str, ...] = ()
+    template_choice_required: bool = False
+    template_choices: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)

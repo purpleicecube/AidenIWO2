@@ -41,6 +41,7 @@ _CONTEXT_KEY = "iwo3_chat_context"
 _PROMOTED_KEY = "iwo3_chat_promoted"
 _HYDRATED_KEY = "iwo3_chat_hydrated_session_id"
 _PERSIST_DISABLED_KEY = "iwo3_chat_persist_disabled"
+_TEMPLATE_PICK_KEY = "iwo3_chat_template_pick"  # idx -> template_profile_id
 
 
 # ── Beta-1.5 phase 2 — server-side persistence helpers ───────────────
@@ -170,15 +171,36 @@ def _render_decision(reply: dict[str, Any]) -> str:
 
     if kind == "work_order_brief":
         b = reply.get("work_order_brief") or {}
-        return (
+        body = (
             head
             + "**Here is what I think you need:** a single-step work order.\n\n"
             + f"**Title:** {reply.get('title')}\n\n"
             + f"**Summary:** {reply.get('summary')}\n\n"
             + f"**Recommended owner:** `{b.get('assigned_role')}`\n\n"
             + f"**Priority:** `{b.get('priority')}`\n\n"
-            + "You can create it directly from this chat."
         )
+        # Loop Eta post-close — surface the resolved Gamma template so
+        # the operator confirms before promoting. When no template
+        # matched but the intake clearly wanted one, the picker renders
+        # below the message body via _render_actions().
+        tpl_key = b.get("template_profile_key")
+        tpl_label = b.get("template_label") or tpl_key
+        if tpl_key:
+            terms = b.get("template_match_terms") or []
+            terms_clause = (
+                f" (matched on: {', '.join(terms)})" if terms else ""
+            )
+            body += (
+                f"**Template:** `{tpl_key}` — {tpl_label}{terms_clause}\n\n"
+            )
+        elif b.get("template_choice_required"):
+            body += (
+                "_⚠️ I couldn't pick a template confidently — choose one "
+                "below before creating the WO so Gamma renders with your "
+                "branded artwork instead of defaults._\n\n"
+            )
+        body += "You can create it directly from this chat."
+        return body
     if kind == "workflow_brief":
         b = reply.get("workflow_brief") or {}
         return (
@@ -309,17 +331,25 @@ def _promote_reply(
     *,
     create_only: bool,
     key_seed: str,
+    template_profile_id: Optional[str] = None,
 ) -> None:
     kind = reply.get("decision_kind")
     title = reply.get("title") or "Untitled request"
     summary = reply.get("summary")
     wo_type = "workflow_brief" if kind == "workflow_brief" else "content_brief"
+    brief = reply.get("work_order_brief") or {}
     priority = (
-        (reply.get("work_order_brief") or {}).get("priority")
+        brief.get("priority")
         if kind == "work_order_brief"
         else "medium"
     ) or "medium"
     correlation_id = f"chat:{key_seed}"
+
+    # Loop Eta post-close — pass operator-confirmed template through to
+    # the WO so dispatch_gamma_for_package targets the right Gamma
+    # template instead of falling back to defaults. Resolver match wins
+    # by default; a chat-side picker (clarification path) overrides it.
+    tpl_id = template_profile_id or brief.get("template_profile_id")
 
     created = api.create_work_order(
         title=title,
@@ -327,6 +357,7 @@ def _promote_reply(
         wo_type=wo_type,
         priority=priority,
         correlation_id=correlation_id,
+        template_profile_id=tpl_id,
     )
     wo_id = created["id"]
     _set_context(work_order_id=wo_id, title=title)
@@ -429,6 +460,41 @@ def _render_context_actions(actions: dict[str, Any], idx: int) -> None:
                 st.switch_page("views/audit_log.py")
 
 
+def _render_template_picker(idx: int, brief: dict[str, Any]) -> Optional[str]:
+    """Loop Eta post-close — render a radio picker for the template
+    candidates Aiden surfaced when the resolver couldn't auto-match.
+    Returns the operator's selected `template_profile_id` (or None when
+    no choice yet). Selection is persisted in session_state so a rerun
+    triggered by clicking Create/Run preserves the pick.
+    """
+    choices = brief.get("template_choices") or []
+    if not choices:
+        return None
+    pick_state: dict = st.session_state.setdefault(_TEMPLATE_PICK_KEY, {})
+    options = [c.get("template_profile_id") for c in choices]
+    labels = {
+        c.get("template_profile_id"): (
+            f"{c.get('profile_key')} — "
+            f"{c.get('label') or c.get('profile_key')} "
+            f"({c.get('output_kind')} / {c.get('engine')})"
+        )
+        for c in choices
+    }
+    current = pick_state.get(str(idx))
+    default_index = options.index(current) if current in options else 0
+
+    selected = st.radio(
+        "Pick the Gamma template for this WO:",
+        options=options,
+        index=default_index,
+        format_func=lambda v: labels.get(v, v),
+        key=f"chat-tpl-pick-{idx}",
+    )
+    pick_state[str(idx)] = selected
+    st.session_state[_TEMPLATE_PICK_KEY] = pick_state
+    return selected
+
+
 def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[str, Any]) -> None:
     kind = reply.get("decision_kind")
     if kind not in {"work_order_brief", "workflow_brief"}:
@@ -445,6 +511,15 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
             "the artefact, or send a new request to create another._"
         )
         return
+
+    # Loop Eta post-close — when Aiden flagged the brief as needing a
+    # template choice, render the picker first and pass the selection
+    # into _promote_reply. When the resolver auto-matched a template,
+    # we skip the picker (the brief already carries template_profile_id).
+    selected_template_id: Optional[str] = None
+    brief_dict = reply.get("work_order_brief") or {}
+    if kind == "work_order_brief" and brief_dict.get("template_choice_required"):
+        selected_template_id = _render_template_picker(idx, brief_dict)
 
     col1, col2 = st.columns([1, 1])
     label_create = "Create WO" if kind == "work_order_brief" else "Create workflow WO"
@@ -464,6 +539,7 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
                     reply,
                     create_only=True,
                     key_seed=f"{idx}-create",
+                    template_profile_id=selected_template_id,
                 )
                 st.session_state[_MESSAGES_KEY] = messages
                 _persist_to_server(api)
@@ -485,6 +561,7 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
                     reply,
                     create_only=False,
                     key_seed=f"{idx}-run",
+                    template_profile_id=selected_template_id,
                 )
                 st.session_state[_MESSAGES_KEY] = messages
                 _persist_to_server(api)
@@ -503,8 +580,21 @@ def main() -> None:
     st.markdown(
         """
         <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">Chat with Aiden</h2>
-        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
+        <div style="color:#6B7280; font-size:0.86rem; margin-bottom:6px;">
           Live Tier-1 LLM classification. Token-budgeted, audit-logged.
+        </div>
+        <div style="
+          background:#F3F4F6; border-left:3px solid #1E5F91;
+          padding:8px 12px; margin-bottom:14px; font-size:0.85rem;
+          color:#374151; border-radius:3px;
+        ">
+          <strong>Templated artifacts:</strong> mention the template by
+          name (e.g. <em>&ldquo;Klear template&rdquo;</em>,
+          <em>&ldquo;RMIS PDF&rdquo;</em>,
+          <em>&ldquo;klearai-pptx&rdquo;</em>) and Aiden will resolve it
+          automatically. For full control of every template field, use
+          <strong>Submit Order</strong> in the sidebar &mdash; it has the
+          explicit dropdown of every active template for this tenant.
         </div>
         """,
         unsafe_allow_html=True,
