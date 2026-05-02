@@ -127,7 +127,24 @@ def _tool_card(name: str, status: str, blurb: str) -> None:
 # an iframe portal so operators can browse their Stitch projects from
 # inside Design Lab without leaving the console.
 
-_STITCH_PUBLIC_URL = "https://stitch.google.com"
+# Default Stitch landing URL. Verified working 2026-05-02 — Google's
+# actual Stitch product domain is `stitch.withgoogle.com`, not the
+# `stitch.google.com` that was originally hardcoded (which doesn't
+# resolve). The `?pli=1` param is Google's "personal-login-indicator"
+# and is harmless if the operator isn't signed in.
+_STITCH_DEFAULT_URL = "https://stitch.withgoogle.com/?pli=1"
+
+_STITCH_USER_URL_KEY = "stitch_user_url"
+
+
+def _resolved_stitch_url() -> str:
+    """Resolve the URL to load: per-session operator override first,
+    then the hardcoded tenant default. A future loop can add a
+    persistent per-tenant default + per-user override (see the
+    `IWO3_LOOP_ETA_POST_CLOSE_DESIGN_LAB_STITCH_PORTAL_NOTE` follow-ups
+    section)."""
+    user_url = (st.session_state.get(_STITCH_USER_URL_KEY) or "").strip()
+    return user_url or _STITCH_DEFAULT_URL
 
 
 def _stitch_live_card(api) -> None:
@@ -199,6 +216,11 @@ def _stitch_live_card(api) -> None:
 def _stitch_projects_portal() -> None:
     """In-page iframe portal for Stitch projects + external eject button.
 
+    Per-operator URL override stored in `st.session_state` (volatile —
+    resets on logout). Persistent per-tenant default + per-user override
+    + RBAC gating is a documented follow-up (see
+    `IWO3_LOOP_ETA_POST_CLOSE_DESIGN_LAB_STITCH_PORTAL_NOTE` § follow-ups).
+
     Google Stitch may set X-Frame-Options or CSP frame-ancestors that
     blocks iframe embedding. The eject button is the always-works
     fallback. The fallback caption tells operators which one to use.
@@ -206,15 +228,61 @@ def _stitch_projects_portal() -> None:
     st.markdown("#### Stitch Projects")
     st.caption(
         "Browse your Stitch projects in-place, or open them in a new "
-        "tab using your existing Google session."
+        "tab using your existing Google session. Set your personal "
+        "Stitch URL below to load a specific project / workspace — "
+        "leave blank to use the default Stitch landing."
     )
 
+    # ── Per-operator URL override (volatile session-state) ──────────
+    with st.expander("Your Stitch URL", expanded=False):
+        url_input = st.text_input(
+            "Project / workspace / home URL",
+            value=st.session_state.get(_STITCH_USER_URL_KEY, ""),
+            placeholder=_STITCH_DEFAULT_URL,
+            help=(
+                "Paste a Stitch URL specific to you or your project. "
+                "Stored in your session only — not persisted across "
+                "logouts. Leave blank to use the default Stitch landing."
+            ),
+            key="stitch_user_url_input",
+        )
+        col_save, col_clear = st.columns([1, 1])
+        with col_save:
+            if st.button(
+                "Use this URL",
+                type="primary",
+                use_container_width=True,
+                key="stitch_url_save",
+            ):
+                st.session_state[_STITCH_USER_URL_KEY] = url_input.strip()
+                st.rerun()
+        with col_clear:
+            if st.button(
+                "Reset to default",
+                type="secondary",
+                use_container_width=True,
+                key="stitch_url_reset",
+            ):
+                st.session_state[_STITCH_USER_URL_KEY] = ""
+                if "stitch_panel_open" in st.session_state:
+                    st.session_state.stitch_panel_open = False
+                st.rerun()
+
+    current_url = _resolved_stitch_url()
+    using_personal = bool(
+        (st.session_state.get(_STITCH_USER_URL_KEY) or "").strip()
+    )
+    label = "your personal URL" if using_personal else "the default landing"
+    st.caption(f"Currently loading {label}: `{current_url}`")
+
+    # ── Open / eject buttons ────────────────────────────────────────
     col_open, col_eject = st.columns([1, 1])
     with col_open:
         if st.button(
             "Open in panel",
             type="primary",
             key="stitch_panel_toggle",
+            use_container_width=True,
         ):
             st.session_state.stitch_panel_open = not st.session_state.get(
                 "stitch_panel_open", False
@@ -222,23 +290,25 @@ def _stitch_projects_portal() -> None:
     with col_eject:
         st.link_button(
             "Open Stitch in a new tab ↗",
-            _STITCH_PUBLIC_URL,
+            current_url,
             type="secondary",
             use_container_width=True,
         )
 
     if st.session_state.get("stitch_panel_open"):
         st.components.v1.iframe(
-            _STITCH_PUBLIC_URL,
+            current_url,
             height=900,
             scrolling=True,
         )
         st.caption(
             "The panel above renders Stitch using your browser's "
-            "existing Google session. If it's blank, Google is "
-            "blocking embedded display via X-Frame-Options or CSP — "
-            "use the new-tab button on the right instead. Either path "
-            "lands at the same Stitch projects view."
+            "existing Google session. If it's blank or shows "
+            "'Server Not Found', either Google is blocking embedded "
+            "display (X-Frame-Options / CSP) or the URL above is not "
+            "reachable from your network. Use the new-tab button on "
+            "the right to open Stitch in your browser session — same "
+            "URL, no embed restrictions."
         )
 
 
