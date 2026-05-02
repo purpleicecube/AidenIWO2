@@ -220,6 +220,29 @@ export const AUDIT_EVENTS = {
   // path reuses CREDENTIAL_ENCRYPTED above (locked in ε.1 anticipating
   // this phase).
   CLIENT_SETTINGS_UPDATED: "client.settings_updated",
+
+  // Beta-2 phase 0.1 — operator-driven output requests. Emitted by
+  // POST /work_orders when requested_outputs is non-null on create
+  // (Q6=A locked: jsonb on work_orders). The tier_1_5 event lands on
+  // workflow instantiation when the PM honors the operator's choice.
+  WORK_ORDER_REQUESTED_OUTPUTS_SET: "work_order.requested_outputs_set",
+  TIER_1_5_REQUESTED_OUTPUT_HONORED: "tier_1_5.requested_output_honored",
+
+  // Beta-2 phase 0.2 — auto-dispatch worker. Q1=B locked: worker is the
+  // sole canonical authority for moving a `pending` WO into `processing`.
+  // The worker writes one of these per WO it picks up per tick.
+  WORK_ORDER_AUTO_DISPATCH_ATTEMPTED: "work_order.auto_dispatch_attempted",
+  WORK_ORDER_AUTO_DISPATCH_SUCCEEDED: "work_order.auto_dispatch_succeeded",
+  WORK_ORDER_AUTO_DISPATCH_FAILED: "work_order.auto_dispatch_failed",
+
+  // Beta-2 phase 0.3 — universal llm_configs management surface.
+  // Phase 1: load + tri-state mutate + version on every change.
+  // Phase 2: history list + rollback. Phase 3: bulk_apply. Phase 4: real preview.
+  LLM_CONFIG_PROMPT_READ:    "llm_config.prompt_read",      // GET /llm/configs/{id}/prompt
+  LLM_CONFIG_VERSIONED:      "llm_config.versioned",        // every mutation that snapshots a row
+  LLM_CONFIG_ROLLED_BACK:    "llm_config.rolled_back",      // rollback action
+  LLM_CONFIG_BULK_APPLIED:   "llm_config.bulk_applied",     // batch apply summary (Phase 3)
+  LLM_CONFIG_PREVIEWED:      "llm_config.previewed",        // in-memory candidate-prompt invoke (Phase 4)
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -383,4 +406,20 @@ export const BETA_PHASE_1_AUDIT_EVENTS: readonly AuditEvent[] = [
 
 export const BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.CLIENT_SETTINGS_UPDATED,
+];
+
+export const BETA_2_PHASE_0_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.WORK_ORDER_REQUESTED_OUTPUTS_SET,
+  AUDIT_EVENTS.TIER_1_5_REQUESTED_OUTPUT_HONORED,
+  AUDIT_EVENTS.WORK_ORDER_AUTO_DISPATCH_ATTEMPTED,
+  AUDIT_EVENTS.WORK_ORDER_AUTO_DISPATCH_SUCCEEDED,
+  AUDIT_EVENTS.WORK_ORDER_AUTO_DISPATCH_FAILED,
+];
+
+export const BETA_2_PHASE_0_3_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.LLM_CONFIG_PROMPT_READ,
+  AUDIT_EVENTS.LLM_CONFIG_VERSIONED,
+  AUDIT_EVENTS.LLM_CONFIG_ROLLED_BACK,
+  AUDIT_EVENTS.LLM_CONFIG_BULK_APPLIED,
+  AUDIT_EVENTS.LLM_CONFIG_PREVIEWED,
 ];

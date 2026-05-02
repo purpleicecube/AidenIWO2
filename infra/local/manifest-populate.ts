@@ -37,6 +37,7 @@ const LOOP_9_VERSION = "iwo3@v0.9.0-loop9";
 const ALPHA_VERSION = "iwo3@v0.10.0-alpha";
 const PRE_BETA_DELTA_VERSION = "iwo3@v0.11.0-pre-beta-delta";
 const BETA_1_VERSION = "iwo3@v0.12.0-beta-1";
+const BETA_2_PHASE_0_3_VERSION = "iwo3@v0.13.0-beta-2-phase-0.3";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -92,6 +93,9 @@ const KNOWN_TABLES: ManifestEntry[] = [
 
   // MegaLoop Beta-1 ε.1 — operator-facing cross-session chat persistence (architect Q7 lock)
   { name: "chat_sessions",              source: "iwo3_native", sourceVersion: BETA_1_VERSION, ownedBy: "drizzle", notes: "MegaLoop Beta-1 ε.1 — per-(operator, tenant) chat session row carrying message history + recent-context JSONB" },
+
+  // Beta-2 phase 0.3 — versioned llm_configs history (CODEX universal-slice Phase 1)
+  { name: "llm_config_versions",        source: "iwo3_native", sourceVersion: BETA_2_PHASE_0_3_VERSION, ownedBy: "drizzle", notes: "Beta-2 phase 0.3.1 — full-row snapshot per llm_configs mutation; rollback = pick prior + write new mutation; immutable (iwo3_app SELECT+INSERT only)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

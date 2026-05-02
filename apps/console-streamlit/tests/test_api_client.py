@@ -114,3 +114,58 @@ def test_api_client_permission_check_roundtrip(running_api: str) -> None:
     denied = api.check_permission("output_candidate:select")  # reviewer-only
     assert denied.allowed is False
     assert denied.reason == "role_lacks_permission"
+
+
+# ─── Beta-2 phase 0.1 — list_template_profiles + create_work_order extension ──
+
+
+@iwo3_db
+def test_api_client_list_template_profiles_klear(running_api: str) -> None:
+    """The Submit Order form populates its template selector via
+    api.list_template_profiles(). Confirm the round-trip surfaces the
+    three seeded Klear template profiles (klear_pptx_primary +
+    klear_pdf_rmis + klear_pdf_claims) under the default `active` filter."""
+    sys.path.insert(0, str(CONSOLE_DIR))
+    from api_client import ApiClient
+
+    api = ApiClient(
+        base_url=running_api,
+        user_id="00000000-0000-4000-8000-000001000003",  # operator
+        client_id="00000000-0000-4000-8000-00000000c001",
+    )
+    profiles = api.list_template_profiles()  # default status="active"
+    profile_keys = {p["profile_key"] for p in profiles}
+    assert "klear_pptx_primary" in profile_keys
+    assert "klear_pdf_rmis" in profile_keys
+    assert "klear_pdf_claims" in profile_keys
+    # Filtering by output_kind narrows correctly.
+    pptx = api.list_template_profiles(output_kind="pptx")
+    assert len(pptx) == 1
+    assert pptx[0]["profile_key"] == "klear_pptx_primary"
+
+
+@iwo3_db
+def test_api_client_create_wo_with_requested_outputs(running_api: str) -> None:
+    """Submit Order's full round-trip: form → create_work_order with
+    output_kind + template_profile_id → server validates + persists +
+    audits → response status=pending (Q1=B locked: no sync dispatch)."""
+    sys.path.insert(0, str(CONSOLE_DIR))
+    from api_client import ApiClient
+
+    api = ApiClient(
+        base_url=running_api,
+        user_id="00000000-0000-4000-8000-000001000001",  # owner
+        client_id="00000000-0000-4000-8000-00000000c001",
+    )
+    KLEAR_PPTX_TID = "00000000-0000-4000-8000-000010000001"
+    resp = api.create_work_order(
+        title="phase-0.1 streamlit api_client smoke",
+        description="From the Submit Order round-trip test.",
+        wo_type="content_brief",
+        priority="medium",
+        correlation_id="phase-0.1-streamlit-smoke",
+        output_kind="pptx",
+        template_profile_id=KLEAR_PPTX_TID,
+    )
+    assert resp["status"] == "pending"
+    assert resp["title"] == "phase-0.1 streamlit api_client smoke"

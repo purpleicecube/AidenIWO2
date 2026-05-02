@@ -20,8 +20,9 @@ The script:
 Passwords never leave the operator's machine. Only the resulting hash
 (which is useless without the password) is sent to Postgres.
 
-After this lands, switch Railway IWO3_AUTH_MODE back to "jwt" so the
-public URL only accepts real Bearer JWT tokens (not dev headers).
+This script does not change Railway env vars. The public runtime stays
+in IWO3_AUTH_MODE=jwt throughout; this helper only writes password
+hashes directly to Postgres.
 """
 
 from __future__ import annotations
@@ -49,6 +50,7 @@ async def main() -> int:
 
     conn = await asyncpg.connect(url)
     try:
+        # lint:bypass-rls-explain="operator-only ζ.6 helper; runs as iwo3 superuser to seed initial passwords across all tenants in one pass"
         rows = await conn.fetch(
             "SELECT id, email FROM users "
             "WHERE password_hash IS NULL "
@@ -87,6 +89,7 @@ async def main() -> int:
                 continue
 
             digest = hash_password(pw)
+            # lint:bypass-rls-explain="operator-only ζ.6 helper; UPDATE keyed on users.id which is unique across tenants; tenant-cross by design"
             await conn.execute(
                 "UPDATE users "
                 "SET password_hash = $1, password_updated_at = NOW() "
@@ -98,12 +101,6 @@ async def main() -> int:
             print(f"  ✓ {email}")
 
         print(f"\n[done] seeded={seeded} skipped={skipped}")
-        if seeded > 0:
-            print(
-                "\nNext: switch Railway IWO3_AUTH_MODE back to 'jwt':\n"
-                "    railway variables --service iwo3-api "
-                "--set IWO3_AUTH_MODE=jwt"
-            )
         return 0
     finally:
         await conn.close()

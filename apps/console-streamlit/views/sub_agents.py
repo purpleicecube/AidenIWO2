@@ -92,14 +92,47 @@ def _render_edit_form(
             key=f"{form_key}-desc",
             height=70,
         )
-        st.markdown("**System Prompt** (leave blank to keep current)")
+
+        # Beta-2 phase 0.3.1 — pre-load the actual prompt body via the
+        # writer-gated /prompt endpoint so operators can see + edit
+        # instead of blind-overwriting.
+        current_prompt = ""
+        if can_admin:
+            try:
+                pr = api.get_llm_config_prompt(cfg["id"])
+                current_prompt = pr.get("system_prompt") or ""
+            except APIError as err:
+                st.warning(
+                    f"Could not load current prompt: {err.status_code} — {err.detail}"
+                )
+
+        st.markdown(
+            f"**System Prompt** &nbsp;·&nbsp; "
+            f"<span style='color:#6B7280; font-size:0.8rem;'>"
+            f"{len(current_prompt)} chars currently stored</span>",
+            unsafe_allow_html=True,
+        )
+        prompt_action = st.radio(
+            "What do you want to do with the system prompt?",
+            options=["Keep unchanged", "Replace with new prompt", "Clear (reset to default)"],
+            index=0,
+            horizontal=True,
+            key=f"{form_key}-prompt-action",
+            label_visibility="collapsed",
+        )
         system_prompt = st.text_area(
             "System Prompt",
-            value="",
-            placeholder="(unchanged)",
+            value=current_prompt,
             key=f"{form_key}-prompt",
-            height=140,
+            height=180,
+            disabled=prompt_action != "Replace with new prompt",
             label_visibility="collapsed",
+        )
+        change_reason = st.text_input(
+            "Change reason (optional, recorded in version history)",
+            value="",
+            key=f"{form_key}-reason",
+            placeholder="e.g. 'Sharper deck-builder voice for Klear pitches'",
         )
 
         save = st.form_submit_button(
@@ -118,14 +151,91 @@ def _render_edit_form(
             }
             if credential_ref.strip():
                 patch["credential_ref"] = credential_ref.strip()
-            if system_prompt.strip():
+            # Beta-2 phase 0.3.2 tri-state contract.
+            if prompt_action == "Replace with new prompt":
+                patch["prompt_action"] = "set"
                 patch["system_prompt"] = system_prompt
+            elif prompt_action == "Clear (reset to default)":
+                patch["prompt_action"] = "clear"
+            else:
+                patch["prompt_action"] = "unchanged"
+            if change_reason.strip():
+                patch["change_reason"] = change_reason.strip()
             try:
                 api.update_llm_config(cfg["id"], **patch)
-                st.success("Saved.")
+                st.success("Saved. New version row written for rollback.")
                 st.rerun()
             except APIError as err:
                 st.error(f"❌ {err.status_code} — {err.detail}")
+
+
+def _render_history_tab(api, cfg: dict, can_admin: bool) -> None:  # noqa: ANN001
+    """Beta-2 phase 0.3.3 — version list + rollback button per row.
+
+    Shows newest-first version history. Each version row carries
+    change_action / changed_fields / change_reason / actor / timestamp.
+    Rollback button (writer-gated) writes a new mutation that restores
+    the chosen historical state.
+    """
+    try:
+        versions = api.list_llm_config_versions(cfg["id"], limit=50)
+    except APIError as err:
+        st.error(f"Could not load history: {err.status_code} — {err.detail}")
+        return
+
+    if not versions:
+        st.caption("No history yet. Edit the prompt to create a version.")
+        return
+
+    st.caption(
+        f"{len(versions)} version(s). Newest first. Rollback writes a new "
+        f"version row pointing at the chosen historical snapshot."
+    )
+
+    for v in versions:
+        v_num = v["version_number"]
+        action = v["change_action"]
+        action_emoji = {
+            "initial": "📌",
+            "create": "✨",
+            "update": "✏️",
+            "rollback": "↩️",
+        }.get(action, "•")
+        prompt_chip = "📝" if v["has_system_prompt"] else "—"
+        cols = st.columns([3, 1])
+        with cols[0]:
+            st.markdown(
+                f"**{action_emoji} v{v_num} — {action}** &nbsp;·&nbsp; "
+                f"`{v['provider']}/{v['model']}` &nbsp;·&nbsp; "
+                f"prompt {prompt_chip} &nbsp;·&nbsp; "
+                f"<span style='color:#6B7280; font-size:0.8rem;'>"
+                f"{v['created_at'][:19]}</span>",
+                unsafe_allow_html=True,
+            )
+            if v.get("change_reason"):
+                st.caption(f"_Reason: {v['change_reason']}_")
+            if v.get("changed_fields"):
+                st.caption(
+                    f"Changed fields: `{', '.join(v['changed_fields'])}`"
+                )
+        with cols[1]:
+            if st.button(
+                "Rollback to this",
+                key=f"rb-{cfg['id']}-{v['id']}",
+                disabled=not can_admin or action == "initial" and v_num == 1 and len(versions) == 1,
+                use_container_width=True,
+            ):
+                try:
+                    api.rollback_llm_config(
+                        cfg["id"],
+                        version_id=v["id"],
+                        change_reason=f"Rolled back to v{v_num}",
+                    )
+                    st.success(f"Rolled back to v{v_num}. New version row written.")
+                    st.rerun()
+                except APIError as err:
+                    st.error(f"❌ {err.status_code} — {err.detail}")
+        st.markdown("---")
 
 
 def _render_new_form(api, can_admin: bool) -> None:
@@ -200,16 +310,18 @@ def main() -> None:
 
     try:
         configs = api.list_llm_configs()
-        can_admin = api.check_permission("system:admin")
+        # Beta-2 phase 0.3.5 RBAC fix — gate on llm_config:write (CODEX
+        # 2026-05-01 finding 5). Connection-test gates on the same.
+        can_admin = api.check_permission("llm_config:write")
     except APIError as err:
         st.error(f"❌ {err.status_code} — {err.detail}")
         return
 
     if not can_admin.allowed:
         st.info(
-            f"Your role `{can_admin.role}` lacks `system:admin`. "
-            f"Edit + create + delete are disabled; read + connection "
-            f"test remain available."
+            f"Your role `{can_admin.role}` lacks `llm_config:write`. "
+            f"Edit + create + connection-test are disabled; read remains "
+            f"available."
         )
 
     if not configs:
@@ -233,7 +345,7 @@ def main() -> None:
             if cfg.get("description"):
                 st.caption(cfg["description"])
 
-            tabs = st.tabs(["Edit", "Test connection", "Disable"])
+            tabs = st.tabs(["Edit", "History", "Test connection", "Disable"])
             with tabs[0]:
                 _render_edit_form(
                     api,
@@ -242,6 +354,8 @@ def main() -> None:
                     form_key=f"edit-{cfg['id']}",
                 )
             with tabs[1]:
+                _render_history_tab(api, cfg, can_admin.allowed)
+            with tabs[2]:
                 if st.button(
                     "Run connection test",
                     key=f"test-{cfg['id']}",
@@ -267,7 +381,7 @@ def main() -> None:
                                 st.caption(f"Sample: {r['sample']}")
                         else:
                             st.warning(f"⚠️ {r.get('error')}")
-            with tabs[2]:
+            with tabs[3]:
                 if cfg["enabled"]:
                     if st.button(
                         f"Disable {cfg['display_name']}",

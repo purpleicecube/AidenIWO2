@@ -877,5 +877,11 @@
   { "role": "owner",        "permissionKey": "llm_config:delete" },
   { "role": "admin",        "permissionKey": "llm_config:write"  },
   { "role": "admin",        "permissionKey": "llm_config:delete" },
-  { "role": "operator",     "permissionKey": "llm_config:write"  }
+  { "role": "operator",     "permissionKey": "llm_config:write"  },
+  { "role": "owner",        "permissionKey": "template_profile:read" },
+  { "role": "admin",        "permissionKey": "template_profile:read" },
+  { "role": "operator",     "permissionKey": "template_profile:read" },
+  { "role": "agent_system", "permissionKey": "template_profile:read" },
+  { "role": "viewer",       "permissionKey": "template_profile:read" },
+  { "role": "agent_system", "permissionKey": "work_order:submit"     }
 ]

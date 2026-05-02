@@ -30,6 +30,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from adapter.dispatch import DispatchError, dispatch_gamma_for_package
 from authz.audit_writer import write_audit_row
 from deps import (
     current_user_context,
@@ -86,6 +87,7 @@ class DispatchResponse(BaseModel):
     workflow_execution_id: Optional[str] = None
     step_run_ids: Optional[list[str]] = None
     clarification_question: Optional[str] = None
+    handoff_id: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -196,6 +198,20 @@ async def dispatch_work_order(
             ),
         )
 
+    if decision.decision_kind == "assistant_reply":
+        # Operator submitted a WO with conversational intake (no concrete
+        # work). Don't dispatch; surface Aiden's reply so the operator
+        # can rewrite the WO with actual deliverable language.
+        a = decision.assistant_reply
+        return DispatchResponse(
+            ok=False,
+            decision_kind="assistant_reply",
+            work_order_id=wo["id"],
+            error=(
+                a.message if a else "(no message returned)"
+            ),
+        )
+
     await _safe_transition_processing(
         conn,
         work_order_id=wo["id"],
@@ -235,22 +251,78 @@ async def dispatch_work_order(
                 error=f"{exc.args[0] if exc.args else 'tier_2_failed'}: {exc}",
             )
 
+        # Beta-2 phase 0.2 — read operator-supplied requested_outputs
+        # from the WO and propagate template_profile_id into the package.
+        # Without this propagation the package row is unbound and the
+        # adapter dispatcher can only fall back to inference.
+        requested_template_id: Optional[str] = None
+        # lint:bypass-rls-explain="conn is already tenant-scoped via get_tenant_scoped_connection (iwo3_app + app.current_client_id GUC); RLS filters work_orders to active tenant transparently"
+        wo_ro_row = await conn.fetchrow(
+            "SELECT requested_outputs::text AS ro FROM work_orders WHERE id = $1::uuid",
+            wo["id"],
+        )
+        if wo_ro_row is not None and wo_ro_row["ro"]:
+            try:
+                ro = json.loads(wo_ro_row["ro"])
+                tpl = ro.get("template_profile_id")
+                if isinstance(tpl, str) and tpl:
+                    requested_template_id = tpl
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
         pkg_id = await produce_output_package(
             conn,
             envelope=envelope,
             title=decision.title or wo["title"],
             work_order_id=wo["id"],
             workflow_execution_id=None,
-            template_profile_id=None,
+            template_profile_id=requested_template_id,
             client_id=ctx["client_id"],
             actor_user_id=ctx["user_id"],
             correlation_id=f"dispatch:{wo['id']}",
         )
+
+        # Beta-2 phase 0.2 — auto-create the output_handoff + submit to
+        # Gamma when the package is gamma_*-kinded. The poll_worker
+        # advances from here; `_maybe_cascade_wo_completed` (Loop 9)
+        # auto-transitions the WO to completed when the handoff lands.
+        # Failure is non-fatal — we still return the package id; the
+        # operator can hit `/work_orders/{id}/render` to retry.
+        handoff_id: Optional[str] = None
+        dispatch_error: Optional[str] = None
+        if envelope.output_kind.startswith("gamma_"):
+            try:
+                result = await dispatch_gamma_for_package(
+                    conn,
+                    output_package_id=pkg_id,
+                    client_id=ctx["client_id"],
+                    actor_user_id=ctx["user_id"],
+                )
+                handoff_id = result.handoff_id
+            except DispatchError as exc:
+                dispatch_error = f"{exc.kind}: {exc.detail}"
+                # Audit the failed-to-dispatch case so operators can see why.
+                await write_audit_row(
+                    conn,
+                    client_id=ctx["client_id"],
+                    actor_user_id=ctx["user_id"],
+                    event="adapter_dispatch.failed",
+                    target_type="output_package",
+                    target_id=pkg_id,
+                    metadata={
+                        "kind": exc.kind,
+                        "detail": exc.detail,
+                        "stage": "auto_dispatch_post_package",
+                    },
+                )
+
         return DispatchResponse(
             ok=True,
             decision_kind="work_order_brief",
             work_order_id=wo["id"],
             output_package_id=pkg_id,
+            handoff_id=handoff_id,
+            error=dispatch_error,
         )
 
     if decision.decision_kind == "workflow_brief":

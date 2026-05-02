@@ -931,67 +931,87 @@ async function main(): Promise<void> {
   const url = process.env.IWO3_DATABASE_URL;
   if (!url) throw new Error("IWO3_DATABASE_URL is required");
 
-  // Loop 1
+  // IWO3_SEED_SCOPE gates operational seeds. "reference" loads only the
+  // rows required for the system to be bootable (clients, template_profiles,
+  // adapter_catalog, adapter_actions, permissions, role_permissions,
+  // llm_configs). Used by hosted ζ.3; ζ.6 unblocks operational seeds.
+  const scope = process.env.IWO3_SEED_SCOPE ?? "all";
+  if (scope !== "all" && scope !== "reference") {
+    throw new Error(
+      `IWO3_SEED_SCOPE must be "all" or "reference"; got "${scope}"`
+    );
+  }
+  const referenceOnly = scope === "reference";
+
+  // Reference seeds — always loaded.
   const clients = loadJson<SeedClient[]>("db/seeds/clients.json");
-  const users = loadJson<SeedUser[]>("db/seeds/users.json");
-  const memberships = loadJson<SeedMembership[]>(
-    "db/seeds/client_memberships.json"
-  );
   const templates = loadJson<SeedTemplateProfile[]>(
     "db/seeds/template_profiles.json"
   );
-
-  // Loop 2
-  const promptProfiles = loadJson<SeedPromptProfile[]>(
-    "db/seeds/prompt_profiles.json"
-  );
-  const promptProfileVersions = loadJson<SeedPromptProfileVersion[]>(
-    "db/seeds/prompt_profile_versions.json"
-  );
-  const repositoryBindings = loadJson<SeedRepositoryBinding[]>(
-    "db/seeds/repository_bindings.json"
-  );
-  const dataSourceBindings = loadJson<SeedDataSourceBinding[]>(
-    "db/seeds/data_source_bindings.json"
-  );
-  const artifacts = loadJson<SeedArtifact[]>("db/seeds/artifacts.json");
-
-  // Loop 3 Phase 1
-  const workOrders = loadJson<SeedWorkOrder[]>("db/seeds/work_orders.json");
-  const workflows = loadJson<SeedWorkflow[]>("db/seeds/workflows.json");
-  const workflowTemplates = loadJson<SeedWorkflowTemplate[]>(
-    "db/seeds/workflow_templates.json"
-  );
-  const workflowTemplateSteps = loadJson<SeedWorkflowTemplateStep[]>(
-    "db/seeds/workflow_template_steps.json"
-  );
-
-  // Loop 3 Phase 2
   const adapterCatalogRows = loadJson<SeedAdapterCatalog[]>(
     "db/seeds/adapter_catalog.json"
   );
   const adapterActionsRows = loadJson<SeedAdapterAction[]>(
     "db/seeds/adapter_actions.json"
   );
-  const clientAdapterConfigsRows = loadJson<SeedClientAdapterConfig[]>(
-    "db/seeds/client_adapter_configs.json"
-  );
-  const adapterActionPoliciesRows = loadJson<SeedAdapterActionPolicy[]>(
-    "db/seeds/adapter_action_policies.json"
-  );
-
-  // Loop 4 Phase 1
   const permissionsRows = loadJson<SeedPermission[]>(
     "db/seeds/permissions.json"
   );
   const rolePermissionsRows = loadJson<SeedRolePermission[]>(
     "db/seeds/role_permissions.json"
   );
-
-  // Loop 9 Phase 9.3
   const llmConfigsRows = loadJson<SeedLlmConfig[]>(
     "db/seeds/llm_configs.json"
   );
+
+  // Operational seeds — held when scope=reference.
+  const users = referenceOnly
+    ? []
+    : loadJson<SeedUser[]>("db/seeds/users.json");
+  const memberships = referenceOnly
+    ? []
+    : loadJson<SeedMembership[]>("db/seeds/client_memberships.json");
+  const promptProfiles = referenceOnly
+    ? []
+    : loadJson<SeedPromptProfile[]>("db/seeds/prompt_profiles.json");
+  const promptProfileVersions = referenceOnly
+    ? []
+    : loadJson<SeedPromptProfileVersion[]>(
+        "db/seeds/prompt_profile_versions.json"
+      );
+  const repositoryBindings = referenceOnly
+    ? []
+    : loadJson<SeedRepositoryBinding[]>("db/seeds/repository_bindings.json");
+  const dataSourceBindings = referenceOnly
+    ? []
+    : loadJson<SeedDataSourceBinding[]>("db/seeds/data_source_bindings.json");
+  const artifacts = referenceOnly
+    ? []
+    : loadJson<SeedArtifact[]>("db/seeds/artifacts.json");
+  const workOrders = referenceOnly
+    ? []
+    : loadJson<SeedWorkOrder[]>("db/seeds/work_orders.json");
+  const workflows = referenceOnly
+    ? []
+    : loadJson<SeedWorkflow[]>("db/seeds/workflows.json");
+  const workflowTemplates = referenceOnly
+    ? []
+    : loadJson<SeedWorkflowTemplate[]>("db/seeds/workflow_templates.json");
+  const workflowTemplateSteps = referenceOnly
+    ? []
+    : loadJson<SeedWorkflowTemplateStep[]>(
+        "db/seeds/workflow_template_steps.json"
+      );
+  const clientAdapterConfigsRows = referenceOnly
+    ? []
+    : loadJson<SeedClientAdapterConfig[]>(
+        "db/seeds/client_adapter_configs.json"
+      );
+  const adapterActionPoliciesRows = referenceOnly
+    ? []
+    : loadJson<SeedAdapterActionPolicy[]>(
+        "db/seeds/adapter_action_policies.json"
+      );
 
   const pool = new Pool({ connectionString: url });
   const c = await pool.connect();
@@ -1023,6 +1043,7 @@ async function main(): Promise<void> {
 
     const receipt = {
       seededAt: new Date().toISOString(),
+      scope,
       counts: {
         clients: clients.length,
         users: users.length,

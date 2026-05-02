@@ -658,6 +658,26 @@ async def execute_step_run(
         )
         raise
 
+    # Beta-2 phase 0.2 — propagate operator-supplied template choice
+    # from the parent WO's requested_outputs into the step's package row
+    # so the adapter dispatcher can target the right Gamma template
+    # without falling back to inference.
+    requested_template_id: Optional[str] = None
+    if row["work_order_id"]:
+        # lint:bypass-rls-explain="execute_step_run runs under tenant-scoped conn; work_orders RLS filters by app.current_client_id transparently"
+        wo_ro_row = await conn.fetchrow(
+            "SELECT requested_outputs::text AS ro FROM work_orders WHERE id = $1::uuid",
+            row["work_order_id"],
+        )
+        if wo_ro_row is not None and wo_ro_row["ro"]:
+            try:
+                ro = json.loads(wo_ro_row["ro"])
+                tpl = ro.get("template_profile_id")
+                if isinstance(tpl, str) and tpl:
+                    requested_template_id = tpl
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
     # Persist output_package + mark completed.
     pkg_id = await produce_output_package(
         conn,
@@ -665,7 +685,7 @@ async def execute_step_run(
         title=f"{row['display_name']} ({row['step_key']})",
         work_order_id=row["work_order_id"],
         workflow_execution_id=row["execution_id"],
-        template_profile_id=None,
+        template_profile_id=requested_template_id,
         client_id=client_id,
         actor_user_id=actor_user_id,
         correlation_id=None,
@@ -689,6 +709,39 @@ async def execute_step_run(
             }
         ),
     )
+
+    # Beta-2 phase 0.2 — auto-dispatch to Gamma when this step's
+    # output is gamma_*-kinded. Mirrors the β.3 single-step path's
+    # auto-dispatch hook so workflow steps close the loop too.
+    if envelope.output_kind.startswith("gamma_"):
+        try:
+            # Local import avoids the runtime → adapter circular-import
+            # hazard at module-load time.
+            from adapter.dispatch import (  # noqa: PLC0415
+                DispatchError as _DispErr,
+                dispatch_gamma_for_package,
+            )
+
+            await dispatch_gamma_for_package(
+                conn,
+                output_package_id=pkg_id,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+            )
+        except _DispErr as exc:
+            await write_audit_row(
+                conn,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                event="adapter_dispatch.failed",
+                target_type="output_package",
+                target_id=pkg_id,
+                metadata={
+                    "kind": exc.kind,
+                    "detail": exc.detail,
+                    "stage": "auto_dispatch_post_step_run",
+                },
+            )
 
     return Tier2InvocationResult(
         role=role,

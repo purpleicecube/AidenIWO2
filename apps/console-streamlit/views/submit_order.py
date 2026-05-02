@@ -1,11 +1,17 @@
 """Submit Order — create a new Work Order.
 
-First-pass form backed by the Loop 8.3 `POST /work_orders` route.
-Fields map to the Drizzle `work_orders` schema + the DigiFLOW intake
-contract (Loop 3 Phase 3.3).
+Beta-2 phase 0.1 (2026-04-30) — extends the Loop 8.3 form with optional
+output_kind + template_profile selectors. Both default to "let Aiden
+decide" (Q3=B locked); if the operator supplies them, the values flow
+into work_orders.requested_outputs jsonb (Q6=A) and Tier 1.5 PM honors
+them at instantiation. POST /work_orders returns 201 with status=pending
+immediately (Q1=B locked: no sync dispatch trigger). The auto-dispatch
+worker (Phase 0.2) picks the WO up within one tick.
 """
 
 from __future__ import annotations
+
+from typing import Optional
 
 import streamlit as st
 
@@ -18,6 +24,19 @@ WO_TYPES = [
     "ad_hoc",
 ]
 WO_PRIORITIES = ["low", "medium", "high", "critical"]
+
+LET_AIDEN_DECIDE = "(let Aiden decide)"
+
+
+def _load_template_profiles(api) -> list[dict]:
+    """Fetch active template_profiles for the active tenant.
+
+    Returns [] on any error (the form falls back to the Aiden-decides
+    default and surfaces a hint, never blocks submission)."""
+    try:
+        return api.list_template_profiles(status="active")
+    except APIError:
+        return []
 
 
 def main() -> None:
@@ -44,8 +63,14 @@ def main() -> None:
         )
         return
 
+    profiles = _load_template_profiles(api)
+    output_kinds_available: list[str] = sorted({p["output_kind"] for p in profiles})
+
     with st.form("submit-order", clear_on_submit=False):
-        title = st.text_input("Title *", placeholder="Draft RMIS one-pager for April brief")
+        title = st.text_input(
+            "Title *",
+            placeholder="Draft RMIS one-pager for April brief",
+        )
         description = st.text_area(
             "Description",
             placeholder="What should this work order produce? Who is the audience?",
@@ -55,6 +80,53 @@ def main() -> None:
             wo_type = st.selectbox("Type", options=WO_TYPES, index=0)
         with col2:
             priority = st.selectbox("Priority", options=WO_PRIORITIES, index=1)
+
+        st.markdown("##### Output (optional)")
+        st.caption(
+            "Pick a specific template (recommended for Gamma + 3rd-party "
+            "renders), filter by output kind, or leave both on "
+            f"\"{LET_AIDEN_DECIDE}\" to let Aiden infer from the brief."
+        )
+
+        def _label(p: dict) -> str:
+            # e.g. "klear_pptx_primary — pptx via gamma"
+            return f"{p['profile_key']} — {p['output_kind']} via {p['engine']}"
+
+        col3, col4 = st.columns(2)
+        with col3:
+            kind_choice = st.selectbox(
+                "Output kind",
+                options=[LET_AIDEN_DECIDE] + output_kinds_available,
+                index=0,
+                help=(
+                    "Optional filter that narrows the Template list. "
+                    "Leave on (let Aiden decide) to see all templates."
+                ),
+            )
+        # Templates are always pickable. The Output kind selector above
+        # is a filter, not a gate — when set, it narrows this list;
+        # when "(let Aiden decide)", we show every active template.
+        if kind_choice == LET_AIDEN_DECIDE:
+            profiles_for_kind = list(profiles)
+        else:
+            profiles_for_kind = [
+                p for p in profiles if p["output_kind"] == kind_choice
+            ]
+        with col4:
+            template_options = [LET_AIDEN_DECIDE] + [
+                _label(p) for p in profiles_for_kind
+            ]
+            template_choice = st.selectbox(
+                "Template",
+                options=template_options,
+                index=0,
+                disabled=(len(profiles) == 0),
+                help=(
+                    f"Pick any active template directly — including Gamma "
+                    f"and 3rd-party. {len(profiles)} active for this tenant."
+                ),
+            )
+
         correlation_id = st.text_input(
             "Correlation ID",
             placeholder="e.g. wo-klear-rmis-apr-001",
@@ -66,6 +138,26 @@ def main() -> None:
             if not title.strip():
                 st.error("Title is required.")
                 return
+
+            output_kind: Optional[str] = (
+                None if kind_choice == LET_AIDEN_DECIDE else kind_choice
+            )
+            template_profile_id: Optional[str] = None
+            if template_choice != LET_AIDEN_DECIDE:
+                # Match the chosen "{profile_key} — {kind} via {engine}"
+                # label back to a row in `profiles_for_kind`.
+                for p in profiles_for_kind:
+                    if template_choice == _label(p):
+                        template_profile_id = p["id"]
+                        # If the operator picked a template without
+                        # filtering by kind, derive output_kind from
+                        # the chosen template — server will accept either
+                        # the explicit pair or the implicit single field,
+                        # and this keeps the audit row semantically full.
+                        if output_kind is None:
+                            output_kind = p["output_kind"]
+                        break
+
             try:
                 resp = api.create_work_order(
                     title=title.strip(),
@@ -73,27 +165,26 @@ def main() -> None:
                     wo_type=wo_type,
                     priority=priority,
                     correlation_id=correlation_id.strip() or None,
+                    output_kind=output_kind,
+                    template_profile_id=template_profile_id,
                 )
             except APIError as err:
-                if err.status_code == 404 and "not_implemented" in str(err.detail):
-                    st.warning(
-                        "**Route pending** — the FastAPI `POST /work_orders` "
-                        "endpoint is not yet available on this server. The "
-                        "form shape is correct; it will work once the route "
-                        "lands. Reported by server: "
-                        f"{err.detail}"
-                    )
-                else:
-                    st.error(f"❌ {err.status_code} — {err.detail}")
+                st.error(f"❌ {err.status_code} — {err.detail}")
                 return
 
             st.success(
                 f"✅ Work Order created: `{resp.get('id', '—')}` "
                 f"(status: `{resp.get('status', '—')}`)"
             )
+            if output_kind is not None or template_profile_id is not None:
+                st.caption(
+                    f"Requested outputs recorded: "
+                    f"`output_kind={output_kind or '—'}` / "
+                    f"`template_profile_id={template_profile_id or '—'}`"
+                )
             st.caption(
-                "Open **Work Orders** to see it in the list and trigger "
-                "transitions."
+                "The auto-dispatch worker will pick this up within one tick "
+                "(Phase 0.2). Open **Work Orders** to watch it advance."
             )
 
 

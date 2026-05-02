@@ -136,12 +136,32 @@ def _status_chip_class(status: str) -> str:
     return "iwo3-chip blue"
 
 
+# Inline glyph that prefixes the status chip text. Matches the IWO2
+# reference image: a quick-scan visual cue per status.
+_STATUS_GLYPH: dict[str, str] = {
+    "completed": "✓",
+    "done": "✓",
+    "failed": "✗",
+    "blocked": "⊘",
+    "awaiting_operator": "⏸",
+    "reopened": "↻",
+    "processing": "▸",
+    "pending": "●",
+    "cancelled": "—",
+    "deferred": "⊙",
+}
+
+
+def _status_chip_glyph(status: str) -> str:
+    return _STATUS_GLYPH.get(status, "•")
+
+
 def _priority_chip_class(priority: str) -> str:
     if priority == "critical":
-        return "iwo3-chip red"
+        return "iwo3-chip red priority"
     if priority == "high":
-        return "iwo3-chip amber"
-    return "iwo3-chip blue"
+        return "iwo3-chip amber priority"
+    return "iwo3-chip blue priority"
 
 
 def _header() -> None:
@@ -173,12 +193,14 @@ def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
     """
     rows_html: list[str] = []
     for wo in wos[:8]:
+        glyph = _status_chip_glyph(wo.status)
         row = (
             f'<div class="iwo3-wo-row">'
             f'<div><div class="title">{escape(wo.title)}</div>'
             f'<div class="meta">{escape(wo.type)} · {escape(wo.created_at[:10])}</div></div>'
             f'<span class="{_priority_chip_class(wo.priority)}">{escape(wo.priority)}</span>'
-            f'<span class="{_status_chip_class(wo.status)}">{escape(wo.status)}</span>'
+            f'<span class="{_status_chip_class(wo.status)}">'
+            f'<span style="margin-right:4px;">{escape(glyph)}</span>{escape(wo.status)}</span>'
             f'</div>'
         )
         rows_html.append(row)
@@ -186,16 +208,12 @@ def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
         '<div class="iwo3-panel">'
         '<div class="iwo3-section-head">'
         '<span>Recent Work Orders</span>'
+        f'<a href="/work_orders" target="_self" class="iwo3-link">View all →</a>'
         '</div>'
         f'{"".join(rows_html)}'
         '</div>'
     )
     st.markdown(html, unsafe_allow_html=True)
-    if st.button(
-        f"View all work orders ({len(wos)}) →",
-        key="dash-view-all-wos",
-    ):
-        st.switch_page("views/work_orders.py")
 
 
 def main() -> None:

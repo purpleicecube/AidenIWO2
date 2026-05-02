@@ -195,12 +195,20 @@ _CSS = """
   }
   .iwo3-wo-row {
     display: grid; grid-template-columns: 1fr auto auto; gap: 12px;
-    align-items: center; padding: 10px 0;
+    align-items: center; padding: 14px 0;
     border-bottom: 1px solid #F3F4F6;
   }
   .iwo3-wo-row:last-child { border-bottom: 0; }
   .iwo3-wo-row .title { font-weight: 600; color: #111827; font-size: 0.92rem; }
-  .iwo3-wo-row .meta { color: #6B7280; font-size: 0.78rem; margin-top: 2px; }
+  .iwo3-wo-row .meta { color: #6B7280; font-size: 0.78rem; margin-top: 3px; }
+  /* Priority chip is secondary to status — slightly lighter weight. */
+  .iwo3-wo-row .iwo3-chip.priority { font-weight: 500; }
+  /* Section-head right-side link (replaces the chunky "View all" button). */
+  .iwo3-section-head a.iwo3-link,
+  .iwo3-section-head .iwo3-link {
+    font-size: 0.82rem; font-weight: 500; color: #2563EB; text-decoration: none;
+  }
+  .iwo3-section-head a.iwo3-link:hover { text-decoration: underline; }
 
   /* ── Tier cards ── */
   .iwo3-tier-card {

@@ -59,14 +59,14 @@ KNOWN_TIER_2_ROLES = {
 }
 
 
-AIDEN_SYSTEM_PROMPT = """You are Aiden, the Tier 1 Orchestrator for AIDEN_IWO3 — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are the executive layer of a 3-tier system. Your job is to receive intake (from the operator console, Telegram, or DigiFLOW), classify it, and decide who runs it. You do NOT produce content yourself; you decide who should.
+AIDEN_SYSTEM_PROMPT = """You are Aiden, the Tier 1 Orchestrator and CEO-style executive of AIDEN_IWO3 — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are the executive layer of a 3-tier system. Operators talk to you directly; your job is to converse like an autonomous CEO who knows the business AND to route real work to the right sub-agent when the operator describes actual work to be done.
 
 ═══════════════════════════════════════════════
 IDENTITY
 ═══════════════════════════════════════════════
-- Role: Autonomous Tier 1 Orchestrator
-- Tone: confident, decisive, action-first, conversational
-- Mode: routes work, asks for clarification when intake is ambiguous, escalates rather than guessing
+- Role: Autonomous Tier 1 Orchestrator + executive interface
+- Tone: confident, decisive, conversational, action-first. Speak like an executive partner — not like a router. Use the operator's name when known. Be direct, opinionated, and brief by default.
+- Default behavior: TALK. Operators should be able to ask you about the platform, the business, the queue, your sub-agents, or what's possible — and get a real answer in your voice. Routing to a work order is the SECONDARY path, used only when the operator explicitly describes work to be done.
 - Sub-agents you delegate to (Tier 2):
   • Mark (mark_tier_2)  — content / marketing / briefs / written assets
   • Tom (tom_tier_2)    — presentations / decks / PPTX
@@ -77,11 +77,12 @@ IDENTITY
 ═══════════════════════════════════════════════
 HARD RULES
 ═══════════════════════════════════════════════
-1. Tier boundary is inviolable. You route + approve; PM coordinates multi-step; Tier 2 executes.
-2. Never invent a sub-agent role outside the four above. If a request doesn't fit one, return decision_kind="clarification".
-3. Single-step request → work_order_brief. Multi-step request (content → deck → deploy) → workflow_brief. Ambiguous → clarification.
+1. Tier boundary is inviolable. You converse + route + approve; PM coordinates multi-step; Tier 2 executes content.
+2. Never invent a sub-agent role outside the four above. If a request needs work but doesn't fit a known role, return decision_kind="clarification" with a specific question — not a generic "How can I assist you?".
+3. Single-step deliverable → work_order_brief. Multi-step deliverable (content → deck → deploy) → workflow_brief. Genuine action ambiguity → clarification. Anything conversational, exploratory, social, or about the platform itself → assistant_reply.
 4. Don't fabricate work-order IDs, output-package IDs, or handoff details — the platform assigns those.
 5. Don't claim you've already done something the platform hasn't actually run.
+6. Clarification is a LAST RESORT for routing, NOT the default. If the operator hasn't described concrete work, talk to them — don't ask them to describe work they didn't mention.
 
 ═══════════════════════════════════════════════
 WHAT YOU KNOW ABOUT THE PLATFORM
@@ -93,23 +94,34 @@ WHAT YOU KNOW ABOUT THE PLATFORM
 - Token budgets apply: 8192 max per call, 50K per work order. Be concise.
 
 ═══════════════════════════════════════════════
-OUTPUT MODES
+OUTPUT MODES — pick exactly one decision_kind per response
 ═══════════════════════════════════════════════
-You operate in two modes selected per request:
+You output strict JSON. The decision_kind field selects mode:
 
-CONVERSATIONAL (assistant_reply) — Use when the operator is greeting you, asking what you can do, asking about the platform, or asking where something landed. Casual social prompts (hi / hello / how are you / what do you do / where is the output) belong here. The runtime intercepts the most common social prompts before they reach you, but if one slips through, respond as Aiden — warm, decisive, oriented toward real work.
+tool_call — When the operator asks about CURRENT runtime state — system health, work-order counts, recent work, queue status, sub-agent state, anything where you'd otherwise be tempted to invent numbers — return decision_kind="tool_call". The runtime will execute the tool, inject the result into your next turn as context, then you compose the final answer using REAL data. NEVER fabricate platform metrics. NEVER pretend you "fetched" or "checked" — call the tool, then answer. The full tool catalog appears in the OUTPUT CONTRACT section below.
 
-DISPATCH (work_order_brief / workflow_brief / clarification) — Use when the operator describes actual work to be done. Output strict JSON matching the schema below.
+assistant_reply — DEFAULT for any input that is conversational, exploratory, social, or where you have everything you need to answer without runtime data. Examples: "Hi Aiden", "talk to me", "what can you do?", "tell me about Klear's GTM motion", "explain how the platform works in concept". Use this AFTER a tool_call to deliver the final answer with the tool's result.
 
-When in doubt about which mode applies: if the operator named a deliverable (a deck, a page, a brief, a campaign), use DISPATCH. If they're chatting about the platform, use CONVERSATIONAL.
+work_order_brief — Operator described one concrete deliverable to produce ("draft a one-pager about X", "build a landing page for Y", "write a brief on Z").
+
+workflow_brief — Operator described a multi-step deliverable ("draft a deck and deploy it", "research X then build a brief and a deck").
+
+clarification — Operator clearly wants action but a required input is missing ("draft something" — about what?). Use sparingly. NEVER use clarification just because the user wasn't specific — if they were chatting, that's assistant_reply.
 
 ═══════════════════════════════════════════════
-DISPATCH SCHEMA (strict JSON)
+DECISION SCHEMA (strict JSON)
 ═══════════════════════════════════════════════
 {
-  "decision_kind": "work_order_brief" | "workflow_brief" | "clarification",
-  "title": "short human-readable title",
-  "summary": "one-paragraph summary of intent",
+  "decision_kind": "assistant_reply" | "work_order_brief" | "workflow_brief" | "clarification",
+  "title": "short human-readable title (always present, even for assistant_reply)",
+  "summary": "one-paragraph summary of intent (optional for assistant_reply)",
+
+  // When decision_kind == "assistant_reply":
+  "assistant_reply": {
+    "headline": "1 short sentence — your CEO-style top-line",
+    "message": "your conversational response in your voice — direct, decisive, in markdown, addressing what the operator actually asked. Don't push them toward a work order unless they signal interest.",
+    "suggested_requests": ["optional", "next-step", "ideas"]
+  },
 
   // When decision_kind == "work_order_brief":
   "work_order_brief": {
@@ -126,15 +138,15 @@ DISPATCH SCHEMA (strict JSON)
 
   // When decision_kind == "clarification":
   "clarification": {
-    "question": "what the operator must answer",
+    "question": "the SPECIFIC piece of information you need to route the work the operator described — never a generic open-ended question",
     "missing_fields": ["list", "of", "fields"]
   }
 }
 
 Rules:
+- Default to assistant_reply when you're unsure. Only use clarification when the operator explicitly described work but a required field is missing.
 - Pick `work_order_brief` for single-step deliverables (one sub-agent produces output).
 - Pick `workflow_brief` for multi-step deliverables (e.g. content + deck + deploy).
-- Pick `clarification` only when intake is genuinely ambiguous.
 - assigned_role MUST be one of the four roles above; never invent a new one.
 - Output JSON ONLY. No commentary, no markdown fences.
 """
@@ -146,7 +158,7 @@ Rules:
 # operator-tunable, the JSON schema is not. Also satisfies Groq's
 # requirement that the prompt mention "json" whenever response_format
 # is set to json_object.
-AIDEN_OUTPUT_SCHEMA = """
+_AIDEN_OUTPUT_SCHEMA_TEMPLATE = """
 
 # Output contract (do not deviate)
 
@@ -154,9 +166,18 @@ You MUST respond with a single JSON object matching the IWO3 Aiden
 Tier-1 decision schema. No prose, no markdown fences, just JSON.
 
 {
-  "decision_kind": "work_order_brief" | "workflow_brief" | "clarification",
+  "decision_kind": "assistant_reply" | "tool_call" | "work_order_brief" | "workflow_brief" | "clarification",
   "title": "short human-readable title",
-  "summary": "one-paragraph summary",
+  "summary": "one-paragraph summary (optional for assistant_reply)",
+  "assistant_reply": {
+     "headline": "1 short sentence — your CEO-style top-line",
+     "message": "your conversational response in markdown",
+     "suggested_requests": ["optional", "next-step", "ideas"]
+  },
+  "tool_call": {
+     "tool_name": "one of the tools in the catalog below",
+     "args": {...}
+  },
   "work_order_brief": {
      "assigned_role": "mark_tier_2" | "tom_tier_2" | "hank_tier_2" | "paul_tier_2",
      "content_blocks": {...},
@@ -166,17 +187,57 @@ Tier-1 decision schema. No prose, no markdown fences, just JSON.
   "clarification":    { "question": "...", "missing_fields": [...] }
 }
 
-Routing hints for `assigned_role`:
+# Tool catalog (use tool_call decision_kind)
+
+When the operator asks about CURRENT runtime state, you MUST call a
+tool — never invent metrics. The runtime executes the tool, feeds the
+result back in your next turn, and then you produce the final
+assistant_reply with real data.
+
+{TOOL_CATALOG}
+
+Examples:
+  - "is anything broken?" / "what is the system health?" → tool_call runtime_health
+  - "how many WO are open?" / "what's pending?" → tool_call work_order_counts
+  - "what was just submitted?" / "what's in flight?" → tool_call recent_work_orders
+
+The runtime caps tool use at 1 tool call per chat turn. If you need
+more data, deliver assistant_reply with what you have plus a
+recommendation for the operator's next question.
+
+# Mode defaults
+
+Default: assistant_reply for any conversational, exploratory, or
+business question that doesn't require runtime data. Use clarification
+ONLY when the operator clearly described concrete work but a required
+field is missing — never as a default for vague intake.
+
+Routing hints for `assigned_role` (when decision_kind=work_order_brief):
   - mark_tier_2  → marketing / content / copy / brief / written assets
   - tom_tier_2   → presentations / decks / slides / pptx
   - hank_tier_2  → web / landing pages / HTML / mini-sites
   - paul_tier_2  → deployment / publishing / handoff to external systems
 
-NEVER invent a new role. If the request doesn't fit one of those four,
-return decision_kind="clarification" instead.
+NEVER invent a new role. If the operator described work but no role fits,
+return decision_kind="clarification" with a specific question.
 
-Only include the brief subobject that matches `decision_kind`.
+Only include the subobject that matches `decision_kind`.
 """
+
+
+def render_aiden_output_schema() -> str:
+    """Inject the live tool catalog into the output-schema contract.
+    Called once per Aiden invocation so new tools registered at runtime
+    show up immediately."""
+    from runtime.aiden_tools import render_tool_catalog
+    return _AIDEN_OUTPUT_SCHEMA_TEMPLATE.replace(
+        "{TOOL_CATALOG}", render_tool_catalog()
+    )
+
+
+# Back-compat alias for any caller that still references the constant
+# name. Resolves to the rendered schema with current tool catalog.
+AIDEN_OUTPUT_SCHEMA = render_aiden_output_schema()
 
 
 @dataclass(frozen=True)
@@ -199,12 +260,43 @@ class AidenClarification:
 
 
 @dataclass(frozen=True)
+class AidenAssistantReply:
+    """CEO-voice conversational response. Mirrors the shape the legacy
+    `_shortcut_reply` regex intercepts produced, so the chat UI renders
+    Aiden's free-form responses identically. assistant_reply is the
+    DEFAULT path for any conversational / exploratory / platform-question
+    intake — clarification is reserved for genuine routing ambiguity."""
+
+    headline: str
+    message: str
+    suggested_requests: list[str]
+
+
+@dataclass(frozen=True)
+class AidenToolCall:
+    """Aiden requests one tool execution before composing his final
+    answer. The runtime executes the tool against a tenant-scoped
+    connection and re-invokes Aiden with the result injected into
+    context. After the second turn Aiden returns assistant_reply with
+    real data — no hallucinated runtime state."""
+
+    tool_name: str
+    args: dict
+
+
+@dataclass(frozen=True)
 class AidenDecision:
     decision_kind: Literal[
-        "work_order_brief", "workflow_brief", "clarification"
+        "assistant_reply",
+        "tool_call",
+        "work_order_brief",
+        "workflow_brief",
+        "clarification",
     ]
     title: str
     summary: Optional[str]
+    assistant_reply: Optional[AidenAssistantReply] = None
+    tool_call: Optional[AidenToolCall] = None
     work_order_brief: Optional[AidenWorkOrderBrief] = None
     workflow_brief: Optional[AidenWorkflowBrief] = None
     clarification: Optional[AidenClarification] = None
@@ -257,21 +349,64 @@ def _parse_decision(raw_text: str) -> AidenDecision:
         )
 
     kind = data.get("decision_kind")
-    if kind not in {"work_order_brief", "workflow_brief", "clarification"}:
+    if kind not in {
+        "assistant_reply",
+        "tool_call",
+        "work_order_brief",
+        "workflow_brief",
+        "clarification",
+    }:
         raise AidenDecisionMalformed(
-            f"decision_kind must be work_order_brief|workflow_brief|"
-            f"clarification, got {kind!r}"
+            f"decision_kind must be assistant_reply|tool_call|"
+            f"work_order_brief|workflow_brief|clarification, got {kind!r}"
         )
     title = data.get("title")
     if not isinstance(title, str) or not title.strip():
         raise AidenDecisionMalformed("title missing or non-string")
     summary = data.get("summary") if isinstance(data.get("summary"), str) else None
 
+    ar = None
+    tc = None
     wob = None
     wfb = None
     cl = None
 
-    if kind == "work_order_brief":
+    if kind == "assistant_reply":
+        sub = data.get("assistant_reply")
+        if not isinstance(sub, dict):
+            raise AidenDecisionMalformed(
+                "decision_kind=assistant_reply but assistant_reply missing"
+            )
+        headline = sub.get("headline")
+        if not isinstance(headline, str) or not headline.strip():
+            raise AidenDecisionMalformed("assistant_reply.headline missing")
+        message = sub.get("message")
+        if not isinstance(message, str) or not message.strip():
+            raise AidenDecisionMalformed("assistant_reply.message missing")
+        sr = sub.get("suggested_requests", [])
+        if not isinstance(sr, list):
+            sr = []
+        ar = AidenAssistantReply(
+            headline=headline.strip(),
+            message=message,
+            suggested_requests=[str(x) for x in sr if isinstance(x, str)][:5],
+        )
+
+    elif kind == "tool_call":
+        sub = data.get("tool_call")
+        if not isinstance(sub, dict):
+            raise AidenDecisionMalformed(
+                "decision_kind=tool_call but tool_call missing"
+            )
+        tn = sub.get("tool_name")
+        if not isinstance(tn, str) or not tn.strip():
+            raise AidenDecisionMalformed("tool_call.tool_name missing")
+        ta = sub.get("args", {})
+        if not isinstance(ta, dict):
+            ta = {}
+        tc = AidenToolCall(tool_name=tn.strip(), args=ta)
+
+    elif kind == "work_order_brief":
         sub = data.get("work_order_brief")
         if not isinstance(sub, dict):
             raise AidenDecisionMalformed(
@@ -331,6 +466,8 @@ def _parse_decision(raw_text: str) -> AidenDecision:
         decision_kind=kind,
         title=title.strip(),
         summary=summary,
+        assistant_reply=ar,
+        tool_call=tc,
         work_order_brief=wob,
         workflow_brief=wfb,
         clarification=cl,
@@ -543,6 +680,8 @@ async def invoke_aiden_tier_1(
         decision_kind=decision.decision_kind,
         title=decision.title,
         summary=decision.summary,
+        assistant_reply=decision.assistant_reply,
+        tool_call=decision.tool_call,
         work_order_brief=decision.work_order_brief,
         workflow_brief=decision.workflow_brief,
         clarification=decision.clarification,

@@ -12,12 +12,15 @@ and `work_order:update` on transitions is enforced inside the helper.
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from adapter.dispatch import DispatchError, dispatch_gamma_for_package
+from authz.audit_writer import write_audit_row
 from deps import (
     current_user_context,
     get_tenant_scoped_connection,
@@ -83,6 +86,10 @@ class CreateWorkOrderRequest(BaseModel):
     type: str = Field("content_brief", max_length=64)
     priority: str = Field("medium")
     correlation_id: Optional[str] = Field(None, max_length=128)
+    # Beta-2 phase 0.1 (Q3=B locked: optional with "let Aiden decide" default).
+    # When provided, persisted into work_orders.requested_outputs jsonb (Q6=A).
+    output_kind: Optional[str] = Field(None, max_length=64)
+    template_profile_id: Optional[str] = Field(None, max_length=64)
 
 
 @router.get(
@@ -138,6 +145,90 @@ async def create_work_order(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error": "invalid_priority", "priority": body.priority},
         )
+
+    # Beta-2 phase 0.1 — validate optional requested_outputs.
+    requested_outputs: Optional[dict] = None
+    if body.template_profile_id is not None or body.output_kind is not None:
+        # Either field implies the operator wants to constrain the artifact
+        # shape. Resolve template_profile_id to its row to validate
+        # tenant + status + (if output_kind given) consistency.
+        if body.template_profile_id is not None:
+            try:
+                tp = await conn.fetchrow(
+                    """
+                    SELECT id::text             AS id,
+                           output_kind::text    AS output_kind,
+                           status::text         AS status
+                      FROM template_profiles
+                     WHERE id = $1::uuid AND client_id = $2::uuid
+                    """,
+                    body.template_profile_id,
+                    ctx["client_id"],
+                )
+            except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error": "invalid_template_profile_id",
+                        "value": body.template_profile_id,
+                    },
+                )
+            if tp is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error": "template_profile_not_found",
+                        "template_profile_id": body.template_profile_id,
+                    },
+                )
+            if tp["status"] != "active":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error": "template_profile_not_active",
+                        "template_profile_id": body.template_profile_id,
+                        "status": tp["status"],
+                    },
+                )
+            if (
+                body.output_kind is not None
+                and body.output_kind != tp["output_kind"]
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error": "output_kind_template_mismatch",
+                        "output_kind": body.output_kind,
+                        "template_profile_output_kind": tp["output_kind"],
+                    },
+                )
+            requested_outputs = {
+                "output_kind": tp["output_kind"],
+                "template_profile_id": tp["id"],
+            }
+        else:
+            # output_kind alone — sanity-check that at least one published
+            # template_profile exists for this tenant+kind.
+            row = await conn.fetchrow(
+                """
+                SELECT count(*)::int AS n
+                  FROM template_profiles
+                 WHERE client_id = $1::uuid
+                   AND output_kind::text = $2
+                   AND status = 'active'
+                """,
+                ctx["client_id"],
+                body.output_kind,
+            )
+            if row is None or int(row["n"]) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error": "no_published_template_for_output_kind",
+                        "output_kind": body.output_kind,
+                    },
+                )
+            requested_outputs = {"output_kind": body.output_kind}
     # Beta-1 ε.3 / Q8 — chat-driven creates carry a partial UNIQUE on
     # (client_id, correlation_id) WHERE correlation_id LIKE 'chat:%'
     # (migration 0016). For chat correlations, look up the existing WO
@@ -170,9 +261,9 @@ async def create_work_order(
         """
         INSERT INTO work_orders
           (client_id, title, description, type, priority, status,
-           submitted_by_user_id, correlation_id)
+           submitted_by_user_id, correlation_id, requested_outputs)
         VALUES ($1::uuid, $2, $3, $4, $5::work_order_priority, 'pending',
-                $6::uuid, $7)
+                $6::uuid, $7, $8::jsonb)
         RETURNING id::text AS id,
                   client_id::text AS client_id,
                   title, description, type,
@@ -190,7 +281,24 @@ async def create_work_order(
         body.priority,
         ctx["user_id"],
         body.correlation_id,
+        json.dumps(requested_outputs) if requested_outputs is not None else None,
     )
+
+    # Beta-2 phase 0.1 — audit operator-supplied output intent. Emitted only
+    # when requested_outputs is non-null (the WO_CREATED audit is implicit
+    # via the existing transition write_audit infrastructure; this row
+    # captures the intent specifically for downstream PM honor + ops review).
+    if requested_outputs is not None:
+        await write_audit_row(
+            conn,
+            client_id=ctx["client_id"],
+            actor_user_id=ctx["user_id"],
+            event="work_order.requested_outputs_set",
+            target_type="work_order",
+            target_id=row["id"],
+            metadata=requested_outputs,
+        )
+
     return WorkOrderRow(**dict(row))
 
 
@@ -369,4 +477,105 @@ async def watchdog_expire(
             "event": result["event"],
             "cycle_id": result.get("cycle_id"),
         }
+    )
+
+
+# ─── Beta-2 phase 0.2 — POST /work_orders/{id}/render ───────────────────
+
+
+class RenderResponse(BaseModel):
+    ok: bool
+    work_order_id: str
+    output_package_id: Optional[str] = None
+    handoff_id: Optional[str] = None
+    external_reference: Optional[str] = None
+    gamma_url: Optional[str] = None
+    error: Optional[str] = None
+
+
+@router.post(
+    "/{work_order_id}/render",
+    response_model=RenderResponse,
+    dependencies=[Depends(require_permission_dep("output_package:submit"))],
+)
+async def render_work_order(
+    work_order_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> RenderResponse:
+    """Submit the WO's latest gamma_*-kinded output_package to Gamma
+    and create the handoff. Used by the Streamlit "Render via Gamma"
+    button to close the loop on WOs that produced a package before the
+    auto-dispatch hooks landed (or whose initial dispatch failed).
+
+    Idempotent: if the package already has an in-flight handoff this
+    returns 409 with the existing handoff_id."""
+    pkg = await conn.fetchrow(
+        """
+        SELECT id::text          AS id,
+               output_kind::text AS output_kind
+          FROM output_packages
+         WHERE work_order_id = $1::uuid
+           AND client_id = $2::uuid
+           AND output_kind::text LIKE 'gamma_%'
+         ORDER BY created_at DESC LIMIT 1
+        """,
+        work_order_id,
+        ctx["client_id"],
+    )
+    if pkg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "no_gamma_package",
+                "work_order_id": work_order_id,
+            },
+        )
+
+    try:
+        result = await dispatch_gamma_for_package(
+            conn,
+            output_package_id=pkg["id"],
+            client_id=ctx["client_id"],
+            actor_user_id=ctx["user_id"],
+        )
+    except DispatchError as exc:
+        if exc.kind == "handoff_already_exists":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": exc.kind,
+                    "detail": exc.detail,
+                    "output_package_id": pkg["id"],
+                },
+            )
+        await write_audit_row(
+            conn,
+            client_id=ctx["client_id"],
+            actor_user_id=ctx["user_id"],
+            event="adapter_dispatch.failed",
+            target_type="output_package",
+            target_id=pkg["id"],
+            metadata={
+                "kind": exc.kind,
+                "detail": exc.detail,
+                "stage": "manual_render_button",
+            },
+        )
+        return RenderResponse(
+            ok=False,
+            work_order_id=work_order_id,
+            output_package_id=pkg["id"],
+            error=f"{exc.kind}: {exc.detail}",
+        )
+
+    return RenderResponse(
+        ok=True,
+        work_order_id=work_order_id,
+        output_package_id=result.output_package_id,
+        handoff_id=result.handoff_id,
+        external_reference=result.external_reference,
+        gamma_url=result.gamma_url,
     )

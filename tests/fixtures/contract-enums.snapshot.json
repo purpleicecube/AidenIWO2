@@ -95,7 +95,8 @@
       "unblock",
       "watchdog",
       "admin_repair",
-      "candidate_request_more"
+      "candidate_request_more",
+      "auto_dispatch"
     ],
     "external_execution_result_status": [
       "success",
@@ -322,9 +323,14 @@
       "llm.budget_exceeded",
       "llm.failed",
       "llm.invoked",
+      "llm_config.bulk_applied",
       "llm_config.created",
       "llm_config.disabled",
+      "llm_config.previewed",
+      "llm_config.prompt_read",
+      "llm_config.rolled_back",
       "llm_config.updated",
+      "llm_config.versioned",
       "llm_provider.connection_tested",
       "output_candidate.rejected",
       "output_candidate.selected",
@@ -349,13 +355,18 @@
       "repository_binding.revoked",
       "role_permission.granted",
       "role_permission.revoked",
+      "tier_1_5.requested_output_honored",
       "webhook.received",
       "webhook.signature_invalid",
       "work_order.archived",
+      "work_order.auto_dispatch_attempted",
+      "work_order.auto_dispatch_failed",
+      "work_order.auto_dispatch_succeeded",
       "work_order.blocked",
       "work_order.cancelled",
       "work_order.created",
       "work_order.reopened",
+      "work_order.requested_outputs_set",
       "work_order.transitioned",
       "work_order.unblocked",
       "work_order.updated",
@@ -520,6 +531,20 @@
       ],
       "BETA_PHASE_1_5_PHASE_2_AUDIT_EVENTS": [
         "client.settings_updated"
+      ],
+      "BETA_2_PHASE_0_AUDIT_EVENTS": [
+        "work_order.requested_outputs_set",
+        "tier_1_5.requested_output_honored",
+        "work_order.auto_dispatch_attempted",
+        "work_order.auto_dispatch_succeeded",
+        "work_order.auto_dispatch_failed"
+      ],
+      "BETA_2_PHASE_0_3_AUDIT_EVENTS": [
+        "llm_config.prompt_read",
+        "llm_config.versioned",
+        "llm_config.rolled_back",
+        "llm_config.bulk_applied",
+        "llm_config.previewed"
       ]
     }
   },
@@ -576,6 +601,7 @@
     "repository_binding:read",
     "repository_binding:update",
     "system:admin",
+    "template_profile:read",
     "user:invite",
     "user:read",
     "user:revoke",

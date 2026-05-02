@@ -206,11 +206,16 @@ def test_create_then_patch_then_soft_delete_roundtrip() -> None:
         )
         assert r2.status_code == 409, r2.text
 
-        # Patch model + system_prompt
+        # Patch model + system_prompt — Phase 0.3.2 requires explicit
+        # tri-state prompt_action whenever system_prompt is in the body.
         r3 = client.patch(
             f"/llm/configs/{cfg_id}",
             headers=_hdr(KLEAR_OWNER),
-            json={"model": "openai/gpt-oss-120b", "system_prompt": "hi"},
+            json={
+                "model": "openai/gpt-oss-120b",
+                "prompt_action": "set",
+                "system_prompt": "hi",
+            },
         )
         assert r3.status_code == 200, r3.text
         assert r3.json()["config"]["has_system_prompt"] is True

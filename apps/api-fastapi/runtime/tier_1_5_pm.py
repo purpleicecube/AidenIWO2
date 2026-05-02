@@ -348,6 +348,32 @@ async def instantiate_workflow_from_brief(
     advancing step_runs to running (Tier 2 dispatch in α.4)."""
     template_key = brief.workflow_template_key
 
+    # Beta-2 phase 0.1 — if the operator carried explicit requested_outputs
+    # on the WO, surface that fact in the audit log. Actual honor at the
+    # adapter-dispatch step lands in Phase 0.2/0.3 (the auto-* workers); this
+    # hook records intent-visibility without changing PM template choice
+    # (which remains Aiden Tier 1's call per Q2=A locked).
+    requested_outputs_seen: Optional[dict] = None
+    if work_order_id is not None:
+        wo_row = await conn.fetchrow(
+            """
+            SELECT requested_outputs
+              FROM work_orders
+             WHERE id = $1::uuid AND client_id = $2::uuid
+            """,
+            work_order_id,
+            client_id,
+        )
+        if wo_row is not None and wo_row["requested_outputs"] is not None:
+            ro_raw = wo_row["requested_outputs"]
+            if isinstance(ro_raw, str):
+                try:
+                    requested_outputs_seen = json.loads(ro_raw)
+                except json.JSONDecodeError:
+                    requested_outputs_seen = None
+            elif isinstance(ro_raw, dict):
+                requested_outputs_seen = ro_raw
+
     cfg = await resolve_llm_config(
         conn, client_id=client_id, agent_role=PM_TIER_15_ROLE
     )
@@ -512,6 +538,25 @@ async def instantiate_workflow_from_brief(
             "stepCount": len(plan),
         },
     )
+
+    # Beta-2 phase 0.1 — record that operator-supplied artifact intent
+    # was visible at PM instantiation time. Adapter dispatch in Phase
+    # 0.2+ will use this to override the workflow's defaultRenderRoute
+    # with operator-chosen template_profile_id.
+    if requested_outputs_seen is not None:
+        await write_audit_row(
+            conn,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            event="tier_1_5.requested_output_honored",
+            target_type="workflow_execution",
+            target_id=exec_id,
+            metadata={
+                "workOrderId": work_order_id,
+                "templateKey": template_key,
+                "requestedOutputs": requested_outputs_seen,
+            },
+        )
 
     step_run_ids: list[str] = []
     by_key = {s.step_key: s for s in steps}

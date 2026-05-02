@@ -38,6 +38,7 @@ from routes import (
     health,
     llm,
     output_packages,
+    template_profiles,
     tenants,
     webhooks,
     work_orders,
@@ -46,6 +47,7 @@ from routes import (
 )
 from workers.poll_worker import poll_worker_loop
 from workers.telegram_worker import telegram_worker_loop
+from workers.wo_dispatch_worker import wo_dispatch_worker_loop
 
 
 log = logging.getLogger("iwo3.main")
@@ -58,14 +60,18 @@ async def lifespan(app: FastAPI):
     telegram_task = asyncio.create_task(
         telegram_worker_loop(get_db_pool())
     )
+    wo_dispatch_task = asyncio.create_task(
+        wo_dispatch_worker_loop(get_db_pool())
+    )
     try:
         yield
     finally:
-        for t in (worker_task, telegram_task):
+        for t in (worker_task, telegram_task, wo_dispatch_task):
             t.cancel()
         for t, name in (
             (worker_task, "poll_worker"),
             (telegram_task, "telegram_worker"),
+            (wo_dispatch_task, "wo_dispatch_worker"),
         ):
             try:
                 await t
@@ -94,6 +100,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(tenants.router)
 app.include_router(work_orders.router)
+app.include_router(template_profiles.router)
 app.include_router(workflows.router)
 app.include_router(output_packages.router)
 app.include_router(candidate_review.router)

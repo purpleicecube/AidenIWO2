@@ -537,5 +537,12 @@
     "displayName": "Delete LLM configs",
     "description": "Soft-delete or hard-delete llm_configs rows for this tenant.",
     "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000078",
+    "permissionKey": "template_profile:read",
+    "displayName": "Read template profiles",
+    "description": "Read tenant-scoped template_profiles. Beta-2 phase 0.1 — populates the Submit Order template selector.",
+    "scope": "tenant"
   }
 ]

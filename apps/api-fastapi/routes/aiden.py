@@ -22,6 +22,7 @@ Audit:
 from __future__ import annotations
 
 import dataclasses
+import json
 import re
 from typing import Annotated, Any, Optional
 
@@ -248,9 +249,21 @@ async def aiden_chat(
         asyncpg.Connection, Depends(get_tenant_scoped_connection)
     ],
 ) -> AidenChatResponse:
-    shortcut = _shortcut_reply(body.message)
-    if shortcut is not None:
-        return shortcut
+    # 2026-05-01 — regex `_shortcut_reply` intercepts removed. Aiden
+    # Tier 1 now has a real `assistant_reply` decision kind, so casual
+    # / exploratory / platform-question intake is handled in Aiden's
+    # CEO voice instead of being routed to canned hardcoded responses.
+    # Empty messages still short-circuit (no point spending LLM tokens).
+    if not body.message or not body.message.strip():
+        return AidenChatResponse(
+            ok=True,
+            decision_kind="assistant_reply",
+            assistant_reply={
+                "headline": "I'm here.",
+                "message": "Tell me what's on your mind — I can talk through what's running, what we've built, or what to do next.",
+                "suggested_requests": [],
+            },
+        )
 
     try:
         decision = await invoke_aiden_tier_1(
@@ -279,12 +292,72 @@ async def aiden_chat(
             error=f"{exc.kind}: {exc}",
         )
 
+    # Beta-2 — tool_call → execute → re-invoke loop. Aiden returns a
+    # tool_call when the operator asks about runtime state; the runtime
+    # executes the tool with the live tenant-scoped connection, then
+    # invokes Aiden a second time with the tool result as context. Cap
+    # at 1 tool round-trip per chat turn (token-budget hygiene).
+    if decision.decision_kind == "tool_call" and decision.tool_call:
+        from runtime.aiden_tools import (
+            ToolExecutionError,
+            ToolNotFoundError,
+            execute_tool,
+        )
+
+        tool_call = decision.tool_call
+        try:
+            tool_result = await execute_tool(
+                conn,
+                tool_name=tool_call.tool_name,
+                args=tool_call.args,
+                client_id=ctx["client_id"],
+                actor_user_id=ctx["user_id"],
+            )
+        except (ToolNotFoundError, ToolExecutionError) as exc:
+            return AidenChatResponse(
+                ok=False,
+                decision_kind="tool_call",
+                title=decision.title,
+                error=f"tool_failed: {exc}",
+            )
+
+        # Re-invoke Aiden with the original message + tool result as
+        # context. Aiden composes the final assistant_reply using REAL
+        # data instead of fabricating it.
+        followup_intake = (
+            f"{body.message}\n\n"
+            f"[TOOL RESULT — {tool_call.tool_name}]\n"
+            f"{json.dumps(tool_result, default=str, indent=2)}\n"
+            f"[END TOOL RESULT]\n\n"
+            f"Compose your final assistant_reply using the data above. "
+            f"Do not call another tool."
+        )
+        try:
+            decision = await invoke_aiden_tier_1(
+                conn,
+                intake_text=followup_intake,
+                client_id=ctx["client_id"],
+                actor_user_id=ctx["user_id"],
+            )
+        except (
+            AidenNoConfig,
+            LlmBudgetExceeded,
+            AidenInvocationError,
+        ) as exc:
+            return AidenChatResponse(
+                ok=False,
+                decision_kind="tool_call",
+                title=decision.title if decision else None,
+                error=f"followup_invoke_failed: {exc}",
+            )
+
     payload = _decision_to_payload(decision)
     return AidenChatResponse(
         ok=True,
         decision_kind=payload.get("decision_kind"),
         title=payload.get("title"),
         summary=payload.get("summary"),
+        assistant_reply=payload.get("assistant_reply"),
         work_order_brief=payload.get("work_order_brief"),
         workflow_brief=payload.get("workflow_brief"),
         clarification=payload.get("clarification"),

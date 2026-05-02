@@ -74,62 +74,32 @@ def test_aiden_chat_returns_credential_missing_when_groq_key_unset() -> None:
             os.environ["GROQ_API_KEY"] = saved
 
 
+# 2026-05-01 — the three regex `_shortcut_reply` tests below were
+# removed when Aiden Tier 1 gained a real `assistant_reply` decision
+# kind. Capability / web-access / status prompts now flow through Aiden's
+# CEO-voice LLM path instead of returning canned hardcoded headlines.
+# Replaced with a single guard test: empty messages still short-circuit
+# (no LLM tokens spent on whitespace).
+
+
 @iwo3_db
-def test_aiden_chat_shortcuts_capability_prompt_without_llm() -> None:
+def test_aiden_chat_empty_message_short_circuits_without_llm() -> None:
     saved = os.environ.pop("GROQ_API_KEY", None)
     try:
         with TestClient(app) as client:
             r = client.post(
                 "/aiden/chat",
-                json={"message": "what do you do"},
+                json={"message": "   "},
                 headers=_hdr(KLEAR_OPERATOR),
             )
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["ok"] is True
         assert body["decision_kind"] == "assistant_reply"
-        assert "assistant_reply" in body
-        assert "what I can do".lower() in body["assistant_reply"]["headline"].lower()
-    finally:
-        if saved is not None:
-            os.environ["GROQ_API_KEY"] = saved
-
-
-@iwo3_db
-def test_aiden_chat_shortcuts_web_access_prompt_without_llm() -> None:
-    saved = os.environ.pop("GROQ_API_KEY", None)
-    try:
-        with TestClient(app) as client:
-            r = client.post(
-                "/aiden/chat",
-                json={"message": "can you search the web"},
-                headers=_hdr(KLEAR_OPERATOR),
-            )
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["ok"] is True
-        assert body["decision_kind"] == "assistant_reply"
-        assert "web access" in body["assistant_reply"]["headline"].lower()
-    finally:
-        if saved is not None:
-            os.environ["GROQ_API_KEY"] = saved
-
-
-@iwo3_db
-def test_aiden_chat_shortcuts_workspace_status_prompt_without_llm() -> None:
-    saved = os.environ.pop("GROQ_API_KEY", None)
-    try:
-        with TestClient(app) as client:
-            r = client.post(
-                "/aiden/chat",
-                json={"message": "what is the status of this workspace"},
-                headers=_hdr(KLEAR_OPERATOR),
-            )
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["ok"] is True
-        assert body["decision_kind"] == "assistant_reply"
-        assert "status" in body["assistant_reply"]["headline"].lower()
+        # Empty-input fallback emits a short prompt-back, no LLM call.
+        ar = body.get("assistant_reply") or {}
+        assert "headline" in ar
+        assert "message" in ar
     finally:
         if saved is not None:
             os.environ["GROQ_API_KEY"] = saved

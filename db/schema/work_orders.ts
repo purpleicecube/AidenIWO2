@@ -54,6 +54,7 @@ export const workOrders = pgTable(
     }),
     correlationId: varchar("correlation_id", { length: 128 }),
     gccMemory: jsonb("gcc_memory"),
+    requestedOutputs: jsonb("requested_outputs"),
     deferredUntil: timestamp("deferred_until", { withTimezone: true }),
     deferredReason: text("deferred_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })

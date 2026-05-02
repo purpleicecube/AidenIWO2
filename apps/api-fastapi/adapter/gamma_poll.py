@@ -79,6 +79,7 @@ async def _load_handoff_for_poll(
                h.status::text                 AS status,
                h.external_reference,
                h.adapter_catalog_id::text     AS adapter_catalog_id,
+               h.created_at,
                h.last_poll_at,
                h.poll_count,
                h.output_package_id::text      AS output_package_id,
@@ -247,7 +248,12 @@ async def poll_gamma_handoff(
 
     poll_timeout = row["poll_timeout_seconds"] or DEFAULT_POLL_TIMEOUT_SECONDS
     now = now_override or datetime.now(timezone.utc)
-    last_poll = row["last_poll_at"] or datetime.fromtimestamp(0, tz=timezone.utc)
+    # First-poll bug fix (Beta-2 phase 0.2): a handoff with `last_poll_at IS
+    # NULL` has never been polled. Falling back to epoch zero made the very
+    # first tick treat every fresh handoff as stale (elapsed ≈ 5.3B seconds
+    # > any timeout). Fall back to `created_at` so "elapsed since
+    # submission" is the correct watchdog input on the first tick.
+    last_poll = row["last_poll_at"] or row["created_at"] or datetime.fromtimestamp(0, tz=timezone.utc)
     elapsed = int((now - last_poll).total_seconds())
     stale = force_stale_watchdog or elapsed > poll_timeout
     if stale:

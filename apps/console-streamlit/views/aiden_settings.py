@@ -309,7 +309,10 @@ def _section_aiden_config(api) -> None:  # noqa: ANN001
     try:
         configs = api.list_llm_configs()
         providers = api.list_llm_providers()
-        can_admin = api.check_permission("system:admin")
+        # Beta-2 phase 0.3.5 RBAC fix: editing is gated by `llm_config:write`,
+        # not `system:admin`. Connection-test gates on the same. Ref CODEX
+        # 2026-05-01 finding 5.
+        can_admin = api.check_permission("llm_config:write")
     except APIError as err:
         with st.container(border=True):
             _section_header(icon="brain", title="LLM Provider")
@@ -338,7 +341,7 @@ def _section_aiden_config(api) -> None:  # noqa: ANN001
 
         _rbac_lockout_banner(
             can_admin,
-            permission="system:admin",
+            permission="llm_config:write",
             action_label="Save / Test connection",
         )
 
@@ -443,12 +446,53 @@ def _section_aiden_config(api) -> None:  # noqa: ANN001
 
             st.markdown('<hr class="settings-sep" />', unsafe_allow_html=True)
 
+            # Beta-2 phase 0.3.1 — pre-load the actual prompt body (writer-gated)
+            # so the operator can see and edit, not blind-overwrite.
+            current_prompt = ""
+            prompt_load_error: Optional[str] = None
+            if can_admin.allowed:
+                try:
+                    pr = api.get_llm_config_prompt(aiden["id"])
+                    current_prompt = pr.get("system_prompt") or ""
+                except APIError as err:
+                    prompt_load_error = f"{err.status_code} — {err.detail}"
+
+            if prompt_load_error:
+                st.warning(
+                    f"Could not load current system prompt: {prompt_load_error}"
+                )
+
+            st.markdown(
+                f"**System prompt** &nbsp;·&nbsp; "
+                f"<span style='color:#6b7280; font-size: 0.8rem;'>"
+                f"{len(current_prompt)} chars currently stored"
+                f"</span>",
+                unsafe_allow_html=True,
+            )
+            prompt_action = st.radio(
+                "What do you want to do with the system prompt?",
+                options=["Keep unchanged", "Replace with new prompt", "Clear (reset to default)"],
+                index=0,
+                horizontal=True,
+                label_visibility="collapsed",
+                key=f"aiden-prompt-action-{aiden['id']}",
+            )
             system_prompt = st.text_area(
                 "System prompt",
+                value=current_prompt,
+                height=240,
+                disabled=prompt_action != "Replace with new prompt",
+                help=(
+                    "Defines how Aiden evaluates work orders at both tiers. "
+                    "Pick \"Replace\" to edit; \"Clear\" to drop back to the "
+                    "runtime default; \"Keep unchanged\" to leave as-is."
+                ),
+                label_visibility="collapsed",
+            )
+            change_reason = st.text_input(
+                "Change reason (optional, recorded in version history)",
                 value="",
-                placeholder="(unchanged — leave blank to keep current prompt)",
-                height=200,
-                help="Defines how Aiden evaluates work orders at both tiers.",
+                placeholder="e.g. 'Tightened brevity rules per Klear feedback'",
             )
 
             action_cols = st.columns([1, 1, 4])
@@ -477,11 +521,20 @@ def _section_aiden_config(api) -> None:  # noqa: ANN001
             }
             if credential_ref.strip():
                 patch["credential_ref"] = credential_ref.strip()
-            if system_prompt.strip():
+            # Beta-2 phase 0.3.2 tri-state contract — the API now requires
+            # explicit prompt_action whenever system_prompt is in the body.
+            if prompt_action == "Replace with new prompt":
+                patch["prompt_action"] = "set"
                 patch["system_prompt"] = system_prompt
+            elif prompt_action == "Clear (reset to default)":
+                patch["prompt_action"] = "clear"
+            else:
+                patch["prompt_action"] = "unchanged"
+            if change_reason.strip():
+                patch["change_reason"] = change_reason.strip()
             try:
                 api.update_llm_config(aiden["id"], **patch)
-                st.success("Saved.")
+                st.success("Saved. New version row written for rollback.")
                 st.rerun()
             except APIError as err:
                 st.error(f"{err.status_code} — {err.detail}")

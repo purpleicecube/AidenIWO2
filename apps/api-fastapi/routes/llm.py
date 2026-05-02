@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Literal, Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -285,15 +285,31 @@ class CreateLlmConfigRequest(BaseModel):
 
 
 class UpdateLlmConfigRequest(BaseModel):
+    """Beta-2 phase 0.3.2 tri-state mutation contract.
+
+    `prompt_action` is REQUIRED whenever `system_prompt` is in the body.
+    Allowed values:
+      - "set": replace the live prompt with `system_prompt` (must be non-empty)
+      - "clear": drop the prompt back to NULL (system_prompt must be absent or null)
+      - "unchanged": leave existing prompt untouched (system_prompt must be absent)
+    Omitting `prompt_action` AND `system_prompt` together = no prompt change.
+    Sending `system_prompt` without `prompt_action` is rejected as ambiguous
+    (closes the "blind overwrite when non-empty" CODEX finding).
+
+    `change_reason` is recorded on the version row for audit forensics.
+    """
+
     display_name: Optional[str] = Field(None, min_length=1, max_length=160)
     description: Optional[str] = Field(None, max_length=4000)
     provider: Optional[str] = Field(None, min_length=1, max_length=32)
     model: Optional[str] = Field(None, min_length=1, max_length=128)
     base_url: Optional[str] = Field(None, max_length=256)
     credential_ref: Optional[str] = Field(None, min_length=1, max_length=256)
-    system_prompt: Optional[str] = None
     options: Optional[dict[str, Any]] = None
     enabled: Optional[bool] = None
+    prompt_action: Optional[Literal["unchanged", "set", "clear"]] = None
+    system_prompt: Optional[str] = None
+    change_reason: Optional[str] = Field(None, max_length=2000)
 
 
 class LlmConfigResponse(BaseModel):
@@ -395,6 +411,25 @@ async def create_config(
             },
         )
 
+    # Phase 0.3 — every mutation snapshots into llm_config_versions.
+    from llm.config_versioning import (
+        fetch_current_config_row,
+        snapshot_config_version,
+    )
+
+    new_row = await fetch_current_config_row(
+        conn, config_id=row["id"], client_id=ctx["client_id"]
+    )
+    assert new_row is not None
+    version = await snapshot_config_version(
+        conn,
+        config_row=new_row,
+        change_action="create",
+        change_reason="llm_config.create",
+        changed_fields=None,
+        actor_user_id=ctx["user_id"],
+    )
+
     await write_audit_row(
         conn,
         client_id=ctx["client_id"],
@@ -407,9 +442,83 @@ async def create_config(
             "provider": body.provider,
             "model": body.model,
             "enabled": body.enabled,
+            "versionNumber": version["version_number"],
+        },
+    )
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="llm_config.versioned",
+        target_type="llm_config_version",
+        target_id=version["id"],
+        metadata={
+            "llmConfigId": row["id"],
+            "agentRole": body.agent_role,
+            "versionNumber": version["version_number"],
+            "changeAction": "create",
         },
     )
     return LlmConfigResponse(config=_row_to_list_item(row))
+
+
+def _resolve_prompt_action(
+    body: UpdateLlmConfigRequest,
+) -> tuple[bool, Optional[str]]:
+    """Validate the tri-state prompt_action contract and return
+    (apply_change, new_prompt_value). `apply_change=False` = leave the
+    column untouched. `apply_change=True` + value=None = clear to NULL.
+    Raises HTTPException(422) on ambiguous combos."""
+    has_system_prompt = body.system_prompt is not None
+    action = body.prompt_action
+
+    if action is None:
+        if has_system_prompt:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "ambiguous_prompt_payload",
+                    "detail": (
+                        "system_prompt was provided without prompt_action. "
+                        "Phase 0.3.2 requires explicit tri-state intent: "
+                        'prompt_action must be one of "set" | "clear" | "unchanged".'
+                    ),
+                },
+            )
+        return (False, None)
+
+    if action == "unchanged":
+        if has_system_prompt:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "prompt_action_conflict",
+                    "detail": 'prompt_action="unchanged" must not be paired with system_prompt.',
+                },
+            )
+        return (False, None)
+
+    if action == "set":
+        if not has_system_prompt or not (body.system_prompt or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "prompt_action_conflict",
+                    "detail": 'prompt_action="set" requires a non-empty system_prompt value.',
+                },
+            )
+        return (True, body.system_prompt)
+
+    # action == "clear"
+    if has_system_prompt:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "prompt_action_conflict",
+                "detail": 'prompt_action="clear" must not be paired with a system_prompt value.',
+            },
+        )
+    return (True, None)
 
 
 @router.patch(
@@ -425,10 +534,27 @@ async def update_config(
         asyncpg.Connection, Depends(get_tenant_scoped_connection)
     ],
 ) -> LlmConfigResponse:
+    """Beta-2 phase 0.3.2 — tri-state PATCH with versioning.
+
+    Transaction shape:
+      1. Validate inputs (tri-state, provider, credential_ref).
+      2. Read OLD state.
+      3. Apply UPDATE.
+      4. Snapshot NEW state into llm_config_versions (change_action='update').
+      5. Emit llm_config.versioned + llm_config.updated/disabled audit.
+    """
+    from llm.config_versioning import (
+        compute_changed_fields,
+        fetch_current_config_row,
+        snapshot_config_version,
+    )
+
     if body.credential_ref is not None:
         _validate_credential_ref(body.credential_ref)
     if body.provider is not None:
         _validate_provider(body.provider)
+
+    apply_prompt_change, new_prompt_value = _resolve_prompt_action(body)
 
     sets: list[str] = []
     args: list[Any] = []
@@ -451,8 +577,8 @@ async def update_config(
         _add("base_url", "${idx}", body.base_url)
     if body.credential_ref is not None:
         _add("credential_ref", "${idx}", body.credential_ref)
-    if body.system_prompt is not None:
-        _add("system_prompt", "${idx}", body.system_prompt)
+    if apply_prompt_change:
+        _add("system_prompt", "${idx}", new_prompt_value)
     if body.options is not None:
         _add("options", "${idx}::jsonb", json.dumps(body.options))
     if body.enabled is not None:
@@ -462,6 +588,16 @@ async def update_config(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": "no_fields_to_update"},
+        )
+
+    # Read OLD state for diff before mutation.
+    old = await fetch_current_config_row(
+        conn, config_id=config_id, client_id=ctx["client_id"]
+    )
+    if old is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "config_not_found", "id": config_id},
         )
 
     sets.append("updated_at = now()")
@@ -493,10 +629,26 @@ async def update_config(
             detail={"error": "invalid_config_id", "value": config_id},
         )
     if row is None:
+        # Should not happen — old read succeeded — but treat defensively.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "config_not_found", "id": config_id},
         )
+
+    # Snapshot the NEW state.
+    new_row = await fetch_current_config_row(
+        conn, config_id=config_id, client_id=ctx["client_id"]
+    )
+    assert new_row is not None  # we just updated it
+    changed_fields = compute_changed_fields(dict(old), dict(new_row))
+    version = await snapshot_config_version(
+        conn,
+        config_row=new_row,
+        change_action="update",
+        change_reason=body.change_reason,
+        changed_fields=changed_fields,
+        actor_user_id=ctx["user_id"],
+    )
 
     # Distinguish "disabled" event from a generic update so audit
     # forensics can answer "who turned it off" without parsing diffs.
@@ -513,7 +665,24 @@ async def update_config(
         target_id=row["id"],
         metadata={
             "agentRole": row["agent_role"],
-            "fieldsChanged": list(field_map.keys()),
+            "fieldsChanged": changed_fields,
+            "promptAction": body.prompt_action,
+            "versionNumber": version["version_number"],
+        },
+    )
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="llm_config.versioned",
+        target_type="llm_config_version",
+        target_id=version["id"],
+        metadata={
+            "llmConfigId": row["id"],
+            "agentRole": row["agent_role"],
+            "versionNumber": version["version_number"],
+            "changeAction": "update",
+            "changedFields": changed_fields,
         },
     )
     return LlmConfigResponse(config=_row_to_list_item(row))
@@ -812,3 +981,294 @@ async def list_personas(
     return PersonasResponse(
         personas=[PersonaRow(**dict(r)) for r in rows]
     )
+
+
+# ── Beta-2 phase 0.3 — load + version + rollback surface ──────────────
+
+
+class LlmConfigPromptResponse(BaseModel):
+    id: str
+    agent_role: str
+    system_prompt: Optional[str] = None
+    has_system_prompt: bool
+
+
+@router.get(
+    "/configs/{config_id}/prompt",
+    response_model=LlmConfigPromptResponse,
+    dependencies=[Depends(require_permission_dep("llm_config:write"))],
+)
+async def get_config_prompt(
+    config_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> LlmConfigPromptResponse:
+    """Phase 0.3.1 — writer-gated read of the actual system_prompt body
+    so editors can pre-fill instead of blind-overwriting. Audited as
+    `llm_config.prompt_read`."""
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT id::text         AS id,
+                   agent_role,
+                   system_prompt
+              FROM llm_configs
+             WHERE id = $1::uuid AND client_id = $2::uuid
+            """,
+            config_id,
+            ctx["client_id"],
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_config_id", "value": config_id},
+        )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "config_not_found", "id": config_id},
+        )
+
+    sp = row["system_prompt"]
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="llm_config.prompt_read",
+        target_type="llm_config",
+        target_id=row["id"],
+        metadata={
+            "agentRole": row["agent_role"],
+            "promptChars": len(sp) if sp else 0,
+        },
+    )
+    return LlmConfigPromptResponse(
+        id=row["id"],
+        agent_role=row["agent_role"],
+        system_prompt=sp,
+        has_system_prompt=bool(sp and len(sp) > 0),
+    )
+
+
+class ConfigVersionListItem(BaseModel):
+    id: str
+    version_number: int
+    agent_role: str
+    provider: str
+    model: str
+    enabled: bool
+    has_system_prompt: bool
+    change_action: str
+    change_reason: Optional[str] = None
+    changed_fields: Optional[list[str]] = None
+    created_at: str
+    created_by_user_id: Optional[str] = None
+
+
+class ListConfigVersionsResponse(BaseModel):
+    versions: list[ConfigVersionListItem]
+
+
+@router.get(
+    "/configs/{config_id}/versions",
+    response_model=ListConfigVersionsResponse,
+    dependencies=[Depends(require_permission_dep("llm_config:write"))],
+)
+async def list_config_versions(
+    config_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+    limit: int = 50,
+) -> ListConfigVersionsResponse:
+    """Phase 0.3.3 — list version snapshots for one config, newest first."""
+    limit = max(1, min(int(limit), 200))
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT v.id::text                          AS id,
+                   v.version_number                   AS version_number,
+                   v.agent_role,
+                   v.provider,
+                   v.model,
+                   v.enabled,
+                   (v.system_prompt IS NOT NULL
+                     AND length(v.system_prompt) > 0) AS has_system_prompt,
+                   v.change_action,
+                   v.change_reason,
+                   v.changed_fields,
+                   v.created_at::text                 AS created_at,
+                   v.created_by_user_id::text         AS created_by_user_id
+              FROM llm_config_versions v
+             WHERE v.llm_config_id = $1::uuid
+               AND v.client_id     = $2::uuid
+             ORDER BY v.version_number DESC
+             LIMIT $3
+            """,
+            config_id,
+            ctx["client_id"],
+            limit,
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_config_id", "value": config_id},
+        )
+    return ListConfigVersionsResponse(
+        versions=[ConfigVersionListItem(**dict(r)) for r in rows]
+    )
+
+
+class RollbackRequest(BaseModel):
+    version_id: str = Field(..., min_length=1, max_length=64)
+    change_reason: Optional[str] = Field(None, max_length=2000)
+
+
+@router.post(
+    "/configs/{config_id}/rollback",
+    response_model=LlmConfigResponse,
+    dependencies=[Depends(require_permission_dep("llm_config:write"))],
+)
+async def rollback_config(
+    config_id: str,
+    body: RollbackRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> LlmConfigResponse:
+    """Phase 0.3.3 — pick a prior version and apply it as a NEW mutation.
+
+    The historical version row is NOT mutated. Rollback writes a fresh
+    version row (change_action='rollback', rolled_back_from_version_id
+    set), then UPDATEs llm_configs to match the chosen snapshot's fields.
+    """
+    from llm.config_versioning import (
+        compute_changed_fields,
+        fetch_current_config_row,
+        fetch_version_by_id,
+        snapshot_config_version,
+    )
+
+    target = await fetch_version_by_id(
+        conn, version_id=body.version_id, client_id=ctx["client_id"]
+    )
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "version_not_found", "version_id": body.version_id},
+        )
+    if target["llm_config_id"] != config_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "version_belongs_to_different_config",
+                "version_id": body.version_id,
+                "expected_config_id": config_id,
+                "actual_config_id": target["llm_config_id"],
+            },
+        )
+
+    old = await fetch_current_config_row(
+        conn, config_id=config_id, client_id=ctx["client_id"]
+    )
+    if old is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "config_not_found", "id": config_id},
+        )
+
+    # Apply target's fields to the live row.
+    options_json = target["options"]  # already JSON text from fetch_version_by_id
+    row = await conn.fetchrow(
+        """
+        UPDATE llm_configs
+           SET provider       = $1,
+               model          = $2,
+               base_url       = $3,
+               credential_ref = $4,
+               system_prompt  = $5,
+               options        = $6::jsonb,
+               enabled        = $7,
+               notes          = $8,
+               display_name   = $9,
+               description    = $10,
+               updated_at     = now()
+         WHERE id = $11::uuid AND client_id = $12::uuid
+        RETURNING id::text             AS id,
+                  agent_role,
+                  display_name,
+                  description,
+                  provider,
+                  model,
+                  base_url,
+                  credential_ref,
+                  enabled,
+                  (system_prompt IS NOT NULL
+                    AND length(system_prompt) > 0) AS has_system_prompt
+        """,
+        target["provider"],
+        target["model"],
+        target["base_url"],
+        target["credential_ref"],
+        target["system_prompt"],
+        options_json,
+        target["enabled"],
+        target["notes"],
+        target["display_name"],
+        target["description"],
+        config_id,
+        ctx["client_id"],
+    )
+    assert row is not None  # old read succeeded
+
+    new_row = await fetch_current_config_row(
+        conn, config_id=config_id, client_id=ctx["client_id"]
+    )
+    assert new_row is not None
+    changed_fields = compute_changed_fields(dict(old), dict(new_row))
+    version = await snapshot_config_version(
+        conn,
+        config_row=new_row,
+        change_action="rollback",
+        change_reason=body.change_reason,
+        changed_fields=changed_fields,
+        actor_user_id=ctx["user_id"],
+        rolled_back_from_version_id=target["id"],
+    )
+
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="llm_config.rolled_back",
+        target_type="llm_config",
+        target_id=row["id"],
+        metadata={
+            "agentRole": row["agent_role"],
+            "fromVersionId": target["id"],
+            "fromVersionNumber": target["version_number"],
+            "newVersionNumber": version["version_number"],
+            "changedFields": changed_fields,
+        },
+    )
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="llm_config.versioned",
+        target_type="llm_config_version",
+        target_id=version["id"],
+        metadata={
+            "llmConfigId": row["id"],
+            "agentRole": row["agent_role"],
+            "versionNumber": version["version_number"],
+            "changeAction": "rollback",
+            "rolledBackFromVersionId": target["id"],
+            "changedFields": changed_fields,
+        },
+    )
+    return LlmConfigResponse(config=_row_to_list_item(row))

@@ -394,3 +394,163 @@ def test_watchdog_expire_requires_processing() -> None:
             assert body["cycle_id"] is not None
     finally:
         asyncio.run(_drop_wo(wo_id))
+
+
+# ─── Beta-2 phase 0.1 — requested_outputs on POST /work_orders ──────────
+
+KLEAR_PPTX_TID = "00000000-0000-4000-8000-000010000001"  # klear_pptx_primary
+FFAI_TID = "00000000-0000-4000-8000-000020000002"        # cross-tenant
+
+
+@iwo3_db
+def test_create_wo_with_requested_outputs_persists() -> None:
+    """Happy path: operator supplies output_kind + template_profile_id;
+    server validates, persists requested_outputs jsonb, and emits the
+    work_order.requested_outputs_set audit row."""
+    import asyncio
+    import json as _json
+
+    async def _fetch_audit_and_wo(wo_id: str):
+        url = os.environ["IWO3_DATABASE_URL"]
+        conn = await asyncpg.connect(dsn=url)
+        try:
+            wo_row = await conn.fetchrow(
+                "SELECT requested_outputs::text AS ro FROM work_orders WHERE id = $1::uuid",
+                wo_id,
+            )
+            audit_row = await conn.fetchrow(
+                """
+                SELECT action, target_id,
+                       metadata::text AS metadata
+                  FROM action_audit_log
+                 WHERE target_id = $1
+                   AND action = 'work_order.requested_outputs_set'
+                 ORDER BY created_at DESC LIMIT 1
+                """,
+                wo_id,
+            )
+            return wo_row, audit_row
+        finally:
+            await conn.close()
+
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={
+                "title": "phase-0.1 requested_outputs persist test",
+                "type": "content_brief",
+                "priority": "medium",
+                "correlation_id": "phase-0.1-test-persist",
+                "output_kind": "pptx",
+                "template_profile_id": KLEAR_PPTX_TID,
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 200, r.text
+    wo_id = r.json()["id"]
+    try:
+        wo_row, audit_row = asyncio.run(_fetch_audit_and_wo(wo_id))
+        assert wo_row is not None
+        ro = _json.loads(wo_row["ro"])
+        assert ro["output_kind"] == "pptx"
+        assert ro["template_profile_id"] == KLEAR_PPTX_TID
+        assert audit_row is not None
+        meta = _json.loads(audit_row["metadata"])
+        assert meta["output_kind"] == "pptx"
+        assert meta["template_profile_id"] == KLEAR_PPTX_TID
+    finally:
+        asyncio.run(_drop_wo(wo_id))
+
+
+@iwo3_db
+def test_create_wo_unknown_template_profile_id_returns_422() -> None:
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={
+                "title": "phase-0.1 unknown tid",
+                "type": "content_brief",
+                "priority": "medium",
+                "template_profile_id": "00000000-0000-4000-8000-deadbeefdead",
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 422
+    assert r.json()["detail"]["error"] == "template_profile_not_found"
+
+
+@iwo3_db
+def test_create_wo_output_kind_template_mismatch_returns_422() -> None:
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={
+                "title": "phase-0.1 mismatch",
+                "type": "content_brief",
+                "priority": "medium",
+                "output_kind": "pdf",
+                "template_profile_id": KLEAR_PPTX_TID,
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert detail["error"] == "output_kind_template_mismatch"
+    assert detail["output_kind"] == "pdf"
+    assert detail["template_profile_output_kind"] == "pptx"
+
+
+@iwo3_db
+def test_create_wo_output_kind_alone_unknown_returns_422() -> None:
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={
+                "title": "phase-0.1 unknown kind",
+                "type": "content_brief",
+                "priority": "medium",
+                "output_kind": "nonexistent_kind",
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert detail["error"] == "no_published_template_for_output_kind"
+    assert detail["output_kind"] == "nonexistent_kind"
+
+
+@iwo3_db
+def test_create_wo_cross_tenant_template_returns_not_found() -> None:
+    """Klear context, FFAI's template_profile_id. RLS scopes the lookup
+    to Klear, so the row is invisible — server returns 422
+    template_profile_not_found (not 403; we don't leak existence)."""
+    with TestClient(app) as client:
+        r = client.post(
+            "/work_orders",
+            json={
+                "title": "phase-0.1 cross-tenant",
+                "type": "content_brief",
+                "priority": "medium",
+                "template_profile_id": FFAI_TID,
+            },
+            headers={
+                "X-IWO3-User": KLEAR_OPERATOR,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert detail["error"] == "template_profile_not_found"
+    assert detail["template_profile_id"] == FFAI_TID

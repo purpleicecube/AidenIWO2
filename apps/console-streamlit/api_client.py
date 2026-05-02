@@ -250,18 +250,35 @@ class ApiClient:
         wo_type: str,
         priority: str,
         correlation_id: Optional[str],
+        output_kind: Optional[str] = None,
+        template_profile_id: Optional[str] = None,
     ) -> dict:
-        return self._request(
-            "POST",
-            "/work_orders",
-            json={
-                "title": title,
-                "description": description,
-                "type": wo_type,
-                "priority": priority,
-                "correlation_id": correlation_id,
-            },
-        )
+        body = {
+            "title": title,
+            "description": description,
+            "type": wo_type,
+            "priority": priority,
+            "correlation_id": correlation_id,
+        }
+        if output_kind is not None:
+            body["output_kind"] = output_kind
+        if template_profile_id is not None:
+            body["template_profile_id"] = template_profile_id
+        return self._request("POST", "/work_orders", json=body)
+
+    def list_template_profiles(
+        self,
+        *,
+        status: Optional[str] = "active",
+        output_kind: Optional[str] = None,
+    ) -> list[dict]:
+        params: dict[str, str] = {}
+        if status is not None:
+            params["status"] = status
+        if output_kind is not None:
+            params["output_kind"] = output_kind
+        data = self._request("GET", "/template_profiles", params=params)
+        return data.get("template_profiles", [])
 
     def transition_work_order(
         self, wo_id: str, to: str, reason: Optional[str] = None
@@ -418,6 +435,36 @@ class ApiClient:
             "DELETE", f"/llm/configs/{config_id}", params=params
         )
 
+    # ---- Beta-2 phase 0.3 — load + version + rollback ----
+
+    def get_llm_config_prompt(self, config_id: str) -> dict[str, Any]:
+        """Writer-gated read of the actual system_prompt body for editor pre-fill."""
+        return self._request("GET", f"/llm/configs/{config_id}/prompt")
+
+    def list_llm_config_versions(
+        self, config_id: str, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        data = self._request(
+            "GET",
+            f"/llm/configs/{config_id}/versions",
+            params={"limit": str(limit)},
+        )
+        return data.get("versions", [])
+
+    def rollback_llm_config(
+        self,
+        config_id: str,
+        *,
+        version_id: str,
+        change_reason: Optional[str] = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"version_id": version_id}
+        if change_reason is not None:
+            body["change_reason"] = change_reason
+        return self._request(
+            "POST", f"/llm/configs/{config_id}/rollback", json=body
+        )
+
     # ---- Pre-Beta β.3 — dispatch ----
 
     def dispatch_work_order(
@@ -434,6 +481,11 @@ class ApiClient:
         return self._request(
             "POST", f"/workflows/{execution_id}/run_next_step"
         )
+
+    def render_work_order(self, wo_id: str) -> dict[str, Any]:
+        """Beta-2 phase 0.2 — submit the WO's latest gamma_* output_package
+        to Gamma + create the handoff. Idempotent: 409 if already in flight."""
+        return self._request("POST", f"/work_orders/{wo_id}/render", json={})
 
     # ---- Beta-1 ε.2 — operator chat persistence ----
 

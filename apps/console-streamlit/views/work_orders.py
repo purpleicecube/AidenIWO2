@@ -409,6 +409,52 @@ def main() -> None:
                                     f"⚠️ {r.get('error')}"
                                 )
 
+                if st.button(
+                    "Render via Gamma",
+                    key=f"render-{wo.id}",
+                    help=(
+                        "One-shot dispatch of this WO's latest "
+                        "gamma_*-kinded output_package to Gamma. "
+                        "Use after Tier 2 has produced the package "
+                        "but the auto-dispatch hook didn't fire (or "
+                        "to retry a failed dispatch). The poll worker "
+                        "advances the rest; the WO auto-completes "
+                        "when the handoff lands."
+                    ),
+                ):
+                    with st.spinner("submitting to Gamma…"):
+                        try:
+                            r = api.render_work_order(wo.id)
+                        except APIError as err:
+                            if err.status_code == 404:
+                                st.warning(
+                                    "No gamma_*-kinded output_package on "
+                                    "this WO yet — run Aiden + Tier 2 first."
+                                )
+                            elif err.status_code == 409:
+                                d = err.detail or {}
+                                st.info(
+                                    f"⏸ A handoff is already in flight for "
+                                    f"this package. {d}"
+                                )
+                            else:
+                                st.error(
+                                    f"❌ {err.status_code} — {err.detail}"
+                                )
+                            r = None
+                    if r:
+                        if r.get("ok"):
+                            handoff = r.get("handoff_id")
+                            ext_ref = r.get("external_reference")
+                            st.success(
+                                f"✅ submitted to Gamma — handoff "
+                                f"`{handoff}` (gamma generation "
+                                f"`{ext_ref}`). Poll worker will advance."
+                            )
+                            st.rerun()
+                        else:
+                            st.warning(f"⚠️ {r.get('error')}")
+
                 st.markdown("**Transitions**")
                 legal = SAFE_TRANSITIONS.get(wo.status, [])
                 if not legal:
