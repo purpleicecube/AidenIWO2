@@ -1,11 +1,35 @@
-"""Sub-Agents — Pre-Beta β.6 CRUD parity v1.
+"""Sub-Agents — Loop Eta phase 1 Worker D rebuild toward IWO2 parity.
 
-Browser-side management of `llm_configs` rows: edit provider/model/
-base URL/system prompt/enabled, create new sub-agent rows, soft-delete
-(disable) existing rows. Connection-test still works after edits.
+What changed from Pre-Beta β.6:
+  * Card-grid layout that scales to all 11 IWO2-parity sub-agents
+    (1 aiden_tier_1 + 1 pm_tier_15 + 4 IWO2-Tier-2 imports + 3 parity
+    approximations + 2 net-new).
+  * Provenance badge per card (extracted_from_iwo2_live = green,
+    extracted_from_iwo2_static = blue, authored_parity_approximation
+    = amber, authored_net_new = violet, otherwise "unknown").
+  * Tool Access tab with the global tool_catalog rendered as a
+    checkbox grid; each toggle hits PUT /llm/configs/{id}/tools/{key}.
+  * Runtime Tools tab — chips listing currently-runnable + assigned
+    + enabled tools (mirrors IWO2 RuntimeToolsSummary).
+  * Tool History tab — stub. Spec says "leave a stub" until a
+    structured agent-tool-history endpoint exists.
+  * RBAC banner per write surface (llm_config:write for prompt/connection
+    edits, sub_agent_tool:assign for Tool Access toggles).
 
-The IWO2 modal carries Tool Access + Tool History; those are explicitly
-deferred to MegaLoop Beta per ADR-024 + the Pre-Beta directive.
+Preserved from Pre-Beta β.6:
+  * Persona / system prompt editor with tri-state contract.
+  * Provider/model/base_url/credential_ref edit form.
+  * Version history + rollback button.
+  * Connection test button.
+  * Soft-delete (Disable) button.
+  * "New sub-agent" form below the grid.
+
+Architectural locks honoured:
+  * Consumes the locked APIs only — the 3 new helpers from Worker C
+    plus existing `list_configs`, `update_config`, `get_config_prompt`,
+    `list_versions`, `rollback_config`, `test_llm`, `delete_config`,
+    `create_config`. No speculative endpoints.
+  * No backend / schema / seed mutations — UI only.
 """
 
 from __future__ import annotations
@@ -25,9 +49,17 @@ _ROLE_LABELS = {
     "tom_tier_2": "Tom (decks)",
     "hank_tier_2": "Hank (web)",
     "paul_tier_2": "Paul (deployment)",
+    "jamie_tier_2": "Jamie (EA / scheduling)",
+    "nyx_tier_2": "Nyx (security / compliance)",
+    "polaris_tier_2": "Polaris (ops / SLA)",
+    "darla_tier_2": "Darla (design)",
+    "sop_master_tier_2": "SOP Master (process)",
 }
 
 _PROVIDER_OPTIONS = ["groq", "openrouter", "openai", "anthropic"]
+
+
+# ── small helpers ─────────────────────────────────────────────────────
 
 
 def _credential_chip(state: str, env_name: str | None) -> str:
@@ -38,14 +70,204 @@ def _credential_chip(state: str, env_name: str | None) -> str:
     return "⛔ credential_ref malformed"
 
 
+def _provenance_label(value: str) -> tuple[str, str, str]:
+    """Return (display_text, bg_color, fg_color) for the badge."""
+    if value == "extracted_from_iwo2_live":
+        return ("IWO2 live import", "#DCFCE7", "#166534")
+    if value == "extracted_from_iwo2_static":
+        return ("IWO2 static port", "#DBEAFE", "#1E40AF")
+    if value == "authored_parity_approximation":
+        return ("parity approximation", "#FEF3C7", "#92400E")
+    if value == "authored_net_new":
+        return ("net new", "#EDE9FE", "#5B21B6")
+    return ("unknown provenance", "#E5E7EB", "#374151")
+
+
+def _provenance_badge_html(value: str) -> str:
+    text, bg, fg = _provenance_label(value)
+    return (
+        f'<span style="display:inline-block; padding:2px 8px; '
+        f'border-radius:9999px; background:{bg}; color:{fg}; '
+        f'font-size:0.72rem; font-weight:600;">{text}</span>'
+    )
+
+
+def _provenance_for_config(cfg: dict[str, Any]) -> str:
+    """Best-effort provenance read.
+
+    The current `/llm/configs` response does not surface the
+    `metadata.prompt_provenance` column (Pre-Beta β.6 schema). We read
+    it defensively in case the API evolves later, and otherwise return
+    "unknown" — exactly as the loop spec requires.
+    """
+    meta = cfg.get("metadata") or {}
+    if isinstance(meta, dict):
+        prov = meta.get("prompt_provenance")
+        if isinstance(prov, str) and prov:
+            return prov
+    return "unknown"
+
+
+def _rbac_banner(decision, *, permission: str, action_label: str) -> None:  # noqa: ANN001
+    """Render an inline amber banner explaining why the surface is
+    locked. Mirrors `aiden_settings._rbac_lockout_banner` minus its
+    custom CSS so this view stays self-contained."""
+    if decision.allowed:
+        return
+    st.markdown(
+        f"""
+        <div style="
+          background:#FEF3C7;
+          border:1px solid #F59E0B;
+          border-radius:6px;
+          padding:8px 12px;
+          font-size:0.85rem;
+          color:#92400E;
+          margin:4px 0 12px 0;
+        ">
+          <strong>{action_label} disabled</strong> — your role
+          <code>{decision.role}</code> does not include
+          <code>{permission}</code>. Sign in as a role that carries
+          this permission to make changes.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ── card header (1) ───────────────────────────────────────────────────
+
+
+def _render_card_header(cfg: dict[str, Any]) -> None:
+    """Section 1 — IWO2-style card header.
+
+    Display name, role chip, provider/model chip, status chip,
+    credential chip, provenance badge.
+    """
+    label = _ROLE_LABELS.get(cfg["agent_role"], cfg["agent_role"])
+    status_chip = (
+        '<span style="background:#DCFCE7; color:#166534; padding:2px 8px; '
+        'border-radius:9999px; font-size:0.72rem; font-weight:600;">'
+        'enabled</span>'
+        if cfg["enabled"]
+        else '<span style="background:#E5E7EB; color:#374151; padding:2px 8px; '
+        'border-radius:9999px; font-size:0.72rem; font-weight:600;">disabled</span>'
+    )
+    provider_chip = (
+        f'<span style="background:#CFFAFE; color:#155E75; padding:2px 8px; '
+        f'border-radius:9999px; font-size:0.72rem; font-weight:600;">'
+        f'{cfg["provider"]} / {cfg["model"]}</span>'
+    )
+    role_chip = (
+        f'<span style="background:#F3F4FA; color:#374151; padding:2px 8px; '
+        f'border-radius:9999px; font-size:0.72rem; font-weight:600;">'
+        f'{cfg["agent_role"]}</span>'
+    )
+    prov_chip = _provenance_badge_html(_provenance_for_config(cfg))
+    cred_state = cfg.get("credential_state", "missing")
+    env_name = cfg.get("env_var_name")
+    cred_chip_color = (
+        ("#DCFCE7", "#166534")
+        if cred_state == "set"
+        else ("#FEE2E2", "#991B1B")
+    )
+    cred_text = (
+        f"ENV {env_name} set"
+        if cred_state == "set"
+        else f"ENV {env_name or '?'} {cred_state}"
+    )
+    cred_chip = (
+        f'<span style="background:{cred_chip_color[0]}; color:{cred_chip_color[1]}; '
+        f'padding:2px 8px; border-radius:9999px; font-size:0.72rem; font-weight:600;">'
+        f'{cred_text}</span>'
+    )
+
+    st.markdown(
+        f"""
+        <div style="
+          display:flex; flex-direction:column; gap:6px;
+          padding:4px 0 6px 0;
+        ">
+          <div style="font-size:1.05rem; font-weight:700;">
+            🤖 {cfg["display_name"]}
+            <span style="color:#6B7280; font-weight:500; font-size:0.84rem;">
+              — {label}
+            </span>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+            {status_chip} {role_chip} {provider_chip} {cred_chip} {prov_chip}
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if cfg.get("description"):
+        st.caption(cfg["description"])
+    st.caption(f"id `{cfg['id']}`")
+
+
+# ── persona / connection editor (2 + 3) ───────────────────────────────
+
+
 def _render_edit_form(
-    api,
-    cfg: dict,
-    can_admin: bool,
+    api,  # noqa: ANN001
+    cfg: dict[str, Any],
     *,
+    can_admin: bool,
     form_key: str,
 ) -> None:
+    """Sections 2 + 3 — persona / system prompt + LLM connection.
+
+    Combined under a single "Edit" tab to keep the Streamlit form
+    submission semantics intact. Persona text area sits up top; the
+    provider/model/base_url/credential_ref controls live below.
+    """
+    # Pre-load actual prompt body via the writer-gated /prompt endpoint
+    # so operators see what's there before they rewrite it.
+    current_prompt = ""
+    if can_admin:
+        try:
+            pr = api.get_llm_config_prompt(cfg["id"])
+            current_prompt = pr.get("system_prompt") or ""
+        except APIError as err:
+            st.warning(
+                f"Could not load current prompt: {err.status_code} — {err.detail}"
+            )
+
     with st.form(key=form_key, clear_on_submit=False):
+        st.markdown("**Section 2 — Persona / system prompt**")
+        st.markdown(
+            f"<div style='color:#6B7280; font-size:0.78rem; margin:-6px 0 6px 0;'>"
+            f"{len(current_prompt)} chars currently stored.</div>",
+            unsafe_allow_html=True,
+        )
+        prompt_action = st.radio(
+            "Prompt mutation",
+            options=[
+                "Keep unchanged",
+                "Replace with new prompt",
+                "Clear (reset to default)",
+            ],
+            index=0,
+            horizontal=True,
+            key=f"{form_key}-prompt-action",
+        )
+        system_prompt = st.text_area(
+            "System prompt",
+            value=current_prompt,
+            key=f"{form_key}-prompt",
+            height=200,
+            disabled=prompt_action != "Replace with new prompt",
+        )
+        change_reason = st.text_input(
+            "Change reason (recorded on the version row)",
+            value="",
+            key=f"{form_key}-reason",
+            placeholder="e.g. 'Sharper deck-builder voice for Klear pitches'",
+        )
+
+        st.divider()
+        st.markdown("**Section 3 — LLM connection**")
         col1, col2 = st.columns(2)
         with col1:
             display_name = st.text_input(
@@ -85,54 +307,11 @@ def _render_edit_form(
                 placeholder="leave blank to keep existing",
                 key=f"{form_key}-credref",
             )
-
         description = st.text_area(
             "Description",
             value=cfg.get("description") or "",
             key=f"{form_key}-desc",
             height=70,
-        )
-
-        # Beta-2 phase 0.3.1 — pre-load the actual prompt body via the
-        # writer-gated /prompt endpoint so operators can see + edit
-        # instead of blind-overwriting.
-        current_prompt = ""
-        if can_admin:
-            try:
-                pr = api.get_llm_config_prompt(cfg["id"])
-                current_prompt = pr.get("system_prompt") or ""
-            except APIError as err:
-                st.warning(
-                    f"Could not load current prompt: {err.status_code} — {err.detail}"
-                )
-
-        st.markdown(
-            f"**System Prompt** &nbsp;·&nbsp; "
-            f"<span style='color:#6B7280; font-size:0.8rem;'>"
-            f"{len(current_prompt)} chars currently stored</span>",
-            unsafe_allow_html=True,
-        )
-        prompt_action = st.radio(
-            "What do you want to do with the system prompt?",
-            options=["Keep unchanged", "Replace with new prompt", "Clear (reset to default)"],
-            index=0,
-            horizontal=True,
-            key=f"{form_key}-prompt-action",
-            label_visibility="collapsed",
-        )
-        system_prompt = st.text_area(
-            "System Prompt",
-            value=current_prompt,
-            key=f"{form_key}-prompt",
-            height=180,
-            disabled=prompt_action != "Replace with new prompt",
-            label_visibility="collapsed",
-        )
-        change_reason = st.text_input(
-            "Change reason (optional, recorded in version history)",
-            value="",
-            key=f"{form_key}-reason",
-            placeholder="e.g. 'Sharper deck-builder voice for Klear pitches'",
         )
 
         save = st.form_submit_button(
@@ -151,7 +330,6 @@ def _render_edit_form(
             }
             if credential_ref.strip():
                 patch["credential_ref"] = credential_ref.strip()
-            # Beta-2 phase 0.3.2 tri-state contract.
             if prompt_action == "Replace with new prompt":
                 patch["prompt_action"] = "set"
                 patch["system_prompt"] = system_prompt
@@ -169,14 +347,230 @@ def _render_edit_form(
                 st.error(f"❌ {err.status_code} — {err.detail}")
 
 
-def _render_history_tab(api, cfg: dict, can_admin: bool) -> None:  # noqa: ANN001
-    """Beta-2 phase 0.3.3 — version list + rollback button per row.
+# ── tool access (4) ───────────────────────────────────────────────────
 
-    Shows newest-first version history. Each version row carries
-    change_action / changed_fields / change_reason / actor / timestamp.
-    Rollback button (writer-gated) writes a new mutation that restores
-    the chosen historical state.
+
+def _render_tool_access_tab(
+    api,  # noqa: ANN001
+    cfg: dict[str, Any],
+    *,
+    can_assign: bool,
+) -> None:
+    """Section 4 — Tool Access checkbox grid.
+
+    GET /llm/configs/{id}/tools returns the catalog joined with the
+    sub_agent_tools assignment state (`assigned`, `enabled`). Toggling
+    a checkbox PUTs the new state. Tools whose `runtime_status` is not
+    `runnable` (i.e. skill_only, mcp_pending) are visible but rendered
+    disabled with a tooltip.
     """
+    try:
+        bundle = api.get_sub_agent_tools(cfg["id"])
+    except APIError as err:
+        st.error(f"Could not load tools: {err.status_code} — {err.detail}")
+        return
+
+    tools = bundle.get("tools", [])
+    if not tools:
+        st.caption(
+            "Global tool catalog is empty (or every row is disabled). "
+            "Seed the catalog before assigning."
+        )
+        return
+
+    enabled_count = sum(1 for t in tools if t.get("enabled"))
+    runnable_count = sum(
+        1 for t in tools if t.get("runtime_status") == "runnable"
+    )
+    st.caption(
+        f"{enabled_count} of {len(tools)} catalog rows enabled. "
+        f"{runnable_count} are runtime-runnable."
+    )
+
+    # Group by category for readability — matches IWO2 visual chunking.
+    by_category: dict[str, list[dict[str, Any]]] = {}
+    for tool in tools:
+        by_category.setdefault(tool.get("category", "other"), []).append(tool)
+
+    for category, rows in sorted(by_category.items()):
+        st.markdown(f"**{category}**")
+        for tool in rows:
+            tool_key = tool["tool_key"]
+            display = tool.get("display_name") or tool_key
+            runtime_status = tool.get("runtime_status", "runnable")
+            is_runnable = runtime_status == "runnable"
+            currently_enabled = bool(tool.get("enabled"))
+            is_assigned = bool(tool.get("assigned"))
+            iwo2_origin = tool.get("iwo2_origin")
+            default_tier = tool.get("default_tier")
+
+            cols = st.columns([0.07, 0.55, 0.38])
+            with cols[0]:
+                # Streamlit checkboxes don't support a true tooltip on
+                # disabled checkboxes; use the `help=` arg.
+                disabled_reason = None
+                if not can_assign:
+                    disabled_reason = (
+                        "sub_agent_tool:assign required to toggle"
+                    )
+                elif not is_runnable:
+                    disabled_reason = (
+                        f"runtime_status={runtime_status} — not runnable"
+                    )
+                new_value = st.checkbox(
+                    "",  # label rendered next column for layout control
+                    value=currently_enabled,
+                    key=f"tool-{cfg['id']}-{tool_key}",
+                    disabled=(not can_assign) or (not is_runnable),
+                    label_visibility="collapsed",
+                    help=disabled_reason,
+                )
+            with cols[1]:
+                state_chip = ""
+                if is_assigned and currently_enabled:
+                    state_chip = (
+                        ' <span style="background:#DCFCE7; color:#166534; '
+                        'padding:1px 6px; border-radius:9999px; font-size:0.68rem; '
+                        'font-weight:600;">assigned</span>'
+                    )
+                elif is_assigned and not currently_enabled:
+                    state_chip = (
+                        ' <span style="background:#E5E7EB; color:#374151; '
+                        'padding:1px 6px; border-radius:9999px; font-size:0.68rem; '
+                        'font-weight:600;">soft-revoked</span>'
+                    )
+                runtime_chip = ""
+                if not is_runnable:
+                    runtime_chip = (
+                        f' <span style="background:#FEF3C7; color:#92400E; '
+                        f'padding:1px 6px; border-radius:9999px; font-size:0.68rem; '
+                        f'font-weight:600;">{runtime_status}</span>'
+                    )
+                st.markdown(
+                    f"<span style='font-size:0.86rem; font-weight:500;'>"
+                    f"{display}</span>"
+                    f"<code style='font-size:0.7rem; color:#6B7280; "
+                    f"margin-left:6px;'>{tool_key}</code>"
+                    f"{state_chip}{runtime_chip}",
+                    unsafe_allow_html=True,
+                )
+            with cols[2]:
+                bits: list[str] = []
+                if default_tier:
+                    bits.append(f"`{default_tier}`")
+                if iwo2_origin:
+                    bits.append(f"iwo2:{iwo2_origin}")
+                st.caption(" · ".join(bits) if bits else "—")
+
+            # Apply toggle if state changed (Streamlit reruns on every
+            # widget interaction; this catches the change before rerun).
+            if (
+                can_assign
+                and is_runnable
+                and new_value != currently_enabled
+            ):
+                try:
+                    api.set_sub_agent_tool(
+                        cfg["id"],
+                        tool_key,
+                        enabled=new_value,
+                        notes=None,
+                    )
+                    if new_value:
+                        st.toast(f"Granted {tool_key}", icon="✅")
+                    else:
+                        st.toast(f"Revoked {tool_key}", icon="🛑")
+                    st.rerun()
+                except APIError as err:
+                    st.error(
+                        f"Could not toggle {tool_key}: "
+                        f"{err.status_code} — {err.detail}"
+                    )
+        st.markdown("")
+
+
+# ── runtime tools (5) ─────────────────────────────────────────────────
+
+
+def _render_runtime_tools_tab(
+    api,  # noqa: ANN001
+    cfg: dict[str, Any],
+) -> None:
+    """Section 5 — Runtime Tools chips.
+
+    Mirrors IWO2 RuntimeToolsSummary: the set of tools the agent will
+    actually receive at execution time, derived from the same join
+    backend. Filter: runnable AND assigned AND enabled.
+    """
+    try:
+        bundle = api.get_sub_agent_tools(cfg["id"])
+    except APIError as err:
+        st.error(f"Could not load runtime tools: {err.status_code} — {err.detail}")
+        return
+
+    tools = bundle.get("tools", [])
+    runtime_tools = [
+        t
+        for t in tools
+        if t.get("runtime_status") == "runnable"
+        and t.get("assigned")
+        and t.get("enabled")
+    ]
+
+    if not runtime_tools:
+        st.warning(
+            "No runtime tools currently bound to this sub-agent. The "
+            "agent will execute with zero tool access until an admin "
+            "assigns tools in the Tool Access tab."
+        )
+        return
+
+    st.success(
+        f"{len(runtime_tools)} tool(s) will be available at execution time."
+    )
+    chip_html = " ".join(
+        f'<span style="display:inline-block; background:#DCFCE7; '
+        f'color:#166534; padding:3px 10px; border-radius:9999px; '
+        f'font-size:0.78rem; font-weight:600; margin:2px 4px 2px 0;">'
+        f'{t.get("display_name") or t["tool_key"]}'
+        f'</span>'
+        for t in runtime_tools
+    )
+    st.markdown(chip_html, unsafe_allow_html=True)
+
+
+# ── tool history (6) ──────────────────────────────────────────────────
+
+
+def _render_tool_history_tab(cfg: dict[str, Any]) -> None:
+    """Section 6 — Tool History.
+
+    The loop spec explicitly authorises a stub here:
+    "The history table is OPTIONAL for this loop — leave a stub
+    'Coming soon' if the API isn't easy to query."
+
+    A structured per-agent tool-call history endpoint does not exist
+    yet (action_audit_log holds the data but is not exposed scoped to
+    a single sub-agent). Will be wired once the audit query surface
+    grows.
+    """
+    st.info(
+        "**Tool History — coming soon.** Per-agent tool-call history "
+        "lands when the audit log gains a `target_id=llm_config` filter. "
+        f"Today, see the global Audit Log page filtered by "
+        f"`agent_role={cfg['agent_role']}` for adjacent visibility."
+    )
+
+
+# ── version history (preserved from β.6) ──────────────────────────────
+
+
+def _render_history_tab(  # noqa: ANN001
+    api,
+    cfg: dict[str, Any],
+    can_admin: bool,
+) -> None:
+    """Preserved from Pre-Beta β.6 — version + rollback list."""
     try:
         versions = api.list_llm_config_versions(cfg["id"], limit=50)
     except APIError as err:
@@ -222,7 +616,8 @@ def _render_history_tab(api, cfg: dict, can_admin: bool) -> None:  # noqa: ANN00
             if st.button(
                 "Rollback to this",
                 key=f"rb-{cfg['id']}-{v['id']}",
-                disabled=not can_admin or action == "initial" and v_num == 1 and len(versions) == 1,
+                disabled=not can_admin
+                or (action == "initial" and v_num == 1 and len(versions) == 1),
                 use_container_width=True,
             ):
                 try:
@@ -238,7 +633,65 @@ def _render_history_tab(api, cfg: dict, can_admin: bool) -> None:  # noqa: ANN00
         st.markdown("---")
 
 
-def _render_new_form(api, can_admin: bool) -> None:
+# ── connection test (preserved) ───────────────────────────────────────
+
+
+def _render_test_tab(  # noqa: ANN001
+    api,
+    cfg: dict[str, Any],
+    can_admin: bool,
+) -> None:
+    if st.button(
+        "Run connection test",
+        key=f"test-{cfg['id']}",
+        disabled=not can_admin,
+    ):
+        with st.spinner("calling provider…"):
+            try:
+                r = api.test_llm(agent_role=cfg["agent_role"])
+            except APIError as err:
+                st.error(f"❌ {err.status_code} — {err.detail}")
+                r = None
+        if r:
+            if r.get("ok"):
+                st.success(
+                    f"✅ {r['provider']}/{r['model']} · "
+                    f"{r['latency_ms']}ms"
+                )
+                if r.get("sample"):
+                    st.caption(f"Sample: {r['sample']}")
+            else:
+                st.warning(f"⚠️ {r.get('error')}")
+
+
+# ── disable (preserved) ───────────────────────────────────────────────
+
+
+def _render_disable_tab(  # noqa: ANN001
+    api,
+    cfg: dict[str, Any],
+    can_admin: bool,
+) -> None:
+    if cfg["enabled"]:
+        if st.button(
+            f"Disable {cfg['display_name']}",
+            key=f"del-{cfg['id']}",
+            disabled=not can_admin,
+        ):
+            try:
+                api.delete_llm_config(cfg["id"])
+                st.success("Disabled.")
+                st.rerun()
+            except APIError as err:
+                st.error(f"❌ {err.detail}")
+    else:
+        st.caption("Already disabled. Re-enable via the Edit tab.")
+
+
+# ── new sub-agent form (preserved from β.6) ───────────────────────────
+
+
+def _render_new_form(api, can_admin: bool) -> None:  # noqa: ANN001
     with st.form(key="new-subagent", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -256,7 +709,8 @@ def _render_new_form(api, can_admin: bool) -> None:
             )
         with col2:
             base_url = st.text_input(
-                "Base URL (optional)", placeholder="leave blank for provider default"
+                "Base URL (optional)",
+                placeholder="leave blank for provider default",
             )
             credential_ref = st.text_input(
                 "Credential ref",
@@ -264,9 +718,7 @@ def _render_new_form(api, can_admin: bool) -> None:
             )
             enabled = st.toggle("Enabled", value=True)
         description = st.text_area("Description", height=70)
-        system_prompt = st.text_area(
-            "System prompt (optional)", height=140
-        )
+        system_prompt = st.text_area("System prompt (optional)", height=140)
         submit = st.form_submit_button(
             "Create sub-agent", type="primary", disabled=not can_admin
         )
@@ -292,13 +744,30 @@ def _render_new_form(api, can_admin: bool) -> None:
                 st.error(f"❌ {err.status_code} — {err.detail}")
 
 
+# ── main entry point ──────────────────────────────────────────────────
+
+
+def _agent_role_sort_key(cfg: dict[str, Any]) -> tuple[int, str]:
+    """Order tier_1 first, tier_15 second, tier_2 alphabetical."""
+    role = cfg["agent_role"]
+    if role == "aiden_tier_1":
+        return (0, role)
+    if role == "pm_tier_15":
+        return (1, role)
+    return (2, role)
+
+
 def main() -> None:
     st.markdown(
         """
-        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">Sub-Agents</h2>
+        <h2 style="margin:0 0 2px 0; font-size:1.5rem; font-weight:700;">
+          Sub-Agents
+        </h2>
         <div style="color:#6B7280; font-size:0.86rem; margin-bottom:14px;">
-          Tier-1 / Tier-1.5 / Tier-2 LLM configs. Edit provider, model,
-          base URL, system prompt, enabled. New rows can be added below.
+          Tier-1 / Tier-1.5 / Tier-2 LLM configs with IWO2-parity
+          surface — persona editor, LLM connection, Tool Access grid,
+          Runtime Tools chips, version history. Provenance badges show
+          where each sub-agent's prompt actually came from.
         </div>
         """,
         unsafe_allow_html=True,
@@ -310,18 +779,31 @@ def main() -> None:
 
     try:
         configs = api.list_llm_configs()
-        # Beta-2 phase 0.3.5 RBAC fix — gate on llm_config:write (CODEX
-        # 2026-05-01 finding 5). Connection-test gates on the same.
         can_admin = api.check_permission("llm_config:write")
+        can_assign = api.check_permission("sub_agent_tool:assign")
     except APIError as err:
         st.error(f"❌ {err.status_code} — {err.detail}")
         return
 
-    if not can_admin.allowed:
+    # Top-of-page combined banner so operators understand which surfaces
+    # are locked before they click in.
+    if not can_admin.allowed and not can_assign.allowed:
         st.info(
-            f"Your role `{can_admin.role}` lacks `llm_config:write`. "
-            f"Edit + create + connection-test are disabled; read remains "
-            f"available."
+            f"Your role `{can_admin.role}` lacks both `llm_config:write` "
+            f"and `sub_agent_tool:assign`. Edit / create / connection-test "
+            f"and Tool Access toggles are disabled; read remains available."
+        )
+    elif not can_admin.allowed:
+        _rbac_banner(
+            can_admin,
+            permission="llm_config:write",
+            action_label="Persona / connection edit",
+        )
+    elif not can_assign.allowed:
+        _rbac_banner(
+            can_assign,
+            permission="sub_agent_tool:assign",
+            action_label="Tool Access toggles",
         )
 
     if not configs:
@@ -329,75 +811,63 @@ def main() -> None:
             "No LLM configs for this tenant yet — use the New Sub-Agent "
             "form below to create the first one."
         )
+        return
 
-    for cfg in sorted(configs, key=lambda c: c["agent_role"]):
-        label = _ROLE_LABELS.get(cfg["agent_role"], cfg["agent_role"])
-        chip = "🟢" if cfg["enabled"] else "⚪"
-        cred_chip = _credential_chip(
-            cfg["credential_state"], cfg.get("env_var_name")
-        )
-        with st.expander(
-            f"{chip} **{cfg['display_name']}** "
-            f"({cfg['agent_role']}) — `{cfg['provider']}` / `{cfg['model']}`",
-            expanded=False,
-        ):
-            st.caption(f"id `{cfg['id']}` · {cred_chip}")
-            if cfg.get("description"):
-                st.caption(cfg["description"])
+    # Card grid — two cards per row. Streamlit's column system isn't a
+    # true CSS grid but it's the closest IWO2-feeling layout we have.
+    sorted_configs = sorted(configs, key=_agent_role_sort_key)
+    st.markdown(
+        f"<div style='color:#6B7280; font-size:0.82rem; margin:6px 0;'>"
+        f"{len(sorted_configs)} sub-agent(s) for this tenant.</div>",
+        unsafe_allow_html=True,
+    )
 
-            tabs = st.tabs(["Edit", "History", "Test connection", "Disable"])
-            with tabs[0]:
-                _render_edit_form(
-                    api,
-                    cfg,
-                    can_admin.allowed,
-                    form_key=f"edit-{cfg['id']}",
-                )
-            with tabs[1]:
-                _render_history_tab(api, cfg, can_admin.allowed)
-            with tabs[2]:
-                if st.button(
-                    "Run connection test",
-                    key=f"test-{cfg['id']}",
-                    disabled=not can_admin.allowed,
-                ):
-                    with st.spinner("calling provider…"):
-                        try:
-                            r = api.test_llm(
-                                agent_role=cfg["agent_role"]
+    for i in range(0, len(sorted_configs), 2):
+        row = sorted_configs[i : i + 2]
+        cols = st.columns(len(row))
+        for col, cfg in zip(cols, row):
+            with col:
+                with st.container(border=True):
+                    _render_card_header(cfg)
+                    with st.expander("Open editor", expanded=False):
+                        tabs = st.tabs(
+                            [
+                                "Edit",
+                                "Tool Access",
+                                "Runtime",
+                                "Tool History",
+                                "Versions",
+                                "Test",
+                                "Disable",
+                            ]
+                        )
+                        with tabs[0]:
+                            _render_edit_form(
+                                api,
+                                cfg,
+                                can_admin=can_admin.allowed,
+                                form_key=f"edit-{cfg['id']}",
                             )
-                        except APIError as err:
-                            st.error(
-                                f"❌ {err.status_code} — {err.detail}"
+                        with tabs[1]:
+                            _render_tool_access_tab(
+                                api, cfg, can_assign=can_assign.allowed
                             )
-                            r = None
-                    if r:
-                        if r.get("ok"):
-                            st.success(
-                                f"✅ {r['provider']}/{r['model']} · "
-                                f"{r['latency_ms']}ms"
+                        with tabs[2]:
+                            _render_runtime_tools_tab(api, cfg)
+                        with tabs[3]:
+                            _render_tool_history_tab(cfg)
+                        with tabs[4]:
+                            _render_history_tab(
+                                api, cfg, can_admin.allowed
                             )
-                            if r.get("sample"):
-                                st.caption(f"Sample: {r['sample']}")
-                        else:
-                            st.warning(f"⚠️ {r.get('error')}")
-            with tabs[3]:
-                if cfg["enabled"]:
-                    if st.button(
-                        f"Disable {cfg['display_name']}",
-                        key=f"del-{cfg['id']}",
-                        disabled=not can_admin.allowed,
-                    ):
-                        try:
-                            api.delete_llm_config(cfg["id"])
-                            st.success("Disabled.")
-                            st.rerun()
-                        except APIError as err:
-                            st.error(f"❌ {err.detail}")
-                else:
-                    st.caption(
-                        "Already disabled. Re-enable via the Edit tab."
-                    )
+                        with tabs[5]:
+                            _render_test_tab(
+                                api, cfg, can_admin.allowed
+                            )
+                        with tabs[6]:
+                            _render_disable_tab(
+                                api, cfg, can_admin.allowed
+                            )
 
     st.divider()
     with st.expander("➕ New sub-agent", expanded=False):
