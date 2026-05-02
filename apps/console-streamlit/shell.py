@@ -241,6 +241,8 @@ _CSS = """
   .iwo3-chip.amber  { background: #FEF3C7; color: #92400E; }
   .iwo3-chip.red    { background: #FEE2E2; color: #991B1B; }
   .iwo3-chip.gray   { background: #F3F4F6; color: #374151; }
+  .iwo3-chip.violet { background: #EDE9FE; color: #6D28D9; }
+  .iwo3-chip.sky    { background: #E0F2FE; color: #0369A1; }
 
   /* ── Streamlit button — align to IWO2 primary-blue pill ── */
   .stButton > button[kind="primary"], [data-testid="stPageLink"] button {

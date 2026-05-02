@@ -129,6 +129,12 @@ def _tier_card(
 def _status_chip_class(status: str) -> str:
     if status in ("completed", "done"):
         return "iwo3-chip green"
+    if status == "reopened":
+        return "iwo3-chip violet"
+    if status in ("deferred",):
+        return "iwo3-chip sky"
+    if status in ("cancelled", "archived"):
+        return "iwo3-chip gray"
     if status == "failed":
         return "iwo3-chip red"
     if status in ("blocked", "awaiting_operator"):
@@ -149,6 +155,7 @@ _STATUS_GLYPH: dict[str, str] = {
     "pending": "●",
     "cancelled": "—",
     "deferred": "⊙",
+    "archived": "□",
 }
 
 

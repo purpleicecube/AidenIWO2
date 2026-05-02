@@ -129,6 +129,46 @@ def _state_chip(status: str) -> str:
     return f"{_STATUS_EMOJI.get(status, '⚫')} `{status}`"
 
 
+def _status_chip_class(status: str) -> str:
+    if status in ("completed", "done"):
+        return "iwo3-chip green"
+    if status == "reopened":
+        return "iwo3-chip violet"
+    if status in ("deferred",):
+        return "iwo3-chip sky"
+    if status in ("cancelled", "archived"):
+        return "iwo3-chip gray"
+    if status == "failed":
+        return "iwo3-chip red"
+    if status in ("blocked", "awaiting_operator"):
+        return "iwo3-chip amber"
+    return "iwo3-chip blue"
+
+
+def _priority_chip_class(priority: str) -> str:
+    if priority == "critical":
+        return "iwo3-chip red"
+    if priority == "high":
+        return "iwo3-chip amber"
+    return "iwo3-chip blue"
+
+
+def _status_chip_html(status: str) -> str:
+    label = status.replace("_", " ")
+    emoji = _STATUS_EMOJI.get(status, "⚫")
+    return (
+        f'<span class="{_status_chip_class(status)}">'
+        f"<span>{emoji}</span>{label}</span>"
+    )
+
+
+def _priority_chip_html(priority: str) -> str:
+    return (
+        f'<span class="{_priority_chip_class(priority)}">'
+        f"{priority}</span>"
+    )
+
+
 def _aiden_decision_card(audit_rows: list[Any]) -> None:
     """Surface the most recent Aiden Tier-1 decision at the top of the
     Lifecycle tab so operators can see what Aiden chose without reading
@@ -163,7 +203,17 @@ def _render_lifecycle(wo: Any, audit_rows: list[Any]) -> None:
         return
 
     _aiden_decision_card(audit_rows)
-    st.markdown(f"**Current state:** {_state_chip(wo.status)}")
+    st.markdown(
+        " ".join(
+            [
+                "**Current state:**",
+                _status_chip_html(wo.status),
+                "&nbsp;&nbsp;**Priority:**",
+                _priority_chip_html(wo.priority),
+            ]
+        ),
+        unsafe_allow_html=True,
+    )
 
     st.markdown("**What happened**")
     for row in audit_rows[:6]:
@@ -350,6 +400,10 @@ def main() -> None:
             f"**{wo.title}** — {_state_chip(wo.status)} · priority `{wo.priority}`",
             expanded=is_focused,
         ):
+            st.markdown(
+                f"{_status_chip_html(wo.status)} &nbsp;&nbsp; {_priority_chip_html(wo.priority)}",
+                unsafe_allow_html=True,
+            )
             col_meta, col_actions = st.columns([2, 1])
             with col_meta:
                 st.markdown(f"**ID:** `{wo.id}`")
