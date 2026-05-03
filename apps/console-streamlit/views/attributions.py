@@ -21,7 +21,7 @@ _ENTRIES: list[dict[str, Any]] = [
         "subtitle": "LuaAzullaB orchestration framework",
         "badge": ("Proprietary", "red"),
         "icon": "◫",
-        "author": "Darrel Vaughn",
+        "author": "Thomas C. Appling III",
         "organization": "10Touros / LuaAzullaB",
         "category": "Foundational Lineage",
         "period": "Mid-2024 to Aug 2025",
@@ -109,39 +109,87 @@ _ENTRIES: list[dict[str, Any]] = [
         ),
     },
     {
-        "name": "Aiden Zephyr / TIB",
-        "subtitle": "Spec-level agent architecture and sub-agent lineage",
-        "badge": ("Internal", "gray"),
-        "icon": "⟡",
-        "author": "Darrel Vaughn",
-        "organization": "LuaAzullaB / AIDEN",
-        "category": "Foundational Lineage",
-        "period": "2024-2025",
-        "origin": (
-            "Aiden Zephyr/TIB represents the spec-level evolution of "
-            "sub-agent identity, delegation logic, and role-driven "
-            "cognition within the broader AIDEN family. It shaped the "
-            "internal logic of role specialization, routing, and governed "
-            "execution."
-        ),
-        "core_concept": (
-            "Its main contribution is the formalization of agent identity, "
-            "delegation boundaries, and specialized sub-agent roles. These "
-            "ideas are reflected in IWO3’s Tier 1 / Tier 1.5 / Tier 2 "
-            "structure and selective capability assignment model."
-        ),
-        "timeline": [
-            ("2024", "sub-agent specialization patterns began forming"),
-            ("2025", "role identity and delegation architecture became more explicit"),
-            ("2025 onward", "integrated into the broader IWO successor direction"),
+        "name": "Aiden Zephyr & TIB",
+        "subtitle": "Thomas C. Appling III / FF.AI",
+        "badge": ("Creative Attribution", "blue"),
+        "icon": "✧",
+        "metadata_rows": [
+            ("Contributor", "Thomas C. Appling III"),
+            ("Organization", "Freedom Forge AI (FF.AI)"),
+            ("Type", "Creative inspiration & conceptual framing"),
         ],
         "license_notice": (
-            "This architecture is treated as internal/proprietary product "
-            "architecture unless separately released."
+            "The Aiden Zephyr concept and TIB (The Internal Brain) "
+            "framework are attributed to Thomas C. Appling III and the "
+            "Freedom Forge AI (FF.AI) as creative and collaborative "
+            "contributions. These are acknowledged as inspirational and "
+            "collaborative inputs, not code-level dependencies. No "
+            "open-source license applies. Attribution is granted in "
+            "recognition of creative influence and collaborative "
+            "development of agent identity, persona design, and cognitive "
+            "architecture framing within the PDOE ecosystem."
+        ),
+        "license_panel_tone": "rose",
+        "origin_heading": "Contributor & Source",
+        "origin": (
+            "Thomas C. Appling III introduced the “Aiden Zephyr” agent "
+            "concept and later contributed The Internal Brain (TIB) "
+            "framework through his work with FF.AI. These ideas shaped the "
+            "identity, persona, and cognitive architecture of the Aiden "
+            "agent within PDOE. Note: Darrel Vaughn’s multi-agent "
+            "orchestration framework (Agent Commander, later "
+            "AgentGoPro/AgentGoFlow) was already in active planning and "
+            "development prior to the introduction of the Aiden Zephyr "
+            "concept."
+        ),
+        "core_heading": "Core Contribution",
+        "core_concept": (
+            "Two distinct contributions: (1) Aiden Zephyr — the original "
+            "agent identity concept that became “Aiden” in PDOE’s Tier 1 "
+            "executive orchestrator. Appling’s vision gave the agent its "
+            "name, persona, and early character as an autonomous reasoning "
+            "entity. (2) The Internal Brain (TIB) — a cognitive "
+            "architecture concept contributed through FF.AI that informed "
+            "how Aiden processes, reasons, and maintains internal state. "
+            "TIB influenced the design of Aiden’s executive decision-"
+            "making layer within the two-tier PDOE architecture. The "
+            "current implementation of the AIDEN_IWO supports the TIB "
+            "framework but is by design — not limited to it."
+        ),
+        "timeline_heading": "Timeline & Precedence",
+        "timeline_note_title": "PRECEDENCE NOTE",
+        "timeline_note_body": (
+            "Darrel Vaughn began Agent Commander (multi-agent "
+            "orchestration framework) architecture planning in early - mid "
+            "(Jun) 2024, with prompt language, infrastructure, and "
+            "multi-agent team structure built through Aug 2024 — most of "
+            "this work prior to the introduction of the Aiden Zephyr "
+            "concept."
+        ),
+        "timeline": [
+            ("Late 2024", "Aiden Zephyr agentic concepts evolved (Appling)"),
+            ("Mar 17, 2025", "“Aiden Zephyr” reference email from Thomas C. Appling III"),
+        ],
+        "timeline_tail": (
+            "The Aiden Zephyr identity and FF.AI / TIB concepts were "
+            "introduced subsequent to Vaughn’s foundational orchestration "
+            "work and were integrated into the already-established multi-"
+            "agent architecture as creative and conceptual enhancements."
         ),
         "attribution_statement": (
-            "IWO3 acknowledges Aiden Zephyr/TIB as a direct lineage source "
-            "for its role-based sub-agent system and delegation structure."
+            "LuaAzullaB / PDOE framework gratefully acknowledges Thomas C. "
+            "Appling III and the Freedom Forge AI (FF.AI) for the creative "
+            "inspiration behind the Aiden agent identity — originally "
+            "conceived as “Aiden Zephyr” — and for the conceptual "
+            "contributions of The Internal Brain (TIB) cognitive "
+            "architecture framework. These contributions shaped the "
+            "persona, identity, and reasoning character of Aiden as PDOE’s "
+            "Tier 1 executive orchestrator. It is expressly noted that "
+            "Darrel Vaughn’s multi-agent orchestration framework (Agent "
+            "Commander / AgentGoPro/AgentGoFlow) was already in active "
+            "planning and development prior to the introduction of the "
+            "Aiden Zephyr concept — the creative identity was layered onto "
+            "an existing architectural foundation."
         ),
     },
     {
@@ -449,6 +497,7 @@ _CSS = """
   .iwo3-attr-badge.green { background: #D1FAE5; color: #065F46; }
   .iwo3-attr-badge.violet { background: #EDE9FE; color: #6D28D9; }
   .iwo3-attr-badge.gray { background: #F3F4F6; color: #374151; }
+  .iwo3-attr-badge.blue { background: #2563EB; color: #FFFFFF; }
   .iwo3-attr-grid {
     display: grid;
     grid-template-columns: 140px 1fr;
@@ -508,6 +557,10 @@ _CSS = """
     background: #FFFBEB;
     border: 1px solid #FDE68A;
   }
+  .iwo3-attr-panel.rose {
+    background: #FFF1F2;
+    border: 1px solid #FBCFE8;
+  }
   .iwo3-attr-panel.note {
     background: #F9FAFB;
     border: 1px solid #E5E7EB;
@@ -544,6 +597,33 @@ def _render_timeline(rows: list[tuple[str, str]]) -> str:
 
 def _render_entry(entry: dict[str, Any]) -> None:
     badge_label, badge_color = entry["badge"]
+    metadata_rows = entry.get(
+        "metadata_rows",
+        [
+            ("Author", entry["author"]),
+            ("Organization", entry["organization"]),
+            ("Category", entry["category"]),
+            ("Period", entry["period"]),
+        ],
+    )
+    metadata_html = "".join(
+        f'<div class="k">{_esc(label)}</div><div class="v">{_esc(value)}</div>'
+        for label, value in metadata_rows
+    )
+    timeline_note_html = ""
+    if entry.get("timeline_note_title") and entry.get("timeline_note_body"):
+        timeline_note_html = (
+            f'<div class="iwo3-attr-panel rose">'
+            f'<h4>{_esc(entry["timeline_note_title"])}</h4>'
+            f'<div class="copy">{_esc(entry["timeline_note_body"])}</div>'
+            f'</div>'
+        )
+    timeline_tail_html = ""
+    if entry.get("timeline_tail"):
+        timeline_tail_html = (
+            f'<div class="iwo3-attr-copy" style="margin-top:12px;">'
+            f'{_esc(entry["timeline_tail"])}</div>'
+        )
     st.markdown(
         f"""
         <div class="iwo3-attr-card">
@@ -559,28 +639,27 @@ def _render_entry(entry: dict[str, Any]) -> None:
           </div>
 
           <div class="iwo3-attr-grid">
-            <div class="k">Author</div><div class="v">{_esc(entry["author"])}</div>
-            <div class="k">Organization</div><div class="v">{_esc(entry["organization"])}</div>
-            <div class="k">Category</div><div class="v">{_esc(entry["category"])}</div>
-            <div class="k">Period</div><div class="v">{_esc(entry["period"])}</div>
+            {metadata_html}
           </div>
 
           <div class="iwo3-attr-section">
-            <h4>Creator &amp; Origin</h4>
+            <h4>{_esc(entry.get("origin_heading", "Creator & Origin"))}</h4>
             <div class="iwo3-attr-copy">{_esc(entry["origin"])}</div>
           </div>
 
           <div class="iwo3-attr-section">
-            <h4>Core Concept</h4>
+            <h4>{_esc(entry.get("core_heading", "Core Concept"))}</h4>
             <div class="iwo3-attr-copy">{_esc(entry["core_concept"])}</div>
           </div>
 
           <div class="iwo3-attr-section">
-            <h4>Timeline &amp; Lineage</h4>
+            <h4>{_esc(entry.get("timeline_heading", "Timeline & Lineage"))}</h4>
+            {timeline_note_html}
             {_render_timeline(entry["timeline"])}
+            {timeline_tail_html}
           </div>
 
-          <div class="iwo3-attr-panel warn">
+          <div class="iwo3-attr-panel {entry.get("license_panel_tone", "warn")}">
             <h4>License Notice</h4>
             <div class="copy">{_esc(entry["license_notice"])}</div>
           </div>
