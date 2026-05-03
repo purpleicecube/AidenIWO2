@@ -468,7 +468,7 @@ def render_sidebar_footer() -> None:
             <div class="role">{tenant_label}<span class="iwo3-chip-admin">{role}</span></div>
           </div>
         </div>
-        <div class="iwo3-footer">AIDEN_IWO3 v0.8.3</div>
+        <div class="iwo3-footer">AIDEN_IWO3 v1.2.3</div>
         """,
         unsafe_allow_html=True,
     )
