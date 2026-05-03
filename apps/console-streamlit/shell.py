@@ -14,6 +14,9 @@ not locally installed).
 from __future__ import annotations
 
 import os
+from base64 import b64encode
+from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 
 import streamlit as st
@@ -128,6 +131,10 @@ _CSS = """
     flex-shrink: 0;
   }
   .iwo3-brand .mark svg { width: 24px; height: 24px; display: block; }
+  .iwo3-brand .mark img {
+    width: 24px; height: 24px; display: block;
+    object-fit: contain;
+  }
   .iwo3-brand .name {
     font-weight: 700; color: #111827; line-height: 1.15;
     letter-spacing: -0.01em; font-size: 0.98rem;
@@ -330,22 +337,22 @@ def clear_auth_session() -> None:
         st.session_state.pop(key, None)
 
 
-def _brand_block_html(tenant_short: str) -> str:
-    """IWO2-style identity block: blue square with white layers SVG +
-    'AIDEN_IWO3 | <tenant>' headline + 'Orchestration Engine' subtitle."""
-    layers_svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-        'fill="none" stroke="currentColor" stroke-width="1.8" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        '<polygon points="12 2 2 7 12 12 22 7 12 2"/>'
-        '<polyline points="2 17 12 22 22 17"/>'
-        '<polyline points="2 12 12 17 22 12"/>'
-        '</svg>'
+@lru_cache(maxsize=1)
+def _brand_mark_img() -> str:
+    icon_path = Path(__file__).parent / "assets" / "favicon.png"
+    data = b64encode(icon_path.read_bytes()).decode("ascii")
+    return (
+        f'<img src="data:image/png;base64,{data}" '
+        'alt="AIDEN IWO3 mark" />'
     )
+
+
+def _brand_block_html(tenant_short: str) -> str:
+    """IWO2-style identity block using the shared favicon asset."""
     return (
         '<a class="iwo3-brand-link" href="/" target="_self">'
         '<div class="iwo3-brand">'
-        f'<div class="mark">{layers_svg}</div>'
+        f'<div class="mark">{_brand_mark_img()}</div>'
         '<div>'
         f'<div class="name">AIDEN_IWO3<span class="tenant">|</span>'
         f'<span style="font-weight:500;color:#374151;">{tenant_short}</span></div>'

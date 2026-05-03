@@ -11,6 +11,7 @@ from api_client import APIError, ApiClient
 from shell import (
     SEED_USERS,
     TENANT_LABELS,
+    _brand_mark_img,
     clear_auth_session,
     render_sidebar_footer,
     render_sidebar_shell,
@@ -332,18 +333,6 @@ _LANDING_CSS = """
 """
 
 
-def _layers_svg() -> str:
-    return (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-        'fill="none" stroke="currentColor" stroke-width="1.8" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        '<polygon points="12 2 2 7 12 12 22 7 12 2"/>'
-        '<polyline points="2 17 12 22 22 17"/>'
-        '<polyline points="2 12 12 17 22 12"/>'
-        '</svg>'
-    )
-
-
 def _set_dev_session(*, base_url: str, user_label: str) -> None:
     user_id, client_id, role = SEED_USERS[user_label]
     api = ApiClient(base_url=base_url, user_id=user_id, client_id=client_id)
@@ -412,7 +401,7 @@ def _render_public_landing() -> None:
             '<div class="iwo3-topbar">'
             '<div class="iwo3-topbar-inner">'
             '<div class="iwo3-topbar-brand">'
-            f'<div class="iwo3-brand-mark">{_layers_svg()}</div>'
+            f'<div class="iwo3-brand-mark">{_brand_mark_img()}</div>'
             '<div>'
             f'<div class="iwo3-brand-name">AIDEN_IWO3 | {_DEFAULT_TENANT_LABEL.split("|", 1)[-1].strip()}</div>'
             '<div class="iwo3-brand-sub">Orchestration Engine</div>'
