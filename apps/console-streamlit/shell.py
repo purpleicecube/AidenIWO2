@@ -244,6 +244,36 @@ _CSS = """
   .iwo3-chip.violet { background: #EDE9FE; color: #6D28D9; }
   .iwo3-chip.sky    { background: #E0F2FE; color: #0369A1; }
 
+  /* ── Compact stat strip ── */
+  .iwo3-stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .iwo3-stat {
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+    padding: 12px 14px;
+    min-width: 0;
+  }
+  .iwo3-stat .k {
+    color: #6B7280;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  .iwo3-stat .v {
+    color: #111827;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+  }
+
   /* ── Streamlit button — align to IWO2 primary-blue pill ── */
   .stButton > button[kind="primary"], [data-testid="stPageLink"] button {
     background: #2563EB !important; color: white !important;

@@ -584,6 +584,7 @@ def _render_authenticated_console() -> None:
         ],
         "Architecture": [
             st.Page("views/tier_overview.py", title="Tier Overview", icon=":material/layers:"),
+            st.Page("views/attributions.py", title="Attributions", icon=":material/account_balance:"),
         ],
         "Configuration": [
             st.Page("views/aiden_settings.py", title="Aiden Settings", icon=":material/settings:"),

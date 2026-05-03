@@ -227,11 +227,25 @@ def _render_lifecycle(wo: Any, audit_rows: list[Any]) -> None:
     )
     if latest_invocation is not None:
         md = latest_invocation.metadata
-        cols = st.columns(4)
-        cols[0].metric("Latest role", md.get("agentRole") or "-")
-        cols[1].metric("Decision/output", md.get("decisionKind") or "-")
-        cols[2].metric("Provider", md.get("provider") or "-")
-        cols[3].metric("Tokens", str(md.get("totalTokens") or "-"))
+        stats = [
+            ("Latest role", md.get("agentRole") or "-"),
+            ("Decision/output", md.get("decisionKind") or "-"),
+            ("Provider", md.get("provider") or "-"),
+            ("Tokens", str(md.get("totalTokens") or "-")),
+        ]
+        stat_html = "".join(
+            (
+                '<div class="iwo3-stat">'
+                f'<div class="k">{label}</div>'
+                f'<div class="v">{value}</div>'
+                "</div>"
+            )
+            for label, value in stats
+        )
+        st.markdown(
+            f'<div class="iwo3-stat-strip">{stat_html}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def _render_outputs(packages: list[Any], handoffs_by_package: dict[str, list[Any]]) -> None:
