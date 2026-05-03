@@ -314,6 +314,15 @@ _LANDING_CSS = """
     font-size: 0.78rem;
     color: #A3AAB6;
   }
+  .iwo3-footer-link {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .iwo3-footer-link:hover {
+    color: #6B7280;
+    border-bottom-color: #CBD5E1;
+  }
   @media (max-width: 960px) {
     [data-testid="stAppViewContainer"] .main .block-container {
       padding-left: 20px;
@@ -548,7 +557,7 @@ def _render_public_landing() -> None:
         <div class="iwo3-landing-footer">
           <div class="name">AIDEN_IWO3 — Intelligent Work Orchestration</div>
           <div class="sub">Lead Developer & Principal Technical Architect: Darrel Vaughn | LuaAzullaB</div>
-          <div class="small">Attributions & Licenses</div>
+          <div class="small"><a class="iwo3-footer-link" href="/attributions" target="_self">Attributions &amp; Licenses</a></div>
         </div>
         </div>
         """,
@@ -573,7 +582,7 @@ def _render_authenticated_console() -> None:
         ],
         "Architecture": [
             st.Page("views/tier_overview.py", title="Tier Overview", icon=":material/layers:"),
-            st.Page("views/attributions.py", title="Attributions", icon=":material/account_balance:"),
+            st.Page("views/attributions.py", title="Attributions", icon=":material/account_balance:", url_path="attributions"),
         ],
         "Configuration": [
             st.Page("views/aiden_settings.py", title="Aiden Settings", icon=":material/settings:"),
@@ -594,6 +603,19 @@ def _render_authenticated_console() -> None:
     nav.run()
 
 
+def _render_public_router() -> None:
+    pages = [
+        st.Page(_render_public_landing, title="Home", url_path="", default=True),
+        st.Page(
+            "views/attributions.py",
+            title="Attributions",
+            url_path="attributions",
+        ),
+    ]
+    nav = st.navigation(pages, position="hidden")
+    nav.run()
+
+
 def main() -> None:
     st.set_page_config(
         page_title="AIDEN IWO3",
@@ -606,7 +628,7 @@ def main() -> None:
         _render_authenticated_console()
     else:
         clear_auth_session()
-        _render_public_landing()
+        _render_public_router()
 
 
 if __name__ == "__main__":

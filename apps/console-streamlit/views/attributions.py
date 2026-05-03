@@ -12,9 +12,6 @@ from typing import Any
 
 import streamlit as st
 
-from shell import page_requires_api
-
-
 _COLLECTED_DATE = "2026-05-02"
 
 
@@ -599,9 +596,6 @@ def _render_entry(entry: dict[str, Any]) -> None:
 
 
 def main() -> None:
-    if page_requires_api() is None:
-        return
-
     st.markdown(_CSS, unsafe_allow_html=True)
     st.markdown('<div class="iwo3-attr-wrap">', unsafe_allow_html=True)
 
