@@ -101,31 +101,84 @@ def _label_for_type(value: str) -> str:
     return value
 
 
-def _badge(text: str, color: str) -> str:
+# IWO2-parity pastel badge palette: subtle bg + matching darker text,
+# narrow padding, no shadow. Replaces the v0.1.0 saturated-color
+# treatment that operators flagged as visually heavy.
+_BADGE_PALETTE: dict[str, tuple[str, str]] = {
+    "active":      ("#dcfce7", "#166534"),  # emerald
+    "inactive":    ("#f3f4f6", "#6b7280"),  # grey
+    "restricted":  ("#fee2e2", "#991b1b"),  # red
+    # Tool type
+    "skill":         ("#eff6ff", "#1d4ed8"),  # subtle blue
+    "python_code":   ("#eff6ff", "#1d4ed8"),
+    "slash_command": ("#ecfeff", "#155e75"),
+    "cli":           ("#ecfeff", "#155e75"),
+    "api":           ("#eff6ff", "#1d4ed8"),
+    "webhook":       ("#ecfeff", "#155e75"),
+    "mcp_server":    ("#e0e7ff", "#3730a3"),  # subtle indigo
+    # Adornments
+    "skill_md":  ("#ede9fe", "#6d28d9"),  # violet for SKILL.md badge
+    "creds":     ("#fef3c7", "#92400e"),  # amber for credentials chip
+    "category":  ("#f3f4f6", "#374151"),  # neutral grey
+    "version":   ("transparent", "#6b7280"),  # borderless tiny grey
+}
+
+
+def _badge(text: str, palette_key: str, *, icon: Optional[str] = None) -> str:
+    """IWO2-style pastel badge — pastel background + colored text + no
+    border. Optional `icon` is a Streamlit material-icon name rendered
+    as inline HTML to stay within the markdown surface (Streamlit
+    parses :material/x: only inside button labels and st.markdown text,
+    not inside arbitrary inline HTML, so we emit the unicode glyph
+    fallback when an icon is requested)."""
+    bg, fg = _BADGE_PALETTE.get(palette_key, ("#f3f4f6", "#374151"))
+    icon_html = (
+        f'<span style="font-size:0.7rem; margin-right:3px;">{icon}</span>'
+        if icon
+        else ""
+    )
+    border = "none" if bg == "transparent" else "none"
     return (
-        f'<span style="background:{color}; color:white; padding:2px 8px; '
-        f'border-radius:10px; font-size:0.72rem; margin-right:6px;">{text}</span>'
+        f'<span style="background:{bg}; color:{fg}; padding:1px 7px; '
+        f'border-radius:4px; font-size:0.68rem; font-weight:500; '
+        f'margin-right:5px; border:{border}; vertical-align:middle; '
+        f'display:inline-block;">{icon_html}{text}</span>'
     )
 
 
 def _status_badge(enabled: bool, restricted: bool) -> str:
     if restricted:
-        return _badge("restricted", "#dc2626")
+        return _badge("restricted", "restricted")
     if enabled:
-        return _badge("active", "#10b981")
-    return _badge("inactive", "#6b7280")
+        return _badge("active", "active")
+    return _badge("inactive", "inactive")
 
 
 def _type_badge(tool_type: Optional[str]) -> str:
     if not tool_type:
         return ""
-    color_map = {
-        "skill": "#8b5cf6", "python_code": "#3b82f6",
-        "slash_command": "#0891b2", "cli": "#0e7490",
-        "api": "#059669", "webhook": "#0d9488",
-        "mcp_server": "#6366f1",
-    }
-    return _badge(_label_for_type(tool_type), color_map.get(tool_type, "#6b7280"))
+    return _badge(_label_for_type(tool_type), tool_type)
+
+
+# Map tool_type to a Streamlit material icon used as the leading
+# glyph in the tool's display name. Streamlit renders :material/x:
+# tokens via Material Symbols Outlined when they appear in markdown
+# text or button labels (NOT inside arbitrary inline HTML), so we
+# emit them directly into the st.markdown content alongside the
+# bolded name.
+_TYPE_ICON: dict[str, str] = {
+    "skill":         ":material/bolt:",
+    "python_code":   ":material/code:",
+    "slash_command": ":material/terminal:",
+    "cli":           ":material/terminal:",
+    "api":           ":material/public:",
+    "webhook":       ":material/link:",
+    "mcp_server":    ":material/dns:",
+}
+
+
+def _type_icon_token(tool_type: Optional[str]) -> str:
+    return _TYPE_ICON.get(tool_type or "", ":material/build:")
 
 
 def _toggle_view(tool_key: Optional[str]) -> None:
@@ -137,46 +190,93 @@ def _toggle_edit(tool_key: Optional[str]) -> None:
 
 
 def _render_card(api, tool: dict[str, Any], can_write: bool) -> None:
+    """IWO2-parity card layout:
+        [type-icon glyph] **Display Name**  [active]
+        `tool_key` (mono caption)
+        Description (2-line clamp via CSS)
+        [Type] [category] [SKILL.md if any] [Creds if any]   v1.0.0
+                                                                    [👁] [✏] [🗑]
+    Action buttons use Streamlit material-icon syntax for monochrome
+    parity with IWO2's lucide-React look. Status badge follows the
+    title; type/category land on a discrete bottom row so the eye
+    parses the hierarchy exactly the way IWO2 does.
+    """
     with st.container(border=True):
-        col1, col2 = st.columns([5, 1])
+        col1, col2 = st.columns([6, 1])
         with col1:
-            badges = (
-                _status_badge(tool.get("enabled", True), tool.get("restricted", False))
-                + _type_badge(tool.get("tool_type"))
-                + _badge(tool.get("category", ""), "#6b7280")
-                + _badge(f"v{tool.get('version_label', '1.0.0')}", "#374151")
-                + _badge(f"tier {tool.get('default_tier', '?')}", "#1f2937")
+            # Title row: leading material icon + bold name + status pill
+            status_html = _status_badge(
+                tool.get("enabled", True), tool.get("restricted", False)
             )
+            icon_token = _type_icon_token(tool.get("tool_type"))
             st.markdown(
-                f"**{tool.get('display_name', tool['tool_key'])}**  &nbsp; {badges}",
+                f"{icon_token} &nbsp;**{tool.get('display_name', tool['tool_key'])}**"
+                f" &nbsp; {status_html}",
                 unsafe_allow_html=True,
             )
-            st.caption(f"`{tool['tool_key']}` — {(tool.get('description') or '')[:200]}")
+            # Slug + description block
+            slug = tool["tool_key"]
+            desc = (tool.get("description") or "").strip()
+            st.markdown(
+                f'<div style="margin-top:-4px; margin-bottom:6px;">'
+                f'<code style="font-size:0.72rem; color:#6b7280; '
+                f'background:transparent; padding:0;">{slug}</code>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            if desc:
+                st.markdown(
+                    f'<div style="font-size:0.82rem; color:#4b5563; '
+                    f'line-height:1.4; margin-bottom:6px; '
+                    f'display:-webkit-box; -webkit-line-clamp:2; '
+                    f'-webkit-box-orient:vertical; overflow:hidden;">{desc}</div>',
+                    unsafe_allow_html=True,
+                )
+            # Bottom badge row — type / category / SKILL.md / Creds / version
+            bottom = (
+                _type_badge(tool.get("tool_type"))
+                + _badge(tool.get("category", ""), "category")
+            )
+            if tool.get("skill_content"):
+                bottom += _badge("SKILL.md", "skill_md")
+            if tool.get("credentials"):
+                bottom += _badge("Creds", "creds")
+            bottom += _badge(
+                f"v{tool.get('version_label', '1.0.0')}", "version"
+            )
+            st.markdown(bottom, unsafe_allow_html=True)
         with col2:
-            view_btn, edit_btn, del_btn = st.columns(3)
+            view_btn, edit_btn, del_btn = st.columns(3, gap="small")
             with view_btn:
-                if st.button("👁", key=f"view-{tool['tool_key']}", help="View"):
+                if st.button(
+                    ":material/visibility:",
+                    key=f"view-{tool['tool_key']}",
+                    help="View",
+                    use_container_width=True,
+                ):
                     _toggle_view(tool["tool_key"])
                     st.rerun()
             with edit_btn:
                 if st.button(
-                    "✏",
+                    ":material/edit:",
                     key=f"edit-{tool['tool_key']}",
                     help="Edit",
                     disabled=not can_write,
+                    use_container_width=True,
                 ):
                     _toggle_edit(tool["tool_key"])
                     st.rerun()
             with del_btn:
                 if st.button(
-                    "🗑",
+                    ":material/delete:",
                     key=f"del-{tool['tool_key']}",
                     help="Delete",
                     disabled=not can_write,
+                    use_container_width=True,
                 ):
                     try:
                         api.delete_tool(tool["tool_key"])
-                        st.toast(f"Deleted {tool['tool_key']}", icon="🗑")
+                        st.toast(f"Deleted {tool['tool_key']}")
                         st.rerun()
                     except APIError as err:
                         st.error(f"Delete failed: {err.status_code} — {err.detail}")
@@ -199,8 +299,8 @@ def _render_view_modal(api, tool_key: str) -> None:
         st.markdown(
             _status_badge(tool.get("enabled", True), tool.get("restricted", False))
             + _type_badge(tool.get("tool_type"))
-            + _badge(tool.get("category", ""), "#6b7280")
-            + _badge(f"v{tool.get('version_label', '1.0.0')}", "#374151"),
+            + _badge(tool.get("category", ""), "category")
+            + _badge(f"v{tool.get('version_label', '1.0.0')}", "version"),
             unsafe_allow_html=True,
         )
         st.caption(f"`{tool['tool_key']}`")
@@ -772,15 +872,19 @@ def _render_import_modal(api) -> None:
             return
         for s in skills:
             with st.container(border=True):
-                col1, col2 = st.columns([5, 1])
+                col1, col2 = st.columns([6, 1])
                 with col1:
                     badges = (
-                        _badge(s["category"], "#6b7280")
-                        + (_badge("imported", "#10b981") if s["already_imported"] else "")
-                        + _badge(f"{s['file_count']} files", "#374151")
+                        _badge(s["category"], "category")
+                        + (
+                            _badge("imported", "active")
+                            if s["already_imported"]
+                            else ""
+                        )
+                        + _badge(f"{s['file_count']} files", "version")
                     )
                     st.markdown(
-                        f"**{s['name']}**  &nbsp; {badges}",
+                        f":material/bolt: &nbsp;**{s['name']}**  &nbsp; {badges}",
                         unsafe_allow_html=True,
                     )
                     st.caption(
@@ -835,7 +939,7 @@ def main() -> None:
     bar = st.columns([1, 1, 4])
     with bar[0]:
         if st.button(
-            "📥 Import Skills",
+            ":material/file_download: Import Skills",
             use_container_width=True,
             disabled=not can_write,
         ):
@@ -843,7 +947,7 @@ def main() -> None:
             st.rerun()
     with bar[1]:
         if st.button(
-            "➕ Deploy Tool",
+            ":material/add: Deploy Tool",
             type="primary",
             use_container_width=True,
             disabled=not can_write,
