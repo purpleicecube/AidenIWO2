@@ -40,6 +40,7 @@ from routes import (
     output_packages,
     template_profiles,
     tenants,
+    tool_locker,
     tools as tools_routes,
     webhooks,
     work_orders,
@@ -111,6 +112,9 @@ app.include_router(adapter_credentials.status_router)
 app.include_router(llm.router)
 app.include_router(llm.tool_catalog_router)
 app.include_router(tools_routes.router)
+# MegaLoop Theta — Tools Locker write-side + skill import + MCP test
+app.include_router(tool_locker.tool_catalog_write_router)
+app.include_router(tool_locker.skills_router)
 app.include_router(channels.router)
 app.include_router(aiden.router)
 app.include_router(dispatch.router)

@@ -25,7 +25,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "brave-search",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "api"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000002",
@@ -53,7 +54,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "perplexity-search",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "api"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000003",
@@ -81,7 +83,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "duckduckgo-search",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "api"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000004",
@@ -109,7 +112,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "web-scraper",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "api"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000005",
@@ -133,7 +137,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "pdf-processor",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "python_code"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000006",
@@ -157,7 +162,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "data-validator",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "python_code"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000007",
@@ -185,7 +191,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "health-check-cli",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "api"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000008",
@@ -213,7 +220,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "md-to-pptx",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1.",
+    "toolType": "python_code"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000009",
@@ -237,7 +245,8 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "gamma-generate",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — runnable wave 1; routes through adapter:gamma."
+    "notes": "Loop Eta phase 0 seed \u2014 runnable wave 1; routes through adapter:gamma.",
+    "toolType": "api"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000010",
@@ -265,13 +274,14 @@
     "defaultTier": "tier_2",
     "iwo2Origin": "stitch-design",
     "enabled": true,
-    "notes": "Loop Eta phase 1.1 — runnable handler shipped (Worker I): runtime/tools/stitch_mcp.py + GET /tools/stitch_design/test_connection. STITCH_MCP_COMMAND env var routes to the stdio MCP proxy (default in IWO2: node server/stitch-mcp-proxy.mjs)."
+    "notes": "Loop Eta phase 1.1 \u2014 runnable handler shipped (Worker I): runtime/tools/stitch_mcp.py + GET /tools/stitch_design/test_connection. STITCH_MCP_COMMAND env var routes to the stdio MCP proxy (default in IWO2: node server/stitch-mcp-proxy.mjs).",
+    "toolType": "mcp_server"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000011",
     "toolKey": "docx_compose_skill",
     "displayName": "Docx Compose Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/docx_compose.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/docx_compose.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -279,13 +289,14 @@
     "defaultTier": "either",
     "iwo2Origin": "docx_compose",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000012",
     "toolKey": "xlsx_compose_skill",
     "displayName": "Xlsx Compose Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/xlsx_compose.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/xlsx_compose.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -293,13 +304,14 @@
     "defaultTier": "either",
     "iwo2Origin": "xlsx_compose",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000013",
     "toolKey": "pptx_compose_skill",
     "displayName": "Pptx Compose Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/pptx_compose.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/pptx_compose.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -307,13 +319,14 @@
     "defaultTier": "either",
     "iwo2Origin": "pptx_compose",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000014",
     "toolKey": "brand_guidelines_skill",
     "displayName": "Brand Guidelines Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/brand_guidelines.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/brand_guidelines.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -321,13 +334,14 @@
     "defaultTier": "either",
     "iwo2Origin": "brand_guidelines",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000015",
     "toolKey": "klearai_pptx_skill",
     "displayName": "Klearai Pptx Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/klearai_pptx.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/klearai_pptx.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -335,13 +349,14 @@
     "defaultTier": "either",
     "iwo2Origin": "klearai_pptx",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000016",
     "toolKey": "theme_factory_skill",
     "displayName": "Theme Factory Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/theme_factory.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/theme_factory.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -349,13 +364,14 @@
     "defaultTier": "either",
     "iwo2Origin": "theme_factory",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000017",
     "toolKey": "web_artifacts_skill",
     "displayName": "Web Artifacts Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/web_artifacts.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/web_artifacts.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -363,13 +379,14 @@
     "defaultTier": "either",
     "iwo2Origin": "web_artifacts",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000018",
     "toolKey": "canvas_design_skill",
     "displayName": "Canvas Design Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/canvas_design.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/canvas_design.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -377,13 +394,14 @@
     "defaultTier": "either",
     "iwo2Origin": "canvas_design",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000019",
     "toolKey": "frontend_design_skill",
     "displayName": "Frontend Design Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/frontend_design.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/frontend_design.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -391,13 +409,14 @@
     "defaultTier": "either",
     "iwo2Origin": "frontend_design",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000020",
     "toolKey": "algorithmic_art_skill",
     "displayName": "Algorithmic Art Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/algorithmic_art.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/algorithmic_art.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -405,13 +424,14 @@
     "defaultTier": "either",
     "iwo2Origin": "algorithmic_art",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000021",
     "toolKey": "slack_gif_skill",
     "displayName": "Slack Gif Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/slack_gif.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/slack_gif.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -419,13 +439,14 @@
     "defaultTier": "either",
     "iwo2Origin": "slack_gif",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000022",
     "toolKey": "mcp_builder_skill",
     "displayName": "Mcp Builder Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/mcp_builder.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/mcp_builder.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -433,13 +454,14 @@
     "defaultTier": "either",
     "iwo2Origin": "mcp_builder",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000023",
     "toolKey": "skill_creator_skill",
     "displayName": "Skill Creator Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/skill_creator.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/skill_creator.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -447,13 +469,14 @@
     "defaultTier": "either",
     "iwo2Origin": "skill_creator",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000024",
     "toolKey": "webapp_testing_skill",
     "displayName": "Webapp Testing Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/webapp_testing.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/webapp_testing.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -461,13 +484,14 @@
     "defaultTier": "either",
     "iwo2Origin": "webapp_testing",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000025",
     "toolKey": "doc_coauthoring_skill",
     "displayName": "Doc Coauthoring Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/doc_coauthoring.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/doc_coauthoring.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -475,13 +499,14 @@
     "defaultTier": "either",
     "iwo2Origin": "doc_coauthoring",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000026",
     "toolKey": "internal_comms_skill",
     "displayName": "Internal Comms Skill",
-    "description": "Catalog-visible skill template only — no runtime handler. Backed by IWO2 .local/skills/internal_comms.md.",
+    "description": "Catalog-visible skill template only \u2014 no runtime handler. Backed by IWO2 .local/skills/internal_comms.md.",
     "category": "skill_only",
     "runtimeStatus": "skill_only",
     "argsSchema": {},
@@ -489,13 +514,14 @@
     "defaultTier": "either",
     "iwo2Origin": "internal_comms",
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — skill_only wave 2 (catalog presence; no exec wiring)."
+    "notes": "Loop Eta phase 0 seed \u2014 skill_only wave 2 (catalog presence; no exec wiring).",
+    "toolType": "skill"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000027",
     "toolKey": "runtime_health",
     "displayName": "Runtime Health",
-    "description": "Aiden Tier 1 introspection — returns IWO3 runtime health (DB, queue, worker liveness).",
+    "description": "Aiden Tier 1 introspection \u2014 returns IWO3 runtime health (DB, queue, worker liveness).",
     "category": "introspection",
     "runtimeStatus": "runnable",
     "argsSchema": {
@@ -507,13 +533,14 @@
     "defaultTier": "tier_1",
     "iwo2Origin": null,
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — IWO3-native introspection (Tier 1 default)."
+    "notes": "Loop Eta phase 0 seed \u2014 IWO3-native introspection (Tier 1 default).",
+    "toolType": "python_code"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000028",
     "toolKey": "work_order_counts",
     "displayName": "WO Counts",
-    "description": "Aiden Tier 1 introspection — returns work_orders count grouped by status for the current tenant.",
+    "description": "Aiden Tier 1 introspection \u2014 returns work_orders count grouped by status for the current tenant.",
     "category": "introspection",
     "runtimeStatus": "runnable",
     "argsSchema": {
@@ -530,13 +557,14 @@
     "defaultTier": "tier_1",
     "iwo2Origin": null,
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — IWO3-native introspection (Tier 1 default)."
+    "notes": "Loop Eta phase 0 seed \u2014 IWO3-native introspection (Tier 1 default).",
+    "toolType": "python_code"
   },
   {
     "id": "00000000-0000-4000-8000-0000c0000029",
     "toolKey": "recent_work_orders",
     "displayName": "Recent WOs",
-    "description": "Aiden Tier 1 introspection — returns the N most recent work_orders for the current tenant.",
+    "description": "Aiden Tier 1 introspection \u2014 returns the N most recent work_orders for the current tenant.",
     "category": "introspection",
     "runtimeStatus": "runnable",
     "argsSchema": {
@@ -553,6 +581,7 @@
     "defaultTier": "tier_1",
     "iwo2Origin": null,
     "enabled": true,
-    "notes": "Loop Eta phase 0 seed — IWO3-native introspection (Tier 1 default)."
+    "notes": "Loop Eta phase 0 seed \u2014 IWO3-native introspection (Tier 1 default).",
+    "toolType": "python_code"
   }
 ]

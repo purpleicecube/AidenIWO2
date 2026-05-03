@@ -110,9 +110,10 @@ describeIwo3("Loop 4 Phase 1 — permission-grant override precedence", () => {
       clientId: KLEAR,
     });
     expect(after.permissions.has("user:invite")).toBe(false);
-    // Size = admin-80 − 1 deny (post-Loop-Eta admin gains tool_catalog:read +
-    // tool_catalog:write + sub_agent_tool:read + sub_agent_tool:assign).
-    expect(after.permissions.size).toBe(79);
+    // Size = admin-85 − 1 deny (post-MegaLoop-Theta admin gains
+    // tool_catalog:create / :update / :delete / :import_skill / :test_mcp
+    // on top of Loop-Eta tool_catalog:read/write + sub_agent_tool:read/assign).
+    expect(after.permissions.size).toBe(84);
   });
 
   it("overrides are tenant-scoped — an allow on Klear does not bleed to FFAI", async () => {

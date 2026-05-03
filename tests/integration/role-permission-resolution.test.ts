@@ -38,9 +38,14 @@ const INTRUDER = "00000000-0000-4000-8000-000099000002";
 // sub_agent_tool:assign) granted to owner + admin only.
 //   owner +4 → 82, admin +4 → 80, operator +2 → 35,
 //   reviewer +2 → 21, viewer +2 → 17, agent_system +2 → 27.
+// MegaLoop Theta (2026-05-02): +5 keys — tool_catalog:create,
+// :update, :delete, :import_skill, :test_mcp. Granted to owner +
+// admin only (no other role gets write paths over the locker).
+//   owner +5 → 87, admin +5 → 85; operator/reviewer/viewer/
+//   agent_system unchanged.
 const EXPECTED_COUNTS = {
-  owner: 82,
-  admin: 80,
+  owner: 87,
+  admin: 85,
   operator: 35,
   reviewer: 21,
   viewer: 17,
@@ -54,21 +59,21 @@ describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
     await pool.end();
   });
 
-  it("permissions vocabulary is locked at 82 keys (§Q1 + α.6 channel + δ.2 workspace + β-1 ε.1 llm_config CRUD split + β-2.0.1 template_profile:read + Loop Eta tool_catalog/sub_agent_tool x4)", async () => {
+  it("permissions vocabulary is locked at 87 keys (Loop Eta x4 + MegaLoop Theta x5)", async () => {
     const { rows } = await pool.query<{ count: string }>(
       `SELECT count(*) AS count FROM permissions`
     );
-    expect(Number(rows[0].count)).toBe(82);
+    expect(Number(rows[0].count)).toBe(87);
   });
 
-  it("role_permissions is seeded at 262 rows across the six roles", async () => {
+  it("role_permissions is seeded at 272 rows across the six roles (Theta adds 5 each on owner+admin)", async () => {
     const { rows } = await pool.query<{ role: string; count: string }>(
       `SELECT role, count(*) AS count FROM role_permissions GROUP BY role ORDER BY role`
     );
     const map = Object.fromEntries(rows.map((r) => [r.role, Number(r.count)]));
     expect(map).toMatchObject(EXPECTED_COUNTS);
     const total = Object.values(map).reduce((a, b) => a + b, 0);
-    expect(total).toBe(262);
+    expect(total).toBe(272);
   });
 
   for (const [userId, role, expected] of [

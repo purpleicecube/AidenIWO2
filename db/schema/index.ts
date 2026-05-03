@@ -48,3 +48,6 @@ export * from "./channel_messages";
 // Loop Eta — global tool catalog + per-(tenant, llm_config) tool assignments
 export * from "./tool_catalog";
 export * from "./sub_agent_tools";
+
+// MegaLoop Theta — tool discovery metadata (Tools Locker)
+export * from "./tool_tags";

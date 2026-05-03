@@ -137,6 +137,14 @@ TOOL_RUNTIME_STATUS: Final[tuple[str, ...]] = (
 TOOL_DEFAULT_TIER: Final[tuple[str, ...]] = (
     'tier_1', 'tier_2', 'either',
 )
+# MegaLoop Theta — IWO2-parity tool type + access tier
+TOOL_TYPE: Final[tuple[str, ...]] = (
+    'skill', 'python_code', 'slash_command', 'cli', 'api', 'webhook',
+    'mcp_server',
+)
+TOOL_ACCESS_TIER: Final[tuple[str, ...]] = (
+    'any', 'tier_1', 'tier_2',
+)
 ToolCategory = Literal[
     'search', 'document', 'rendering', 'design', 'data', 'ops',
     'introspection', 'skill_only',
@@ -145,6 +153,11 @@ ToolRuntimeStatus = Literal[
     'runnable', 'skill_only', 'mcp', 'planned',
 ]
 ToolDefaultTier = Literal['tier_1', 'tier_2', 'either']
+ToolType = Literal[
+    'skill', 'python_code', 'slash_command', 'cli', 'api', 'webhook',
+    'mcp_server',
+]
+ToolAccessTier = Literal['any', 'tier_1', 'tier_2']
 
 # --- Registry — enables run-time introspection and the parity CLI ---
 
@@ -197,4 +210,7 @@ ALL_ENUMS: Final[dict[str, tuple[str, ...]]] = {
     'tool_category': TOOL_CATEGORY,
     'tool_default_tier': TOOL_DEFAULT_TIER,
     'tool_runtime_status': TOOL_RUNTIME_STATUS,
+    # MegaLoop Theta
+    'tool_type': TOOL_TYPE,
+    'tool_access_tier': TOOL_ACCESS_TIER,
 }

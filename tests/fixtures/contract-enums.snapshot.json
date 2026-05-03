@@ -218,6 +218,11 @@
       "active",
       "archived"
     ],
+    "tool_access_tier": [
+      "any",
+      "tier_1",
+      "tier_2"
+    ],
     "tool_category": [
       "search",
       "document",
@@ -238,6 +243,15 @@
       "skill_only",
       "mcp",
       "planned"
+    ],
+    "tool_type": [
+      "skill",
+      "python_code",
+      "slash_command",
+      "cli",
+      "api",
+      "webhook",
+      "mcp_server"
     ],
     "user_status": [
       "active",
@@ -388,8 +402,12 @@
       "sub_agent.tool_revoked",
       "sub_agent.tool_unauthorized",
       "tier_1_5.requested_output_honored",
+      "tool_catalog.created",
+      "tool_catalog.deleted",
       "tool_catalog.disabled",
+      "tool_catalog.mcp_tested",
       "tool_catalog.registered",
+      "tool_catalog.skill_imported",
       "tool_catalog.updated",
       "webhook.received",
       "webhook.signature_invalid",
@@ -598,6 +616,12 @@
         "mcp.session_opened",
         "mcp.session_closed",
         "mcp.connection_tested"
+      ],
+      "LOOP_THETA_AUDIT_EVENTS": [
+        "tool_catalog.created",
+        "tool_catalog.deleted",
+        "tool_catalog.skill_imported",
+        "tool_catalog.mcp_tested"
       ]
     }
   },
@@ -657,7 +681,12 @@
     "sub_agent_tool:read",
     "system:admin",
     "template_profile:read",
+    "tool_catalog:create",
+    "tool_catalog:delete",
+    "tool_catalog:import_skill",
     "tool_catalog:read",
+    "tool_catalog:test_mcp",
+    "tool_catalog:update",
     "tool_catalog:write",
     "user:invite",
     "user:read",

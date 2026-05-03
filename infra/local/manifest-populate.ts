@@ -39,6 +39,7 @@ const PRE_BETA_DELTA_VERSION = "iwo3@v0.11.0-pre-beta-delta";
 const BETA_1_VERSION = "iwo3@v0.12.0-beta-1";
 const BETA_2_PHASE_0_3_VERSION = "iwo3@v0.13.0-beta-2-phase-0.3";
 const LOOP_ETA_VERSION = "iwo3@v0.14.0-loop-eta";
+const MEGALOOP_THETA_VERSION = "iwo3@v0.15.0-loop-theta";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -101,6 +102,10 @@ const KNOWN_TABLES: ManifestEntry[] = [
   // Loop Eta phase 0 — global tool catalog + per-(tenant, llm_config) tool assignments
   { name: "tool_catalog",               source: "iwo3_native", sourceVersion: LOOP_ETA_VERSION, ownedBy: "drizzle", notes: "Loop Eta phase 0 — tenant-agnostic tool registry; metadata + runtime_status only, executable handlers live in apps/api-fastapi/runtime/aiden_tools.py" },
   { name: "sub_agent_tools",            source: "iwo3_native", sourceVersion: LOOP_ETA_VERSION, ownedBy: "drizzle", notes: "Loop Eta phase 0 — per-(client, llm_config, tool_key) assignment row; FORCE RLS; soft-revoke via enabled=false" },
+
+  // MegaLoop Theta — Tools Locker discovery metadata (UI surface deferred)
+  { name: "tool_tags",                  source: "iwo3_native", sourceVersion: MEGALOOP_THETA_VERSION, ownedBy: "drizzle", notes: "MegaLoop Theta — flat tag dictionary for the Tools Locker; tag CRUD UI deferred per scope §Out-of-scope" },
+  { name: "tool_tag_assignments",       source: "iwo3_native", sourceVersion: MEGALOOP_THETA_VERSION, ownedBy: "drizzle", notes: "MegaLoop Theta — many-to-many bridge between tool_catalog and tool_tags; CASCADE on both FKs" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

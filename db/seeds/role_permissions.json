@@ -899,5 +899,16 @@
   { "role": "viewer",       "permissionKey": "tool_catalog:read"      },
   { "role": "viewer",       "permissionKey": "sub_agent_tool:read"    },
   { "role": "agent_system", "permissionKey": "tool_catalog:read"      },
-  { "role": "agent_system", "permissionKey": "sub_agent_tool:read"    }
+  { "role": "agent_system", "permissionKey": "sub_agent_tool:read"    },
+
+  { "role": "owner", "permissionKey": "tool_catalog:create"        },
+  { "role": "owner", "permissionKey": "tool_catalog:update"        },
+  { "role": "owner", "permissionKey": "tool_catalog:delete"        },
+  { "role": "owner", "permissionKey": "tool_catalog:import_skill"  },
+  { "role": "owner", "permissionKey": "tool_catalog:test_mcp"      },
+  { "role": "admin", "permissionKey": "tool_catalog:create"        },
+  { "role": "admin", "permissionKey": "tool_catalog:update"        },
+  { "role": "admin", "permissionKey": "tool_catalog:delete"        },
+  { "role": "admin", "permissionKey": "tool_catalog:import_skill"  },
+  { "role": "admin", "permissionKey": "tool_catalog:test_mcp"      }
 ]

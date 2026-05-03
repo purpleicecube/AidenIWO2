@@ -903,6 +903,9 @@ interface SeedToolCatalog {
   iwo2Origin: string | null;
   enabled: boolean;
   notes: string | null;
+  // MegaLoop Theta — IWO2-parity tool type. Optional in JSON; the
+  // loader sends NULL when absent so legacy seed files stay valid.
+  toolType?: string | null;
 }
 
 interface SeedSubAgentTool {
@@ -980,9 +983,10 @@ async function upsertToolCatalog(
       `INSERT INTO tool_catalog
          (id, tool_key, display_name, description, category,
           runtime_status, args_schema, handler_ref, default_tier,
-          iwo2_origin, enabled, notes)
+          iwo2_origin, enabled, notes, tool_type)
        VALUES ($1, $2, $3, $4, $5::tool_category, $6::tool_runtime_status,
-               $7::jsonb, $8, $9::tool_default_tier, $10, $11, $12)
+               $7::jsonb, $8, $9::tool_default_tier, $10, $11, $12,
+               $13::tool_type)
        ON CONFLICT (tool_key) DO UPDATE SET
          display_name = EXCLUDED.display_name,
          description = EXCLUDED.description,
@@ -994,6 +998,7 @@ async function upsertToolCatalog(
          iwo2_origin = EXCLUDED.iwo2_origin,
          enabled = EXCLUDED.enabled,
          notes = EXCLUDED.notes,
+         tool_type = EXCLUDED.tool_type,
          updated_at = now()`,
       [
         r.id,
@@ -1008,6 +1013,7 @@ async function upsertToolCatalog(
         r.iwo2Origin,
         r.enabled,
         r.notes,
+        r.toolType ?? null,
       ]
     );
   }

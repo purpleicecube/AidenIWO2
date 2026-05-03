@@ -572,5 +572,40 @@
     "displayName": "Assign tools to sub-agents",
     "description": "Toggle sub_agent_tools rows for this tenant. Loop Eta phase 0 — drives PUT /llm/configs/{id}/tools/{tool_key}.",
     "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000083",
+    "permissionKey": "tool_catalog:create",
+    "displayName": "Create tool catalog rows",
+    "description": "Deploy a new tool into the global tool_catalog. MegaLoop Theta — admin-only POST /tool_catalog.",
+    "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000084",
+    "permissionKey": "tool_catalog:update",
+    "displayName": "Update tool catalog rows",
+    "description": "Edit any tool_catalog row in the global registry. MegaLoop Theta — admin-only PUT /tool_catalog/{tool_key}.",
+    "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000085",
+    "permissionKey": "tool_catalog:delete",
+    "displayName": "Delete tool catalog rows",
+    "description": "Remove a tool from the global registry. MegaLoop Theta — admin-only DELETE /tool_catalog/{tool_key}.",
+    "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000086",
+    "permissionKey": "tool_catalog:import_skill",
+    "displayName": "Import filesystem skill into catalog",
+    "description": "Scan IWO3_SKILLS_DIR/{dirName}/SKILL.md and create a tool_catalog row from it. MegaLoop Theta — admin-only POST /tool_catalog/import_skill.",
+    "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000087",
+    "permissionKey": "tool_catalog:test_mcp",
+    "displayName": "Test MCP server connectivity",
+    "description": "Open an ad-hoc MCP session and list its tools. MegaLoop Theta — admin-only POST /tool_catalog/mcp/test_connection. Audit-logged on every call.",
+    "scope": "global"
   }
 ]

@@ -1325,6 +1325,38 @@ class ToolCatalogRow(BaseModel):
     default_tier: ToolDefaultTier
     iwo2_origin: Optional[str] = None
     enabled: bool
+    # MegaLoop Theta — IWO2 Tools Locker parity fields. All optional on
+    # the wire so existing Loop Eta consumers (Sub-Agents page) can
+    # ignore them without code changes; the Tools Locker page reads
+    # them all.
+    tool_type: Optional[str] = None
+    version_label: Optional[str] = None
+    execution_mode: Optional[str] = None
+    skill_content: Optional[str] = None
+    skill_instructions: Optional[str] = None
+    trigger_conditions: Optional[list[dict[str, Any]]] = None
+    source_code: Optional[str] = None
+    entry_point: Optional[str] = None
+    runtime_environment: Optional[str] = None
+    sandbox_config: Optional[dict[str, Any]] = None
+    mcp_config: Optional[dict[str, Any]] = None
+    credentials: Optional[list[dict[str, Any]]] = None
+    usage_instructions: Optional[str] = None
+    input_schema: Optional[dict[str, Any]] = None
+    output_schema: Optional[dict[str, Any]] = None
+    access_tier: Optional[str] = None
+    max_concurrent: Optional[int] = None
+    default_lease_seconds: Optional[int] = None
+    max_lease_seconds: Optional[int] = None
+    daily_usage_limit: Optional[int] = None
+    cost_ceiling_per_day: Optional[str] = None
+    requires_approval: Optional[bool] = None
+    restricted: Optional[bool] = None
+    restricted_reason: Optional[str] = None
+    restricted_by_user_id: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class ListToolCatalogResponse(BaseModel):
@@ -1365,7 +1397,35 @@ async def list_tool_catalog(
                args_schema,
                default_tier::text   AS default_tier,
                iwo2_origin,
-               enabled
+               enabled,
+               tool_type::text      AS tool_type,
+               version_label,
+               execution_mode,
+               skill_content,
+               skill_instructions,
+               trigger_conditions,
+               source_code,
+               entry_point,
+               runtime_environment,
+               sandbox_config,
+               mcp_config,
+               credentials,
+               usage_instructions,
+               input_schema,
+               output_schema,
+               access_tier::text    AS access_tier,
+               max_concurrent,
+               default_lease_seconds,
+               max_lease_seconds,
+               daily_usage_limit,
+               cost_ceiling_per_day,
+               requires_approval,
+               restricted,
+               restricted_reason,
+               restricted_by_user_id::text AS restricted_by_user_id,
+               notes,
+               created_at::text     AS created_at,
+               updated_at::text     AS updated_at
           FROM tool_catalog
          WHERE 1=1
         """
@@ -1386,6 +1446,16 @@ async def list_tool_catalog(
     sql.append(f"AND enabled = ${len(args)}")
     sql.append("ORDER BY category, default_tier, tool_key")
     rows = await conn.fetch("\n".join(sql), *args)
+    def _jsonb(value: Any, default: Any) -> Any:
+        if value is None:
+            return default
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return default
+        return value
+
     return ListToolCatalogResponse(
         tools=[
             ToolCatalogRow(
@@ -1394,14 +1464,38 @@ async def list_tool_catalog(
                 description=r["description"],
                 category=r["category"],
                 runtime_status=r["runtime_status"],
-                args_schema=(
-                    json.loads(r["args_schema"])
-                    if isinstance(r["args_schema"], str)
-                    else (r["args_schema"] or {})
-                ),
+                args_schema=_jsonb(r["args_schema"], {}),
                 default_tier=r["default_tier"],
                 iwo2_origin=r["iwo2_origin"],
                 enabled=r["enabled"],
+                tool_type=r["tool_type"],
+                version_label=r["version_label"],
+                execution_mode=r["execution_mode"],
+                skill_content=r["skill_content"],
+                skill_instructions=r["skill_instructions"],
+                trigger_conditions=_jsonb(r["trigger_conditions"], []),
+                source_code=r["source_code"],
+                entry_point=r["entry_point"],
+                runtime_environment=r["runtime_environment"],
+                sandbox_config=_jsonb(r["sandbox_config"], {}),
+                mcp_config=_jsonb(r["mcp_config"], {}),
+                credentials=_jsonb(r["credentials"], []),
+                usage_instructions=r["usage_instructions"],
+                input_schema=_jsonb(r["input_schema"], {}),
+                output_schema=_jsonb(r["output_schema"], {}),
+                access_tier=r["access_tier"],
+                max_concurrent=r["max_concurrent"],
+                default_lease_seconds=r["default_lease_seconds"],
+                max_lease_seconds=r["max_lease_seconds"],
+                daily_usage_limit=r["daily_usage_limit"],
+                cost_ceiling_per_day=r["cost_ceiling_per_day"],
+                requires_approval=r["requires_approval"],
+                restricted=r["restricted"],
+                restricted_reason=r["restricted_reason"],
+                restricted_by_user_id=r["restricted_by_user_id"],
+                notes=r["notes"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
             )
             for r in rows
         ]

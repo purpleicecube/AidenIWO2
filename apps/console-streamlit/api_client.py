@@ -367,6 +367,61 @@ class ApiClient:
         data = self._request("GET", "/llm/configs")
         return data["configs"]
 
+    # ── MegaLoop Theta — Tools Locker ──────────────────────────────
+
+    def list_tool_catalog(
+        self,
+        *,
+        enabled: bool = True,
+        category: Optional[str] = None,
+        runtime_status: Optional[str] = None,
+        default_tier: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"enabled": str(enabled).lower()}
+        if category:
+            params["category"] = category
+        if runtime_status:
+            params["runtime_status"] = runtime_status
+        if default_tier:
+            params["default_tier"] = default_tier
+        data = self._request("GET", "/tool_catalog", params=params)
+        return data["tools"]
+
+    def create_tool(self, body: dict[str, Any]) -> dict[str, Any]:
+        return self._request("POST", "/tool_catalog", json=body)
+
+    def update_tool(
+        self, tool_key: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._request("PUT", f"/tool_catalog/{tool_key}", json=body)
+
+    def delete_tool(self, tool_key: str) -> None:
+        self._request("DELETE", f"/tool_catalog/{tool_key}")
+
+    def list_available_skills(self) -> dict[str, Any]:
+        return self._request("GET", "/skills/available")
+
+    def import_skill(
+        self,
+        *,
+        dir_name: str,
+        name_override: Optional[str] = None,
+        description_override: Optional[str] = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"dir_name": dir_name}
+        if name_override:
+            body["name_override"] = name_override
+        if description_override:
+            body["description_override"] = description_override
+        return self._request("POST", "/tool_catalog/import_skill", json=body)
+
+    def test_mcp_connection(self, mcp_config: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/tool_catalog/mcp/test_connection",
+            json={"mcp_config": mcp_config},
+        )
+
     def list_llm_providers(self) -> list[dict[str, Any]]:
         data = self._request("GET", "/llm/providers")
         return data["providers"]

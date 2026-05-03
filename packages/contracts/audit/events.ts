@@ -275,6 +275,15 @@ export const AUDIT_EVENTS = {
   MCP_SESSION_OPENED:    "mcp.session_opened",
   MCP_SESSION_CLOSED:    "mcp.session_closed",
   MCP_CONNECTION_TESTED: "mcp.connection_tested",
+
+  // MegaLoop Theta — Tools Locker write-side events. The `*.updated`
+  // and `*.disabled` events from Loop Eta still apply for catalog
+  // edits via PUT and the soft-disable toggle; these are the new
+  // create/delete/import/test_mcp lifecycle pieces.
+  TOOL_CATALOG_CREATED:        "tool_catalog.created",
+  TOOL_CATALOG_DELETED:        "tool_catalog.deleted",
+  TOOL_CATALOG_SKILL_IMPORTED: "tool_catalog.skill_imported",
+  TOOL_CATALOG_MCP_TESTED:     "tool_catalog.mcp_tested",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -479,6 +488,18 @@ export const LOOP_ETA_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.MCP_SESSION_OPENED,
   AUDIT_EVENTS.MCP_SESSION_CLOSED,
   AUDIT_EVENTS.MCP_CONNECTION_TESTED,
+];
+
+// MegaLoop Theta — Tools Locker write-side. Operator CRUD on the global
+// catalog plus filesystem skill import + ad-hoc MCP test. The Loop Eta
+// `tool_catalog.updated` and `tool_catalog.disabled` events still apply
+// for PUT edits and the enabled-toggle path; these four are the
+// genuinely new lifecycle pieces.
+export const LOOP_THETA_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.TOOL_CATALOG_CREATED,
+  AUDIT_EVENTS.TOOL_CATALOG_DELETED,
+  AUDIT_EVENTS.TOOL_CATALOG_SKILL_IMPORTED,
+  AUDIT_EVENTS.TOOL_CATALOG_MCP_TESTED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs
