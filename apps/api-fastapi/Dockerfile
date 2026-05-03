@@ -48,6 +48,12 @@ RUN cd apps/api-fastapi/vendor && npm install --omit=dev --no-audit --no-fund
 # Copy the FastAPI app source (includes vendor/stitch-mcp-proxy.mjs).
 COPY apps/api-fastapi/ ./apps/api-fastapi/
 
+# MegaLoop Theta — bundle the IWO2-parity skills directory so the
+# Tools Locker's Import Skills modal can scan SKILL.md files inside
+# the container. routes/tool_locker.py resolves IWO3_SKILLS_DIR with
+# this default of {repo_root}/.local/skills/.
+COPY .local/skills/ ./.local/skills/
+
 # Default Stitch MCP command points at the vendored proxy. Operators
 # may override via Railway env if they want to swap to a sidecar.
 ENV STITCH_MCP_COMMAND="node /app/apps/api-fastapi/vendor/stitch-mcp-proxy.mjs"
