@@ -111,6 +111,14 @@ _CSS = """
     padding: 18px 14px 14px 14px; border-bottom: 1px solid #E5E7EB;
     margin: 0;
   }
+  .iwo3-brand-link {
+    color: inherit;
+    text-decoration: none;
+    display: block;
+  }
+  .iwo3-brand-link:hover .iwo3-brand {
+    background: #F8FAFC;
+  }
   .iwo3-brand .mark {
     width: 42px; height: 42px; border-radius: 10px;
     background: #2563EB;
@@ -335,6 +343,7 @@ def _brand_block_html(tenant_short: str) -> str:
         '</svg>'
     )
     return (
+        '<a class="iwo3-brand-link" href="/" target="_self">'
         '<div class="iwo3-brand">'
         f'<div class="mark">{layers_svg}</div>'
         '<div>'
@@ -343,6 +352,7 @@ def _brand_block_html(tenant_short: str) -> str:
         '<div class="sub">Orchestration Engine</div>'
         '</div>'
         '</div>'
+        '</a>'
     )
 
 
@@ -476,8 +486,8 @@ def page_requires_api() -> Optional[ApiClient]:
 def _render_top_right_home_link() -> None:
     """Fixed top-right `← Dashboard` link rendered on every
     authenticated page. The HTML anchor navigates via Streamlit's
-    multipage routing (Dashboard is `default=True`, served at both
-    `/` and `/Dashboard`). target=_self keeps the same tab so session
+    multipage routing (Dashboard is the default page and is served at
+    `/`). target=_self keeps the same tab so session
     state survives the navigation."""
     st.markdown(
         """
@@ -508,7 +518,7 @@ def _render_top_right_home_link() -> None:
           }
           .iwo3-home-link svg { display: block; }
         </style>
-        <a class="iwo3-home-link" href="/Dashboard" target="_self">
+        <a class="iwo3-home-link" href="/" target="_self">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
                viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

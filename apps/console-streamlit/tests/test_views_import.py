@@ -32,6 +32,7 @@ EXPECTED_VIEWS: list[str] = [
     "sandbox.py",
     "design_lab.py",
     "tier_overview.py",
+    "attributions.py",
     "aiden_settings.py",
     "sub_agents.py",
     "tools.py",
