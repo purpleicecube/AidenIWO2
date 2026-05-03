@@ -1081,6 +1081,26 @@ Documented above in Session 13 entry. Parser: article skip, Phase 3b bare folder
 
 ---
 
+## Session — IWO3 Chat Correlation-ID Collision (2026-05-03)
+
+Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
+
+### BUG-058: Chat-driven WO 409s after clear-history or new session (cross-session correlation_id collision) (High)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-03 |
+| Severity | High (blocks chat-driven WO creation in any second-session attempt at the same message index) |
+| Status | Fixed, verified |
+| Files | `apps/console-streamlit/views/chat.py` |
+| Symptom | Operator submitted *"I need a workorder for a 6 slide introdeck wlcome to Klear.ai"* on `aiden-iwo3.streamlit.app/chat`, picked the `klear_pptx_primary` template from the resolver clarification picker, clicked **Create + run now**, and got back a raw JSON 409 in the chat: `409 — {'error': 'duplicate_correlation_id', 'correlation_id': 'chat:2-run', 'existing_work_order_id': 'f8dda4e3-…', 'existing_title': 'Create 4-slide Intro Deck for Klear.ai'}`. The brief was a brand-new request (different title, different slide count), but the DB rejected it because a prior session at the same message index had already used `correlation_id='chat:2-run'`. |
+| Root Cause | `views/chat.py::_promote_reply` built the WO `correlation_id` as `f"chat:{idx}-{action}"` where `idx` is the message-list index. The Beta-1 ε.3 / Q8 partial UNIQUE on `(client_id, correlation_id) WHERE correlation_id LIKE 'chat:%'` was added to prevent fast-double-click duplicates within a single session — but `idx` resets to 0,1,2 every time the operator clears history or starts a new session. Cross-session collisions on the same idx slug were inevitable. The `_handle_action_error` path also rendered the raw 409 JSON with no operator-readable summary. |
+| Fix | (A) New `_correlation_id_for_turn(messages, idx, action)` helper builds the correlation_id from `sha1(msg.ts \| idx \| title)[:12]` so the same message in the same session always produces the same hash (idempotency preserved against fast double-clicks) but different sessions / different briefs always get distinct hashes. (B) New `_existing_wo_from_409(detail)` helper extracts `existing_work_order_id` + `existing_title` from the 409 detail (handles both dict and JSON-string shapes). (C) New `_handle_action_error` callback in `_render_actions` detects the `duplicate_correlation_id` 409 specifically, surfaces a friendly warning *"This brief was already submitted as **Title** (`uuid`). Open the existing work order from the buttons below…"*, and appends a status message to the chat with Open-WO action buttons so the operator can navigate to the prior WO instead of seeing a JSON dump. |
+| Verified | Smoke-test: `_correlation_id_for_turn` returns same hash for same message+idx (`chat:9a273470b57a-run`) and different hash after ts change (`chat:40229f411e77-run`). `_existing_wo_from_409` parses both `dict` and JSON-string forms; returns None for unrelated 409s. Streamlit smoke 30/5 unchanged. |
+| Files Changed | `apps/console-streamlit/views/chat.py` (new helpers + correlation_id call-site update + friendlier error rendering, ~80 lines) |
+
+---
+
 ## Summary
 
 | Category | Count | Critical | High | Medium | Low |
@@ -1100,7 +1120,8 @@ Documented above in Session 13 entry. Parser: article skip, Phase 3b bare folder
 | Bugs fixed (Session 13) | 1 | 0 | 1 | 0 | 0 |
 | Bugs fixed (Session 14) | 3 | 0 | 3 | 0 | 0 |
 | Bugs fixed (Session 17) | 1 | 1 | 0 | 0 | 0 |
-| **Total bugs fixed** | **55** | **9** | **30** | **12** | **1** |
+| Bugs fixed (IWO3 Theta post-close, 2026-05-03) | 1 | 0 | 1 | 0 | 0 |
+| **Total bugs fixed** | **56** | **9** | **31** | **12** | **1** |
 | Feature implementations (Session 6) | 3 | — | — | — | — |
 | Feature implementations (Session 12b) | 1 | — | — | — | — |
 | Feature implementations (Session 14) | 3 | — | — | — | — |

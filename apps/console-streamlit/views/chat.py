@@ -24,6 +24,8 @@ Persistence (Beta-1.5 phase 2 / Q7):
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime
 from typing import Any, Optional
@@ -324,13 +326,70 @@ def _maybe_followup_reply(
 # ── Promote (create / create+run) ────────────────────────────────────
 
 
+def _correlation_id_for_turn(
+    messages: list[dict[str, Any]],
+    idx: int,
+    action: str,
+) -> str:
+    """Build a session-unique correlation_id for a chat-driven WO create.
+
+    Bug fix (2026-05-03): Prior implementation used `chat:{idx}-{action}`,
+    where `idx` reset to 0 every time the operator cleared chat history
+    or refreshed the page. The work_orders table has a partial UNIQUE on
+    `(client_id, correlation_id) WHERE correlation_id LIKE 'chat:%'`
+    (added Beta-1 ε.3 / Q8 to prevent fast-double-click duplicates within
+    a single session). When idx 2 came round again in a new session, the
+    DB rejected with 409 even though the operator's intent was a brand
+    new WO.
+
+    Fix: incorporate the message's own ISO timestamp + the bound title
+    into a short hash, so the same brief in the same session keeps its
+    idempotency (same hash on every click) while different sessions /
+    different briefs always get distinct hashes.
+    """
+    msg = messages[idx] if 0 <= idx < len(messages) else {}
+    ts = msg.get("ts") or ""
+    title = (
+        (msg.get("reply") or {}).get("title")
+        or msg.get("content", "")[:80]
+    )
+    seed = f"{ts}|{idx}|{title}"
+    digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    return f"chat:{digest}-{action}"
+
+
+def _existing_wo_from_409(detail: Any) -> Optional[dict[str, str]]:
+    """Pull `existing_work_order_id` + `existing_title` out of an
+    APIError 409 detail. Returns None if the shape doesn't match the
+    duplicate-correlation contract.
+
+    The FastAPI 409 body is the dict raised in
+    routes/work_orders.py::create_work_order. ApiClient surfaces it as
+    err.detail — usually a parsed dict, sometimes a JSON-encoded
+    string when the client took a string codepath."""
+    if isinstance(detail, str):
+        try:
+            detail = json.loads(detail)
+        except (json.JSONDecodeError, ValueError):
+            return None
+    if not isinstance(detail, dict):
+        return None
+    if detail.get("error") != "duplicate_correlation_id":
+        return None
+    wo_id = detail.get("existing_work_order_id")
+    title = detail.get("existing_title")
+    if not wo_id:
+        return None
+    return {"work_order_id": str(wo_id), "title": str(title or "(untitled)")}
+
+
 def _promote_reply(
     api,
     messages: list[dict[str, Any]],
     reply: dict[str, Any],
     *,
     create_only: bool,
-    key_seed: str,
+    correlation_id: str,
     template_profile_id: Optional[str] = None,
 ) -> None:
     kind = reply.get("decision_kind")
@@ -343,7 +402,6 @@ def _promote_reply(
         if kind == "work_order_brief"
         else "medium"
     ) or "medium"
-    correlation_id = f"chat:{key_seed}"
 
     # Loop Eta post-close — pass operator-confirmed template through to
     # the WO so dispatch_gamma_for_package targets the right Gamma
@@ -528,6 +586,37 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
         if kind == "work_order_brief"
         else "Create + instantiate"
     )
+
+    def _handle_action_error(err: APIError, action_key: str) -> None:
+        """Friendly error rendering. Catches the duplicate_correlation_id
+        409 specifically (cross-session collision) and points the
+        operator at the existing WO instead of dumping the raw JSON."""
+        promoted_set.discard(action_key)
+        st.session_state[_PROMOTED_KEY] = promoted_set
+        if err.status_code == 409:
+            existing = _existing_wo_from_409(err.detail)
+            if existing is not None:
+                st.warning(
+                    f"This brief was already submitted as "
+                    f"**{existing['title']}** "
+                    f"(`{existing['work_order_id']}`). Open the existing "
+                    f"work order from the buttons below, or send a fresh "
+                    f"message to create a new one."
+                )
+                _append_status_message(
+                    messages,
+                    f"⚠️ Skipped duplicate — existing WO **{existing['title']}** "
+                    f"(`{existing['work_order_id']}`).",
+                    context_actions={
+                        "work_order_id": existing["work_order_id"],
+                        "title": existing["title"],
+                    },
+                )
+                st.session_state[_MESSAGES_KEY] = messages
+                _persist_to_server(api)
+                return
+        st.error(f"❌ {err.status_code} — {err.detail}")
+
     with col1:
         if st.button(label_create, key=f"chat-create-{idx}"):
             promoted_set.add(f"create-{idx}")
@@ -538,18 +627,16 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
                     messages,
                     reply,
                     create_only=True,
-                    key_seed=f"{idx}-create",
+                    correlation_id=_correlation_id_for_turn(
+                        messages, idx, "create"
+                    ),
                     template_profile_id=selected_template_id,
                 )
                 st.session_state[_MESSAGES_KEY] = messages
                 _persist_to_server(api)
                 st.rerun()
             except APIError as err:
-                # Unwind the guard so the operator can retry after fixing
-                # the error (e.g. transient 5xx).
-                promoted_set.discard(f"create-{idx}")
-                st.session_state[_PROMOTED_KEY] = promoted_set
-                st.error(f"❌ {err.status_code} — {err.detail}")
+                _handle_action_error(err, f"create-{idx}")
     with col2:
         if st.button(label_run, key=f"chat-run-{idx}", type="primary"):
             promoted_set.add(f"run-{idx}")
@@ -560,16 +647,16 @@ def _render_actions(api, messages: list[dict[str, Any]], idx: int, reply: dict[s
                     messages,
                     reply,
                     create_only=False,
-                    key_seed=f"{idx}-run",
+                    correlation_id=_correlation_id_for_turn(
+                        messages, idx, "run"
+                    ),
                     template_profile_id=selected_template_id,
                 )
                 st.session_state[_MESSAGES_KEY] = messages
                 _persist_to_server(api)
                 st.rerun()
             except APIError as err:
-                promoted_set.discard(f"run-{idx}")
-                st.session_state[_PROMOTED_KEY] = promoted_set
-                st.error(f"❌ {err.status_code} — {err.detail}")
+                _handle_action_error(err, f"run-{idx}")
 
 
 def _render_context_followup(reply: dict[str, Any]) -> str:
