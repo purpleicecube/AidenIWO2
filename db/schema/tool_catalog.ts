@@ -51,11 +51,19 @@ export const toolCategoryEnum = pgEnum("tool_category", [
   "skill_only",
 ]);
 
+// MegaLoop Theta revisions (D9.2, 2026-05-03) — pure execution-truth
+// vocabulary. Old `mcp` value retired (transport mode, not exec
+// truth — captured by tool_type enum instead). Old `skill_only`
+// generalised to `catalog_only` (skill is just one shape of
+// catalog-only metadata). Two new values:
+//   catalog_only — metadata-only row, no runnable handler in
+//                  aiden_tools.TOOL_REGISTRY
+//   legacy       — retired tool kept for audit/history forensics
 export const toolRuntimeStatusEnum = pgEnum("tool_runtime_status", [
   "runnable",
-  "skill_only",
-  "mcp",
+  "catalog_only",
   "planned",
+  "legacy",
 ]);
 
 export const toolDefaultTierEnum = pgEnum("tool_default_tier", [
@@ -109,7 +117,12 @@ export const toolCatalog = pgTable(
     notes: text("notes"),
 
     // ── MegaLoop Theta extensions ────────────────────────────────
-    toolType: toolTypeEnum("tool_type"),
+    // D1.1 revision (2026-05-03): tool_type is NOT NULL after the
+    // 0024 migration — the Pydantic create body required it from day
+    // one and the UI conditional-tab logic depends on a value being
+    // present. Previously nullable to keep the 0023 migration
+    // single-pass; that's no longer needed.
+    toolType: toolTypeEnum("tool_type").notNull(),
     versionLabel: varchar("version_label", { length: 32 })
       .notNull()
       .default("1.0.0"),

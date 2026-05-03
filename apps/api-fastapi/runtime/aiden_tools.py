@@ -260,8 +260,10 @@ async def check_sub_agent_tool_assignment(
 
     Returns True only if BOTH the assignment row and the catalog row are
     enabled AND the catalog row's `runtime_status='runnable'`. Catalog
-    rows with `runtime_status` of `mcp`, `skill_only`, or `planned` are
-    refused — those are not invocable from this surface in this loop.
+    rows with `runtime_status` of `catalog_only`, `planned`, or `legacy`
+    are refused — those are not invocable from this surface in this
+    loop. (MegaLoop Theta D9.2 retired the `mcp` and `skill_only`
+    values in favour of pure-execution-truth vocabulary.)
 
     Caller (Tier 2 runtime) writes the `sub_agent.tool_unauthorized`
     audit row when this returns False; this helper has no side effects."""

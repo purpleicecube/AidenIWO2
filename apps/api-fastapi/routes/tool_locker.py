@@ -866,7 +866,7 @@ async def import_skill(
            access_tier)
         VALUES
           ($1::uuid, $2, $3, $4, 'skill_only'::tool_category,
-           'skill_only'::tool_runtime_status,
+           'catalog_only'::tool_runtime_status,
            '{{}}'::jsonb, 'either'::tool_default_tier, true,
            'skill'::tool_type, '1.0.0', 'prompt_injection', $5,
            'any'::tool_access_tier)

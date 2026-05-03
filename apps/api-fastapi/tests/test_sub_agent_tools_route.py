@@ -60,6 +60,7 @@ _FIXTURES: list[dict] = [
         "category": "search",
         "runtime_status": "runnable",
         "default_tier": "either",
+        "tool_type": "api",
         "iwo2_origin": f"{_TEST_TAG}-search",
     },
     {
@@ -69,6 +70,7 @@ _FIXTURES: list[dict] = [
         "category": "rendering",
         "runtime_status": "runnable",
         "default_tier": "tier_2",
+        "tool_type": "python_code",
         "iwo2_origin": f"{_TEST_TAG}-render",
     },
 ]
@@ -91,10 +93,10 @@ async def _seed_tool_catalog() -> None:
                 INSERT INTO tool_catalog
                   (tool_key, display_name, description,
                    category, runtime_status,
-                   default_tier, iwo2_origin, enabled)
+                   default_tier, tool_type, iwo2_origin, enabled)
                 VALUES ($1, $2, $3,
                         $4::tool_category, $5::tool_runtime_status,
-                        $6::tool_default_tier, $7, true)
+                        $6::tool_default_tier, $7::tool_type, $8, true)
                 """,
                 f["tool_key"],
                 f["display_name"],
@@ -102,6 +104,7 @@ async def _seed_tool_catalog() -> None:
                 f["category"],
                 f["runtime_status"],
                 f["default_tier"],
+                f["tool_type"],
                 f["iwo2_origin"],
             )
     finally:

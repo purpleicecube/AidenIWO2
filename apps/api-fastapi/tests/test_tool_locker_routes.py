@@ -295,7 +295,7 @@ def test_import_skill_happy_path_with_temp_skills_dir() -> None:
                 body = r.json()
                 assert body["tool_key"] == "skill-theta-smoke-skill"
                 assert body["tool_type"] == "skill"
-                assert body["runtime_status"] == "skill_only"
+                assert body["runtime_status"] == "catalog_only"
                 assert "Theta Smoke" in (body.get("skill_content") or "")
                 # Re-import same dir -> 409
                 r2 = client.post(

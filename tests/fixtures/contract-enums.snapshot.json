@@ -240,9 +240,9 @@
     ],
     "tool_runtime_status": [
       "runnable",
-      "skill_only",
-      "mcp",
-      "planned"
+      "catalog_only",
+      "planned",
+      "legacy"
     ],
     "tool_type": [
       "skill",

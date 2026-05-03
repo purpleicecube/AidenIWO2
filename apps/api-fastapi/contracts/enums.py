@@ -132,7 +132,7 @@ TOOL_CATEGORY: Final[tuple[str, ...]] = (
     'introspection', 'skill_only',
 )
 TOOL_RUNTIME_STATUS: Final[tuple[str, ...]] = (
-    'runnable', 'skill_only', 'mcp', 'planned',
+    'runnable', 'catalog_only', 'planned', 'legacy',
 )
 TOOL_DEFAULT_TIER: Final[tuple[str, ...]] = (
     'tier_1', 'tier_2', 'either',
@@ -150,7 +150,7 @@ ToolCategory = Literal[
     'introspection', 'skill_only',
 ]
 ToolRuntimeStatus = Literal[
-    'runnable', 'skill_only', 'mcp', 'planned',
+    'runnable', 'catalog_only', 'planned', 'legacy',
 ]
 ToolDefaultTier = Literal['tier_1', 'tier_2', 'either']
 ToolType = Literal[

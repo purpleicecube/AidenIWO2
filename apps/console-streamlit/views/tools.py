@@ -47,7 +47,7 @@ _CATEGORIES = [
     "search", "document", "rendering", "design", "data", "ops",
     "introspection", "skill_only",
 ]
-_RUNTIME_STATUSES = ["runnable", "skill_only", "mcp", "planned"]
+_RUNTIME_STATUSES = ["runnable", "catalog_only", "planned", "legacy"]
 _DEFAULT_TIERS = ["tier_1", "tier_2", "either"]
 _ACCESS_TIERS = ["any", "tier_1", "tier_2"]
 
