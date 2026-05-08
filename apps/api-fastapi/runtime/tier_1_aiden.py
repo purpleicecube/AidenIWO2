@@ -594,6 +594,7 @@ async def invoke_aiden_tier_1(
     work_order_id: Optional[str] = None,
     intake_metadata: Optional[dict] = None,
     transport=None,
+    memory_block: Optional[str] = None,
 ) -> AidenDecision:
     """Run Aiden Tier 1 against `intake_text`; return a parsed decision.
 
@@ -601,6 +602,14 @@ async def invoke_aiden_tier_1(
     Aiden route) is responsible for acting on the decision: creating
     the WO, instantiating the workflow_execution, or surfacing the
     clarification question.
+
+    Loop Iota — when `memory_block` is provided, it is prepended to the
+    user-message payload (NOT the system prompt) so the operator sees
+    canonical facts + chat history + workspace grounding + scratch
+    BEFORE their actual intake. Aiden's identity stays in the system
+    prompt; tenant memory is user-side context. The block is already
+    tenant-validated by `memory.context_builder._validate_tenant_safety`
+    — invoke_aiden_tier_1 never inspects or trusts arbitrary content.
 
     Raises:
       AidenNoConfig          tenant has no aiden_tier_1 LLM config
@@ -616,6 +625,13 @@ async def invoke_aiden_tier_1(
             f"no enabled aiden_tier_1 LLM config for tenant {client_id}"
         )
 
+    # Loop Iota — the user-message payload is memory + intake. Memory
+    # already bounded to ~2K tokens by the builder's budget allocator.
+    if memory_block:
+        user_payload = f"{memory_block}\n\n[OPERATOR INTAKE]\n{intake_text}"
+    else:
+        user_payload = intake_text
+
     # Pre-flight budget — uses naive token estimate (chars/4) as a
     # cheap gate; the real per-call usage is logged after the call
     # completes with the provider-reported counts.
@@ -623,7 +639,7 @@ async def invoke_aiden_tier_1(
         128,
         min(
             DEFAULT_PER_CALL_MAX_TOKENS,
-            (len(AIDEN_SYSTEM_PROMPT) + len(intake_text)) // 4,
+            (len(AIDEN_SYSTEM_PROMPT) + len(user_payload)) // 4,
         ),
     )
     await check_or_raise_wo_budget(
@@ -663,7 +679,7 @@ async def invoke_aiden_tier_1(
                 (cfg.system_prompt or AIDEN_SYSTEM_PROMPT)
                 + AIDEN_OUTPUT_SCHEMA
             ),
-            user_message=intake_text,
+            user_message=user_payload,
             options=options,
             transport=transport,
         )

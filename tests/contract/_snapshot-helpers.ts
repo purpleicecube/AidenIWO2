@@ -40,6 +40,7 @@ import {
   BETA_2_PHASE_0_4_AUDIT_EVENTS,
   LOOP_ETA_AUDIT_EVENTS,
   LOOP_THETA_AUDIT_EVENTS,
+  LOOP_IOTA_AUDIT_EVENTS,
 } from "../../packages/contracts/audit/events";
 
 export interface ContractSnapshot {
@@ -109,6 +110,7 @@ export function loadAuditEvents(): ContractSnapshot["auditEvents"] {
       BETA_2_PHASE_0_4_AUDIT_EVENTS: [...BETA_2_PHASE_0_4_AUDIT_EVENTS],
       LOOP_ETA_AUDIT_EVENTS: [...LOOP_ETA_AUDIT_EVENTS],
       LOOP_THETA_AUDIT_EVENTS: [...LOOP_THETA_AUDIT_EVENTS],
+      LOOP_IOTA_AUDIT_EVENTS: [...LOOP_IOTA_AUDIT_EVENTS],
     },
   };
 }

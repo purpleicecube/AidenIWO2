@@ -35,6 +35,7 @@ from deps import (
     get_tenant_scoped_connection,
     require_permission_dep,
 )
+from memory import memory_context_builder
 from runtime.budgets import LlmBudgetExceeded
 from runtime.template_resolver import (
     TemplateResolution,
@@ -69,6 +70,11 @@ class AidenChatResponse(BaseModel):
     model: Optional[str] = None
     latency_ms: Optional[int] = None
     error: Optional[str] = None
+    # Loop Iota — Streamlit "Grounded by" chips. Empty list when the
+    # memory bundle was bypassed (kill switch / no sources / very short
+    # intake). One entry per validated source kind in the assembled
+    # bundle.
+    memory_sources: Optional[list[dict[str, Any]]] = None
 
 
 def _decision_to_payload(dec) -> dict[str, Any]:  # noqa: ANN001
@@ -353,12 +359,26 @@ async def aiden_chat(
             },
         )
 
+    # Loop Iota — assemble memory ONCE per HTTP request. The bundle is
+    # reused across the tool-call re-invoke path below (firewall §5 +
+    # acceptance criterion §AC #17 — no duplicate memory.applied rows).
+    # The builder owns its own audit emissions (memory.applied /
+    # bypassed / budget_truncated / source_rejected); aiden_chat does
+    # not need to re-audit memory.
+    memory_bundle = await memory_context_builder(
+        conn,
+        client_id=ctx["client_id"],
+        user_id=ctx["user_id"],
+        message=body.message,
+    )
+
     try:
         decision = await invoke_aiden_tier_1(
             conn,
             intake_text=body.message,
             client_id=ctx["client_id"],
             actor_user_id=ctx["user_id"],
+            memory_block=memory_bundle.block or None,
         )
     except AidenNoConfig as exc:
         raise HTTPException(
@@ -420,12 +440,16 @@ async def aiden_chat(
             f"Compose your final assistant_reply using the data above. "
             f"Do not call another tool."
         )
+        # Loop Iota — reuse the SAME memory bundle assembled before the
+        # first tier_1 invoke (acceptance criterion §AC #17). Tool result
+        # is the new context for the second turn; memory does not reload.
         try:
             decision = await invoke_aiden_tier_1(
                 conn,
                 intake_text=followup_intake,
                 client_id=ctx["client_id"],
                 actor_user_id=ctx["user_id"],
+                memory_block=memory_bundle.block or None,
             )
         except (
             AidenNoConfig,
@@ -459,6 +483,33 @@ async def aiden_chat(
             pass
 
     payload = _decision_to_payload(decision)
+    # Loop Iota — surface the memory source list for "Grounded by" chips
+    # in the Streamlit chat view. One row per validated source kind +
+    # short metadata for human-readable rendering. Empty list when
+    # bypassed.
+    memory_sources_for_ui: list[dict[str, Any]] = []
+    if not memory_bundle.bypassed:
+        for src in memory_bundle.sources:
+            entry: dict[str, Any] = {
+                "kind": src.kind,
+                "tokens": src.tokens,
+            }
+            if src.kind in ("workspace_retrieval", "scratch_retrieval"):
+                fn = src.metadata.get("filename") if src.metadata else None
+                if fn:
+                    entry["filename"] = fn
+                score = src.metadata.get("score") if src.metadata else None
+                if isinstance(score, (int, float)):
+                    entry["score"] = round(float(score), 3)
+            elif src.kind == "chat_history":
+                entry["turn_count"] = (
+                    src.metadata.get("turn_count") if src.metadata else None
+                )
+            elif src.kind == "canonical_facts":
+                entry["revision"] = (
+                    src.metadata.get("revision") if src.metadata else None
+                )
+            memory_sources_for_ui.append(entry)
     return AidenChatResponse(
         ok=True,
         decision_kind=payload.get("decision_kind"),
@@ -471,4 +522,5 @@ async def aiden_chat(
         provider=payload.get("provider"),
         model=payload.get("model"),
         latency_ms=payload.get("latency_ms"),
+        memory_sources=memory_sources_for_ui,
     )

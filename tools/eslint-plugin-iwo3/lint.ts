@@ -19,6 +19,7 @@ import {
   type LintFinding,
 } from "./rules/no-raw-audit-insert";
 import { scanForUnscopedTenantQuery } from "./rules/require-tenant-scope-on-client-tables";
+import { scanForDirectLlmContentInjection } from "./rules/no-direct-llm-content-injection";
 
 const REPO_ROOT = resolve(__dirname, "..", "..");
 
@@ -91,6 +92,7 @@ export function lintRepo(): LintFinding[] {
     }
     findings.push(...scanForRawAuditInsert(rel, src));
     findings.push(...scanForUnscopedTenantQuery(rel, src));
+    findings.push(...scanForDirectLlmContentInjection(rel, src));
   }
   return findings;
 }

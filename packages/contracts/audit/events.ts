@@ -284,6 +284,20 @@ export const AUDIT_EVENTS = {
   TOOL_CATALOG_DELETED:        "tool_catalog.deleted",
   TOOL_CATALOG_SKILL_IMPORTED: "tool_catalog.skill_imported",
   TOOL_CATALOG_MCP_TESTED:     "tool_catalog.mcp_tested",
+
+  // Loop Iota — Memory V1 retrofit. Locked at scope authoring per
+  // IWO3_LOOP_IOTA_SCOPE_PROPOSAL §AC + audit vocabulary table.
+  // memory.applied — bundle assembled and injected into Tier 1 LLM call
+  // memory.bypassed — env or per-tenant kill switch tripped (or empty intake)
+  // memory.budget_truncated — at least one source kind dropped to fit budget
+  // memory.source_rejected — firewall Layer 4 caught a tenant/owner mismatch.
+  //   This is the smoke alarm — should never fire in normal operation
+  //   (M-009 in scope risk register; ops runbook treats any non-zero
+  //   count as P0).
+  MEMORY_APPLIED:          "memory.applied",
+  MEMORY_BYPASSED:         "memory.bypassed",
+  MEMORY_BUDGET_TRUNCATED: "memory.budget_truncated",
+  MEMORY_SOURCE_REJECTED:  "memory.source_rejected",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -500,6 +514,23 @@ export const LOOP_THETA_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.TOOL_CATALOG_DELETED,
   AUDIT_EVENTS.TOOL_CATALOG_SKILL_IMPORTED,
   AUDIT_EVENTS.TOOL_CATALOG_MCP_TESTED,
+];
+
+// Loop Iota — Memory V1 retrofit. Four events locked at scope authoring
+// per IWO3_LOOP_IOTA_SCOPE_PROPOSAL_v0.1.0.md §"Audit vocabulary".
+//
+// `memory.applied` is the success path emitted exactly once per chat
+// HTTP request (acceptance criterion #17 — tool-call re-invokes do NOT
+// re-run the assembler). The other three are exception paths:
+//   bypassed → kill switch / no sources / very short intake
+//   budget_truncated → at least one source kind dropped to fit 2K tokens
+//   source_rejected → firewall caught a tenant/owner mismatch; SHOULD
+//                     NEVER FIRE in production. M-009 watchlist item.
+export const LOOP_IOTA_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.MEMORY_APPLIED,
+  AUDIT_EVENTS.MEMORY_BYPASSED,
+  AUDIT_EVENTS.MEMORY_BUDGET_TRUNCATED,
+  AUDIT_EVENTS.MEMORY_SOURCE_REJECTED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs

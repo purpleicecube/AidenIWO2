@@ -76,10 +76,13 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     ).toEqual(snap.permissionKeys);
   });
 
-  it("snapshot cardinalities match expected Loop 1-Theta baselines", () => {
+  it("snapshot cardinalities match expected Loop 1-Iota baselines", () => {
     const snap = loadSnapshot();
     expect(Object.keys(snap.dbEnums).length).toBe(49);
-    expect(snap.auditEvents.all.length).toBe(138);
+    // Loop Iota — Memory V1 shipped 4 audit events under
+    // LOOP_IOTA_AUDIT_EVENTS (memory.applied / .bypassed /
+    // .budget_truncated / .source_rejected). Total: 138 + 4 = 142.
+    expect(snap.auditEvents.all.length).toBe(142);
     expect(snap.permissionKeys.length).toBe(87);
     // Every locked per-loop array carries the right shape.
     expect(snap.auditEvents.byLoop.LOOP_2_AUDIT_EVENTS.length).toBe(12);
@@ -106,6 +109,8 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     expect(snap.auditEvents.byLoop.BETA_2_PHASE_0_4_AUDIT_EVENTS.length).toBe(2);
     expect(snap.auditEvents.byLoop.LOOP_ETA_AUDIT_EVENTS.length).toBe(12);
     expect(snap.auditEvents.byLoop.LOOP_THETA_AUDIT_EVENTS.length).toBe(4);
+    // Loop Iota — Memory V1.
+    expect(snap.auditEvents.byLoop.LOOP_IOTA_AUDIT_EVENTS.length).toBe(4);
   });
 });
 

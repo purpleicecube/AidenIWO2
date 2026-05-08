@@ -485,6 +485,56 @@ def _promote_reply(
 # ── Renderers ─────────────────────────────────────────────────────────
 
 
+# Loop Iota — "Grounded by" chips. One small caption row under each
+# assistant reply showing which memory sources were injected. Empty
+# memory bundles render nothing (don't draw operator attention to a
+# negative). Source kinds:
+#   canonical_facts → ⭐ Canonical facts (rev N)
+#   chat_history    → 💬 Chat history (N turns)
+#   workspace_retrieval → 📄 filename (score=0.92)
+#   scratch_retrieval   → 🗒️ filename (score=0.81)
+_KIND_LABELS = {
+    "canonical_facts": "⭐ Canonical facts",
+    "chat_history": "💬 Chat history",
+    "workspace_retrieval": "📄",
+    "scratch_retrieval": "🗒️",
+}
+
+
+def _format_grounded_entry(entry: dict[str, Any]) -> str:
+    kind = entry.get("kind")
+    if kind == "canonical_facts":
+        rev = entry.get("revision")
+        return (
+            f"{_KIND_LABELS[kind]} (rev {rev})"
+            if rev is not None
+            else _KIND_LABELS[kind]
+        )
+    if kind == "chat_history":
+        n = entry.get("turn_count")
+        return (
+            f"{_KIND_LABELS[kind]} ({n} turns)"
+            if n is not None
+            else _KIND_LABELS[kind]
+        )
+    if kind in ("workspace_retrieval", "scratch_retrieval"):
+        fn = entry.get("filename") or "(unnamed)"
+        score = entry.get("score")
+        score_label = f" · {score:.2f}" if isinstance(score, (int, float)) else ""
+        return f"{_KIND_LABELS[kind]} {fn}{score_label}"
+    return str(kind)
+
+
+def _render_grounded_chips(reply: dict[str, Any]) -> None:
+    """Render the Grounded-by source chip row. No-op when memory was
+    bypassed or the bundle was empty."""
+    sources = (reply or {}).get("memory_sources") or []
+    if not sources:
+        return
+    chips = " &nbsp; ".join(_format_grounded_entry(s) for s in sources)
+    st.caption(f"_Grounded by:_ {chips}")
+
+
 def _render_context_actions(actions: dict[str, Any], idx: int) -> None:
     """Render Open-X buttons for a status message. Routes via
     st.session_state to the destination page so the same filter/picker
@@ -703,6 +753,9 @@ def main() -> None:
             st.markdown(m["content"])
             st.caption(m.get("ts", ""))
             if m.get("source") == "aiden" and m.get("reply"):
+                # Loop Iota — Grounded by chips render before the action
+                # buttons so operators see the memory provenance first.
+                _render_grounded_chips(m["reply"])
                 _render_actions(api, messages, idx, m["reply"])
             actions = m.get("context_actions") or {}
             if actions:

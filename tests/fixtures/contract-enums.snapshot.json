@@ -372,6 +372,10 @@
       "mcp.connection_tested",
       "mcp.session_closed",
       "mcp.session_opened",
+      "memory.applied",
+      "memory.budget_truncated",
+      "memory.bypassed",
+      "memory.source_rejected",
       "output_candidate.rejected",
       "output_candidate.selected",
       "output_handoff.completed",
@@ -622,6 +626,12 @@
         "tool_catalog.deleted",
         "tool_catalog.skill_imported",
         "tool_catalog.mcp_tested"
+      ],
+      "LOOP_IOTA_AUDIT_EVENTS": [
+        "memory.applied",
+        "memory.bypassed",
+        "memory.budget_truncated",
+        "memory.source_rejected"
       ]
     }
   },
