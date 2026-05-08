@@ -201,7 +201,13 @@ def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
     rows_html: list[str] = []
     for wo in wos[:8]:
         glyph = _status_chip_glyph(wo.status)
+        # Loop Iota.x — wrap each row in an `<a>` so clicking the row
+        # navigates to /work_orders?focus=<id>. work_orders.py reads
+        # the focus from query_params (in addition to session_state)
+        # and auto-expands the matching expander.
         row = (
+            f'<a href="/work_orders?focus={escape(wo.id)}" target="_self" '
+            f'class="iwo3-wo-row-link">'
             f'<div class="iwo3-wo-row">'
             f'<div><div class="title">{escape(wo.title)}</div>'
             f'<div class="meta">{escape(wo.type)} · {escape(wo.created_at[:10])}</div></div>'
@@ -209,6 +215,7 @@ def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
             f'<span class="{_status_chip_class(wo.status)}">'
             f'<span style="margin-right:4px;">{escape(glyph)}</span>{escape(wo.status)}</span>'
             f'</div>'
+            f'</a>'
         )
         rows_html.append(row)
     html = (

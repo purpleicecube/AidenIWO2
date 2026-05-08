@@ -392,7 +392,19 @@ def main() -> None:
     status_filter = st.multiselect("Status", options=statuses, default=statuses)
 
     # Optional focus from chat → "Open Work Order" or from output_packages.
+    # Loop Iota.x — also accept ?focus=<id> from the URL so the Dashboard
+    # Recent Work Orders rows can deep-link directly. session_state wins
+    # if both are present (chat handoff is more explicit than URL).
     focus_id = st.session_state.pop("work_orders_focus_id", None)
+    if not focus_id:
+        qp_focus = st.query_params.get("focus")
+        if isinstance(qp_focus, str) and qp_focus.strip():
+            focus_id = qp_focus.strip()
+            # Clear the param so a refresh doesn't re-pin focus indefinitely.
+            try:
+                del st.query_params["focus"]
+            except KeyError:
+                pass
     if focus_id:
         st.info(
             "Showing the work order opened from another surface. The expander "

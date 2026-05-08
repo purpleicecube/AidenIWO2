@@ -218,6 +218,22 @@ _CSS = """
   .iwo3-wo-row .meta { color: #6B7280; font-size: 0.78rem; margin-top: 3px; }
   /* Priority chip is secondary to status — slightly lighter weight. */
   .iwo3-wo-row .iwo3-chip.priority { font-weight: 500; }
+  /* Loop Iota.x — make recent-WO rows clickable. The anchor wraps the
+     row div; we kill default link styling and add a subtle hover so
+     operators see the row is interactive. The :last-child border-0
+     rule keeps working because it targets the inner div, not the <a>. */
+  a.iwo3-wo-row-link,
+  a.iwo3-wo-row-link:visited {
+    text-decoration: none; color: inherit; display: block;
+  }
+  a.iwo3-wo-row-link:hover .iwo3-wo-row {
+    background: #F9FAFB;
+    margin: 0 -12px; padding-left: 12px; padding-right: 12px;
+    border-radius: 6px;
+  }
+  a.iwo3-wo-row-link:hover .iwo3-wo-row .title {
+    color: #1E5F91;
+  }
   /* Section-head right-side link (replaces the chunky "View all" button). */
   .iwo3-section-head a.iwo3-link,
   .iwo3-section-head .iwo3-link {
