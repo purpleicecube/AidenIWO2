@@ -13,6 +13,9 @@ from typing import Literal, Optional
 
 MemorySourceKind = Literal[
     "canonical_facts",
+    "path_targeted",      # Loop Kappa — operator named a workspace path
+    "folder_listing",     # Loop Kappa — synthesized directory map
+    "filename_match",     # Loop Kappa — filename ILIKE hit
     "chat_history",
     "workspace_retrieval",
     "scratch_retrieval",
@@ -22,12 +25,26 @@ MemorySourceKind = Literal[
 # Stable priority order. Used by the budget allocator to decide which
 # source to truncate first when the 2K token budget is exceeded.
 # Lower number = higher priority = truncated last.
+#
+# Loop Kappa rationale (D-K3): operator-explicit retrieval intent
+# (path / folder / filename) outranks tsquery and chat history.
+# tsquery-driven `workspace_retrieval` outranks chat history because
+# when retrieval signal is present, grounding beats continuity.
 SOURCE_PRIORITY: dict[str, int] = {
-    "canonical_facts": 1,  # never truncated; raises overrun if alone exceeds
-    "chat_history": 2,
-    "workspace_retrieval": 3,
-    "scratch_retrieval": 4,
+    "canonical_facts": 1,    # never truncated; char-truncated to fit if alone exceeds
+    "path_targeted": 2,      # explicit operator path intent
+    "folder_listing": 3,     # synthesized directory map
+    "filename_match": 4,     # operator named a filename
+    "workspace_retrieval": 5,  # tsquery hits
+    "chat_history": 6,
+    "scratch_retrieval": 7,
 }
+
+
+# Folder-listing caps (Q-K3 default: 25 / 50). Exceeding either emits
+# a truncation marker line in the rendered listing.
+FOLDER_LISTING_MAX_SUBFOLDERS: int = 25
+FOLDER_LISTING_MAX_FILES: int = 50
 
 
 # 2,000 tokens for the memory block; leaves >40K for the rest of the

@@ -24,6 +24,7 @@ from authz.audit_writer import write_audit_row
 
 from . import assembler, cache  # noqa: F401  (cache re-exported for tests)
 from .budget import allocate, render_block
+from .intent_parser import parse_context_intent
 from .types import (
     MEMORY_BUDGET_TOKENS,
     SHORT_INTAKE_THRESHOLD_CHARS,
@@ -232,14 +233,19 @@ async def memory_context_builder(
     intake = (message or "").strip()
     very_short = len(intake) < SHORT_INTAKE_THRESHOLD_CHARS
 
-    # Single composite query.
+    # Loop Kappa — parse structured intent (paths, filename terms,
+    # folder-listing intent) before retrieval. Cheap pure regex pass;
+    # empty intent on short intakes preserves Iota fallback behavior.
+    intent = parse_context_intent("" if very_short else intake)
+
+    # Single composite query (plus optional folder-listing follow-up
+    # when intent.wants_folder_listing).
     inputs = await assembler.fetch_memory_inputs(
         conn,
         client_id=client_id,
         user_id=user_id,
         intake_text=intake if not very_short else "",
-        # Note: passing empty intake when short skips workspace + scratch
-        # CTEs because tsquery_terms will be None.
+        intent=intent,
     )
 
     # Per-tenant kill switch (read from clients row).

@@ -333,6 +333,9 @@
       "auth.session_refreshed",
       "auth.session_started",
       "authz.denied",
+      "canonical_facts.created",
+      "canonical_facts.deleted",
+      "canonical_facts.updated",
       "channel_auth_code.issued",
       "channel_identity.bound",
       "channel_identity.revoked",
@@ -632,6 +635,11 @@
         "memory.bypassed",
         "memory.budget_truncated",
         "memory.source_rejected"
+      ],
+      "LOOP_KAPPA_AUDIT_EVENTS": [
+        "canonical_facts.created",
+        "canonical_facts.updated",
+        "canonical_facts.deleted"
       ]
     }
   },
@@ -646,6 +654,11 @@
     "adapter_policy:read",
     "adapter_policy:update",
     "audit_log:read",
+    "canonical_facts:create",
+    "canonical_facts:delete",
+    "canonical_facts:read",
+    "canonical_facts:set_severity",
+    "canonical_facts:update",
     "channel_auth_code:issue",
     "channel_identity:read",
     "channel_identity:revoke",

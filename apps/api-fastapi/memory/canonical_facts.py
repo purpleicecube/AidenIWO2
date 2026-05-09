@@ -36,12 +36,54 @@ from typing import Optional
 import asyncpg
 
 from . import cache
+from .canonical_facts_service import (
+    count_active_canonical_facts,
+    refresh_canonical_facts_from_table,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
 _CANONICAL_FACTS_FOLDER_NAME = "canonical facts"
+
+
+async def refresh_canonical_facts_for_tenant_hybrid(
+    conn: asyncpg.Connection,
+    *,
+    client_id: str,
+) -> Optional[int]:
+    """Loop Kappa hybrid switch: prefer the `canonical_facts` table
+    when populated; fall back to the workspace-folder path when the
+    table is empty for this tenant.
+
+    Returns the new `canonical_facts_revision`, or None on no-op.
+
+    D-K2 rationale: tenants currently using the `Canonical Facts/`
+    workspace folder must keep working without a forced migration.
+    Adoption of the CRUD UI is voluntary and per-tenant; switchover
+    is automatic on the first INSERT into `canonical_facts`.
+    """
+    try:
+        active_count = await count_active_canonical_facts(
+            conn, client_id=client_id
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "refresh_canonical_facts_for_tenant_hybrid: count failed "
+            "for client_id=%s, falling back to folder path: %s",
+            client_id,
+            exc,
+        )
+        active_count = 0
+
+    if active_count > 0:
+        return await refresh_canonical_facts_from_table(
+            conn, client_id=client_id
+        )
+    return await refresh_canonical_facts_for_tenant(
+        conn, client_id=client_id
+    )
 
 
 async def refresh_canonical_facts_for_tenant(

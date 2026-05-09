@@ -607,5 +607,40 @@
     "displayName": "Test MCP server connectivity",
     "description": "Open an ad-hoc MCP session and list its tools. MegaLoop Theta — admin-only POST /tool_catalog/mcp/test_connection. Audit-logged on every call.",
     "scope": "global"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000088",
+    "permissionKey": "canonical_facts:read",
+    "displayName": "Read canonical facts",
+    "description": "List and view the tenant's canonical_facts table rows. Loop Kappa — GET /canonical_facts.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000089",
+    "permissionKey": "canonical_facts:create",
+    "displayName": "Create canonical facts",
+    "description": "Author a new canonical fact entry. Triggers tenant blob refresh + canonical_facts_revision bump. Loop Kappa — POST /canonical_facts.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a000008a",
+    "permissionKey": "canonical_facts:update",
+    "displayName": "Update canonical facts",
+    "description": "Edit an existing canonical fact body or activation flag. Triggers blob refresh. Loop Kappa — PATCH /canonical_facts/{id}.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a000008b",
+    "permissionKey": "canonical_facts:delete",
+    "displayName": "Delete canonical facts",
+    "description": "Soft-delete (is_active=false) a canonical fact row. Triggers blob refresh. Loop Kappa — DELETE /canonical_facts/{id}.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a000008c",
+    "permissionKey": "canonical_facts:set_severity",
+    "displayName": "Set canonical fact severity",
+    "description": "Adjust severity (critical/high/medium/low) on an existing canonical fact. Loop Kappa — PATCH /canonical_facts/{id} with severity field.",
+    "scope": "tenant"
   }
 ]

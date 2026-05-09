@@ -34,6 +34,7 @@ EXPECTED_VIEWS: list[str] = [
     "tier_overview.py",
     "attributions.py",
     "aiden_settings.py",
+    "canonical_facts.py",
     "sub_agents.py",
     "tools.py",
     "pipelines.py",
@@ -42,6 +43,7 @@ EXPECTED_VIEWS: list[str] = [
     "output_packages.py",
     "handoffs.py",
     "audit_log.py",
+    "ops_memory_health.py",
 ]
 
 

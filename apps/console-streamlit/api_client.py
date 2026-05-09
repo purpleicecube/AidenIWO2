@@ -686,3 +686,47 @@ class ApiClient:
         return self._request(
             "GET", "/tools/stitch_design/test_connection"
         )
+
+    # ── Loop Kappa — Memory V1.5 canonical facts CRUD ───────────────
+
+    def list_canonical_facts(
+        self, *, include_inactive: bool = False
+    ) -> dict[str, Any]:
+        return self._request(
+            "GET",
+            "/canonical_facts",
+            params={"include_inactive": "true" if include_inactive else "false"},
+        )
+
+    def create_canonical_fact(
+        self, *, body: str, severity: str = "medium"
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/canonical_facts",
+            json={"body": body, "severity": severity},
+        )
+
+    def update_canonical_fact(
+        self,
+        fact_id: str,
+        *,
+        body: Optional[str] = None,
+        severity: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if body is not None:
+            payload["body"] = body
+        if severity is not None:
+            payload["severity"] = severity
+        if is_active is not None:
+            payload["is_active"] = is_active
+        return self._request(
+            "PATCH",
+            f"/canonical_facts/{fact_id}",
+            json=payload,
+        )
+
+    def delete_canonical_fact(self, fact_id: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/canonical_facts/{fact_id}")

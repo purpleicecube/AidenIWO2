@@ -51,3 +51,6 @@ export * from "./sub_agent_tools";
 
 // MegaLoop Theta — tool discovery metadata (Tools Locker)
 export * from "./tool_tags";
+
+// Loop Kappa — Memory V1.5 canonical facts CRUD table
+export * from "./canonical_facts";

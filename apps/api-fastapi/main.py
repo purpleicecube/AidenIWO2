@@ -32,6 +32,7 @@ from routes import (
     audit_log,
     auth as auth_routes,
     candidate_review,
+    canonical_facts as canonical_facts_routes,
     channels,
     chat_sessions,
     dispatch,
@@ -119,6 +120,7 @@ app.include_router(channels.router)
 app.include_router(aiden.router)
 app.include_router(dispatch.router)
 app.include_router(workspace.router)
+app.include_router(canonical_facts_routes.router)
 app.include_router(chat_sessions.router)
 app.include_router(auth_routes.router)
 app.include_router(webhooks.router)

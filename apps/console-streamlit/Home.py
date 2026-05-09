@@ -586,6 +586,7 @@ def _render_authenticated_console() -> None:
         ],
         "Configuration": [
             st.Page("views/aiden_settings.py", title="Aiden Settings", icon=":material/settings:"),
+            st.Page("views/canonical_facts.py", title="Canonical Facts", icon=":material/verified:"),
             st.Page("views/sub_agents.py", title="Sub-Agents", icon=":material/smart_toy:"),
             st.Page("views/tools.py", title="Tools", icon=":material/build:"),
             st.Page("views/pipelines.py", title="Pipelines", icon=":material/conversion_path:"),
@@ -596,6 +597,7 @@ def _render_authenticated_console() -> None:
             st.Page("views/output_packages.py", title="Output Packages", icon=":material/inventory_2:"),
             st.Page("views/handoffs.py", title="Handoffs", icon=":material/send:"),
             st.Page("views/audit_log.py", title="Audit Log", icon=":material/history:"),
+            st.Page("views/ops_memory_health.py", title="Memory Health", icon=":material/health_and_safety:"),
         ],
     }
     nav = st.navigation(pages, position="sidebar")

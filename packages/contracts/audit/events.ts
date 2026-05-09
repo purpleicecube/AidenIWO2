@@ -298,6 +298,14 @@ export const AUDIT_EVENTS = {
   MEMORY_BYPASSED:         "memory.bypassed",
   MEMORY_BUDGET_TRUNCATED: "memory.budget_truncated",
   MEMORY_SOURCE_REJECTED:  "memory.source_rejected",
+
+  // Loop Kappa — Memory V1.5 canonical facts CRUD lifecycle.
+  // canonical_facts.created  — POST /canonical_facts succeeds
+  // canonical_facts.updated  — PATCH /canonical_facts/{id} succeeds
+  // canonical_facts.deleted  — DELETE /canonical_facts/{id} (soft-delete) succeeds
+  CANONICAL_FACTS_CREATED: "canonical_facts.created",
+  CANONICAL_FACTS_UPDATED: "canonical_facts.updated",
+  CANONICAL_FACTS_DELETED: "canonical_facts.deleted",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -531,6 +539,15 @@ export const LOOP_IOTA_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.MEMORY_BYPASSED,
   AUDIT_EVENTS.MEMORY_BUDGET_TRUNCATED,
   AUDIT_EVENTS.MEMORY_SOURCE_REJECTED,
+];
+
+// Loop Kappa — Memory V1.5 operational maturity. Three events for
+// canonical_facts CRUD lifecycle (D-K2 hybrid table-driven path).
+// `delete` is soft-delete (is_active=false) — preserves audit lineage.
+export const LOOP_KAPPA_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.CANONICAL_FACTS_CREATED,
+  AUDIT_EVENTS.CANONICAL_FACTS_UPDATED,
+  AUDIT_EVENTS.CANONICAL_FACTS_DELETED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs

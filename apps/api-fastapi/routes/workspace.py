@@ -43,7 +43,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from authz.audit_writer import write_audit_row
-from memory.canonical_facts import refresh_canonical_facts_for_tenant
+from memory.canonical_facts import (
+    refresh_canonical_facts_for_tenant,
+    refresh_canonical_facts_for_tenant_hybrid,
+)
 from deps import (
     current_user_context,
     get_tenant_scoped_connection,
@@ -570,7 +573,7 @@ async def create_folder(
     # Loop Iota — a new folder named "Canonical Facts" creates an empty
     # canonical-facts source. The hook runs unconditionally; cheap when
     # no match.
-    await refresh_canonical_facts_for_tenant(conn, client_id=ctx["client_id"])
+    await refresh_canonical_facts_for_tenant_hybrid(conn, client_id=ctx["client_id"])
     return FolderResponse(folder=_folder_from_row(row))
 
 
@@ -661,7 +664,7 @@ async def update_folder(
     )
     # Loop Iota — folder rename/move can flip a folder in/out of the
     # Canonical Facts subtree.
-    await refresh_canonical_facts_for_tenant(conn, client_id=ctx["client_id"])
+    await refresh_canonical_facts_for_tenant_hybrid(conn, client_id=ctx["client_id"])
     return FolderResponse(folder=_folder_from_row(row))
 
 
@@ -742,7 +745,7 @@ async def delete_folder(
         )
         # Loop Iota — hard delete may have removed a Canonical Facts
         # subtree. Refresh.
-        await refresh_canonical_facts_for_tenant(
+        await refresh_canonical_facts_for_tenant_hybrid(
             conn, client_id=ctx["client_id"]
         )
         return FolderResponse(folder=WorkspaceFolder(
@@ -787,7 +790,7 @@ async def delete_folder(
     # Loop Iota — soft delete may hide a Canonical Facts folder; the
     # refresh helper filters on `deleted_at IS NULL`, so the next
     # rebuild excludes it.
-    await refresh_canonical_facts_for_tenant(conn, client_id=ctx["client_id"])
+    await refresh_canonical_facts_for_tenant_hybrid(conn, client_id=ctx["client_id"])
     return FolderResponse(folder=_folder_from_row(row))
 
 
@@ -874,7 +877,7 @@ async def create_file(
     # Loop Iota — refresh canonical facts blob if this write affects
     # the tenant's `Canonical Facts/` subtree. No-op when no such
     # folder exists.
-    await refresh_canonical_facts_for_tenant(conn, client_id=ctx["client_id"])
+    await refresh_canonical_facts_for_tenant_hybrid(conn, client_id=ctx["client_id"])
     return FileResponse(file=_file_from_row(row))
 
 
@@ -945,7 +948,7 @@ async def update_file(
     )
     # Loop Iota — file rename / move may pull a file in or out of the
     # Canonical Facts subtree. Refresh on both paths.
-    await refresh_canonical_facts_for_tenant(conn, client_id=ctx["client_id"])
+    await refresh_canonical_facts_for_tenant_hybrid(conn, client_id=ctx["client_id"])
     return FileResponse(file=_file_from_row(row))
 
 
@@ -987,7 +990,7 @@ async def delete_file(
             },
         )
         # Loop Iota — hard delete may remove a Canonical Facts file.
-        await refresh_canonical_facts_for_tenant(
+        await refresh_canonical_facts_for_tenant_hybrid(
             conn, client_id=ctx["client_id"]
         )
         return FileResponse(file=_file_from_row(f))
@@ -1026,7 +1029,7 @@ async def delete_file(
     )
     # Loop Iota — soft delete unlinks the file from the workspace tree.
     # Refresh in case the unlinked file was part of Canonical Facts.
-    await refresh_canonical_facts_for_tenant(conn, client_id=ctx["client_id"])
+    await refresh_canonical_facts_for_tenant_hybrid(conn, client_id=ctx["client_id"])
     return FileResponse(file=_file_from_row(row))
 
 

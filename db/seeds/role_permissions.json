@@ -910,5 +910,22 @@
   { "role": "admin", "permissionKey": "tool_catalog:update"        },
   { "role": "admin", "permissionKey": "tool_catalog:delete"        },
   { "role": "admin", "permissionKey": "tool_catalog:import_skill"  },
-  { "role": "admin", "permissionKey": "tool_catalog:test_mcp"      }
+  { "role": "admin", "permissionKey": "tool_catalog:test_mcp"      },
+
+  { "role": "owner",        "permissionKey": "canonical_facts:read"          },
+  { "role": "owner",        "permissionKey": "canonical_facts:create"        },
+  { "role": "owner",        "permissionKey": "canonical_facts:update"        },
+  { "role": "owner",        "permissionKey": "canonical_facts:delete"        },
+  { "role": "owner",        "permissionKey": "canonical_facts:set_severity"  },
+  { "role": "admin",        "permissionKey": "canonical_facts:read"          },
+  { "role": "admin",        "permissionKey": "canonical_facts:create"        },
+  { "role": "admin",        "permissionKey": "canonical_facts:update"        },
+  { "role": "admin",        "permissionKey": "canonical_facts:delete"        },
+  { "role": "admin",        "permissionKey": "canonical_facts:set_severity"  },
+  { "role": "operator",     "permissionKey": "canonical_facts:read"          },
+  { "role": "operator",     "permissionKey": "canonical_facts:create"        },
+  { "role": "operator",     "permissionKey": "canonical_facts:update"        },
+  { "role": "reviewer",     "permissionKey": "canonical_facts:read"          },
+  { "role": "viewer",       "permissionKey": "canonical_facts:read"          },
+  { "role": "agent_system", "permissionKey": "canonical_facts:read"          }
 ]

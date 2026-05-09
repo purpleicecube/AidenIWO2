@@ -40,6 +40,7 @@ const BETA_1_VERSION = "iwo3@v0.12.0-beta-1";
 const BETA_2_PHASE_0_3_VERSION = "iwo3@v0.13.0-beta-2-phase-0.3";
 const LOOP_ETA_VERSION = "iwo3@v0.14.0-loop-eta";
 const MEGALOOP_THETA_VERSION = "iwo3@v0.15.0-loop-theta";
+const LOOP_KAPPA_VERSION = "iwo3@v0.16.0-loop-kappa";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -106,6 +107,9 @@ const KNOWN_TABLES: ManifestEntry[] = [
   // MegaLoop Theta — Tools Locker discovery metadata (UI surface deferred)
   { name: "tool_tags",                  source: "iwo3_native", sourceVersion: MEGALOOP_THETA_VERSION, ownedBy: "drizzle", notes: "MegaLoop Theta — flat tag dictionary for the Tools Locker; tag CRUD UI deferred per scope §Out-of-scope" },
   { name: "tool_tag_assignments",       source: "iwo3_native", sourceVersion: MEGALOOP_THETA_VERSION, ownedBy: "drizzle", notes: "MegaLoop Theta — many-to-many bridge between tool_catalog and tool_tags; CASCADE on both FKs" },
+
+  // Loop Kappa — Memory V1.5 canonical facts CRUD table (D-K2 hybrid)
+  { name: "canonical_facts",            source: "iwo3_native", sourceVersion: LOOP_KAPPA_VERSION, ownedBy: "drizzle", notes: "Loop Kappa — Memory V1.5 canonical facts authoring source; FORCE RLS; clients.canonical_facts_blob becomes denormalized read cache rebuilt from this table when populated (folder fallback otherwise)" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

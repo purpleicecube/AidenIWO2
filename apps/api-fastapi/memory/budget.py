@@ -122,31 +122,56 @@ def allocate(
     return kept, sorted(truncated_kinds)
 
 
+_GROUNDING_RULES_PREAMBLE = """## GROUNDING RULES
+- Use ONLY the facts, data, metrics, and quotes found in the sources below.
+- Do NOT invent or extrapolate numbers, statistics, or claims absent from the source content.
+- If the sources do not contain specific data needed, say so explicitly rather than fabricating.
+- When citing a source, reference its filename or path so the operator can verify."""
+
+
+def _format_citation_line(src: MemorySource) -> str:
+    """One line per kept source for the end-of-block CITATIONS index.
+
+    Format:  `[<short_id>] <kind> — <filename or label> (<score or revision>)`
+
+    The short_id is the first 8 chars of `record_id` plus the kind
+    prefix so operators can match a citation back to its section.
+    """
+    short_id = (src.record_id or "")[:8] or "?"
+    fn = src.metadata.get("filename")
+    if not fn:
+        if src.kind == "canonical_facts":
+            fn = f"canonical_facts (rev {src.metadata.get('revision', '?')})"
+        elif src.kind == "folder_listing":
+            fn = src.metadata.get("root_path") or "folder_listing"
+        elif src.kind == "chat_history":
+            fn = f"chat_session ({src.metadata.get('turn_count', '?')} turns)"
+        else:
+            fn = "(unnamed)"
+    score = src.metadata.get("score")
+    score_label = (
+        f" score={score:.2f}"
+        if isinstance(score, float) and src.kind not in {"canonical_facts", "chat_history", "folder_listing"}
+        else ""
+    )
+    return f"- [{short_id}] {src.kind} — {fn}{score_label}"
+
+
 def render_block(sources: list[MemorySource]) -> str:
     """Concatenate kept sources into the final memory block string.
 
-    Format (deterministic; lint-friendly; LLM-readable):
-
+    Loop Kappa render order (matches SOURCE_PRIORITY):
+        ## GROUNDING RULES (preamble — anti-hallucination posture)
         ## CANONICAL FACTS (authoritative)
-        <blob>
-
+        ## PATH-TARGETED FILES
+        ## FOLDER LISTING
+        ## FILENAME MATCHES
+        ## WORKSPACE GROUNDING (tsquery)
         ## RECENT CHAT HISTORY
-        - operator: "..."
-        - aiden: "..."
-
-        ## WORKSPACE GROUNDING
-        ### Outputs/RMIS_pricing_deck.pptx (score=0.92)
-        <extracted text excerpt>
-
-        ### Drafts/q2_forecast.md (score=0.81)
-        <extracted text excerpt>
-
         ## OPERATOR SCRATCH
-        ### scratch/q2_forecast.md (score=0.74)
-        <extracted text excerpt>
+        ## CITATIONS (one line per kept source)
 
-    A leading divider tells Aiden where memory ends and the live intake
-    begins. Empty bundle returns empty string.
+    Empty bundle returns empty string.
     """
     if not sources:
         return ""
@@ -158,14 +183,35 @@ def render_block(sources: list[MemorySource]) -> str:
         sections.setdefault(src.kind, []).append(src)
 
     parts: list[str] = ["[MEMORY CONTEXT — tenant-validated]"]
+    parts.append("")
+    parts.append(_GROUNDING_RULES_PREAMBLE)
+
     if "canonical_facts" in sections:
         parts.append("\n## CANONICAL FACTS (authoritative)")
         for src in sections["canonical_facts"]:
             parts.append(src.text.rstrip())
-    if "chat_history" in sections:
-        parts.append("\n## RECENT CHAT HISTORY")
-        for src in sections["chat_history"]:
+
+    if "path_targeted" in sections:
+        parts.append("\n## PATH-TARGETED FILES")
+        for src in sections["path_targeted"]:
+            fn = src.metadata.get("filename") or "(unnamed)"
+            folder = src.metadata.get("folder_path") or ""
+            label = f"{folder}/{fn}" if folder else fn
+            parts.append(f"\n### {label}")
             parts.append(src.text.rstrip())
+
+    if "folder_listing" in sections:
+        parts.append("\n## FOLDER LISTING")
+        for src in sections["folder_listing"]:
+            parts.append(src.text.rstrip())
+
+    if "filename_match" in sections:
+        parts.append("\n## FILENAME MATCHES")
+        for src in sections["filename_match"]:
+            fn = src.metadata.get("filename") or "(unnamed)"
+            parts.append(f"\n### {fn}")
+            parts.append(src.text.rstrip())
+
     if "workspace_retrieval" in sections:
         parts.append("\n## WORKSPACE GROUNDING")
         for src in sections["workspace_retrieval"]:
@@ -174,6 +220,12 @@ def render_block(sources: list[MemorySource]) -> str:
             score_label = f" (score={score:.2f})" if isinstance(score, float) else ""
             parts.append(f"\n### {fn}{score_label}")
             parts.append(src.text.rstrip())
+
+    if "chat_history" in sections:
+        parts.append("\n## RECENT CHAT HISTORY")
+        for src in sections["chat_history"]:
+            parts.append(src.text.rstrip())
+
     if "scratch_retrieval" in sections:
         parts.append("\n## OPERATOR SCRATCH")
         for src in sections["scratch_retrieval"]:
@@ -182,5 +234,12 @@ def render_block(sources: list[MemorySource]) -> str:
             score_label = f" (score={score:.2f})" if isinstance(score, float) else ""
             parts.append(f"\n### {fn}{score_label}")
             parts.append(src.text.rstrip())
+
+    # End-of-block citation index. Lists every kept source by short id
+    # + kind + filename so the LLM can cite verifiably.
+    parts.append("\n## CITATIONS")
+    for src in by_priority:
+        parts.append(_format_citation_line(src))
+
     parts.append("\n[END MEMORY CONTEXT]")
     return "\n".join(parts)
