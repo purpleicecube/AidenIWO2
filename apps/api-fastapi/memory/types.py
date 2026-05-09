@@ -13,11 +13,12 @@ from typing import Literal, Optional
 
 MemorySourceKind = Literal[
     "canonical_facts",
-    "path_targeted",      # Loop Kappa — operator named a workspace path
-    "folder_listing",     # Loop Kappa — synthesized directory map
-    "filename_match",     # Loop Kappa — filename ILIKE hit
+    "path_targeted",        # Loop Kappa — operator named a workspace path
+    "folder_listing",       # Loop Kappa — synthesized directory map
+    "filename_match",       # Loop Kappa — filename ILIKE hit
+    "workspace_retrieval",  # tsquery (exact keyword match)
+    "semantic_retrieval",   # Loop Mu — vector cosine similarity
     "chat_history",
-    "workspace_retrieval",
     "scratch_retrieval",
 ]
 
@@ -30,15 +31,31 @@ MemorySourceKind = Literal[
 # (path / folder / filename) outranks tsquery and chat history.
 # tsquery-driven `workspace_retrieval` outranks chat history because
 # when retrieval signal is present, grounding beats continuity.
+#
+# Loop Mu rationale (D-M1): semantic_retrieval slots BETWEEN
+# workspace_retrieval (tsquery, exact-keyword) and chat_history.
+# Exact keyword wins over fuzzy semantic when both fire; semantic
+# beats chat continuity for the same reason tsquery does — when
+# retrieval signal is present, grounding beats continuity.
+# Deterministic kinds (canonical_facts, path/folder/filename) all
+# rank above semantic_retrieval — Mu adds capability without
+# replacing deterministic-first posture (V3 brief constraint).
 SOURCE_PRIORITY: dict[str, int] = {
     "canonical_facts": 1,    # never truncated; char-truncated to fit if alone exceeds
     "path_targeted": 2,      # explicit operator path intent
     "folder_listing": 3,     # synthesized directory map
     "filename_match": 4,     # operator named a filename
-    "workspace_retrieval": 5,  # tsquery hits
-    "chat_history": 6,
-    "scratch_retrieval": 7,
+    "workspace_retrieval": 5,  # tsquery hits (exact keyword)
+    "semantic_retrieval": 6,   # Loop Mu — vector cosine
+    "chat_history": 7,
+    "scratch_retrieval": 8,
 }
+
+
+# Loop Mu — top-N semantic retrieval results per turn. Smaller than
+# RETRIEVAL_TOP_N (3) because semantic chunks are noisier and the
+# 2K Tier-1 budget should not be dominated by fuzzy hits.
+SEMANTIC_RETRIEVAL_TOP_N: int = 3
 
 
 # Folder-listing caps (Q-K3 default: 25 / 50). Exceeding either emits

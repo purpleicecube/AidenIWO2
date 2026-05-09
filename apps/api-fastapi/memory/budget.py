@@ -221,6 +221,15 @@ def render_block(sources: list[MemorySource]) -> str:
             parts.append(f"\n### {fn}{score_label}")
             parts.append(src.text.rstrip())
 
+    if "semantic_retrieval" in sections:
+        parts.append("\n## SEMANTIC GROUNDING (vector search)")
+        for src in sections["semantic_retrieval"]:
+            fn = src.metadata.get("filename") or "(unnamed)"
+            score = src.metadata.get("score")
+            score_label = f" (cosine={score:.2f})" if isinstance(score, float) else ""
+            parts.append(f"\n### {fn}{score_label}")
+            parts.append(src.text.rstrip())
+
     if "chat_history" in sections:
         parts.append("\n## RECENT CHAT HISTORY")
         for src in sections["chat_history"]:

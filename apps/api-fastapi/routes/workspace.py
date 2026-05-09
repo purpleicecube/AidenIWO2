@@ -878,6 +878,28 @@ async def create_file(
     # the tenant's `Canonical Facts/` subtree. No-op when no such
     # folder exists.
     await refresh_canonical_facts_for_tenant_hybrid(conn, client_id=ctx["client_id"])
+    # Loop Mu — best-effort semantic-vector indexing for the new
+    # artifact. Skipped silently when chromadb is unavailable, the
+    # env kill switch is off, or the text is empty/binary. Never
+    # blocks the workspace write — Chroma errors are logged and
+    # swallowed inside vector_store helpers.
+    if extracted_text and not extracted_text.startswith("b64:"):
+        from memory.vector_store import (  # local to keep import-cycle safe
+            env_semantic_enabled,
+            index_artifact_for_tenant,
+        )
+        if env_semantic_enabled():
+            try:
+                index_artifact_for_tenant(
+                    client_id=ctx["client_id"],
+                    artifact_id=row["id"],
+                    filename=row["filename"],
+                    text=extracted_text,
+                    workspace_folder_id=row["workspace_folder_id"],
+                )
+            except Exception:  # noqa: BLE001
+                # Defensive — never block file creation on indexing.
+                pass
     return FileResponse(file=_file_from_row(row))
 
 

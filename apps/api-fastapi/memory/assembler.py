@@ -52,8 +52,10 @@ from .types import (
     FOLDER_LISTING_MAX_FILES,
     FOLDER_LISTING_MAX_SUBFOLDERS,
     RETRIEVAL_TOP_N,
+    SEMANTIC_RETRIEVAL_TOP_N,
     MemorySource,
 )
+from . import vector_store
 
 
 # Operator scratch retrieval gate. Per scope §D Phase ι.3 + firewall
@@ -334,7 +336,27 @@ async def fetch_memory_inputs(
         "path_hits": _maybe_json(row["path_hits_json"], []) if row else [],
         "filename_hits": _maybe_json(row["filename_hits_json"], []) if row else [],
         "folder_listing": None,
+        "semantic_hits": [],
     }
+
+    # Loop Mu — semantic retrieval. Runs OUTSIDE the composite query
+    # because Chroma is its own runtime with its own connection. Per-
+    # tenant collection (`tenant_<client_id>`) means cross-tenant
+    # leakage is impossible at index time. Env-level kill switch +
+    # client_id metadata-belt check (vector_store internal) preserve
+    # the firewall layers analogously to ADR-031 Layer 4 + Layer 5.
+    #
+    # Skip when:
+    #   - env kill switch off
+    #   - intake too short for meaningful embedding (no useful query)
+    #   - chromadb unavailable (helper returns [])
+    #   - tenant collection doesn't exist yet (no indexed artifacts)
+    if vector_store.env_semantic_enabled() and intake_text and len(intake_text) >= 12:
+        out["semantic_hits"] = vector_store.semantic_search_for_tenant(
+            client_id=client_id,
+            query=intake_text,
+            top_k=SEMANTIC_RETRIEVAL_TOP_N,
+        )
 
     # Optional follow-up: if operator wants a folder listing AND we
     # have at least one matched path, fetch the structural directory
@@ -668,6 +690,38 @@ def assemble_sources(
                     "score": float(hit.get("score") or 0.0),
                     "workspace_folder_id": hit.get("workspace_folder_id"),
                     "match_kind": "tsquery",
+                },
+            )
+        )
+
+    # Loop Mu — semantic retrieval. Slot priority 6 per types.py.
+    # Already-surfaced artifacts (path/filename/tsquery) skip
+    # semantic to avoid double-counting. Score is cosine similarity
+    # (0-1); Chroma metadata `client_id` already validated by
+    # `vector_store.semantic_search_for_tenant` defensive check.
+    for hit in inputs.get("semantic_hits", []) or []:
+        artifact_id = hit.get("artifact_id") or ""
+        if artifact_id in seen_artifact_ids:
+            continue
+        text = (hit.get("text") or "").strip()
+        if not text:
+            continue
+        if artifact_id:
+            seen_artifact_ids.add(artifact_id)
+        sources.append(
+            MemorySource(
+                kind="semantic_retrieval",
+                client_id=client_id,  # tenant-scoped at index time
+                record_id=artifact_id or f"semantic:{hash(text)}",
+                text=text,
+                tokens=estimate_tokens(text),
+                owner_user_id=None,
+                metadata={
+                    "filename": hit.get("filename"),
+                    "score": float(hit.get("score") or 0.0),
+                    "workspace_folder_id": hit.get("workspace_folder_id") or None,
+                    "chunk_idx": hit.get("chunk_idx"),
+                    "match_kind": "semantic_cosine",
                 },
             )
         )
