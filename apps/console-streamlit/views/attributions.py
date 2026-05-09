@@ -1,124 +1,350 @@
-"""Attribution Register — document-style provenance surface for IWO3.
+"""Attribution Register — IWO3 public attribution page.
 
-Mirrors the IWO2-inspired register layout rather than rendering as a
-settings/admin page. First release is repo-tracked content with no DB
-dependency so the public surface stays stable while Tool Locker evolves.
+Literal mirror of the canonical IWO2/IWO3 React attribution page
+(`client/src/pages/attributions.tsx`). Replaces the prior generic
+`_ENTRIES + _render_entry()` model that flattened distinct card
+vocabularies into one schema and crashed on the Aiden Zephyr entry.
+
+Architecture (per the recon prep package
+`WS024_IWO3[Branch]/05_Artifacts/CLAUDE_HANDBACK_*` thread):
+
+  - Four foundational cards are hand-authored, each with its own
+    metadata vocabulary + section structure (no shared schema).
+  - The Lead Developer card and page footer mirror the canonical
+    React reference exactly.
+  - IWO3-specific external-tooling acknowledgements (Gamma, Stitch
+    MCP, Brave, Perplexity) live in a clearly secondary section
+    below the foundational cards, with a tiny shared helper since
+    they DO share a uniform shape.
+
+HTML rendering uses `st.html()` (Streamlit ≥1.33) to bypass
+Markdown indentation parsing. This eliminates the prior bug where
+indented HTML inside `st.markdown(unsafe_allow_html=True)` rendered
+as escaped literal text.
 """
 
 from __future__ import annotations
 
 from html import escape
-from typing import Any
+from typing import Optional
 
 import streamlit as st
 
-_COLLECTED_DATE = "2026-05-02"
+
+_COLLECTED_DATE = "2026-05-09"
 
 
-_ENTRIES: list[dict[str, Any]] = [
-    {
-        "name": "AgentGoPro/AgentGoFlow",
-        "subtitle": "LuaAzullaB orchestration framework",
-        "badge": ("Proprietary", "red"),
-        "icon": "◫",
-        "author": "Thomas C. Appling III",
-        "organization": "10Touros / LuaAzullaB",
-        "category": "Foundational Lineage",
-        "period": "Mid-2024 to Aug 2025",
-        "origin": (
-            "AgentGoPro/AgentGoFlow established the earliest practical "
-            "orchestration patterns that later informed the PDOE and IWO "
-            "architecture. It was developed independently by Darrel Vaughn "
-            "through 10Touros and LuaAzullaB as a coordination framework "
-            "for LLM-driven agent work, structured delegation, and "
-            "workflow-governed execution. It predates the later adoption "
-            "of PocketFlow and the formalization of GCC Memory as "
-            "separate production layers."
+# ── Helper primitives ────────────────────────────────────────────
+
+
+def _esc(value: object) -> str:
+    """HTML-escape a value, coerced to string."""
+    return escape("" if value is None else str(value))
+
+
+def _info_row(label: str, value_html: str) -> str:
+    """One metadata row in a card. `value_html` is the already-
+    safe inner HTML for the value cell (links pre-formed by caller;
+    plain strings pre-escaped by `_esc()`)."""
+    return (
+        f'<div class="iwo3-info-row">'
+        f'<span class="k">{_esc(label)}</span>'
+        f'<span class="v">{value_html}</span>'
+        f'</div>'
+    )
+
+
+def _section(heading: str, body_html: str) -> str:
+    """A top-bordered section with a heading + free-form body HTML."""
+    return (
+        f'<div class="iwo3-attr-section">'
+        f'<h4>{_esc(heading)}</h4>'
+        f'<div class="iwo3-attr-copy">{body_html}</div>'
+        f'</div>'
+    )
+
+
+def _panel(tone: str, heading: str, body_html: str) -> str:
+    """A tinted panel — used for License Notice + Attribution
+    Statement + License Details (per-card colored). `tone` is one
+    of: amber, rose, purple, blue, note."""
+    return (
+        f'<div class="iwo3-attr-panel {_esc(tone)}">'
+        f'<h4>{_esc(heading)}</h4>'
+        f'<div class="copy">{body_html}</div>'
+        f'</div>'
+    )
+
+
+def _link(href: str, text: str) -> str:
+    """An external link with the canonical styling."""
+    return (
+        f'<a class="iwo3-attr-link" '
+        f'href="{_esc(href)}" target="_blank" rel="noopener noreferrer">'
+        f'{_esc(text)} ↗'
+        f'</a>'
+    )
+
+
+def _code(text: str) -> str:
+    return f'<code class="iwo3-attr-code">{_esc(text)}</code>'
+
+
+def _timeline_rows_html(rows: list[tuple[str, str]]) -> str:
+    """Render a label/note timeline. Each row: ('Mar 2025', 'detail')."""
+    return (
+        '<div class="iwo3-attr-timeline">'
+        + "".join(
+            f'<span class="t">{_esc(period)}</span>'
+            f'<span class="n">{_esc(note)}</span>'
+            for period, note in rows
+        )
+        + '</div>'
+    )
+
+
+def _card_open(*, theme: str, icon_glyph: str, title: str, subtitle: str,
+               license_label: str, license_color: str) -> str:
+    """Open a foundational-lineage card. `theme` drives the icon-
+    chip color set: amber / rose / purple / blue."""
+    return (
+        f'<section class="iwo3-attr-card iwo3-attr-card--{_esc(theme)}">'
+        f'<header class="iwo3-attr-head">'
+        f'<div class="iwo3-attr-head-main">'
+        f'<div class="iwo3-attr-icon iwo3-attr-icon--{_esc(theme)}">{_esc(icon_glyph)}</div>'
+        f'<div>'
+        f'<h3 class="iwo3-attr-name">{_esc(title)}</h3>'
+        f'<div class="iwo3-attr-sub">{_esc(subtitle)}</div>'
+        f'</div>'
+        f'</div>'
+        f'<span class="iwo3-attr-badge iwo3-attr-badge--{_esc(license_color)}">'
+        f'⚖ {_esc(license_label)}'
+        f'</span>'
+        f'</header>'
+        f'<div class="iwo3-attr-body">'
+    )
+
+
+def _card_close() -> str:
+    return '</div></section>'
+
+
+def _metadata_grid(rows_html: list[str]) -> str:
+    return f'<div class="iwo3-attr-grid">{"".join(rows_html)}</div>'
+
+
+# ── Card 1 — AgentGoPro / AgentGoFlow ────────────────────────────
+
+
+def _render_card_agentgoflow() -> None:
+    """Foundational lineage — AgentGoPro/AgentGoFlow, including the
+    LuaAzullaB Orchestration Framework / BeginnersMind Workshops
+    sub-section per the canonical reference. Author: Darrel Vaughn
+    (TRUTH FIX — prior generic renderer had Thomas C. Appling III)."""
+
+    metadata = _metadata_grid([
+        _info_row("Author", _esc("Darrel Vaughn")),
+        _info_row("Consulting", _esc("10Touros")),
+        _info_row("Lab", _esc("LuaAzullaB (formerly LuaLab)")),
+        _info_row("Period", _esc("Mid-2024 – Aug 2025")),
+    ])
+
+    creator_origin = _section(
+        "Creator & Origin",
+        (
+            "AgentGoPro/AgentGoFlow — originally named &ldquo;Agent "
+            "Commander&rdquo; in Replit — was a basic orchestration "
+            "framework for LLM-based agent coordination, developed "
+            "independently by Darrel Vaughn under 10Touros (consulting) "
+            "and LuaAzullaB (R&amp;D lab), beginning mid-2024 and "
+            "continuing into 2025. The project was renamed from Agent "
+            "Commander to AgentGoPro/AgentGoFlow during active "
+            "development. It predates the adoption of PocketFlow and "
+            "GCC Memory and is the foundational precursor to the PDOE "
+            "agent orchestration architecture."
         ),
-        "core_concept": (
-            "AgentGoPro/AgentGoFlow contributed the foundational ideas of "
-            "tiered agent authority, structured handoff, execution-vs-"
-            "orchestration separation, and workflow-mediated coordination. "
-            "These ideas remain visible in IWO3 through role-based "
-            "orchestration, sub-agent routing, governed execution, and "
-            "lifecycle-driven work-order progression."
+    )
+
+    core_concept = _section(
+        "Core Concept",
+        (
+            "AgentGoPro/AgentGoFlow established the foundational "
+            "orchestration patterns later refined in PDOE: agent-to-"
+            "agent task delegation, tiered authority (executive vs. "
+            "execution layers), structured handoff protocols, and "
+            "flow-based coordination of LLM agents. This original "
+            "framework informed the architectural decisions that led "
+            "to adopting PocketFlow as the production execution "
+            "substrate and GCC Memory as the persistence layer."
         ),
-        "timeline": [
-            ("Jun 2024", "early orchestration planning and agent-control experiments"),
-            ("Jul 2024", "prompt-language and coordination structure established"),
-            ("Aug 2024", "multi-agent team pattern stabilized"),
-            ("Nov 2024", "deployment and runtime infrastructure hardened"),
-            ("Dec 2024", "earlier project naming still in use during active development"),
-            ("Jan 2025", "orchestration patterns expanded and generalized"),
-            ("Feb-Aug 2025", "concepts matured into the broader PDOE architecture"),
-            ("Through Aug 2025", "PocketFlow and GCC Memory adopted downstream as execution and persistence layers"),
-        ],
-        "license_notice": (
-            "AgentGoPro/AgentGoFlow is proprietary software and framework "
-            "IP associated with Darrel Vaughn and the operating entities "
-            "under which the work was developed. It is not presented as "
-            "open-source software. Reproduction, redistribution, or "
-            "derivative reuse of its design patterns, implementation "
-            "details, or documentation should be treated as rights-"
-            "reserved unless separately authorized."
+    )
+
+    timeline_rows = [
+        ("Jun 2024", "Agent architecture planning (complete)"),
+        ("Jul 2024", "Agent prompt language & infrastructure (complete)"),
+        ("Aug 2024", "Multi-agent team structure (complete)"),
+        ("Nov 2024", "Replit deployment infrastructure (complete)"),
+        ("Dec 2024",
+         '"Agent Commander" (original Replit project name) / RFP '
+         'Bridge Assistant LAUNCH — LIVE. Project renamed to '
+         'AgentGoPro/AgentGoFlow during this period.'),
+        ("Jan 2025", "API enhancements & expansion (complete)"),
+        ("Feb–Mar 2025", "Advanced agent research & new tools (ongoing)"),
+        ("Through Aug 2025",
+         "PDOE architecture formalized; PocketFlow adopted as "
+         "execution substrate"),
+    ]
+    timeline_section = _section(
+        "Timeline & Lineage",
+        _timeline_rows_html(timeline_rows),
+    )
+
+    license_notice = _panel(
+        "amber",
+        "License Notice",
+        (
+            "AgentGoPro/AgentGoFlow is proprietary software owned by "
+            "Darrel Vaughn, operating under 10Touros (consulting "
+            "company) and LuaAzullaB (formerly LuaLab, R&amp;D lab). "
+            "This is NOT open-source. No MIT, Apache, or Creative "
+            "Commons license applies. All rights to the AgentGoPro/"
+            "AgentGoFlow codebase, design patterns, and derived "
+            "orchestration concepts are retained by Darrel Vaughn / "
+            "10Touros / LuaAzullaB. Any reproduction, distribution, or "
+            "derivative use requires explicit written permission from "
+            "the rights holder."
         ),
-        "attribution_statement": (
-            "IWO3/PDOE acknowledges AgentGoPro/AgentGoFlow as a "
-            "foundational precursor to its orchestration model. The later "
-            "adoption of other frameworks and infrastructure components "
-            "builds on, rather than replaces, this original orchestration "
-            "lineage."
+    )
+
+    attribution_statement = _panel(
+        "note",
+        "Attribution Statement",
+        (
+            "AgentGoPro/AgentGoFlow is the original LLM agent "
+            "orchestration framework created by Darrel Vaughn under "
+            "10Touros (consulting) and LuaAzullaB (formerly LuaLab, "
+            "R&amp;D lab), developed from mid-2024 into 2025. It "
+            "established the foundational patterns for tiered agent "
+            "governance, structured task delegation, and flow-based "
+            "orchestration that underpin the PDOE architecture. "
+            "AgentGoPro/AgentGoFlow is proprietary software — all "
+            "rights reserved by Darrel Vaughn / 10Touros / LuaAzullaB. "
+            "The subsequent adoption of PocketFlow and GCC Memory "
+            "within PDOE builds upon and extends these original "
+            "concepts under their respective open-source licenses."
         ),
-    },
-    {
-        "name": "LuaAzullaB Orchestration Framework",
-        "subtitle": "Conceptual orchestration model and workshop lineage",
-        "badge": ("Proprietary", "red"),
-        "icon": "◎",
-        "author": "Darrel Vaughn",
-        "organization": "LuaAzullaB",
-        "category": "Foundational Lineage",
-        "period": "2025",
-        "origin": (
-            "The LuaAzullaB Orchestration Framework consolidated workshop-"
-            "era thinking around structured execution, factual outputs, "
-            "governed workflows, and operationalized agent systems. It "
-            "served as a conceptual bridge between earlier orchestration "
-            "experiments and the more explicit PDOE/IWO architecture."
+    )
+
+    # LuaAzullaB Orchestration Framework — BeginnersMind Workshops
+    # sub-section. Internal to the AgentGoPro card per IWO2 canon.
+    bm_intro = (
+        "The LuaAzullaB Orchestration Framework, developed by Darrel "
+        "Vaughn (Oct 2025) and outlined in the BeginnersMind workshops, "
+        "provides the conceptual and cognitive foundation for the PDOE "
+        "orchestration model. The framework defines:"
+    )
+    bm_formula = (
+        '<div class="iwo3-attr-formula">'
+        '<p>Orchestration = [Workflow] × [Execution] → Results '
+        '(factual) ≠ Goals (aspirational)</p>'
+        '<p>Workflow = [Plan] + [Context(i)]</p>'
+        '<p>where Context(i) is <strong>Informed Context</strong> — '
+        '&ldquo;Know-How&rdquo; — comprising four interdependent '
+        'dimensions:</p>'
+        '<p><strong>Attention · Meaning · Relevance · Memory</strong></p>'
+        '</div>'
+    )
+    bm_after_formula = (
+        "These four dimensions form a cross-linked quadrant that "
+        "governs how agents maintain, retrieve, and apply contextual "
+        "awareness during orchestrated execution. This cognitive + "
+        "orchestration model is the theoretical basis for the "
+        "AgentGoPro/AgentGoFlow orchestration architecture and "
+        "directly informed the design of PDOE&rsquo;s two-tier "
+        "governance, GCC Memory&rsquo;s persistence layer (the Memory "
+        "dimension), and Aiden&rsquo;s executive reasoning (the "
+        "Attention and Meaning dimensions)."
+    )
+    bm_diagram = (
+        '<pre class="iwo3-attr-ascii">'
+        + escape(
+            "                    ORCHESTRATION\n"
+            "                   /             \\\n"
+            "                  /               \\\n"
+            "            WORKFLOW    ×    EXECUTION\n"
+            "           /        \\               \\\n"
+            "          /          \\               \\\n"
+            "      PLAN    +    CONTEXT(i)     RESULTS (factual)\n"
+            "                   \"Know-How\"         |\n"
+            "                 /    |    \\           ≠\n"
+            "               /      |      \\        |\n"
+            "        Attention  Relevance  Memory  GOALS (aspirational)\n"
+            "             \\        |       /\n"
+            "              \\       |      /\n"
+            "                \\     |     /\n"
+            "                 Meaning"
+        )
+        + '</pre>'
+    )
+    bm_ref_path = (
+        '<p class="iwo3-attr-fineprint">Reference diagram: '
+        + _code("+6PLOCKER/Locker_BM.AI/Lua_Orchestration_Framework.png")
+        + '</p>'
+        '<p class="iwo3-attr-fineprint">Developed by Darrel Vaughn '
+        '| LuaAzullaB | Oct 20, 2025</p>'
+    )
+    beginnersmind_subsection = _section(
+        "LuaAzullaB Orchestration Framework — BeginnersMind Workshops",
+        (
+            f'<p>{bm_intro}</p>'
+            f'{bm_formula}'
+            f'<p>{bm_after_formula}</p>'
+            f'{bm_diagram}'
+            f'{bm_ref_path}'
         ),
-        "core_concept": (
-            "This framework emphasized that orchestration is not just "
-            "message passing between models, but a governed relationship "
-            "between workflow, execution, results, and goals. That framing "
-            "directly supports IWO3’s treatment of work orders, workflows, "
-            "lifecycle states, review gates, and output contracts."
-        ),
-        "timeline": [
-            ("Early 2025", "framework language consolidated through internal development and workshops"),
-            ("2025", "orchestration formula and governance concepts refined"),
-            ("2025 onward", "concepts reflected in PDOE and IWO3 architecture planning"),
-        ],
-        "license_notice": (
-            "This framework is treated as proprietary internal methodology "
-            "unless otherwise released under explicit terms."
-        ),
-        "attribution_statement": (
-            "IWO3 acknowledges the LuaAzullaB Orchestration Framework as "
-            "part of the conceptual foundation behind its governed "
-            "orchestration model."
-        ),
-    },
-    {
-        "name": "Aiden Zephyr & TIB",
-        "subtitle": "Thomas C. Appling III / FF.AI",
-        "badge": ("Creative Attribution", "blue"),
-        "icon": "✧",
-        "metadata_rows": [
-            ("Contributor", "Thomas C. Appling III"),
-            ("Organization", "Freedom Forge AI (FF.AI)"),
-            ("Type", "Creative inspiration & conceptual framing"),
-        ],
-        "license_notice": (
+    )
+
+    st.html(
+        _card_open(
+            theme="amber",
+            icon_glyph="◫",
+            title="AgentGoPro/AgentGoFlow",
+            subtitle="LuaAzullaB Orchestration Framework",
+            license_label="Proprietary",
+            license_color="red",
+        )
+        + metadata
+        + creator_origin
+        + core_concept
+        + timeline_section
+        + license_notice
+        + attribution_statement
+        + beginnersmind_subsection
+        + _card_close()
+    )
+
+
+# ── Card 2 — Aiden Zephyr & TIB ──────────────────────────────────
+
+
+def _render_card_aiden_zephyr() -> None:
+    """Foundational lineage — Aiden Zephyr concept and TIB framework
+    contributed by Thomas C. Appling III / FF.AI. Note this card has
+    no `Author` field — its metadata vocabulary is
+    Contributor/Organization/Type. Prior generic renderer crashed on
+    `entry["author"]`; the literal-mirror posture eliminates the
+    shared-schema assumption."""
+
+    metadata = _metadata_grid([
+        _info_row("Contributor", _esc("Thomas C. Appling III")),
+        _info_row("Organization", _esc("Freedom Forge AI (FF.AI)")),
+        _info_row("Type", _esc("Creative inspiration & conceptual framing")),
+    ])
+
+    license_notice = _panel(
+        "rose",
+        "License Notice",
+        (
             "The Aiden Zephyr concept and TIB (The Internal Brain) "
             "framework are attributed to Thomas C. Appling III and the "
             "Freedom Forge AI (FF.AI) as creative and collaborative "
@@ -126,280 +352,520 @@ _ENTRIES: list[dict[str, Any]] = [
             "collaborative inputs, not code-level dependencies. No "
             "open-source license applies. Attribution is granted in "
             "recognition of creative influence and collaborative "
-            "development of agent identity, persona design, and cognitive "
-            "architecture framing within the PDOE ecosystem."
+            "development of agent identity, persona design, and "
+            "cognitive architecture framing within the PDOE ecosystem."
         ),
-        "license_panel_tone": "rose",
-        "origin_heading": "Contributor & Source",
-        "origin": (
-            "Thomas C. Appling III introduced the “Aiden Zephyr” agent "
-            "concept and later contributed The Internal Brain (TIB) "
-            "framework through his work with FF.AI. These ideas shaped the "
-            "identity, persona, and cognitive architecture of the Aiden "
-            "agent within PDOE. Note: Darrel Vaughn’s multi-agent "
-            "orchestration framework (Agent Commander, later "
-            "AgentGoPro/AgentGoFlow) was already in active planning and "
-            "development prior to the introduction of the Aiden Zephyr "
-            "concept."
+    )
+
+    contributor_source = _section(
+        "Contributor & Source",
+        (
+            "Thomas C. Appling III introduced the &ldquo;Aiden "
+            "Zephyr&rdquo; agent concept and later contributed The "
+            "Internal Brain (TIB) framework through his work with "
+            "FF.AI. These ideas shaped the identity, persona, and "
+            "cognitive architecture of the Aiden agent within PDOE. "
+            "Note: Darrel Vaughn&rsquo;s multi-agent orchestration "
+            "framework (Agent Commander, later AgentGoPro/AgentGoFlow) "
+            "was already in active planning and development prior to "
+            "the introduction of the Aiden Zephyr concept."
         ),
-        "core_heading": "Core Contribution",
-        "core_concept": (
-            "Two distinct contributions: (1) Aiden Zephyr — the original "
-            "agent identity concept that became “Aiden” in PDOE’s Tier 1 "
-            "executive orchestrator. Appling’s vision gave the agent its "
-            "name, persona, and early character as an autonomous reasoning "
-            "entity. (2) The Internal Brain (TIB) — a cognitive "
-            "architecture concept contributed through FF.AI that informed "
-            "how Aiden processes, reasons, and maintains internal state. "
-            "TIB influenced the design of Aiden’s executive decision-"
-            "making layer within the two-tier PDOE architecture. The "
-            "current implementation of the AIDEN_IWO supports the TIB "
-            "framework but is by design — not limited to it."
+    )
+
+    core_contribution = _section(
+        "Core Contribution",
+        (
+            "Two distinct contributions: (1) <strong>Aiden Zephyr"
+            "</strong> — the original agent identity concept that "
+            "became &ldquo;Aiden&rdquo; in PDOE&rsquo;s Tier 1 "
+            "executive orchestrator. Appling&rsquo;s vision gave the "
+            "agent its name, persona, and early character as an "
+            "autonomous reasoning entity. (2) <strong>The Internal "
+            "Brain (TIB)</strong> — a cognitive architecture concept "
+            "contributed through FF.AI that informed how Aiden "
+            "processes, reasons, and maintains internal state. TIB "
+            "influenced the design of Aiden&rsquo;s executive "
+            "decision-making layer within the two-tier PDOE "
+            "architecture. The current implementation of the AIDEN_IWO "
+            "supports the TIB framework but is by design — not "
+            "limited to it."
         ),
-        "timeline_heading": "Timeline & Precedence",
-        "timeline_note_title": "PRECEDENCE NOTE",
-        "timeline_note_body": (
-            "Darrel Vaughn began Agent Commander (multi-agent "
-            "orchestration framework) architecture planning in early - mid "
-            "(Jun) 2024, with prompt language, infrastructure, and "
-            "multi-agent team structure built through Aug 2024 — most of "
-            "this work prior to the introduction of the Aiden Zephyr "
-            "concept."
-        ),
-        "timeline": [
-            ("Late 2024", "Aiden Zephyr agentic concepts evolved (Appling)"),
-            ("Mar 17, 2025", "“Aiden Zephyr” reference email from Thomas C. Appling III"),
-        ],
-        "timeline_tail": (
-            "The Aiden Zephyr identity and FF.AI / TIB concepts were "
-            "introduced subsequent to Vaughn’s foundational orchestration "
-            "work and were integrated into the already-established multi-"
-            "agent architecture as creative and conceptual enhancements."
-        ),
-        "attribution_statement": (
-            "LuaAzullaB / PDOE framework gratefully acknowledges Thomas C. "
-            "Appling III and the Freedom Forge AI (FF.AI) for the creative "
-            "inspiration behind the Aiden agent identity — originally "
-            "conceived as “Aiden Zephyr” — and for the conceptual "
-            "contributions of The Internal Brain (TIB) cognitive "
-            "architecture framework. These contributions shaped the "
-            "persona, identity, and reasoning character of Aiden as PDOE’s "
-            "Tier 1 executive orchestrator. It is expressly noted that "
-            "Darrel Vaughn’s multi-agent orchestration framework (Agent "
+    )
+
+    precedence_note = (
+        '<div class="iwo3-attr-precedence">'
+        '<div class="iwo3-attr-precedence-title">PRECEDENCE NOTE</div>'
+        '<div class="iwo3-attr-precedence-body">'
+        "Darrel Vaughn began Agent Commander (multi-agent "
+        "orchestration framework) architecture planning in early - "
+        "mid (Jun) 2024, with prompt language, infrastructure, and "
+        "multi-agent team structure built through Aug 2024 — most of "
+        "this work prior to the introduction of the Aiden Zephyr "
+        "concept."
+        '</div>'
+        '</div>'
+    )
+    timeline_rows = [
+        ("Late 2024", "Aiden Zephyr agentic concepts evolved (Appling)"),
+        ("Mar 17, 2025",
+         '"Aiden Zephyr" reference email from Thomas C. Appling III'),
+    ]
+    timeline_tail = (
+        '<p class="iwo3-attr-tail">'
+        "The Aiden Zephyr identity and FF.AI / TIB concepts were "
+        "introduced subsequent to Vaughn&rsquo;s foundational "
+        "orchestration work and were integrated into the already-"
+        "established multi-agent architecture as creative and "
+        "conceptual enhancements."
+        '</p>'
+    )
+    timeline_section = _section(
+        "Timeline & Precedence",
+        precedence_note + _timeline_rows_html(timeline_rows) + timeline_tail,
+    )
+
+    attribution_statement = _panel(
+        "note",
+        "Attribution Statement",
+        (
+            "LuaAzullaB / PDOE framework gratefully acknowledges Thomas "
+            "C. Appling III and the Freedom Forge AI (FF.AI) for the "
+            "creative inspiration behind the Aiden agent identity — "
+            "originally conceived as &ldquo;Aiden Zephyr&rdquo; — and "
+            "for the conceptual contributions of The Internal Brain "
+            "(TIB) cognitive architecture framework. These "
+            "contributions shaped the persona, identity, and reasoning "
+            "character of Aiden as PDOE&rsquo;s Tier 1 executive "
+            "orchestrator. It is expressly noted that Darrel "
+            "Vaughn&rsquo;s multi-agent orchestration framework (Agent "
             "Commander / AgentGoPro/AgentGoFlow) was already in active "
             "planning and development prior to the introduction of the "
-            "Aiden Zephyr concept — the creative identity was layered onto "
-            "an existing architectural foundation."
+            "Aiden Zephyr concept — the creative identity was layered "
+            "onto an existing architectural foundation."
         ),
-    },
-    {
-        "name": "PocketFlow",
-        "subtitle": "Execution substrate for iterative workflow runs",
-        "badge": ("Open Source", "green"),
-        "icon": "◌",
-        "author": "PocketFlow contributors",
-        "organization": "PocketFlow project",
-        "category": "Framework",
-        "period": "Adopted downstream in PDOE/IWO",
-        "origin": (
-            "PocketFlow was adopted as an execution substrate after the "
-            "earlier orchestration patterns were already established. It "
-            "provided a practical framework for iterative plan/execute/"
-            "evaluate/refine execution loops."
+    )
+
+    st.html(
+        _card_open(
+            theme="rose",
+            icon_glyph="✧",
+            title="Aiden Zephyr & TIB",
+            subtitle="Thomas C. Appling III / FF.AI",
+            license_label="Creative Attribution",
+            license_color="default",
+        )
+        + metadata
+        + license_notice
+        + contributor_source
+        + core_contribution
+        + timeline_section
+        + attribution_statement
+        + _card_close()
+    )
+
+
+# ── Card 3 — GCC Memory ──────────────────────────────────────────
+
+
+def _render_card_gcc_memory() -> None:
+    """Foundational lineage — GCC Memory (Junde Wu, arXiv:2508.00031).
+    Metadata vocabulary: Paper / DOI / URL — not the generic
+    Author/Org. License: CC BY 4.0 / MIT (preserved verbatim from
+    canonical reference, not collapsed to generic 'Open Source')."""
+
+    metadata = _metadata_grid([
+        _info_row(
+            "Paper",
+            _esc(
+                'Wu, Junde. "Git Context Controller: Manage the Context '
+                'of LLM-based Agents like Git." arXiv:2508.00031 (2025)'
+            ),
         ),
-        "core_concept": (
-            "PocketFlow contributes the execution-cycle machinery that "
-            "supports structured multi-step agent work, iterative "
-            "refinement, and controlled completion loops. In IWO3, it is "
-            "part of the execution layer rather than the origin of the "
-            "orchestration model itself."
+        _info_row("DOI", _link(
+            "https://doi.org/10.48550/arXiv.2508.00031",
+            "10.48550/arXiv.2508.00031",
+        )),
+        _info_row("URL", _link(
+            "https://arxiv.org/abs/2508.00031",
+            "arxiv.org/abs/2508.00031",
+        )),
+    ])
+
+    core_concept = _section(
+        "Core Concept",
+        (
+            "GCC applies Git&rsquo;s version-control metaphor to LLM "
+            "agent memory. Four canonical commands: <strong>COMMIT"
+            "</strong> (durable milestone snapshot of branch progress), "
+            "<strong>BRANCH</strong> (isolated memory line for alternate "
+            "strategy exploration), <strong>MERGE</strong> (consolidate "
+            "branch outcomes under Tier 1 governance), <strong>CONTEXT"
+            "</strong> (scoped history retrieval at multiple "
+            "granularities). Memory artifacts are stored as markdown "
+            "files in a project/branch/commit filesystem hierarchy."
         ),
-        "timeline": [
-            ("Pre-adoption", "orchestration concepts already existed upstream"),
-            ("Adoption phase", "PocketFlow selected as the execution substrate"),
-            ("Later", "integrated into PDOE/IWO and extended by product-specific governance"),
-        ],
-        "license_notice": (
-            "Open-source license applies according to the PocketFlow "
-            "project’s published terms and repository."
+    )
+
+    pdoe_integration = _section(
+        "PDOE Integration (WS014)",
+        (
+            "GCC Memory is a Tier 1 platform service in PDOE, peer to "
+            "Channel Gateway and Tools Locker. Tier 2 agents may "
+            "COMMIT and CONTEXT; only Tier 1 may MERGE. Branch "
+            "creation requires Tier 1 approval (mode-dependent). GCC "
+            "metadata lives in shared dict (" + _code("gcc.*")
+            + " keys) and filesystem artifacts only — never injected "
+            "into Work Order or BDM payloads. Contracts: "
+            + _code("gcc_command_contract.md")
+            + " (GCC-A-001), "
+            + _code("gcc_shared_dict_contract.md")
+            + " (GCC-A-002)."
         ),
-        "attribution_statement": (
-            "IWO3 uses PocketFlow as an execution substrate while "
-            "acknowledging that its orchestration model predates and "
-            "extends beyond PocketFlow alone."
+    )
+
+    license_details = _panel(
+        "purple",
+        "License Details",
+        (
+            '<p><strong>Paper (CC BY 4.0):</strong> Cite + attribution '
+            'if concepts are reused.</p>'
+            '<p><strong>Implementation (MIT):</strong> Preserve MIT '
+            'notice if code is reused (human-re/GCC).</p>'
+            '<p><strong>Packages (MIT):</strong> Preserve MIT notice '
+            'if aline-ai package code reused.</p>'
         ),
-    },
-    {
-        "name": "GCC Memory",
-        "subtitle": "Persistence and memory-layer influence",
-        "badge": ("Open Source", "green"),
-        "icon": "◍",
-        "author": "GCC Memory contributors",
-        "organization": "GCC Memory project",
-        "category": "Framework",
-        "period": "Adopted downstream in PDOE/IWO",
-        "origin": (
-            "GCC Memory was adopted as a persistence and memory-layer "
-            "component within the broader PDOE/IWO stack after the initial "
-            "orchestration model had already been established."
+    )
+
+    attribution_statement = _panel(
+        "note",
+        "Attribution Statement",
+        (
+            "The GCC Memory Framework in PDOE is inspired by &ldquo;"
+            "Git Context Controller: Manage the Context of LLM-based "
+            "Agents like Git&rdquo; (Junde Wu, arXiv:2508.00031, "
+            "2025, CC BY 4.0). The reference implementation at "
+            "human-re/GCC and the aline-ai tooling packages are both "
+            "MIT-licensed. PDOE adapts the GCC conceptual model — "
+            "Git-style COMMIT/BRANCH/MERGE/CONTEXT commands for "
+            "persistent agent memory — within its existing two-tier "
+            "PocketFlow orchestration architecture. No GCC source "
+            "code is vendored; PDOE uses its own TypeScript "
+            "implementation conforming to the GCC protocol contracts."
         ),
-        "core_concept": (
-            "Its contribution is persistent contextual storage, durable "
-            "memory handling, and retrieval support for longer-running "
-            "agent systems. In IWO3, this supports continuity, "
-            "traceability, and structured context retention."
+    )
+
+    st.html(
+        _card_open(
+            theme="purple",
+            icon_glyph="◍",
+            title="GCC Memory",
+            subtitle="Git Context Controller",
+            license_label="CC BY 4.0 / MIT",
+            license_color="purple",
+        )
+        + metadata
+        + core_concept
+        + pdoe_integration
+        + license_details
+        + attribution_statement
+        + _card_close()
+    )
+
+
+# ── Card 4 — PocketFlow ──────────────────────────────────────────
+
+
+def _render_card_pocketflow() -> None:
+    """Foundational lineage — PocketFlow (Zachary Huang, MIT). Full
+    metadata vocabulary preserved: Author/Affiliation/Organization/
+    Repository/Docs/PyPI/License — not collapsed to generic shape."""
+
+    metadata = _metadata_grid([
+        _info_row("Author", _esc("Zachary Huang (GitHub: zachary62)")),
+        _info_row(
+            "Affiliation",
+            _esc(
+                "Microsoft Research AI Frontiers; PhD Columbia "
+                "University; 2023 Google PhD Fellow"
+            ),
         ),
-        "timeline": [
-            ("Earlier orchestration phases", "persistence concerns existed conceptually"),
-            ("Adoption phase", "GCC Memory chosen as memory/persistence layer"),
-            ("Later", "integrated into the broader PDOE runtime pattern"),
-        ],
-        "license_notice": (
-            "Open-source license applies according to the GCC Memory "
-            "project’s published terms and repository."
+        _info_row("Organization", _esc("The-Pocket (GitHub org)")),
+        _info_row("Repository", _link(
+            "https://github.com/The-Pocket/PocketFlow",
+            "github.com/The-Pocket/PocketFlow",
+        )),
+        _info_row("Docs", _link(
+            "https://the-pocket.github.io/PocketFlow/",
+            "the-pocket.github.io/PocketFlow",
+        )),
+        _info_row("PyPI", _esc("pocketflow (v0.0.3)")),
+        _info_row("License", _esc("MIT (Copyright 2024 Zachary Huang)")),
+    ])
+
+    core_concept = _section(
+        "Core Concept",
+        (
+            "PocketFlow distills LLM framework abstractions into 100 "
+            "lines of dependency-free Python. The core is a directed "
+            "graph of Nodes and Flows: <strong>BaseNode</strong> "
+            "(prep/exec/post lifecycle, " + _code(">>") + " and "
+            + _code("-")
+            + " DSL operators), <strong>Node</strong> (sync with retry), "
+            "<strong>BatchNode</strong> (list processing), "
+            "<strong>Flow</strong> (graph orchestrator with start_node "
+            "and _orch() loop), plus async variants. From this 100-line "
+            "core, users implement Agents, Multi-Agents, Workflows, "
+            "RAG, Map-Reduce, Structured Output, and other LLM design "
+            "patterns."
         ),
-        "attribution_statement": (
-            "IWO3 acknowledges GCC Memory as an important persistence-layer "
-            "influence within the broader PDOE stack."
+    )
+
+    pdoe_integration = _section(
+        "PDOE Integration (WS012 → WS014)",
+        (
+            "WS012 is the library/reference workspace (upstream clone "
+            "+ offline docs mirror + PDOE supplement). WS014 is the "
+            "production integration workspace that vendors PocketFlow "
+            "core and ships runnable two-tier flows. WS006 is the "
+            "canonical source for the PocketFlow Supplement spec and "
+            "schemas (Work Orders, BDM Markers, Policy Gates). "
+            "PocketFlow runs INSIDE each tier as a flow executor, not "
+            "as the overall system controller."
         ),
-    },
-    {
-        "name": "Gamma",
-        "subtitle": "Presentation and document rendering adapter",
-        "badge": ("Commercial API", "violet"),
-        "icon": "▣",
-        "author": "Gamma",
-        "organization": "Gamma",
-        "category": "External Tooling",
-        "period": "Active in IWO/IWO3 delivery paths",
-        "origin": (
-            "Gamma is used by the IWO product line as an external "
-            "rendering/delivery system for high-quality presentation and "
-            "document outputs, especially for template-governed PPTX/PDF "
-            "workflows."
+    )
+
+    mit_license = _panel(
+        "blue",
+        "MIT License",
+        (
+            "MIT License — free to use, copy, modify, merge, publish, "
+            "distribute, sublicense, sell. Obligation: preserve MIT "
+            "notice when vendoring code. WS014 vendors "
+            + _code("pocketflow/__init__.py")
+            + " at "
+            + _code("02_Execution/vendor/pocketflow/__init__.py")
+            + "."
         ),
-        "core_concept": (
-            "Its role is output finishing rather than orchestration. Gamma "
-            "contributes polished rendering and client-facing deliverable "
-            "generation where product policy selects Gamma-backed delivery."
+    )
+
+    attribution_statement = _panel(
+        "note",
+        "Attribution Statement",
+        (
+            "PocketFlow, created by Zachary Huang and maintained "
+            "under The-Pocket GitHub organization, is a minimalist "
+            "LLM orchestration framework whose entire core fits in "
+            "100 lines of Python. It provides a graph-based "
+            "abstraction (Nodes and Flows) with zero dependencies and "
+            "zero vendor lock-in, supporting Agents, Multi-Agents, "
+            "Workflows, and RAG patterns. Licensed under the MIT "
+            "License (Copyright 2024 Zachary Huang). PDOE vendors the "
+            "100-line core from WS012 into the WS014 production "
+            "runtime and extends it with PDOE-specific nodes for "
+            "two-tier orchestration."
         ),
-        "timeline": [
-            ("IWO2", "Gamma integrated into deliverable flows"),
-            ("IWO3", "adapter model preserves Gamma as one output path among several"),
-            ("Current", "active hosted/runtime integration"),
-        ],
-        "license_notice": (
-            "Gamma is a third-party commercial service. Usage is governed "
-            "by Gamma’s service terms and API/platform policies."
-        ),
-        "attribution_statement": (
-            "IWO3 acknowledges Gamma as an external presentation/document "
-            "rendering platform used within its adapter-driven output "
-            "architecture."
-        ),
-    },
-    {
-        "name": "Stitch MCP",
-        "subtitle": "Design-generation and MCP-backed design tooling",
-        "badge": ("Commercial API", "violet"),
-        "icon": "◈",
-        "author": "Google Stitch",
-        "organization": "Google",
-        "category": "MCP / External Tooling",
-        "period": "Active in Loop Eta and hosted parity rollout",
-        "origin": (
-            "Stitch MCP was integrated into IWO3 as part of the Tool "
-            "Locker and design-oriented sub-agent capability surface. It "
-            "is used through MCP-backed runtime tooling rather than as a "
-            "native orchestration framework."
-        ),
-        "core_concept": (
-            "Its role is design generation, design tooling access, and "
-            "structured design-assist workflows, especially for "
-            "Hank/Darla-oriented surfaces. It contributes specialized "
-            "external capability, not core orchestration logic."
-        ),
-        "timeline": [
-            ("Loop Eta", "Stitch added to runnable Tool Locker scope"),
-            ("Post-close", "local env activation completed"),
-            ("Hosted parity", "live hosted connection verified"),
-        ],
-        "license_notice": (
-            "Stitch is a third-party service and is governed by its own "
-            "service terms, access controls, and API/platform restrictions."
-        ),
-        "attribution_statement": (
-            "IWO3 acknowledges Stitch as an external design-tool "
-            "integration used through MCP-backed tooling in the Tool "
-            "Locker and related sub-agent workflows."
-        ),
-    },
-    {
-        "name": "Brave Search API",
-        "subtitle": "Live web search capability for tool-assisted sub-agents",
-        "badge": ("Commercial API", "violet"),
-        "icon": "⌕",
-        "author": "Brave",
-        "organization": "Brave Software",
-        "category": "External Tooling",
-        "period": "Active in post-close Tool Locker runtime",
-        "origin": (
-            "Brave Search was integrated as a live search tool for IWO3’s "
-            "growing Tool Locker/runtime tool surface."
-        ),
-        "core_concept": (
-            "It contributes current web-search capability for agents that "
-            "need retrieval beyond local state, especially in research, "
-            "design, and content-oriented workflows."
-        ),
-        "timeline": [
-            ("Loop Eta", "search chain ported into IWO3 runtime"),
-            ("Post-close", "local live activation completed"),
-            ("Hosted parity", "live hosted verification completed"),
-        ],
-        "license_notice": (
-            "Brave Search is a third-party commercial/API service governed "
-            "by Brave’s platform and service terms."
-        ),
-        "attribution_statement": (
-            "IWO3 acknowledges Brave Search as an external live-search "
-            "provider used for tool-assisted runtime retrieval."
-        ),
-    },
-    {
-        "name": "Perplexity API",
-        "subtitle": "Live answer-oriented search and synthesis support",
-        "badge": ("Commercial API", "violet"),
-        "icon": "✦",
-        "author": "Perplexity",
-        "organization": "Perplexity",
-        "category": "External Tooling",
-        "period": "Active in post-close Tool Locker runtime",
-        "origin": (
-            "Perplexity was integrated as an additional external "
-            "search/retrieval path within IWO3’s runtime tool layer."
-        ),
-        "core_concept": (
-            "It contributes answer-oriented search and retrieval support "
-            "for agents that benefit from external synthesis capabilities "
-            "during tool-assisted execution."
-        ),
-        "timeline": [
-            ("Loop Eta", "search tooling ported into IWO3 runtime"),
-            ("Post-close", "local live activation completed"),
-            ("Hosted parity", "hosted env synced for live use"),
-        ],
-        "license_notice": (
-            "Perplexity is a third-party commercial/API service governed "
-            "by its own service terms and API restrictions."
-        ),
-        "attribution_statement": (
-            "IWO3 acknowledges Perplexity as an external retrieval and "
-            "synthesis provider used through the Tool Locker/runtime tool "
-            "layer."
-        ),
-    },
-]
+    )
+
+    st.html(
+        _card_open(
+            theme="blue",
+            icon_glyph="◌",
+            title="PocketFlow",
+            subtitle="100-Line LLM Framework",
+            license_label="MIT",
+            license_color="outline",
+        )
+        + metadata
+        + core_concept
+        + pdoe_integration
+        + mit_license
+        + attribution_statement
+        + _card_close()
+    )
+
+
+# ── Lead Developer Card ──────────────────────────────────────────
+
+
+def _render_lead_developer_card() -> None:
+    """The Vaughn lead-developer attribution card mirrors the
+    canonical reference's gradient panel with Sparkles icon."""
+    st.html(
+        '<section class="iwo3-attr-leaddev">'
+        '<div class="iwo3-attr-leaddev-row">'
+        '<div class="iwo3-attr-leaddev-icon">✦</div>'
+        '<div>'
+        '<div class="iwo3-attr-leaddev-eyebrow">'
+        'Lead Developer &amp; Principal Technical Architect'
+        '</div>'
+        '<h2 class="iwo3-attr-leaddev-name">Darrel Vaughn</h2>'
+        '<div class="iwo3-attr-leaddev-role">'
+        'LuaAzullaB (R&amp;D Lab) · 10Touros (Consulting) · '
+        'AIDEN_IWO / PDOE Platform'
+        '</div>'
+        '</div>'
+        '</div>'
+        '<hr class="iwo3-attr-leaddev-rule" />'
+        '<p class="iwo3-attr-leaddev-prose">'
+        'Darrel Vaughn is the lead developer and principal technical '
+        'architect of the AIDEN_IWO platform. From the original Agent '
+        'Commander concept (mid-2024) through the AgentGoPro/'
+        'AgentGoFlow orchestration framework and into the current '
+        'IWO/PDOE two-tier architecture, Vaughn has designed, built, '
+        'and led every layer of the system — including the '
+        'orchestration engine, GCC Memory integration, PocketFlow '
+        'execution substrate, Agentic Tools Locker, workspace filing, '
+        'and the BeginnersMind cognitive model that governs agent '
+        'reasoning.'
+        '</p>'
+        '</section>'
+    )
+
+
+# ── External Tooling section (IWO3-specific, secondary) ──────────
+
+
+def _render_external_tooling() -> None:
+    """IWO3-specific external tooling acknowledgements. These are
+    NOT in the canonical IWO2 attribution register — they're added
+    here as a clearly secondary section so the foundational lineage
+    surface stays canonical-faithful. Smaller card style, uniform
+    metadata vocabulary (Author / Organization / Type / License)
+    because these external services share the same shape (unlike
+    the foundational lineage cards)."""
+
+    entries: list[dict] = [
+        {
+            "icon": "▣",
+            "title": "Gamma",
+            "subtitle": "Presentation and document rendering adapter",
+            "license_label": "Commercial API",
+            "license_color": "violet",
+            "rows": [
+                ("Author", "Gamma"),
+                ("Organization", "Gamma"),
+                ("Type", "External rendering / output adapter"),
+                ("License", "Service terms (commercial API)"),
+            ],
+            "blurb": (
+                "Gamma is used by the IWO product line as an external "
+                "rendering / delivery system for high-quality "
+                "presentation and document outputs, especially for "
+                "template-governed PPTX/PDF workflows. IWO3 "
+                "acknowledges Gamma as an external presentation/"
+                "document rendering platform used within its "
+                "adapter-driven output architecture."
+            ),
+        },
+        {
+            "icon": "◈",
+            "title": "Stitch (Google) — via MCP",
+            "subtitle": "Design-generation and MCP-backed design tooling",
+            "license_label": "Commercial API",
+            "license_color": "violet",
+            "rows": [
+                ("Author", "Google Stitch"),
+                ("Organization", "Google"),
+                ("Type", "MCP-backed external tooling"),
+                ("License", "Service terms (Google Stitch)"),
+            ],
+            "blurb": (
+                "Stitch was integrated into IWO3 as part of the Tool "
+                "Locker and design-oriented sub-agent capability "
+                "surface. It is used through MCP-backed runtime "
+                "tooling rather than as a native orchestration "
+                "framework. IWO3 acknowledges Stitch as an external "
+                "design-tool integration used through MCP-backed "
+                "tooling in the Tool Locker and related sub-agent "
+                "workflows."
+            ),
+        },
+        {
+            "icon": "⌕",
+            "title": "Brave Search API",
+            "subtitle": "Live web search capability for tool-assisted sub-agents",
+            "license_label": "Commercial API",
+            "license_color": "violet",
+            "rows": [
+                ("Author", "Brave"),
+                ("Organization", "Brave Software"),
+                ("Type", "External live-search provider"),
+                ("License", "Service terms (Brave Search API)"),
+            ],
+            "blurb": (
+                "Brave Search was integrated as a live search tool "
+                "for IWO3&rsquo;s Tool Locker / runtime tool surface. "
+                "It contributes current web-search capability for "
+                "agents that need retrieval beyond local state, "
+                "especially in research, design, and content-oriented "
+                "workflows."
+            ),
+        },
+        {
+            "icon": "✦",
+            "title": "Perplexity API",
+            "subtitle": "Live answer-oriented search and synthesis support",
+            "license_label": "Commercial API",
+            "license_color": "violet",
+            "rows": [
+                ("Author", "Perplexity"),
+                ("Organization", "Perplexity"),
+                ("Type", "External retrieval / synthesis provider"),
+                ("License", "Service terms (Perplexity API)"),
+            ],
+            "blurb": (
+                "Perplexity was integrated as an additional external "
+                "search/retrieval path within IWO3&rsquo;s runtime "
+                "tool layer. It contributes answer-oriented search "
+                "and retrieval support for agents that benefit from "
+                "external synthesis capabilities during tool-assisted "
+                "execution."
+            ),
+        },
+    ]
+
+    st.html(
+        '<section class="iwo3-attr-tooling-section">'
+        '<h2 class="iwo3-attr-tooling-heading">External Tooling Used by IWO3</h2>'
+        '<p class="iwo3-attr-tooling-sub">'
+        'Third-party services and APIs integrated by IWO3 for runtime '
+        'capability. These are operational dependencies, not '
+        'foundational lineage of the orchestration architecture above.'
+        '</p>'
+        '</section>'
+    )
+
+    for entry in entries:
+        rows_html = _metadata_grid([
+            _info_row(label, _esc(value)) for label, value in entry["rows"]
+        ])
+        body = (
+            f'<p class="iwo3-attr-copy">{entry["blurb"]}</p>'
+        )
+        st.html(
+            f'<section class="iwo3-attr-tool-card">'
+            f'<header class="iwo3-attr-head iwo3-attr-head--small">'
+            f'<div class="iwo3-attr-head-main">'
+            f'<div class="iwo3-attr-icon iwo3-attr-icon--violet">'
+            f'{_esc(entry["icon"])}</div>'
+            f'<div>'
+            f'<h3 class="iwo3-attr-name">{_esc(entry["title"])}</h3>'
+            f'<div class="iwo3-attr-sub">{_esc(entry["subtitle"])}</div>'
+            f'</div>'
+            f'</div>'
+            f'<span class="iwo3-attr-badge iwo3-attr-badge--{_esc(entry["license_color"])}">'
+            f'⚖ {_esc(entry["license_label"])}'
+            f'</span>'
+            f'</header>'
+            f'<div class="iwo3-attr-body">'
+            f'{rows_html}'
+            f'{body}'
+            f'</div>'
+            f'</section>'
+        )
+
+
+# ── Page CSS ─────────────────────────────────────────────────────
 
 
 _CSS = """
@@ -439,6 +905,8 @@ _CSS = """
     color: #6B7280;
     margin-bottom: 26px;
   }
+
+  /* Card primitives */
   .iwo3-attr-card {
     border: 1px solid #E5E7EB;
     border-radius: 16px;
@@ -464,26 +932,31 @@ _CSS = """
     width: 42px;
     height: 42px;
     border-radius: 12px;
-    background: #FEF3C7;
-    color: #B45309;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.15rem;
     flex-shrink: 0;
   }
+  .iwo3-attr-icon--amber  { background: #FEF3C7; color: #B45309; }
+  .iwo3-attr-icon--rose   { background: #FFE4E6; color: #BE123C; }
+  .iwo3-attr-icon--purple { background: #EDE9FE; color: #6D28D9; }
+  .iwo3-attr-icon--blue   { background: #DBEAFE; color: #1D4ED8; }
+  .iwo3-attr-icon--violet { background: #EDE9FE; color: #6D28D9; }
   .iwo3-attr-name {
     font-size: 1.06rem;
     font-weight: 700;
     color: #111827;
     line-height: 1.2;
-    margin-bottom: 3px;
+    margin: 0 0 3px 0;
   }
   .iwo3-attr-sub {
     font-size: 0.94rem;
     color: #6B7280;
     line-height: 1.4;
   }
+
+  /* Badge */
   .iwo3-attr-badge {
     display: inline-flex;
     align-items: center;
@@ -492,27 +965,38 @@ _CSS = """
     font-size: 0.74rem;
     font-weight: 600;
     white-space: nowrap;
+    gap: 4px;
   }
-  .iwo3-attr-badge.red { background: #DC2626; color: #FFFFFF; }
-  .iwo3-attr-badge.green { background: #D1FAE5; color: #065F46; }
-  .iwo3-attr-badge.violet { background: #EDE9FE; color: #6D28D9; }
-  .iwo3-attr-badge.gray { background: #F3F4F6; color: #374151; }
-  .iwo3-attr-badge.blue { background: #2563EB; color: #FFFFFF; }
+  .iwo3-attr-badge--red     { background: #DC2626; color: #FFFFFF; }
+  .iwo3-attr-badge--default { background: #1F2937; color: #FFFFFF; }
+  .iwo3-attr-badge--purple  { background: #6D28D9; color: #FFFFFF; }
+  .iwo3-attr-badge--outline { background: #FFFFFF; color: #374151; border: 1px solid #D1D5DB; }
+  .iwo3-attr-badge--violet  { background: #EDE9FE; color: #6D28D9; }
+
+  /* Metadata grid */
   .iwo3-attr-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .iwo3-info-row {
     display: grid;
     grid-template-columns: 140px 1fr;
     column-gap: 18px;
-    row-gap: 10px;
-    margin-bottom: 18px;
+    align-items: baseline;
   }
-  .iwo3-attr-grid .k {
+  .iwo3-info-row .k {
     color: #6B7280;
     font-size: 0.92rem;
+    font-weight: 500;
   }
-  .iwo3-attr-grid .v {
+  .iwo3-info-row .v {
     color: #111827;
     font-size: 0.94rem;
   }
+
+  /* Sections */
   .iwo3-attr-section {
     border-top: 1px solid #E5E7EB;
     padding-top: 16px;
@@ -529,10 +1013,14 @@ _CSS = """
     font-size: 0.95rem;
     line-height: 1.65;
   }
+  .iwo3-attr-copy p { margin: 0 0 12px 0; }
+  .iwo3-attr-copy p:last-child { margin-bottom: 0; }
+
+  /* Timeline */
   .iwo3-attr-timeline {
     display: grid;
-    grid-template-columns: 110px 1fr;
-    gap: 6px 12px;
+    grid-template-columns: 130px 1fr;
+    gap: 8px 16px;
     color: #4B5563;
     font-size: 0.94rem;
     line-height: 1.55;
@@ -540,8 +1028,17 @@ _CSS = """
   .iwo3-attr-timeline .t {
     color: #6B7280;
     text-align: right;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    font-size: 0.78rem;
+    padding-top: 2px;
     font-variant-numeric: tabular-nums;
   }
+  .iwo3-attr-timeline .n {
+    color: #4B5563;
+  }
+
+  /* Panels */
   .iwo3-attr-panel {
     border-radius: 12px;
     padding: 14px 16px;
@@ -553,27 +1050,200 @@ _CSS = """
     font-weight: 700;
     color: #111827;
   }
-  .iwo3-attr-panel.warn {
-    background: #FFFBEB;
-    border: 1px solid #FDE68A;
-  }
-  .iwo3-attr-panel.rose {
-    background: #FFF1F2;
-    border: 1px solid #FBCFE8;
-  }
-  .iwo3-attr-panel.note {
-    background: #F9FAFB;
-    border: 1px solid #E5E7EB;
-  }
+  .iwo3-attr-panel.amber  { background: #FFFBEB; border: 1px solid #FDE68A; }
+  .iwo3-attr-panel.rose   { background: #FFF1F2; border: 1px solid #FBCFE8; }
+  .iwo3-attr-panel.purple { background: #FAF5FF; border: 1px solid #E9D5FF; }
+  .iwo3-attr-panel.blue   { background: #EFF6FF; border: 1px solid #BFDBFE; }
+  .iwo3-attr-panel.note   { background: #F9FAFB; border: 1px solid #E5E7EB; }
   .iwo3-attr-panel .copy {
     color: #4B5563;
     font-size: 0.93rem;
     line-height: 1.65;
   }
+  .iwo3-attr-panel .copy p { margin: 0 0 8px 0; }
+  .iwo3-attr-panel .copy p:last-child { margin-bottom: 0; }
+
+  /* Aiden precedence note (rose) */
+  .iwo3-attr-precedence {
+    background: #FFF1F2;
+    border: 1px solid #FBCFE8;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .iwo3-attr-precedence-title {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #9F1239;
+    letter-spacing: 0.03em;
+    margin-bottom: 4px;
+  }
+  .iwo3-attr-precedence-body {
+    color: #4B5563;
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+  .iwo3-attr-tail {
+    margin-top: 12px;
+    color: #4B5563;
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+
+  /* AgentGoPro / BeginnersMind formula + ASCII diagram */
+  .iwo3-attr-formula {
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    color: #4B5563;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.55;
+  }
+  .iwo3-attr-formula p { margin: 0 0 6px 0; }
+  .iwo3-attr-formula p:last-child { margin-bottom: 0; }
+  .iwo3-attr-ascii {
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    color: #4B5563;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .iwo3-attr-fineprint {
+    color: #6B7280;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    margin: 4px 0 0 0;
+  }
+  .iwo3-attr-code {
+    background: #F3F4F6;
+    color: #111827;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.82rem;
+  }
+  .iwo3-attr-link {
+    color: #2563EB;
+    text-decoration: none;
+    border-bottom: 1px dotted #93C5FD;
+  }
+  .iwo3-attr-link:hover { color: #1D4ED8; border-bottom-style: solid; }
+
+  /* Lead Developer card */
+  .iwo3-attr-leaddev {
+    margin-top: 28px;
+    padding: 22px 24px;
+    border: 1px solid #FCD34D55;
+    border-radius: 16px;
+    background: linear-gradient(120deg, #FFFBEB 0%, #FFFFFF 50%, #EFF6FF 100%);
+  }
+  .iwo3-attr-leaddev-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .iwo3-attr-leaddev-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: #FEF3C7;
+    color: #B45309;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    border: 1px solid #FDE68A;
+  }
+  .iwo3-attr-leaddev-eyebrow {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: #B45309;
+    text-transform: uppercase;
+  }
+  .iwo3-attr-leaddev-name {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.78rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 2px 0 4px 0;
+  }
+  .iwo3-attr-leaddev-role {
+    color: #6B7280;
+    font-size: 0.9rem;
+  }
+  .iwo3-attr-leaddev-rule {
+    border: none;
+    border-top: 1px solid #E5E7EB;
+    margin: 16px 0;
+  }
+  .iwo3-attr-leaddev-prose {
+    color: #1F2937;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  /* External Tooling secondary section */
+  .iwo3-attr-tooling-section {
+    margin-top: 36px;
+    padding-top: 16px;
+    border-top: 2px solid #E5E7EB;
+  }
+  .iwo3-attr-tooling-heading {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.4rem;
+    color: #111827;
+    margin: 0 0 6px 0;
+    font-weight: 700;
+  }
+  .iwo3-attr-tooling-sub {
+    color: #6B7280;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+  }
+  .iwo3-attr-tool-card {
+    border: 1px solid #E5E7EB;
+    border-radius: 14px;
+    background: #FFFFFF;
+    padding: 18px 20px 20px 20px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    margin-bottom: 14px;
+  }
+  .iwo3-attr-head--small { margin-bottom: 14px; }
+  .iwo3-attr-tool-card .iwo3-attr-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+  .iwo3-attr-tool-card .iwo3-attr-name { font-size: 1rem; }
+
+  /* Footer */
+  .iwo3-attr-footer {
+    margin-top: 36px;
+    padding-top: 18px;
+    border-top: 1px solid #E5E7EB;
+    text-align: center;
+    color: #6B7280;
+    font-size: 0.88rem;
+  }
+  .iwo3-attr-footer p { margin: 2px 0; }
+  .iwo3-attr-footer .small { font-size: 0.78rem; }
+
   @media (max-width: 820px) {
     .iwo3-attr-title { font-size: 2.2rem; }
     .iwo3-attr-head { flex-direction: column; }
-    .iwo3-attr-grid,
+    .iwo3-info-row,
     .iwo3-attr-timeline {
       grid-template-columns: 1fr;
     }
@@ -583,120 +1253,59 @@ _CSS = """
 """
 
 
-def _esc(value: Any) -> str:
-    return escape(str(value))
-
-
-def _render_timeline(rows: list[tuple[str, str]]) -> str:
-    body = "".join(
-        f'<div class="t">{_esc(period)}</div><div>{_esc(note)}</div>'
-        for period, note in rows
-    )
-    return f'<div class="iwo3-attr-timeline">{body}</div>'
-
-
-def _render_entry(entry: dict[str, Any]) -> None:
-    badge_label, badge_color = entry["badge"]
-    metadata_rows = entry.get(
-        "metadata_rows",
-        [
-            ("Author", entry["author"]),
-            ("Organization", entry["organization"]),
-            ("Category", entry["category"]),
-            ("Period", entry["period"]),
-        ],
-    )
-    metadata_html = "".join(
-        f'<div class="k">{_esc(label)}</div><div class="v">{_esc(value)}</div>'
-        for label, value in metadata_rows
-    )
-    timeline_note_html = ""
-    if entry.get("timeline_note_title") and entry.get("timeline_note_body"):
-        timeline_note_html = (
-            f'<div class="iwo3-attr-panel rose">'
-            f'<h4>{_esc(entry["timeline_note_title"])}</h4>'
-            f'<div class="copy">{_esc(entry["timeline_note_body"])}</div>'
-            f'</div>'
-        )
-    timeline_tail_html = ""
-    if entry.get("timeline_tail"):
-        timeline_tail_html = (
-            f'<div class="iwo3-attr-copy" style="margin-top:12px;">'
-            f'{_esc(entry["timeline_tail"])}</div>'
-        )
-    st.markdown(
-        f"""
-        <div class="iwo3-attr-card">
-          <div class="iwo3-attr-head">
-            <div class="iwo3-attr-head-main">
-              <div class="iwo3-attr-icon">{_esc(entry["icon"])}</div>
-              <div>
-                <div class="iwo3-attr-name">{_esc(entry["name"])}</div>
-                <div class="iwo3-attr-sub">{_esc(entry["subtitle"])}</div>
-              </div>
-            </div>
-            <div class="iwo3-attr-badge {badge_color}">{_esc(badge_label)}</div>
-          </div>
-
-          <div class="iwo3-attr-grid">
-            {metadata_html}
-          </div>
-
-          <div class="iwo3-attr-section">
-            <h4>{_esc(entry.get("origin_heading", "Creator & Origin"))}</h4>
-            <div class="iwo3-attr-copy">{_esc(entry["origin"])}</div>
-          </div>
-
-          <div class="iwo3-attr-section">
-            <h4>{_esc(entry.get("core_heading", "Core Concept"))}</h4>
-            <div class="iwo3-attr-copy">{_esc(entry["core_concept"])}</div>
-          </div>
-
-          <div class="iwo3-attr-section">
-            <h4>{_esc(entry.get("timeline_heading", "Timeline & Lineage"))}</h4>
-            {timeline_note_html}
-            {_render_timeline(entry["timeline"])}
-            {timeline_tail_html}
-          </div>
-
-          <div class="iwo3-attr-panel {entry.get("license_panel_tone", "warn")}">
-            <h4>License Notice</h4>
-            <div class="copy">{_esc(entry["license_notice"])}</div>
-          </div>
-
-          <div class="iwo3-attr-panel note">
-            <h4>Attribution Statement</h4>
-            <div class="copy">{_esc(entry["attribution_statement"])}</div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+# ── Entry point ──────────────────────────────────────────────────
 
 
 def main() -> None:
-    st.markdown(_CSS, unsafe_allow_html=True)
-    st.markdown('<div class="iwo3-attr-wrap">', unsafe_allow_html=True)
+    st.html(_CSS)
+    st.html('<div class="iwo3-attr-wrap">')
 
     if st.button("← Back", key="attr-back", type="tertiary"):
-        st.switch_page("views/tier_overview.py")
+        # Authenticated callers came from the Tier Overview surface;
+        # public/anonymous callers came from the landing page. The
+        # Tier Overview switch_page is the existing legacy default;
+        # if it's unreachable (no auth context), Streamlit raises
+        # which Streamlit's own runtime handles by ignoring.
+        try:
+            st.switch_page("views/tier_overview.py")
+        except Exception:  # noqa: BLE001
+            try:
+                st.switch_page("Home.py")
+            except Exception:  # noqa: BLE001
+                pass
 
-    st.markdown(
-        """
-        <h1 class="iwo3-attr-title">Attribution Register</h1>
-        <div class="iwo3-attr-subtitle">
-          Foundational lineages, orchestration frameworks, memory layers,
-          and major external tooling that materially shaped or power IWO3/PDOE.
-        </div>
-        <div class="iwo3-attr-collected">Collected 2026-05-02</div>
-        """,
-        unsafe_allow_html=True,
+    st.html(
+        '<h1 class="iwo3-attr-title">Attribution Register</h1>'
+        '<div class="iwo3-attr-subtitle">'
+        'AgentGoPro/AgentGoFlow, Aiden Zephyr/TIB, GCC Memory '
+        '&amp; PocketFlow — foundational lineages of IWO/PDOE.'
+        '</div>'
+        f'<div class="iwo3-attr-collected">Collected {_esc(_COLLECTED_DATE)}</div>'
     )
 
-    for entry in _ENTRIES:
-        _render_entry(entry)
+    # Foundational lineage — order mirrors the canonical reference.
+    _render_card_agentgoflow()
+    _render_card_aiden_zephyr()
+    _render_card_gcc_memory()
+    _render_card_pocketflow()
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Lead Developer card sits between the foundational cards and
+    # the external-tooling section, matching canonical layout.
+    _render_lead_developer_card()
+
+    # IWO3-specific external tooling — clearly secondary section.
+    _render_external_tooling()
+
+    # Footer — IWO3 (not IWO2).
+    st.html(
+        '<footer class="iwo3-attr-footer">'
+        '<p>AIDEN_IWO3 — Intelligent Work Orchestration</p>'
+        '<p class="small">Lead Developer &amp; Principal Technical '
+        'Architect: Darrel Vaughn | LuaAzullaB</p>'
+        '</footer>'
+    )
+
+    st.html('</div>')
 
 
 main()
