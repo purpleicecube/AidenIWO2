@@ -12,6 +12,7 @@ backups/
 .local/gamma_candidates/
 .local/iowa-site/
 .local/workspace/
+.local/chroma/
 
 # IWO3 Python toolchain
 __pycache__/
