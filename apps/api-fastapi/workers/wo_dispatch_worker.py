@@ -330,6 +330,20 @@ async def dispatch_one_wo(
             if decision.decision_kind == "work_order_brief":
                 brief = decision.work_order_brief
                 assert brief is not None
+                # Loop Lambda — assemble Tier-2 memory bundle for the
+                # async dispatch path. Operator identity falls back to
+                # WO submitter (or sentinel if NULL — see wrappers.py).
+                from memory.wrappers import (  # local to avoid cycle
+                    memory_context_builder_for_subagent,
+                )
+                tier2_bundle = await memory_context_builder_for_subagent(
+                    conn,
+                    client_id=client_id,
+                    work_order_id=wo["id"],
+                    sub_agent_role=brief.assigned_role,
+                    intake_text=intake_text,
+                    actor_user_id=actor,
+                )
                 try:
                     envelope = await invoke_tier_2(
                         conn,
@@ -339,6 +353,7 @@ async def dispatch_one_wo(
                         work_order_id=wo["id"],
                         client_id=client_id,
                         actor_user_id=actor,
+                        memory_block=tier2_bundle.block,
                     )
                 except (Tier2Error, LlmBudgetExceeded) as exc:
                     await write_audit_row(
@@ -430,6 +445,20 @@ async def dispatch_one_wo(
             if decision.decision_kind == "workflow_brief":
                 brief = decision.workflow_brief
                 assert brief is not None
+                # Loop Lambda — assemble PM memory bundle for the
+                # async workflow-instantiation path. Bundle is
+                # MEMORY_BUDGET_TIER_1_5 (1.5K).
+                from memory.wrappers import (  # local to avoid cycle
+                    memory_context_builder_for_workflow,
+                )
+                pm_bundle = await memory_context_builder_for_workflow(
+                    conn,
+                    client_id=client_id,
+                    work_order_id=wo["id"],
+                    workflow_execution_id=None,
+                    intake_text=intake_text,
+                    actor_user_id=actor,
+                )
                 try:
                     inst = await instantiate_workflow_from_brief(
                         conn,
@@ -439,6 +468,7 @@ async def dispatch_one_wo(
                         work_order_id=wo["id"],
                         client_id=client_id,
                         actor_user_id=actor,
+                        memory_block=pm_bundle.block,
                     )
                 except PmError as exc:
                     await write_audit_row(

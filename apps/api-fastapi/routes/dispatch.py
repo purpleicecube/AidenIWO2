@@ -32,6 +32,10 @@ from pydantic import BaseModel, Field
 
 from adapter.dispatch import DispatchError, dispatch_gamma_for_package
 from authz.audit_writer import write_audit_row
+from memory.wrappers import (
+    memory_context_builder_for_subagent,
+    memory_context_builder_for_workflow,
+)
 from deps import (
     current_user_context,
     get_tenant_scoped_connection,
@@ -223,6 +227,18 @@ async def dispatch_work_order(
     if decision.decision_kind == "work_order_brief":
         brief = decision.work_order_brief
         assert brief is not None
+        # Loop Lambda — assemble a Tier-2 memory bundle before invoking
+        # the sub-agent. Fresh assembly per invocation (D-L2 default);
+        # Tier-1 chat bundle NOT propagated. Bypass / no_sources falls
+        # through with empty block — Tier-2 still runs.
+        tier2_bundle = await memory_context_builder_for_subagent(
+            conn,
+            client_id=ctx["client_id"],
+            work_order_id=wo["id"],
+            sub_agent_role=brief.assigned_role,
+            intake_text=intake_text,
+            actor_user_id=ctx["user_id"],
+        )
         try:
             envelope = await invoke_tier_2(
                 conn,
@@ -232,6 +248,7 @@ async def dispatch_work_order(
                 work_order_id=wo["id"],
                 client_id=ctx["client_id"],
                 actor_user_id=ctx["user_id"],
+                memory_block=tier2_bundle.block,
             )
         except LlmBudgetExceeded as exc:
             return DispatchResponse(
@@ -328,6 +345,17 @@ async def dispatch_work_order(
     if decision.decision_kind == "workflow_brief":
         brief = decision.workflow_brief
         assert brief is not None
+        # Loop Lambda — assemble a PM memory bundle before invoking
+        # PM Tier-1.5 elaboration. PM gets MEMORY_BUDGET_TIER_1_5
+        # (1.5K) per D-L1 default; surface tag "tier_1_5_pm".
+        pm_bundle = await memory_context_builder_for_workflow(
+            conn,
+            client_id=ctx["client_id"],
+            work_order_id=wo["id"],
+            workflow_execution_id=None,
+            intake_text=intake_text,
+            actor_user_id=ctx["user_id"],
+        )
         try:
             inst = await instantiate_workflow_from_brief(
                 conn,
@@ -337,6 +365,7 @@ async def dispatch_work_order(
                 work_order_id=wo["id"],
                 client_id=ctx["client_id"],
                 actor_user_id=ctx["user_id"],
+                memory_block=pm_bundle.block,
             )
         except PmError as exc:
             return DispatchResponse(
@@ -427,12 +456,44 @@ async def run_next_step(
             workflow_finished=True,
         )
 
+    # Loop Lambda — assemble a Tier-2 memory bundle for this step.
+    # The intake is the step_key + display_name (resolved inside
+    # execute_step_run); the wrapper looks up the step's role + WO
+    # for tenant + operator scope.
+    step_meta = await conn.fetchrow(
+        """
+        SELECT wts.assigned_sub_agent_key,
+               coalesce(wts.display_name, wts.step_key) AS intake_label,
+               we.work_order_id::text AS work_order_id
+          FROM workflow_step_runs sr
+          JOIN workflow_executions we ON we.id = sr.execution_id
+          JOIN workflow_template_steps wts
+            ON wts.template_id = we.template_id
+           AND wts.step_key = sr.step_key
+         WHERE sr.id = $1::uuid AND we.client_id = $2::uuid
+        """,
+        next_pending["id"],
+        ctx["client_id"],
+    )
+    step_role = (step_meta["assigned_sub_agent_key"] if step_meta else None) or "mark"
+    step_intake = (step_meta["intake_label"] if step_meta else None) or next_pending["step_key"]
+    step_wo_id = step_meta["work_order_id"] if step_meta else None
+    step_bundle = await memory_context_builder_for_subagent(
+        conn,
+        client_id=ctx["client_id"],
+        work_order_id=step_wo_id,
+        sub_agent_role=step_role,
+        intake_text=step_intake,
+        actor_user_id=ctx["user_id"],
+    )
+
     try:
         result = await execute_step_run(
             conn,
             step_run_id=next_pending["id"],
             client_id=ctx["client_id"],
             actor_user_id=ctx["user_id"],
+            memory_block=step_bundle.block,
         )
     except Tier2Error as exc:
         return RunNextStepResponse(

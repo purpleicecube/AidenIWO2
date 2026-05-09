@@ -341,6 +341,7 @@ async def instantiate_workflow_from_brief(
     work_order_id: Optional[str],
     client_id: str,
     actor_user_id: Optional[str],
+    memory_block: str = "",
     transport=None,
 ) -> WorkflowInstantiationResult:
     """Run PM Tier 1.5 against `brief` + create the workflow_execution
@@ -443,6 +444,16 @@ async def instantiate_workflow_from_brief(
     options.setdefault("max_tokens", resolve_max_tokens(cfg.options))
     options.setdefault("response_format", {"type": "json_object"})
 
+    # Loop Lambda — prepend memory_block to PM's system prompt when
+    # the wrapper supplies one. Empty string is the safe default
+    # (preserves Iota/Kappa Tier-1 behavior unchanged for callers
+    # that don't yet pass memory).
+    base_system_prompt = cfg.system_prompt or PM_SYSTEM_PROMPT
+    if memory_block:
+        composed_system_prompt = memory_block + "\n\n" + base_system_prompt
+    else:
+        composed_system_prompt = base_system_prompt
+
     started = time.monotonic()
     try:
         result = call_openai_compatible(
@@ -450,7 +461,7 @@ async def instantiate_workflow_from_brief(
             model=cfg.model,
             api_key=api_key,
             base_url=cfg.base_url,
-            system_prompt=cfg.system_prompt or PM_SYSTEM_PROMPT,
+            system_prompt=composed_system_prompt,
             user_message=user_msg,
             options=options,
             transport=transport,

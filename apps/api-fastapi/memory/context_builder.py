@@ -30,6 +30,7 @@ from .types import (
     SHORT_INTAKE_THRESHOLD_CHARS,
     MemoryBundle,
     MemorySource,
+    Surface,
 )
 from .validator import validate_tenant_safety
 
@@ -61,6 +62,9 @@ async def _emit_applied(
     client_id: str,
     user_id: str,
     bundle: MemoryBundle,
+    surface: str = "chat",
+    extra_metadata: Optional[dict] = None,
+    budget: int = MEMORY_BUDGET_TOKENS,
 ) -> None:
     sources_used = [
         {
@@ -74,6 +78,7 @@ async def _emit_applied(
     metadata = {
         "client_id": client_id,
         "user_id": user_id,
+        "surface": surface,
         "sources_used": sources_used,
         "tokens_used": bundle.tokens_used,
         "truncated_kinds": list(bundle.truncated_kinds),
@@ -81,30 +86,37 @@ async def _emit_applied(
         "memory_budget_ms": bundle.assembly_ms,
         "rejected_count": len(bundle.rejected),
     }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    target_type = "chat_session" if surface == "chat" else "memory_bundle"
     await write_audit_row(
         conn,
         client_id=client_id,
         actor_user_id=user_id,
         event=MEMORY_AUDIT_EVENTS["applied"],
-        target_type="chat_session",
+        target_type=target_type,
         target_id=None,
         metadata=metadata,
     )
     if bundle.truncated_kinds:
+        truncated_metadata = {
+            "client_id": client_id,
+            "user_id": user_id,
+            "surface": surface,
+            "truncated_kinds": list(bundle.truncated_kinds),
+            "tokens_after": bundle.tokens_used,
+            "budget": budget,
+        }
+        if extra_metadata:
+            truncated_metadata.update(extra_metadata)
         await write_audit_row(
             conn,
             client_id=client_id,
             actor_user_id=user_id,
             event=MEMORY_AUDIT_EVENTS["budget_truncated"],
-            target_type="chat_session",
+            target_type=target_type,
             target_id=None,
-            metadata={
-                "client_id": client_id,
-                "user_id": user_id,
-                "truncated_kinds": list(bundle.truncated_kinds),
-                "tokens_after": bundle.tokens_used,
-                "budget": MEMORY_BUDGET_TOKENS,
-            },
+            metadata=truncated_metadata,
         )
 
 
@@ -114,19 +126,26 @@ async def _emit_bypassed(
     client_id: str,
     user_id: str,
     reason: str,
+    surface: str = "chat",
+    extra_metadata: Optional[dict] = None,
 ) -> None:
+    metadata = {
+        "client_id": client_id,
+        "user_id": user_id,
+        "surface": surface,
+        "reason": reason,
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    target_type = "chat_session" if surface == "chat" else "memory_bundle"
     await write_audit_row(
         conn,
         client_id=client_id,
         actor_user_id=user_id,
         event=MEMORY_AUDIT_EVENTS["bypassed"],
-        target_type="chat_session",
+        target_type=target_type,
         target_id=None,
-        metadata={
-            "client_id": client_id,
-            "user_id": user_id,
-            "reason": reason,
-        },
+        metadata=metadata,
     )
 
 
@@ -185,30 +204,46 @@ async def memory_context_builder(
     client_id: str,
     user_id: str,
     message: str,
+    surface: Surface = "chat",
+    budget: int = MEMORY_BUDGET_TOKENS,
+    extra_metadata: Optional[dict] = None,
 ) -> MemoryBundle:
-    """Assemble a memory bundle for one Tier-1 chat turn.
+    """Assemble a memory bundle for ONE memory-injecting LLM call.
 
     Inputs:
       conn       — tenant-scoped FastAPI connection (firewall Layer 2).
                    Caller is responsible for SET LOCAL ROLE iwo3_app +
                    app.current_client_id at the connection level.
       client_id  — active tenant
-      user_id    — active operator
-      message    — raw operator intake (used for retrieval term build
-                   and short-intake gate)
+      user_id    — active operator (or async-creator-fallback identity
+                   for non-chat surfaces; see wrappers.py)
+      message    — raw operator intake / WO description / step input;
+                   feeds the parser + tsquery + intent gate
+      surface    — Loop Lambda discriminator. "chat" (default) for
+                   Tier-1 aiden_chat; "tier_1_5_pm" for PM elaboration;
+                   "tier_2_subagent" for Tier-2 invocation. Carried in
+                   audit metadata; affects `target_type` of the
+                   audit row.
+      budget     — token budget ceiling. Defaults to MEMORY_BUDGET_TOKENS
+                   (2K, Tier-1 chat). Wrappers pass MEMORY_BUDGET_TIER_1_5
+                   (1.5K) and MEMORY_BUDGET_TIER_2 (1.5K) for the new
+                   surfaces (D-L1 default).
+      extra_metadata — optional fields added to the audit row metadata
+                   (e.g. work_order_id, sub_agent_role,
+                   workflow_execution_id). Wrappers populate these.
 
     Returns:
       MemoryBundle. `bundle.block` is the rendered string ready to
-      prepend to Tier-1's system prompt. Empty `block` is fine — caller
-      passes through.
+      prepend to the LLM's system prompt. Empty `block` is fine —
+      caller passes through.
 
     Side effects:
       Emits exactly one of:
         - `memory.bypassed` (kill switch / no sources / short intake)
         - `memory.applied` (success path; may be followed by
            `memory.budget_truncated` and/or N × `memory.source_rejected`)
-      Caller invokes this once per HTTP request and may reuse the
-      bundle on tool-call re-invokes.
+      All audit rows carry the `surface` discriminator in metadata
+      (D-L3 default).
     """
     started = time.monotonic()
 
@@ -220,6 +255,8 @@ async def memory_context_builder(
             client_id=client_id,
             user_id=user_id,
             reason="env_disabled",
+            surface=surface,
+            extra_metadata=extra_metadata,
         )
         return _empty_bundle(
             bypassed=True,
@@ -257,6 +294,8 @@ async def memory_context_builder(
             client_id=client_id,
             user_id=user_id,
             reason="tenant_disabled",
+            surface=surface,
+            extra_metadata=extra_metadata,
         )
         return _empty_bundle(
             bypassed=True,
@@ -277,6 +316,8 @@ async def memory_context_builder(
             client_id=client_id,
             user_id=user_id,
             reason="no_sources",
+            surface=surface,
+            extra_metadata=extra_metadata,
         )
         return _empty_bundle(
             bypassed=True,
@@ -292,7 +333,9 @@ async def memory_context_builder(
     )
 
     # Budget allocation + truncation (canonical facts never dropped).
-    kept, truncated_kinds = allocate(validated, budget=MEMORY_BUDGET_TOKENS)
+    # Loop Lambda — `budget` parameter lets wrappers pass per-surface
+    # ceilings (Tier-1=2K default, PM=1.5K, Tier-2=1.5K).
+    kept, truncated_kinds = allocate(validated, budget=budget)
 
     block = render_block(kept)
     tokens_used = sum(s.tokens for s in kept)
@@ -335,6 +378,9 @@ async def memory_context_builder(
         client_id=client_id,
         user_id=user_id,
         bundle=bundle,
+        surface=surface,
+        extra_metadata=extra_metadata,
+        budget=budget,
     )
 
     return bundle

@@ -47,9 +47,28 @@ FOLDER_LISTING_MAX_SUBFOLDERS: int = 25
 FOLDER_LISTING_MAX_FILES: int = 50
 
 
-# 2,000 tokens for the memory block; leaves >40K for the rest of the
-# Tier-1 prompt + completion under the 50K WO ceiling.
+# 2,000 tokens for the Tier-1 chat memory block; leaves >40K for the
+# rest of the Tier-1 prompt + completion under the 50K WO ceiling.
 MEMORY_BUDGET_TOKENS: int = 2000
+
+# Loop Lambda — per-surface budgets for memory injection beyond Tier-1
+# chat. PM elaboration prompts are shorter than Aiden's; Tier-2
+# sub-agent prompts already carry rich per-WO payload (intake +
+# content_blocks + system prompt). Smaller budgets keep total prompt
+# under the 50K WO ceiling even when N step_runs each carry their own
+# memory bundle.
+#
+# D-L1 default (accepted in the seven-decision baseline): per-call
+# budgets, not a shared per-WO scheduler.
+MEMORY_BUDGET_TIER_1_5: int = 1500   # PM elaboration
+MEMORY_BUDGET_TIER_2: int = 1500     # Sub-agent invocation
+
+
+# Surface discriminator for memory.applied audit metadata. Locked here
+# so the audit writer + tests share one vocabulary. D-L3 default
+# (accepted): same memory.applied event family with a `surface` field;
+# no event-name proliferation.
+Surface = Literal["chat", "tier_1_5_pm", "tier_2_subagent"]
 
 # 4 chars per token approximation — same heuristic used by tier_1_aiden
 # for budget pre-flight. The real provider count is logged after.

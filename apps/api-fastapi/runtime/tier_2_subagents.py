@@ -437,6 +437,7 @@ async def _invoke_tier_2_once(
     client_id: str,
     actor_user_id: Optional[str],
     disable_tool_call: bool,
+    memory_block: str = "",
     transport=None,
 ) -> Tier2Decision:
     """Single Tier 2 round-trip. Returns either an envelope (final
@@ -452,9 +453,18 @@ async def _invoke_tier_2_once(
         if disable_tool_call
         else TIER_2_OUTPUT_SCHEMA_BASE
     )
-    system_prompt = (
+    base_role_prompt = (
         cfg.system_prompt or DEFAULT_SYSTEM_PROMPTS.get(norm_role, "")
-    ) + schema
+    )
+    # Loop Lambda — prepend memory_block when the wrapper supplied
+    # one. Memory context goes BEFORE the role prompt + schema so the
+    # tenant-validated facts appear at the top of the system message.
+    # Empty string is the safe default — Iota/Kappa Tier-2 behavior
+    # preserved for callers that don't yet pass memory.
+    if memory_block:
+        system_prompt = memory_block + "\n\n" + base_role_prompt + schema
+    else:
+        system_prompt = base_role_prompt + schema
 
     user_msg = json.dumps(
         {"intake_text": intake_text, "content_blocks": content_blocks}
@@ -552,6 +562,7 @@ async def invoke_tier_2(
     work_order_id: Optional[str],
     client_id: str,
     actor_user_id: Optional[str],
+    memory_block: str = "",
     transport=None,
 ) -> Tier2OutputEnvelope:
     """Run a Tier 2 sub-agent end-to-end, including up to
@@ -639,6 +650,7 @@ async def invoke_tier_2(
             client_id=client_id,
             actor_user_id=actor_user_id,
             disable_tool_call=disable_tool_call,
+            memory_block=memory_block,
             transport=transport,
         )
 
@@ -947,6 +959,7 @@ async def execute_step_run(
     client_id: str,
     actor_user_id: Optional[str],
     intake_context: Optional[str] = None,
+    memory_block: str = "",
     transport=None,
 ) -> Tier2InvocationResult:
     """Advance one workflow_step_run through Tier 2.
@@ -1021,6 +1034,7 @@ async def execute_step_run(
             work_order_id=row["work_order_id"],
             client_id=client_id,
             actor_user_id=actor_user_id,
+            memory_block=memory_block,
             transport=transport,
         )
     except Exception as exc:
