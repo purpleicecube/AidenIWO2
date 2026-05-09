@@ -84,9 +84,10 @@ describeIwo3("Loop 4 Phase 1 — permission-grant override precedence", () => {
       clientId: KLEAR,
     });
     expect(after.permissions.has("audit_log:read")).toBe(true);
-    // Size = operator-35 + 1 override (post-Loop-Eta tool_catalog:read +
-    // sub_agent_tool:read add to operator's defaults).
-    expect(after.permissions.size).toBe(36);
+    // Size = operator-38 + 1 override. Operator role grants now total
+    // 38 after Loop Kappa (+canonical_facts:read/create/update); the
+    // +1 from this allow override pushes the resolved size to 39.
+    expect(after.permissions.size).toBe(39);
   });
 
   it("deny override removes a permission the role default would grant", async () => {
@@ -110,10 +111,12 @@ describeIwo3("Loop 4 Phase 1 — permission-grant override precedence", () => {
       clientId: KLEAR,
     });
     expect(after.permissions.has("user:invite")).toBe(false);
-    // Size = admin-85 − 1 deny (post-MegaLoop-Theta admin gains
-    // tool_catalog:create / :update / :delete / :import_skill / :test_mcp
-    // on top of Loop-Eta tool_catalog:read/write + sub_agent_tool:read/assign).
-    expect(after.permissions.size).toBe(84);
+    // Size = admin-90 − 1 deny. Admin role grants now total 90 after
+    // Loop Kappa (+canonical_facts:read/create/update/delete/set_severity
+    // on top of MegaLoop-Theta tool_catalog write paths + Loop-Eta
+    // tool_catalog/sub_agent_tool basics); the deny pushes the
+    // resolved size to 89.
+    expect(after.permissions.size).toBe(89);
   });
 
   it("overrides are tenant-scoped — an allow on Klear does not bleed to FFAI", async () => {

@@ -41,6 +41,7 @@ import {
   LOOP_ETA_AUDIT_EVENTS,
   LOOP_THETA_AUDIT_EVENTS,
   LOOP_IOTA_AUDIT_EVENTS,
+  LOOP_KAPPA_AUDIT_EVENTS,
 } from "../../packages/contracts/audit/events";
 
 export interface ContractSnapshot {
@@ -111,6 +112,7 @@ export function loadAuditEvents(): ContractSnapshot["auditEvents"] {
       LOOP_ETA_AUDIT_EVENTS: [...LOOP_ETA_AUDIT_EVENTS],
       LOOP_THETA_AUDIT_EVENTS: [...LOOP_THETA_AUDIT_EVENTS],
       LOOP_IOTA_AUDIT_EVENTS: [...LOOP_IOTA_AUDIT_EVENTS],
+      LOOP_KAPPA_AUDIT_EVENTS: [...LOOP_KAPPA_AUDIT_EVENTS],
     },
   };
 }

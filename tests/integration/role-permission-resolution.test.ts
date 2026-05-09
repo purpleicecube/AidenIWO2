@@ -43,13 +43,19 @@ const INTRUDER = "00000000-0000-4000-8000-000099000002";
 // admin only (no other role gets write paths over the locker).
 //   owner +5 → 87, admin +5 → 85; operator/reviewer/viewer/
 //   agent_system unchanged.
+// Loop Kappa (2026-05-09): +5 keys — canonical_facts:read, :create,
+// :update, :delete, :set_severity. Tiered grants: owner+admin all 5;
+// operator read+create+update (3); reviewer/viewer/agent_system read
+// only (1). New cumulative role grants:
+//   owner +5 → 92, admin +5 → 90, operator +3 → 38,
+//   reviewer +1 → 22, viewer +1 → 18, agent_system +1 → 28.
 const EXPECTED_COUNTS = {
-  owner: 87,
-  admin: 85,
-  operator: 35,
-  reviewer: 21,
-  viewer: 17,
-  agent_system: 27,
+  owner: 92,
+  admin: 90,
+  operator: 38,
+  reviewer: 22,
+  viewer: 18,
+  agent_system: 28,
 } as const;
 
 describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
@@ -59,21 +65,21 @@ describeIwo3("Loop 4 Phase 1 — role-permission resolution", () => {
     await pool.end();
   });
 
-  it("permissions vocabulary is locked at 87 keys (Loop Eta x4 + MegaLoop Theta x5)", async () => {
+  it("permissions vocabulary is locked at 92 keys (Loop Eta x4 + MegaLoop Theta x5 + Loop Kappa x5)", async () => {
     const { rows } = await pool.query<{ count: string }>(
       `SELECT count(*) AS count FROM permissions`
     );
-    expect(Number(rows[0].count)).toBe(87);
+    expect(Number(rows[0].count)).toBe(92);
   });
 
-  it("role_permissions is seeded at 272 rows across the six roles (Theta adds 5 each on owner+admin)", async () => {
+  it("role_permissions is seeded at 288 rows across the six roles (Kappa adds 5/5/3/1/1/1)", async () => {
     const { rows } = await pool.query<{ role: string; count: string }>(
       `SELECT role, count(*) AS count FROM role_permissions GROUP BY role ORDER BY role`
     );
     const map = Object.fromEntries(rows.map((r) => [r.role, Number(r.count)]));
     expect(map).toMatchObject(EXPECTED_COUNTS);
     const total = Object.values(map).reduce((a, b) => a + b, 0);
-    expect(total).toBe(272);
+    expect(total).toBe(288);
   });
 
   for (const [userId, role, expected] of [

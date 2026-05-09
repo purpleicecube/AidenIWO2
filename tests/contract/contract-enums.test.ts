@@ -76,14 +76,19 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     ).toEqual(snap.permissionKeys);
   });
 
-  it("snapshot cardinalities match expected Loop 1-Iota baselines", () => {
+  it("snapshot cardinalities match expected Loop 1-Kappa baselines", () => {
     const snap = loadSnapshot();
     expect(Object.keys(snap.dbEnums).length).toBe(49);
     // Loop Iota — Memory V1 shipped 4 audit events under
     // LOOP_IOTA_AUDIT_EVENTS (memory.applied / .bypassed /
     // .budget_truncated / .source_rejected). Total: 138 + 4 = 142.
-    expect(snap.auditEvents.all.length).toBe(142);
-    expect(snap.permissionKeys.length).toBe(87);
+    // Loop Kappa — Memory V1.5 shipped 3 audit events under
+    // LOOP_KAPPA_AUDIT_EVENTS (canonical_facts.created / .updated /
+    // .deleted). Total: 142 + 3 = 145.
+    expect(snap.auditEvents.all.length).toBe(145);
+    // Loop Kappa added 5 RBAC keys (canonical_facts: read / create /
+    // update / delete / set_severity). Total: 87 + 5 = 92.
+    expect(snap.permissionKeys.length).toBe(92);
     // Every locked per-loop array carries the right shape.
     expect(snap.auditEvents.byLoop.LOOP_2_AUDIT_EVENTS.length).toBe(12);
     expect(snap.auditEvents.byLoop.LOOP_3_PHASE_1_AUDIT_EVENTS.length).toBe(13);
@@ -111,6 +116,8 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     expect(snap.auditEvents.byLoop.LOOP_THETA_AUDIT_EVENTS.length).toBe(4);
     // Loop Iota — Memory V1.
     expect(snap.auditEvents.byLoop.LOOP_IOTA_AUDIT_EVENTS.length).toBe(4);
+    // Loop Kappa — Memory V1.5 (canonical_facts CRUD lifecycle).
+    expect(snap.auditEvents.byLoop.LOOP_KAPPA_AUDIT_EVENTS.length).toBe(3);
   });
 });
 
