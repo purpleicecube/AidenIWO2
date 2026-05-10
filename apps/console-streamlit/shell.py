@@ -261,32 +261,25 @@ _CSS = """
     height: 100%;
     padding-top: 6px;
   }
-  /* Left-align the WO title button text. Streamlit's tertiary button
-     with use_container_width centers its label by default; on a list
-     row we want it flush-left like a normal title. Scope to the
-     dashboard recent-WO rows only via the st.container(key=...)
-     wrapper, so workspace folder/file cards (which want centered
-     tertiary titles under an icon) stay unaffected. */
+  /* Recent WO title buttons. Tertiary + no use_container_width →
+     button shrinks to text width and sits flush-left in its column.
+     Light styling so it reads as a clickable title, not a heavy
+     button. Scoped via the button's own emitted key class
+     (Streamlit emits `st-key-<key>` on the keyed widget wrapper). */
   .iwo3-recent-head { margin-bottom: 4px; }
-  [class*="st-key-iwo3-wo-title-"] button {
-    justify-content: flex-start !important;
-    text-align: left !important;
-    padding: 4px 4px !important;
+  [class*="st-key-dash_open_wo_"] button {
+    padding: 2px 0 !important;
     font-weight: 600 !important;
     color: #111827 !important;
     height: auto !important;
     min-height: 0 !important;
-    line-height: 1.25 !important;
+    line-height: 1.3 !important;
+    border: none !important;
+    background: transparent !important;
   }
-  [class*="st-key-iwo3-wo-title-"] button p,
-  [class*="st-key-iwo3-wo-title-"] button div {
-    text-align: left !important;
-    width: 100% !important;
-    margin: 0 !important;
-  }
-  [class*="st-key-iwo3-wo-title-"] button:hover {
-    background: #F9FAFB !important;
+  [class*="st-key-dash_open_wo_"] button:hover {
     color: #1E5F91 !important;
+    background: transparent !important;
   }
 
   /* ── Tier cards ── */

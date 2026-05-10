@@ -226,15 +226,13 @@ def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
             glyph = _status_chip_glyph(wo.status)
             cols = st.columns([5, 1, 1.6])
             with cols[0]:
-                with st.container(key=f"iwo3-wo-title-{wo.id}"):
-                    if st.button(
-                        wo.title,
-                        key=f"dash_open_wo_{wo.id}",
-                        use_container_width=True,
-                        type="tertiary",
-                    ):
-                        st.session_state["work_orders_focus_id"] = wo.id
-                        st.switch_page("views/work_orders.py")
+                if st.button(
+                    wo.title,
+                    key=f"dash_open_wo_{wo.id}",
+                    type="tertiary",
+                ):
+                    st.session_state["work_orders_focus_id"] = wo.id
+                    st.switch_page("views/work_orders.py")
                 st.markdown(
                     f'<div class="iwo3-wo-row-meta">'
                     f'{escape(wo.type)} · {escape(wo.created_at[:10])}'
