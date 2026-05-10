@@ -263,10 +263,12 @@ _CSS = """
   }
   /* Left-align the WO title button text. Streamlit's tertiary button
      with use_container_width centers its label by default; on a list
-     row we want it flush-left like a normal title. */
+     row we want it flush-left like a normal title. Scope to the
+     dashboard recent-WO rows only via the st.container(key=...)
+     wrapper, so workspace folder/file cards (which want centered
+     tertiary titles under an icon) stay unaffected. */
   .iwo3-recent-head { margin-bottom: 4px; }
-  div[data-testid="stVerticalBlockBorderWrapper"]
-    button[kind="tertiary"] {
+  [class*="st-key-iwo3-wo-title-"] button {
     justify-content: flex-start !important;
     text-align: left !important;
     padding: 4px 4px !important;
@@ -276,14 +278,13 @@ _CSS = """
     min-height: 0 !important;
     line-height: 1.25 !important;
   }
-  div[data-testid="stVerticalBlockBorderWrapper"]
-    button[kind="tertiary"] p {
+  [class*="st-key-iwo3-wo-title-"] button p,
+  [class*="st-key-iwo3-wo-title-"] button div {
     text-align: left !important;
     width: 100% !important;
     margin: 0 !important;
   }
-  div[data-testid="stVerticalBlockBorderWrapper"]
-    button[kind="tertiary"]:hover {
+  [class*="st-key-iwo3-wo-title-"] button:hover {
     background: #F9FAFB !important;
     color: #1E5F91 !important;
   }
