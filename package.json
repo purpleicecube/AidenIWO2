@@ -16,7 +16,7 @@
     "db:generate:iwo3": "drizzle-kit generate --config drizzle.config.iwo3.ts",
     "seed:iwo3": "bash infra/local/seed-iwo3.sh",
     "test:integration": "bash infra/local/test-integration-iwo3.sh",
-    "test:integration:live": "vitest run"
+    "test:vitest:live": "vitest run"
   },
   "engines": {
     "node": "20.x"

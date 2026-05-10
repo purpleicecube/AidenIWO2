@@ -108,15 +108,17 @@ The wrapper at `infra/local/test-integration-iwo3.sh` enforces three guards:
 2. Refuses if the test URL equals the live URL.
 3. Refuses if the test DB name does not end with `_test` (defense against accidental live-DB wipe).
 
-**Drift-tolerant quick check (optional):**
+**Drift-tolerant quick check (optional, vitest only):**
 
 ```bash
 # Run vitest against whatever IWO3_DATABASE_URL points at (may be live).
 # Use this for fast iteration when you already know your DB is in a
 # good state. Exact-count integration assertions may fail under drift.
-npm run test:integration:live
+# This script intentionally runs vitest only — it does NOT run pytest;
+# that's why the name says "vitest" and not "integration".
+npm run test:vitest:live
 
-# Python pytest against the live DB
+# Python pytest against the live DB (separate manual step)
 cd apps/api-fastapi && uv run pytest && cd -
 ```
 

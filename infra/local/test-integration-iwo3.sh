@@ -134,7 +134,17 @@ npm run test
 echo "[test-integration] 6/6  pytest (api-fastapi + console-streamlit)"
 if command -v uv >/dev/null 2>&1; then
   (cd apps/api-fastapi && IWO3_DATABASE_URL="$TEST_URL" uv run pytest)
+
   if [[ -d apps/console-streamlit/tests ]]; then
+    # The console-streamlit api_client tests spawn a FastAPI subprocess
+    # on a fixed port (8765 by default). If the previous step's pytest
+    # left a lingering uvicorn behind (rare; usually only happens after
+    # a debug-mode kill), the new fixture's bind would race and time
+    # out. Reap any matching `python -m uvicorn main:app` process owned
+    # by this user before the next pytest spins up its own subprocess.
+    pkill -u "$USER" -f 'python -m uvicorn main:app' 2>/dev/null || true
+    sleep 1
+
     (cd apps/api-fastapi && IWO3_DATABASE_URL="$TEST_URL" uv run pytest ../console-streamlit/tests -v)
   fi
 else
