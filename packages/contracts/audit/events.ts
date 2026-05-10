@@ -228,6 +228,19 @@ export const AUDIT_EVENTS = {
   WORK_ORDER_REQUESTED_OUTPUTS_SET: "work_order.requested_outputs_set",
   TIER_1_5_REQUESTED_OUTPUT_HONORED: "tier_1_5.requested_output_honored",
 
+  // Loop Xi — operator recovery loop (reopen + edit + redispatch). The
+  // `reopened` event is already locked above (work_order.reopened);
+  // these two extend the vocabulary for inline edits via
+  // `PUT /work_orders/{id}` and explicit operator-triggered
+  // re-dispatch via `POST /work_orders/{id}/redispatch`.
+  // `work_order.edited` covers partial-field updates (title /
+  // description / type / priority / requested_outputs.template_profile_id);
+  // distinct from the existing `work_order.updated` which historically
+  // carried status mutations from the transition helper. The new event
+  // keeps inline-edit forensics separable from transition forensics.
+  WORK_ORDER_EDITED:        "work_order.edited",
+  WORK_ORDER_REDISPATCHED:  "work_order.redispatched",
+
   // Beta-2 phase 0.2 — auto-dispatch worker. Q1=B locked: worker is the
   // sole canonical authority for moving a `pending` WO into `processing`.
   // The worker writes one of these per WO it picks up per tick.
@@ -548,6 +561,16 @@ export const LOOP_KAPPA_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.CANONICAL_FACTS_CREATED,
   AUDIT_EVENTS.CANONICAL_FACTS_UPDATED,
   AUDIT_EVENTS.CANONICAL_FACTS_DELETED,
+];
+
+// Loop Xi — operator recovery loop (reopen + edit + redispatch). Skips
+// Nu (reserved for V3.5 KG augmentation per memory roadmap). The
+// canonical reopen event `work_order.reopened` lives in the WO
+// transition vocabulary above; this loop adds two new events for the
+// inline-edit and redispatch operator surfaces.
+export const LOOP_XI_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.WORK_ORDER_EDITED,
+  AUDIT_EVENTS.WORK_ORDER_REDISPATCHED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs

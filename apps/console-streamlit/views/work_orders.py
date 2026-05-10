@@ -302,6 +302,220 @@ def _render_audit_panel(wo_id: str, audit_rows: list[Any]) -> None:
             )
 
 
+def _operator_recovery_panel(api, wo: Any) -> None:
+    """Loop Xi — Reopen / Edit / Redispatch. Only renders if the WO is
+    in a status where at least one of the three actions is legal. Hides
+    quietly otherwise so the col_actions panel stays compact for new
+    WOs that don't need recovery affordances."""
+    is_terminal = wo.status in ("completed", "done", "failed")
+    is_active = wo.status in ("pending", "processing")
+    if not (is_terminal or is_active):
+        return
+
+    st.markdown("**Recovery**")
+
+    # Permission preflight — all three actions gate on work_order:update
+    # server-side. One check covers all three buttons.
+    try:
+        decision = api.check_permission("work_order:update")
+    except APIError as err:
+        st.caption(f"⚠️ perm check failed: {err.detail}")
+        return
+    if not decision.allowed:
+        st.caption(
+            f"_Recovery requires `work_order:update` "
+            f"(your role: `{decision.role}`)._"
+        )
+        return
+
+    if is_terminal:
+        with st.popover(
+            "Reopen", icon=":material/restart_alt:", use_container_width=True
+        ):
+            st.markdown("**Reopen this work order**")
+            st.caption(
+                "Moves the WO from terminal back to `processing`. "
+                "A reason is required and recorded in the audit trail."
+            )
+            reason = st.text_area(
+                "Reason",
+                key=f"reopen-reason-{wo.id}",
+                max_chars=500,
+                placeholder="e.g., template wrong; needs Klear branding",
+            )
+            if st.button(
+                "Confirm Reopen",
+                key=f"reopen-confirm-{wo.id}",
+                type="primary",
+                disabled=not reason.strip(),
+            ):
+                with st.spinner("reopening…"):
+                    try:
+                        result = api.reopen_work_order(
+                            wo.id, reason=reason.strip()
+                        )
+                        st.success(
+                            f"✅ Reopened — cycle "
+                            f"`{result.get('cycle_id') or '-'}`"
+                            + (
+                                " · prior assignments cleared"
+                                if result.get("cleared_assignments")
+                                else ""
+                            )
+                        )
+                        st.rerun()
+                    except APIError as err:
+                        st.error(f"❌ {err.status_code} — {err.detail}")
+
+    if is_active:
+        # Inline edit form. Template dropdown is sourced from the
+        # tenant-scoped /template_profiles endpoint so the operator
+        # gets explicit selection (improvement over IWO2's prose-only
+        # path).
+        with st.popover(
+            "Edit", icon=":material/edit:", use_container_width=True
+        ):
+            st.markdown("**Edit this work order**")
+            st.caption(
+                "Partial update. Only changed fields are written; "
+                "blank fields keep their current value."
+            )
+            new_title = st.text_input(
+                "Title",
+                value=wo.title,
+                max_chars=240,
+                key=f"edit-title-{wo.id}",
+            )
+            new_desc = st.text_area(
+                "Description",
+                value=wo.description or "",
+                max_chars=8000,
+                height=140,
+                key=f"edit-desc-{wo.id}",
+            )
+            type_options = (
+                "content_brief",
+                "deck_build",
+                "data_analysis",
+                "research",
+                "code_change",
+                "decision_request",
+                "ops_task",
+                "general",
+            )
+            new_type = st.selectbox(
+                "Type",
+                options=type_options,
+                index=(
+                    type_options.index(wo.type)
+                    if wo.type in type_options
+                    else 0
+                ),
+                key=f"edit-type-{wo.id}",
+            )
+            priority_options = ("low", "medium", "high", "critical")
+            new_priority = st.selectbox(
+                "Priority",
+                options=priority_options,
+                index=(
+                    priority_options.index(wo.priority)
+                    if wo.priority in priority_options
+                    else 1
+                ),
+                key=f"edit-prio-{wo.id}",
+            )
+            # Template dropdown — Loop Xi explicit-template upgrade
+            # over IWO2. Pulls active tenant-scoped profiles only.
+            tp_options = [("(no change)", None)]
+            try:
+                tps = api.list_template_profiles(status="active")
+                for tp in tps:
+                    label = (
+                        f"{tp.get('profile_key')} · "
+                        f"{tp.get('output_kind')}"
+                    )
+                    tp_options.append((label, tp.get("id")))
+            except APIError as err:
+                st.caption(
+                    f"⚠️ template list unavailable: {err.detail}"
+                )
+            tp_choice = st.selectbox(
+                "Template profile (optional)",
+                options=[label for label, _ in tp_options],
+                index=0,
+                key=f"edit-tp-{wo.id}",
+                help=(
+                    "Explicit template selection. Improves on IWO2 "
+                    "where templates were inferred from description "
+                    "prose."
+                ),
+            )
+            tp_id = next(
+                (tid for label, tid in tp_options if label == tp_choice),
+                None,
+            )
+            if st.button(
+                "Save edits",
+                key=f"edit-save-{wo.id}",
+                type="primary",
+            ):
+                payload: dict[str, Any] = {}
+                if new_title and new_title != wo.title:
+                    payload["title"] = new_title
+                if new_desc != (wo.description or ""):
+                    payload["description"] = new_desc
+                if new_type and new_type != wo.type:
+                    payload["type"] = new_type
+                if new_priority and new_priority != wo.priority:
+                    payload["priority"] = new_priority
+                if tp_id is not None:
+                    payload["template_profile_id"] = tp_id
+                if not payload:
+                    st.info("No changes to save.")
+                else:
+                    with st.spinner("saving…"):
+                        try:
+                            api.edit_work_order(wo.id, **payload)
+                            st.success(
+                                f"✅ Saved — fields: "
+                                f"{', '.join(sorted(payload.keys()))}"
+                            )
+                            st.rerun()
+                        except APIError as err:
+                            st.error(
+                                f"❌ {err.status_code} — {err.detail}"
+                            )
+
+        # Redispatch — fresh-fire dispatch on the reopened/edited WO.
+        if st.button(
+            "Redispatch to Aiden",
+            key=f"redispatch-{wo.id}",
+            help=(
+                "Re-fire Aiden Tier 1 → Tier 2/Workflow on the "
+                "current WO contents. Use after reopen + edit to "
+                "send the revised brief through the pipeline."
+            ),
+        ):
+            with st.spinner("redispatching…"):
+                try:
+                    r = api.redispatch_work_order(wo.id)
+                except APIError as err:
+                    st.error(f"❌ {err.status_code} — {err.detail}")
+                    r = None
+            if r:
+                if r.get("ok"):
+                    kind = r.get("decision_kind") or "redispatched"
+                    st.success(f"✅ {kind}")
+                    st.rerun()
+                elif r.get("decision_kind") == "clarification":
+                    st.warning(
+                        "❓ Aiden asked: "
+                        f"{r.get('clarification_question')}"
+                    )
+                else:
+                    st.warning(f"⚠️ {r.get('error')}")
+
+
 def _transition_button(api, wo_id: str, from_status: str, to_status: str) -> None:
     perm = PERM_FOR_TRANSITION.get(to_status, "work_order:update")
     try:
@@ -534,6 +748,10 @@ def main() -> None:
                             st.rerun()
                         else:
                             st.warning(f"⚠️ {r.get('error')}")
+
+                # Loop Xi — operator recovery panel. Renders Reopen on
+                # terminal WOs and Edit + Redispatch on active WOs.
+                _operator_recovery_panel(api, wo)
 
                 st.markdown("**Transitions**")
                 legal = SAFE_TRANSITIONS.get(wo.status, [])

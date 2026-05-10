@@ -85,7 +85,11 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // Loop Kappa — Memory V1.5 shipped 3 audit events under
     // LOOP_KAPPA_AUDIT_EVENTS (canonical_facts.created / .updated /
     // .deleted). Total: 142 + 3 = 145.
-    expect(snap.auditEvents.all.length).toBe(145);
+    // Loop Xi — operator recovery loop (reopen/edit/redispatch) shipped
+    // 2 audit events under LOOP_XI_AUDIT_EVENTS (work_order.edited /
+    // work_order.redispatched; work_order.reopened was already locked).
+    // Total: 145 + 2 = 147.
+    expect(snap.auditEvents.all.length).toBe(147);
     // Loop Kappa added 5 RBAC keys (canonical_facts: read / create /
     // update / delete / set_severity). Total: 87 + 5 = 92.
     expect(snap.permissionKeys.length).toBe(92);
@@ -118,6 +122,10 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     expect(snap.auditEvents.byLoop.LOOP_IOTA_AUDIT_EVENTS.length).toBe(4);
     // Loop Kappa — Memory V1.5 (canonical_facts CRUD lifecycle).
     expect(snap.auditEvents.byLoop.LOOP_KAPPA_AUDIT_EVENTS.length).toBe(3);
+    // Loop Xi — operator recovery loop. work_order.edited +
+    // work_order.redispatched; reopen reuses the existing
+    // work_order.reopened from the WO transition vocabulary.
+    expect(snap.auditEvents.byLoop.LOOP_XI_AUDIT_EVENTS.length).toBe(2);
   });
 });
 

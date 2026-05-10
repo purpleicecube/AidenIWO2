@@ -425,6 +425,8 @@
       "work_order.blocked",
       "work_order.cancelled",
       "work_order.created",
+      "work_order.edited",
+      "work_order.redispatched",
       "work_order.reopened",
       "work_order.requested_outputs_set",
       "work_order.transitioned",
@@ -640,6 +642,10 @@
         "canonical_facts.created",
         "canonical_facts.updated",
         "canonical_facts.deleted"
+      ],
+      "LOOP_XI_AUDIT_EVENTS": [
+        "work_order.edited",
+        "work_order.redispatched"
       ]
     }
   },

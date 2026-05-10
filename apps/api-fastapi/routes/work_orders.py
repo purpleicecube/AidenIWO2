@@ -2,8 +2,13 @@
 
   GET  /work_orders                list WOs in the current tenant
   GET  /work_orders/{id}           single WO
-  POST /work_orders/{id}/transition   body: {to, reason?}
-  POST /work_orders/{id}/watchdog_expire   body: {reason}
+  POST /work_orders/{id}/transition       body: {to, reason?}
+  POST /work_orders/{id}/watchdog_expire  body: {reason}
+
+Loop Xi — operator recovery loop (reopen + edit + redispatch):
+  POST /work_orders/{id}/reopen      body: {reason}
+  PUT  /work_orders/{id}             body: partial fields incl. template
+  POST /work_orders/{id}/redispatch  body: {}
 
 Every mutation gates on the transition helper's declared permissions;
 the route itself enforces a generic `work_order:read` on listing + get,
@@ -579,3 +584,494 @@ async def render_work_order(
         external_reference=result.external_reference,
         gamma_url=result.gamma_url,
     )
+
+
+# ─── Loop Xi — operator recovery (reopen + edit + redispatch) ──────────
+
+
+# States from which a WO may be reopened. Mirrors the WO state machine
+# spec at contracts/state_machines.py — completed / done / failed all
+# transition to processing under the (execution_cycle:reopen +
+# work_order:update) gate.
+_REOPENABLE_FROM = ("completed", "done", "failed")
+
+# States in which inline edits are accepted. Locked to the post-create
+# window (pending) and the post-reopen window (processing) so an edit
+# can never collide with a terminal state. Cancelled / archived /
+# blocked / awaiting_operator are intentionally read-only here — those
+# need their own lifecycle transition first.
+_EDITABLE_STATUSES = ("pending", "processing")
+
+# States from which the operator may force a fresh dispatch. Mirrors
+# _EDITABLE_STATUSES — after edit the operator clicks Redispatch, and
+# the freshly-reopened WO sits in `processing`.
+_REDISPATCHABLE_STATUSES = ("pending", "processing")
+
+# Allowed `type` enum values on partial-update. Reuses the same surface
+# as POST /work_orders (no DB enum — `type` is a free-form short string
+# the orchestrator routes on).
+_ALLOWED_TYPES = (
+    "content_brief",
+    "deck_build",
+    "data_analysis",
+    "research",
+    "code_change",
+    "decision_request",
+    "ops_task",
+    "general",
+)
+
+
+class ReopenRequest(BaseModel):
+    reason: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Operator-supplied reason for reopening. Required.",
+    )
+
+
+class ReopenResponse(BaseModel):
+    work_order_id: str
+    from_status: str = Field(..., alias="from")
+    to_status: str = Field(..., alias="to")
+    cycle_id: Optional[str] = None
+    superseded_executions: int = Field(
+        0,
+        description=(
+            "Count of in-flight workflow_executions cancelled on reopen "
+            "so the next dispatch creates a fresh execution chain."
+        ),
+    )
+
+    class Config:
+        populate_by_name = True
+
+
+class EditRequest(BaseModel):
+    """Partial-update payload. Every field is Optional; only those
+    explicitly supplied are written. `template_profile_id=None` is
+    treated as 'leave unchanged' (use a sentinel like '' to clear in a
+    future loop if needed; current scope is set-only)."""
+
+    title: Optional[str] = Field(None, min_length=1, max_length=240)
+    description: Optional[str] = Field(None, max_length=8000)
+    type: Optional[str] = Field(None, max_length=64)
+    priority: Optional[str] = Field(None)
+    template_profile_id: Optional[str] = Field(None, max_length=64)
+
+
+class RedispatchRequest(BaseModel):
+    """Empty body for now. The redispatch path always reuses the WO's
+    current title + description. Operators who want to override intake
+    should edit the WO first via PUT /work_orders/{id}."""
+
+
+@router.post(
+    "/{work_order_id}/reopen",
+    response_model=ReopenResponse,
+    dependencies=[Depends(require_permission_dep("work_order:update"))],
+)
+async def reopen_work_order(
+    work_order_id: str,
+    body: ReopenRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> ReopenResponse:
+    """Reopen a terminal WO back to `processing` so it can be edited
+    and re-dispatched. Mirrors IWO2's POST /api/work-orders/:id/reopen
+    contract: requires a non-empty reason, allowed only from terminal
+    states, writes a new execution_cycles row with trigger='reopen' via
+    the central transition helper.
+
+    IWO2 also resets stale orchestration linkage on the WO row
+    (assigned_sub_agent_id / workflow_execution_id). IWO3's schema
+    keeps that linkage on `workflow_executions.work_order_id`
+    (back-reference), so the equivalent is to cancel any in-flight
+    workflow_executions tied to this WO. Prior `completed` /
+    `failed` / `cancelled` executions stay as audit history; only
+    `pending` / `running` ones get superseded."""
+    row = await conn.fetchrow(
+        """
+        SELECT id::text     AS id,
+               status::text AS status
+          FROM work_orders
+         WHERE id = $1::uuid AND client_id = $2::uuid
+        """,
+        work_order_id,
+        ctx["client_id"],
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "work_order_id": work_order_id},
+        )
+    if row["status"] not in _REOPENABLE_FROM:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "not_reopenable",
+                "current_status": row["status"],
+                "allowed_from": list(_REOPENABLE_FROM),
+            },
+        )
+
+    try:
+        result = await transition_work_order(
+            conn,
+            work_order_id=work_order_id,
+            client_id=ctx["client_id"],
+            actor_user_id=ctx["user_id"],
+            to="processing",
+            reason=body.reason,
+        )
+    except PermissionDenied as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "permission_denied",
+                "permission": err.permission,
+                "reason": err.reason,
+                "role": err.role,
+            },
+        )
+    except IllegalTransition as err:
+        # Defensive — the pre-check above should make this unreachable.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "illegal_transition",
+                "code": err.code,
+                "from": err.from_,
+                "to": err.to,
+            },
+        )
+
+    # Cancel any in-flight workflow_executions linked to this WO so the
+    # next dispatch creates a fresh chain. The UPDATE is RLS-scoped via
+    # the tenant connection. We don't go through the WF transition
+    # helper because (a) requires_cycle false-positives would write
+    # noisy execution_cycles and (b) the WF state machine `cancelled`
+    # transition demands `workflow:cancel` which the operator may not
+    # hold even with `work_order:update`.
+    # lint:bypass-rls-explain="tenant-scoped connection — RLS filters by client_id"
+    superseded_count = await conn.fetchval(
+        """
+        WITH cancelled AS (
+          UPDATE workflow_executions
+             SET status = 'cancelled',
+                 completed_at = now()
+           WHERE work_order_id = $1::uuid
+             AND client_id = $2::uuid
+             AND status IN ('pending', 'running')
+          RETURNING id
+        )
+        SELECT count(*)::int FROM cancelled
+        """,
+        work_order_id,
+        ctx["client_id"],
+    )
+
+    return ReopenResponse(
+        **{
+            "work_order_id": work_order_id,
+            "from": result["from"],
+            "to": result["to"],
+            "cycle_id": result.get("cycle_id"),
+            "superseded_executions": int(superseded_count or 0),
+        }
+    )
+
+
+@router.put(
+    "/{work_order_id}",
+    response_model=WorkOrderRow,
+    dependencies=[Depends(require_permission_dep("work_order:update"))],
+)
+async def edit_work_order(
+    work_order_id: str,
+    body: EditRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> WorkOrderRow:
+    """Inline-edit a non-terminal WO. Accepts partial updates on
+    title / description / type / priority / requested_outputs.template_profile_id.
+    The status field is intentionally NOT mutable here — status changes
+    must go through the transition helper (POST /transition) so the
+    state machine + audit cycle invariants hold.
+
+    Slight upgrade over IWO2: explicit template_profile_id selection
+    (IWO2 only allows prose hinting via description). Templates are
+    validated tenant-scoped + active before persisting."""
+    # Validate the WO exists, scope, and editable status.
+    row = await conn.fetchrow(
+        """
+        SELECT id::text             AS id,
+               client_id::text      AS client_id,
+               status::text         AS status,
+               requested_outputs
+          FROM work_orders
+         WHERE id = $1::uuid AND client_id = $2::uuid
+        """,
+        work_order_id,
+        ctx["client_id"],
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "work_order_id": work_order_id},
+        )
+    if row["status"] not in _EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "not_editable",
+                "current_status": row["status"],
+                "allowed_statuses": list(_EDITABLE_STATUSES),
+                "hint": (
+                    "Reopen the work order first (POST /reopen) if it is in "
+                    "a terminal state."
+                ),
+            },
+        )
+
+    # Validate non-None field values against narrow vocabularies.
+    if body.priority is not None and body.priority not in {
+        "low",
+        "medium",
+        "high",
+        "critical",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "invalid_priority", "priority": body.priority},
+        )
+    if body.type is not None and body.type not in _ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "invalid_type",
+                "type": body.type,
+                "allowed": list(_ALLOWED_TYPES),
+            },
+        )
+
+    # Resolve template_profile_id if supplied — same validation as
+    # create_work_order: tenant-scoped + active.
+    new_requested_outputs: Optional[dict] = None
+    if body.template_profile_id is not None:
+        try:
+            tp = await conn.fetchrow(
+                """
+                SELECT id::text          AS id,
+                       output_kind::text AS output_kind,
+                       status::text      AS status
+                  FROM template_profiles
+                 WHERE id = $1::uuid AND client_id = $2::uuid
+                """,
+                body.template_profile_id,
+                ctx["client_id"],
+            )
+        except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "invalid_template_profile_id",
+                    "value": body.template_profile_id,
+                },
+            )
+        if tp is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "template_profile_not_found",
+                    "template_profile_id": body.template_profile_id,
+                },
+            )
+        if tp["status"] != "active":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "template_profile_not_active",
+                    "template_profile_id": body.template_profile_id,
+                    "status": tp["status"],
+                },
+            )
+        # Merge into existing requested_outputs (preserve other keys
+        # like output_kind if already set on the WO).
+        existing = (
+            json.loads(row["requested_outputs"])
+            if isinstance(row["requested_outputs"], str)
+            else (row["requested_outputs"] or {})
+        )
+        new_requested_outputs = {
+            **existing,
+            "output_kind": tp["output_kind"],
+            "template_profile_id": tp["id"],
+        }
+
+    # Build the dynamic UPDATE. Only set fields the operator supplied.
+    sets: list[str] = []
+    params: list[Any] = []
+    changed_fields: list[str] = []
+
+    def _set(col: str, value: Any, *, sql_cast: str = "") -> None:
+        params.append(value)
+        sets.append(f"{col} = ${len(params)}{sql_cast}")
+        changed_fields.append(col)
+
+    if body.title is not None:
+        _set("title", body.title)
+    if body.description is not None:
+        _set("description", body.description)
+    if body.type is not None:
+        _set("type", body.type)
+    if body.priority is not None:
+        _set("priority", body.priority, sql_cast="::work_order_priority")
+    if new_requested_outputs is not None:
+        params.append(json.dumps(new_requested_outputs))
+        sets.append(f"requested_outputs = ${len(params)}::jsonb")
+        changed_fields.append("requested_outputs")
+
+    if not sets:
+        # No-op edit — still surface the current row for client refresh.
+        # No audit emission for a noop.
+        full = await conn.fetchrow(
+            """
+            SELECT id::text AS id,
+                   client_id::text AS client_id,
+                   title, description, type,
+                   priority::text AS priority,
+                   status::text AS status,
+                   submitted_by_user_id::text AS submitted_by_user_id,
+                   correlation_id,
+                   created_at::text AS created_at,
+                   updated_at::text AS updated_at
+              FROM work_orders WHERE id = $1
+            """,
+            work_order_id,
+        )
+        return WorkOrderRow(**dict(full))
+
+    # Append updated_at + WHERE binds.
+    sets.append("updated_at = now()")
+    params.append(work_order_id)
+    wo_id_idx = len(params)
+    params.append(ctx["client_id"])
+    cid_idx = len(params)
+
+    sql = f"""
+        UPDATE work_orders
+           SET {', '.join(sets)}
+         WHERE id = ${wo_id_idx}::uuid AND client_id = ${cid_idx}::uuid
+        RETURNING id::text AS id,
+                  client_id::text AS client_id,
+                  title, description, type,
+                  priority::text AS priority,
+                  status::text AS status,
+                  submitted_by_user_id::text AS submitted_by_user_id,
+                  correlation_id,
+                  created_at::text AS created_at,
+                  updated_at::text AS updated_at
+    """
+    updated = await conn.fetchrow(sql, *params)
+
+    # Audit. The metadata captures both the diff vocabulary and the
+    # full new requested_outputs jsonb shape (so reviewers can
+    # reconstruct template assignment without re-querying).
+    audit_meta: dict[str, Any] = {
+        "changed_fields": changed_fields,
+        "from_status": row["status"],
+    }
+    if new_requested_outputs is not None:
+        audit_meta["requested_outputs"] = new_requested_outputs
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="work_order.edited",
+        target_type="work_order",
+        target_id=work_order_id,
+        metadata=audit_meta,
+    )
+
+    return WorkOrderRow(**dict(updated))
+
+
+@router.post(
+    "/{work_order_id}/redispatch",
+    dependencies=[Depends(require_permission_dep("work_order:update"))],
+)
+async def redispatch_work_order(
+    work_order_id: str,
+    _body: RedispatchRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> dict[str, Any]:
+    """Re-fire the dispatch pipeline for a WO that's been reopened or
+    is otherwise pending. Writes a `work_order.redispatched` audit row
+    upfront, then delegates to the existing
+    POST /work_orders/{id}/dispatch helper so we don't fork the
+    orchestration logic.
+
+    Returns the same shape as /dispatch with an extra `redispatched`
+    flag so the UI can render an op-level confirmation."""
+    row = await conn.fetchrow(
+        """
+        SELECT status::text AS status
+          FROM work_orders
+         WHERE id = $1::uuid AND client_id = $2::uuid
+        """,
+        work_order_id,
+        ctx["client_id"],
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "work_order_id": work_order_id},
+        )
+    if row["status"] not in _REDISPATCHABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "not_redispatchable",
+                "current_status": row["status"],
+                "allowed_statuses": list(_REDISPATCHABLE_STATUSES),
+                "hint": (
+                    "Reopen a terminal WO first (POST /reopen) before "
+                    "redispatching."
+                ),
+            },
+        )
+
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="work_order.redispatched",
+        target_type="work_order",
+        target_id=work_order_id,
+        metadata={"from_status": row["status"]},
+    )
+
+    # Delegate to the existing dispatch handler. Lazy-imported to avoid
+    # a circular import at module load (routes.dispatch imports
+    # transitions which routes.work_orders also uses; the lazy hop
+    # keeps the dependency graph linear).
+    from routes.dispatch import DispatchRequest, dispatch_work_order
+
+    result = await dispatch_work_order(
+        work_order_id=work_order_id,
+        body=DispatchRequest(intake_override=None),
+        ctx=ctx,
+        conn=conn,
+    )
+    payload = result.model_dump()
+    payload["redispatched"] = True
+    return payload

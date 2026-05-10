@@ -542,6 +542,56 @@ class ApiClient:
         to Gamma + create the handoff. Idempotent: 409 if already in flight."""
         return self._request("POST", f"/work_orders/{wo_id}/render", json={})
 
+    # ---- Loop Xi — operator recovery (reopen + edit + redispatch) ----
+
+    def reopen_work_order(self, wo_id: str, *, reason: str) -> dict[str, Any]:
+        """Reopen a terminal (completed/done/failed) WO back to processing.
+        Mandatory reason — server enforces non-empty."""
+        return self._request(
+            "POST",
+            f"/work_orders/{wo_id}/reopen",
+            json={"reason": reason},
+        )
+
+    def edit_work_order(
+        self,
+        wo_id: str,
+        *,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        type: Optional[str] = None,  # noqa: A002 — server-side field name
+        priority: Optional[str] = None,
+        template_profile_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Partial-update a non-terminal (pending/processing) WO. Only
+        non-None fields are sent. `template_profile_id` is validated
+        tenant-scoped + active server-side; the resulting
+        `requested_outputs.template_profile_id` is honored by the next
+        dispatch."""
+        body: dict[str, Any] = {}
+        if title is not None:
+            body["title"] = title
+        if description is not None:
+            body["description"] = description
+        if type is not None:
+            body["type"] = type
+        if priority is not None:
+            body["priority"] = priority
+        if template_profile_id is not None:
+            body["template_profile_id"] = template_profile_id
+        return self._request("PUT", f"/work_orders/{wo_id}", json=body)
+
+    def redispatch_work_order(self, wo_id: str) -> dict[str, Any]:
+        """Re-fire the dispatch pipeline on a reopened/pending WO.
+        Writes `work_order.redispatched` audit upfront and delegates to
+        the standard dispatch endpoint internally; returns the same
+        shape as `/dispatch` plus `redispatched=True`."""
+        return self._request(
+            "POST",
+            f"/work_orders/{wo_id}/redispatch",
+            json={},
+        )
+
     # ---- Beta-1 ε.2 — operator chat persistence ----
 
     def get_my_chat_session(self) -> dict[str, Any]:
