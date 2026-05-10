@@ -210,56 +210,55 @@ def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
 
     The "View all →" link uses `st.page_link` for the same reason.
     """
-    # Section header. Use Streamlit native widgets for click-targets.
-    st.markdown(
-        '<div class="iwo3-panel">'
-        '<div class="iwo3-section-head">'
-        '<span>Recent Work Orders</span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-    # SPA-safe "View all" link — preserves session_state.
-    st.page_link("views/work_orders.py", label="View all →")
+    with st.container(border=True):
+        head_cols = st.columns([8, 2])
+        with head_cols[0]:
+            st.markdown(
+                '<div class="iwo3-section-head iwo3-recent-head">'
+                '<span>Recent Work Orders</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        with head_cols[1]:
+            st.page_link("views/work_orders.py", label="View all →")
 
-    for wo in wos[:8]:
-        glyph = _status_chip_glyph(wo.status)
-        cols = st.columns([5, 1, 1.6])
-        with cols[0]:
-            if st.button(
-                wo.title,
-                key=f"dash_open_wo_{wo.id}",
-                use_container_width=True,
-                type="tertiary",
-            ):
-                st.session_state["work_orders_focus_id"] = wo.id
-                st.switch_page("views/work_orders.py")
-            st.markdown(
-                f'<div class="iwo3-wo-row-meta">'
-                f'{escape(wo.type)} · {escape(wo.created_at[:10])}'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with cols[1]:
-            st.markdown(
-                f'<div class="iwo3-wo-chip-cell">'
-                f'<span class="{_priority_chip_class(wo.priority)}">'
-                f'{escape(wo.priority)}'
-                f'</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with cols[2]:
-            st.markdown(
-                f'<div class="iwo3-wo-chip-cell">'
-                f'<span class="{_status_chip_class(wo.status)}">'
-                f'<span style="margin-right:4px;">{escape(glyph)}</span>'
-                f'{escape(wo.status)}'
-                f'</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-    st.markdown('</div>', unsafe_allow_html=True)
+        for wo in wos[:8]:
+            glyph = _status_chip_glyph(wo.status)
+            cols = st.columns([5, 1, 1.6])
+            with cols[0]:
+                if st.button(
+                    wo.title,
+                    key=f"dash_open_wo_{wo.id}",
+                    use_container_width=True,
+                    type="tertiary",
+                ):
+                    st.session_state["work_orders_focus_id"] = wo.id
+                    st.switch_page("views/work_orders.py")
+                st.markdown(
+                    f'<div class="iwo3-wo-row-meta">'
+                    f'{escape(wo.type)} · {escape(wo.created_at[:10])}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[1]:
+                st.markdown(
+                    f'<div class="iwo3-wo-chip-cell">'
+                    f'<span class="{_priority_chip_class(wo.priority)}">'
+                    f'{escape(wo.priority)}'
+                    f'</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[2]:
+                st.markdown(
+                    f'<div class="iwo3-wo-chip-cell">'
+                    f'<span class="{_status_chip_class(wo.status)}">'
+                    f'<span style="margin-right:4px;">{escape(glyph)}</span>'
+                    f'{escape(wo.status)}'
+                    f'</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
 
 
 def main() -> None:

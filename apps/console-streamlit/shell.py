@@ -261,6 +261,32 @@ _CSS = """
     height: 100%;
     padding-top: 6px;
   }
+  /* Left-align the WO title button text. Streamlit's tertiary button
+     with use_container_width centers its label by default; on a list
+     row we want it flush-left like a normal title. */
+  .iwo3-recent-head { margin-bottom: 4px; }
+  div[data-testid="stVerticalBlockBorderWrapper"]
+    button[kind="tertiary"] {
+    justify-content: flex-start !important;
+    text-align: left !important;
+    padding: 4px 4px !important;
+    font-weight: 600 !important;
+    color: #111827 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: 1.25 !important;
+  }
+  div[data-testid="stVerticalBlockBorderWrapper"]
+    button[kind="tertiary"] p {
+    text-align: left !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+  div[data-testid="stVerticalBlockBorderWrapper"]
+    button[kind="tertiary"]:hover {
+    background: #F9FAFB !important;
+    color: #1E5F91 !important;
+  }
 
   /* ── Tier cards ── */
   .iwo3-tier-card {
