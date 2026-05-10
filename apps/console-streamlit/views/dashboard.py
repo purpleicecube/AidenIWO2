@@ -189,45 +189,77 @@ def _header() -> None:
 
 
 def _recent_wo_panel(wos: list[WorkOrderRow]) -> None:
-    """Render every WO row inside ONE markdown block so the flex-grid
-    layout survives (Streamlit wraps each st.markdown in a div which
-    breaks cross-element CSS grid).
+    """Render Recent Work Orders panel with Streamlit-native row clicks.
 
-    Flatten HTML to a single line so Streamlit's markdown parser does
-    NOT treat 4-space-indented lines as an indented code block. That
-    was bug #1 in the first visual rev — the panel rendered as literal
-    HTML source inside a `<pre>`.
+    BUG-059 fix (2026-05-10) — the previous version wrapped each row
+    in an HTML `<a href="/work_orders?focus=...">` anchor. That's a
+    *hard browser navigation* on Streamlit Cloud: it terminates the
+    WebSocket session, creates a new empty `st.session_state`, drops
+    `iwo3_logged_in`, and bounces the operator to the public landing
+    page. Streamlit Cloud only preserves session_state across in-app
+    reruns, never across full-URL navigations.
+
+    Fix: render each row as a Streamlit-native column layout with a
+    tertiary button on the title. Click sets
+    `session_state["work_orders_focus_id"]` and calls
+    `st.switch_page("views/work_orders.py")` — which is SPA-style
+    in-app navigation, preserves session_state, no auth loss.
+    work_orders.py at line 398 already reads
+    `session_state["work_orders_focus_id"]` to auto-expand the focused
+    WO, so the existing focus-resolution UX is unchanged.
+
+    The "View all →" link uses `st.page_link` for the same reason.
     """
-    rows_html: list[str] = []
-    for wo in wos[:8]:
-        glyph = _status_chip_glyph(wo.status)
-        # Loop Iota.x — wrap each row in an `<a>` so clicking the row
-        # navigates to /work_orders?focus=<id>. work_orders.py reads
-        # the focus from query_params (in addition to session_state)
-        # and auto-expands the matching expander.
-        row = (
-            f'<a href="/work_orders?focus={escape(wo.id)}" target="_self" '
-            f'class="iwo3-wo-row-link">'
-            f'<div class="iwo3-wo-row">'
-            f'<div><div class="title">{escape(wo.title)}</div>'
-            f'<div class="meta">{escape(wo.type)} · {escape(wo.created_at[:10])}</div></div>'
-            f'<span class="{_priority_chip_class(wo.priority)}">{escape(wo.priority)}</span>'
-            f'<span class="{_status_chip_class(wo.status)}">'
-            f'<span style="margin-right:4px;">{escape(glyph)}</span>{escape(wo.status)}</span>'
-            f'</div>'
-            f'</a>'
-        )
-        rows_html.append(row)
-    html = (
+    # Section header. Use Streamlit native widgets for click-targets.
+    st.markdown(
         '<div class="iwo3-panel">'
         '<div class="iwo3-section-head">'
         '<span>Recent Work Orders</span>'
-        f'<a href="/work_orders" target="_self" class="iwo3-link">View all →</a>'
-        '</div>'
-        f'{"".join(rows_html)}'
-        '</div>'
+        '</div>',
+        unsafe_allow_html=True,
     )
-    st.markdown(html, unsafe_allow_html=True)
+    # SPA-safe "View all" link — preserves session_state.
+    st.page_link("views/work_orders.py", label="View all →")
+
+    for wo in wos[:8]:
+        glyph = _status_chip_glyph(wo.status)
+        cols = st.columns([5, 1, 1.6])
+        with cols[0]:
+            if st.button(
+                wo.title,
+                key=f"dash_open_wo_{wo.id}",
+                use_container_width=True,
+                type="tertiary",
+            ):
+                st.session_state["work_orders_focus_id"] = wo.id
+                st.switch_page("views/work_orders.py")
+            st.markdown(
+                f'<div class="iwo3-wo-row-meta">'
+                f'{escape(wo.type)} · {escape(wo.created_at[:10])}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with cols[1]:
+            st.markdown(
+                f'<div class="iwo3-wo-chip-cell">'
+                f'<span class="{_priority_chip_class(wo.priority)}">'
+                f'{escape(wo.priority)}'
+                f'</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with cols[2]:
+            st.markdown(
+                f'<div class="iwo3-wo-chip-cell">'
+                f'<span class="{_status_chip_class(wo.status)}">'
+                f'<span style="margin-right:4px;">{escape(glyph)}</span>'
+                f'{escape(wo.status)}'
+                f'</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def main() -> None:

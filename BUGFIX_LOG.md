@@ -1101,6 +1101,27 @@ Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
 
 ---
 
+## Session — IWO3 Dashboard Recent-WO Click Auth Loss (2026-05-10)
+
+Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
+
+### BUG-059: Clicking a Recent Work Order on the Dashboard kicks operator back to login (High)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-10 |
+| Severity | High (blocks the most natural navigation path on the dashboard; every WO click on the live console terminates the operator's session) |
+| Status | Fixed, verified |
+| Files | `apps/console-streamlit/views/dashboard.py`, `apps/console-streamlit/shell.py` |
+| Symptom | Operator on `aiden-iwo3.streamlit.app/dashboard` clicked the row "I Need a PPT based on Klear.ai template in GAMMA" in the Recent Work Orders panel. Browser navigated to `aiden-iwo3.streamlit.app/work_orders?focus=<id>`. Streamlit Cloud responded with a "Page not found" dialog and the page underneath was the public landing/login screen. The operator had to sign in again from scratch. Reproduced on every recent-WO row click. |
+| Root Cause | Loop Iota.x dashboard polish (commit `608439d`) wrapped each Recent-WO row in a raw HTML `<a href="/work_orders?focus={id}" target="_self">`. That's a *full browser navigation*, not Streamlit-native in-app routing. Two compounding effects on Streamlit Cloud: (1) the registered `st.Page("views/work_orders.py", title="Work Orders")` has no explicit `url_path`; Streamlit auto-derives the URL — typically `/work-orders` (hyphen), not `/work_orders` (underscore) — so the link's path doesn't match a registered page and Streamlit emits a 404 fallback. (2) Even if the path matched, Streamlit Cloud creates a *new* WebSocket session on a hard browser navigation; the new session has empty `st.session_state`, `iwo3_logged_in` is False, and `Home.py` falls through to `_render_public_router()` (the landing page). Streamlit Cloud preserves session_state across in-app reruns ONLY, never across full URL navigations. The same architectural constraint also affected the panel's "View all →" link at the section-head; it landed on a registered page so the URL itself worked, but it would still drop session_state if exercised. |
+| Fix | Replaced the HTML `<a>`-wrapped rows with a Streamlit-native column layout per row. Each row is now `st.columns([5, 1, 1.6])` with: (a) a tertiary `st.button(wo.title, key=f"dash_open_wo_{wo.id}", use_container_width=True, type="tertiary")` in the title column — on click, sets `st.session_state["work_orders_focus_id"] = wo.id` then calls `st.switch_page("views/work_orders.py")` (in-app navigation, preserves session_state); (b) the priority chip in column 1; (c) the status chip in column 2. The "View all →" link was converted to `st.page_link("views/work_orders.py", label="View all →")` — Streamlit's SPA-safe navigation primitive (≥1.30). `views/work_orders.py:398` already reads `session_state["work_orders_focus_id"]` (set at line 398 via `pop`), so the existing focus-resolution UX is unchanged. New CSS in `shell.py` (`.iwo3-wo-row-meta`, `.iwo3-wo-chip-cell`) tightens the meta caption + chip alignment so the row still reads as a polished list item. Fix scope: ~70 lines across 2 files. |
+| Verified | Streamlit view-import smoke 25/25 still green; full Streamlit suite 60/5 still green. Manual test path: dashboard → click Recent WO row → switch_page lands on `/work-orders` with the focused WO auto-expanded; `iwo3_logged_in` preserved (no re-login). Hosted verification: Streamlit Cloud auto-redeploy from `iwo3/main` will pick up the fix; operator visual smoke at `https://aiden-iwo3.streamlit.app/dashboard` is the next gate. |
+| Files Changed | `apps/console-streamlit/views/dashboard.py` (`_recent_wo_panel` rewrite + docstring with BUG-059 reference, ~50 lines), `apps/console-streamlit/shell.py` (+2 CSS classes, ~20 lines) |
+| Related | The pattern "HTML `<a target=_self>` for in-app navigation" should be rejected anywhere in the Streamlit console going forward — same architectural constraint applies to every `<a href="/...">` that points at a Streamlit page. Use `st.switch_page` for click-handler navigation and `st.page_link` for static link affordances. |
+
+---
+
 ## Summary
 
 | Category | Count | Critical | High | Medium | Low |

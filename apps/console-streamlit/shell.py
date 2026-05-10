@@ -241,6 +241,27 @@ _CSS = """
   }
   .iwo3-section-head a.iwo3-link:hover { text-decoration: underline; }
 
+  /* BUG-059 fix — Streamlit-native row layout. The dashboard's recent
+     WO rows used to be HTML <a> anchors which hard-navigated and
+     dropped session_state. Now each row is rendered as a Streamlit
+     column block with a tertiary button on the title. The styles
+     below tighten Streamlit's default button + caption rendering so
+     the row still reads as a polished list item. */
+  .iwo3-wo-row-meta {
+    color: #6B7280;
+    font-size: 0.78rem;
+    margin-top: -6px;
+    margin-bottom: 8px;
+    padding-left: 4px;
+  }
+  .iwo3-wo-chip-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    padding-top: 6px;
+  }
+
   /* ── Tier cards ── */
   .iwo3-tier-card {
     border: 1px solid #E5E7EB; border-left: 3px solid #2563EB;
