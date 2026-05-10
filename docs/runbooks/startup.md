@@ -80,13 +80,47 @@ uv run uvicorn main:app --reload --port 5500
 
 ## Run tests
 
-```bash
-# Node (Vitest) — IWO3 integration tests require IWO3_DATABASE_URL in env
-npm run test
+IWO3 uses **two explicit local-DB lanes** (Test DB Split Darkmode 2026-05-10):
 
-# Python
+| Lane | Env var | Purpose | Drift posture |
+| --- | --- | --- | --- |
+| `local-live` | `IWO3_DATABASE_URL` | Operator app/dev DB. Click around, run real WOs, exercise the UI. | Allowed to drift |
+| `local-test-fresh` | `IWO3_TEST_DATABASE_URL` | Disposable integration-test DB. Always reset+reseeded before tests. | Always destroyed and rebuilt |
+
+**Which DB is which:**
+
+- Live: `aiden_iwo3` — safe to click around in. Holds your operator state.
+- Test: `aiden_iwo3_test` — safe to destroy. Reset on every `npm run test:integration` run.
+
+Both share the same Postgres host/port; only the database name differs.
+
+**Canonical local integration validation (recommended):**
+
+```bash
+# Reset + reseed the disposable test DB, then run vitest + pytest.
+# Operator's lived-in IWO3_DATABASE_URL is NOT touched.
+npm run test:integration
+```
+
+The wrapper at `infra/local/test-integration-iwo3.sh` enforces three guards:
+
+1. Refuses if `IWO3_TEST_DATABASE_URL` is unset.
+2. Refuses if the test URL equals the live URL.
+3. Refuses if the test DB name does not end with `_test` (defense against accidental live-DB wipe).
+
+**Drift-tolerant quick check (optional):**
+
+```bash
+# Run vitest against whatever IWO3_DATABASE_URL points at (may be live).
+# Use this for fast iteration when you already know your DB is in a
+# good state. Exact-count integration assertions may fail under drift.
+npm run test:integration:live
+
+# Python pytest against the live DB
 cd apps/api-fastapi && uv run pytest && cd -
 ```
+
+**Source of truth:** `npm run test:integration` is the source of truth for local integration validation. CI (`baseline-check.sh`) runs the equivalent flow against a fresh DB service container, so green-locally-via-`test:integration` ≡ green-on-CI.
 
 ## Full baseline check (what CI runs)
 
