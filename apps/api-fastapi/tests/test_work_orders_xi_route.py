@@ -303,9 +303,12 @@ def test_edit_invalid_priority_422() -> None:
 
 
 @iwo3_db
-def test_edit_blocked_status_rejected() -> None:
-    """Edits not allowed on terminal/non-active statuses — operator
-    must reopen first."""
+def test_edit_completed_status_rejected() -> None:
+    """Edits not allowed on terminal statuses — operator must reopen
+    first. (Renamed from test_edit_blocked_status_rejected on 2026-05-10
+    when BUG-060 widened _EDITABLE_STATUSES to include `blocked` /
+    `awaiting_operator` / `deferred`. The original name was misleading
+    because it always seeded `completed`, never `blocked`.)"""
     wo_id = asyncio.run(_seed_wo("completed"))
     try:
         with TestClient(app) as client:
@@ -319,6 +322,64 @@ def test_edit_blocked_status_rejected() -> None:
             )
         assert r.status_code == 409
         assert r.json()["detail"]["error"] == "not_editable"
+    finally:
+        asyncio.run(_drop_wo(wo_id))
+
+
+# BUG-060 — Edit + Redispatch now legal on all non-terminal states
+# where operator amendment is operationally useful. These three tests
+# lock the widened gate so a regression that re-narrows the set
+# breaks CI loudly.
+
+
+@iwo3_db
+@pytest.mark.parametrize(
+    "status",
+    ["blocked", "awaiting_operator", "deferred"],
+)
+def test_edit_allowed_from_non_terminal_status(status: str) -> None:
+    """BUG-060 lock: edit allowed from blocked / awaiting_operator /
+    deferred — not just pending/processing."""
+    wo_id = asyncio.run(_seed_wo(status))
+    try:
+        with TestClient(app) as client:
+            r = client.put(
+                f"/work_orders/{wo_id}",
+                json={"title": f"edit from {status}"},
+                headers={
+                    "X-IWO3-User": KLEAR_OPERATOR,
+                    "X-IWO3-Client": KLEAR_CLIENT,
+                },
+            )
+        assert r.status_code == 200, r.text
+        assert r.json()["title"] == f"edit from {status}"
+    finally:
+        asyncio.run(_drop_wo(wo_id))
+
+
+@iwo3_db
+@pytest.mark.parametrize(
+    "status",
+    ["blocked", "awaiting_operator", "deferred"],
+)
+def test_redispatch_allowed_from_non_terminal_status(status: str) -> None:
+    """BUG-060 lock: redispatch allowed from blocked / awaiting_operator
+    / deferred — not just pending/processing. We don't care whether the
+    downstream dispatch returns ok=True (depends on Aiden config); we
+    care that the gate accepts the call AND writes the audit row."""
+    wo_id = asyncio.run(_seed_wo(status))
+    try:
+        with TestClient(app) as client:
+            client.post(
+                f"/work_orders/{wo_id}/redispatch",
+                json={},
+                headers={
+                    "X-IWO3-User": KLEAR_OPERATOR,
+                    "X-IWO3-Client": KLEAR_CLIENT,
+                },
+            )
+        events = asyncio.run(_audit_events_for(wo_id))
+        assert "work_order.redispatched" in events
     finally:
         asyncio.run(_drop_wo(wo_id))
 

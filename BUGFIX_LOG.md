@@ -1122,6 +1122,27 @@ Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
 
 ---
 
+## Session — IWO3 Loop Xi Recovery Gate Too Narrow (2026-05-10)
+
+Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
+
+### BUG-060: Loop Xi Edit + Redispatch unreachable from `awaiting_operator` / `blocked` / `deferred` (Medium)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-10 |
+| Severity | Medium (operator can still recover via a manual status hop, but the trap is invisible — the Recovery panel just hides itself with no explanation, and the natural state to amend a WO from is exactly the state that's blocked) |
+| Status | Fixed, verified |
+| Files | `apps/api-fastapi/routes/work_orders.py`, `apps/console-streamlit/views/work_orders.py`, `apps/api-fastapi/tests/test_work_orders_xi_route.py` |
+| Symptom | Operator on `aiden-iwo3.streamlit.app/work_orders` had a WO `bec65d0e-...` ("I Need a PPT based on Klear.ai template in GAMMA") in `awaiting_operator` after a redispatch. They wanted to attach the Klear template (`klear_pptx_primary`) and re-run, but the Loop Xi Recovery panel did not render the Edit popover on `awaiting_operator` — only Reopen (terminal-only) and the unrelated Transitions picker showed. Operator's only path to amend was: transition `awaiting_operator → processing` first, then Edit, then Save, then Redispatch. The hop was undocumented in-UI and the recovery panel went silent rather than surfacing a "transition first" hint. |
+| Root Cause | Loop Xi (commit `caa7c8c`) defined `_EDITABLE_STATUSES = ("pending", "processing")` server-side and `is_active = wo.status in ("pending", "processing")` UI-side. The two-element set was too narrow: `awaiting_operator` (operator-review-required), `blocked` (mid-flight stuck, awaiting human), and `deferred` (decision postponed) are all non-terminal states where operator amendment is operationally useful — those are *exactly* the states from which an operator most often wants to edit + retry. Lock-step gate on both sides meant the operator's natural recovery surface disappeared in the most common amendment scenarios, with no in-UI hint that a transition-first hop was required. The original Loop Xi scope brief (`IWO3_DARKMODE_ONESHOT_SCOPE_REOPEN_EDIT_REDISPATCH_v0.1.0.md`) didn't enumerate every non-terminal status by name; the implementer chose the narrow set defensively, which surfaced as an operator trap on first contact with a real `awaiting_operator` WO. |
+| Fix | Universal widening on both sides of the dispatch boundary. Backend `apps/api-fastapi/routes/work_orders.py:_EDITABLE_STATUSES` and `_REDISPATCHABLE_STATUSES` both now equal `("pending", "processing", "blocked", "awaiting_operator", "deferred")` — every non-terminal status. Terminal states (`completed`, `done`, `failed`) still require POST `/reopen` first; `cancelled` remains a deliberately one-way trip. UI `apps/console-streamlit/views/work_orders.py:_operator_recovery_panel` widened `is_active` to the matching set so Edit + Redispatch buttons render in lockstep with the backend gate. The PUT and POST `/redispatch` 409 error payload's `allowed_statuses` field now reflects the wider set, so any future operator who hits a 409 sees the actual current vocabulary in the response. |
+| Verified | New parametrized pytest `test_edit_allowed_from_non_terminal_status[blocked\|awaiting_operator\|deferred]` and `test_redispatch_allowed_from_non_terminal_status[...]` lock the widened gate (6 new test cases). Existing `test_edit_blocked_status_rejected` was renamed to `test_edit_completed_status_rejected` because the original name was misleading (it always seeded `completed`, never `blocked`); the assertion still locks the terminal-state-rejection case. Full Loop Xi test suite green: 20/20 (was 14/14). Streamlit smoke 27/27 unchanged. The hosted operator path is now: WO is in any non-terminal state → Edit popover renders → select template → Save → `work_order.edited` audit row appears → click Redispatch → fresh dispatch with the attached template_profile_id. No transition-first hop required. |
+| Files Changed | `apps/api-fastapi/routes/work_orders.py` (~15 lines: widen both status tuples + extended docstring with BUG-060 reference), `apps/console-streamlit/views/work_orders.py` (~10 lines: widen `is_active` + docstring note), `apps/api-fastapi/tests/test_work_orders_xi_route.py` (~50 lines: rename misleading test + 2 new parametrized lock-tests covering 6 cases) |
+| Related | This addresses the D-Xi-8 ask floated in the Loop Xi handback follow-up. The Recovery panel still hides on terminal states (correct behavior — Reopen is the entry point there). Future polish (separate from this fix): the panel could surface a passive caption like "_Recovery actions are reachable from any non-terminal state. Currently `cancelled`._" when the panel hides on `cancelled`, so the silence isn't ambiguous. Out of scope for this bug fix. |
+
+---
+
 ## Summary
 
 | Category | Count | Critical | High | Medium | Low |

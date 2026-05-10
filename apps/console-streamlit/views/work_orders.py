@@ -306,9 +306,24 @@ def _operator_recovery_panel(api, wo: Any) -> None:
     """Loop Xi — Reopen / Edit / Redispatch. Only renders if the WO is
     in a status where at least one of the three actions is legal. Hides
     quietly otherwise so the col_actions panel stays compact for new
-    WOs that don't need recovery affordances."""
+    WOs that don't need recovery affordances.
+
+    BUG-060 (2026-05-10): widened `is_active` from ("pending",
+    "processing") to include all non-terminal states where operator
+    amendment is operationally useful — `blocked`,
+    `awaiting_operator`, and `deferred`. Operator-reported trap: a WO
+    in `awaiting_operator` (the most likely state for amendment)
+    could not be edited without a manual status hop through
+    `processing` first. Now in lockstep with backend
+    _EDITABLE_STATUSES / _REDISPATCHABLE_STATUSES."""
     is_terminal = wo.status in ("completed", "done", "failed")
-    is_active = wo.status in ("pending", "processing")
+    is_active = wo.status in (
+        "pending",
+        "processing",
+        "blocked",
+        "awaiting_operator",
+        "deferred",
+    )
     if not (is_terminal or is_active):
         return
 

@@ -595,17 +595,37 @@ async def render_work_order(
 # work_order:update) gate.
 _REOPENABLE_FROM = ("completed", "done", "failed")
 
-# States in which inline edits are accepted. Locked to the post-create
-# window (pending) and the post-reopen window (processing) so an edit
-# can never collide with a terminal state. Cancelled / archived /
-# blocked / awaiting_operator are intentionally read-only here — those
-# need their own lifecycle transition first.
-_EDITABLE_STATUSES = ("pending", "processing")
+# States in which inline edits are accepted. Anything non-terminal
+# where operator amendment is operationally useful: post-create
+# (`pending`), post-reopen / mid-flight (`processing`), mid-flight
+# stuck states (`blocked`, `awaiting_operator`), and parked
+# (`deferred`). Terminal states (`completed` / `done` / `failed` /
+# `cancelled`) are intentionally rejected here — operator must
+# reopen first via POST /reopen for the closed-loop terminal cases,
+# and `cancelled` is a deliberately one-way trip.
+#
+# BUG-060 (2026-05-10): widened from ("pending", "processing") to
+# include the three other non-terminal states. Operator-reported
+# trap: a WO in `awaiting_operator` could not be edited without a
+# manual status hop through `processing`, even though
+# `awaiting_operator` is exactly the state where operator
+# amendment is most likely.
+_EDITABLE_STATUSES = (
+    "pending",
+    "processing",
+    "blocked",
+    "awaiting_operator",
+    "deferred",
+)
 
 # States from which the operator may force a fresh dispatch. Mirrors
-# _EDITABLE_STATUSES — after edit the operator clicks Redispatch, and
-# the freshly-reopened WO sits in `processing`.
-_REDISPATCHABLE_STATUSES = ("pending", "processing")
+# _EDITABLE_STATUSES so the recovery flow is consistent: every state
+# where you can Edit, you can also Redispatch. The dispatch path
+# itself idempotently transitions `pending` -> `processing` and is
+# safe to call from `blocked` / `awaiting_operator` / `deferred`
+# (those produce a fresh dispatch attempt; the prior orchestration
+# state stays in audit history).
+_REDISPATCHABLE_STATUSES = _EDITABLE_STATUSES
 
 # Allowed `type` enum values on partial-update. Reuses the same surface
 # as POST /work_orders (no DB enum — `type` is a free-form short string
