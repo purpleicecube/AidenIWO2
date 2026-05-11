@@ -3280,25 +3280,52 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Session not found" });
       }
 
-      const env = session.environment as any;
-      const workOrderId = env?.sourceId;
-      if (!workOrderId) {
-        return res.status(400).json({ message: "No linked work order found for this session" });
+      // Path B-b (ADR-035, 2026-05-11): sourceId is now an IWO3
+      // workspace **artifact UUID**, not the IWO2-era work-order UUID.
+      // The Node sandbox route no longer reads `work_orders.tier2_result`
+      // (which IWO3 doesn't carry). It calls the FastAPI workspace
+      // content endpoint via the sandbox-bounded cross-service helper.
+      const env = (session.environment as any) || {};
+      const artifactId = env.sourceId;
+      if (!artifactId) {
+        return res.status(400).json({
+          message:
+            "No linked artifact found for this session. Set environment.sourceId to a workspace artifact UUID.",
+        });
       }
 
-      const order = await storage.getWorkOrder(workOrderId);
-      if (!order) {
-        return res.status(404).json({ message: "Linked work order not found" });
+      const { fetchSandboxArtifactContent } = await import("./sandbox-crossservice");
+      const appUser = (req as any).appUser;
+      const fetched = await fetchSandboxArtifactContent(artifactId, appUser.id);
+
+      if ("kind" in fetched) {
+        // Cross-service helper signaled an honest error shape.
+        const statusByKind: Record<typeof fetched.kind, number> = {
+          invalid_uuid: 400,
+          not_found: 404,
+          no_tenant: 400,
+          fastapi_unreachable: 502,
+          fastapi_error: 502,
+        };
+        return res.status(statusByKind[fetched.kind] ?? 500).json({
+          message: "Failed to load linked artifact",
+          error: fetched.detail,
+          kind: fetched.kind,
+        });
       }
 
-      const tier2 = (order.tier2Result as any) || {};
-      const deliverable = tier2.output?.deliverable || null;
-      if (!deliverable) {
-        return res.status(400).json({ message: "Work order has no deliverable content" });
+      if (fetched.encoding !== "utf-8" || !fetched.content) {
+        return res.status(400).json({
+          message:
+            "Linked artifact is not text-renderable. Path B-b V1 supports utf-8 text/markdown/code artifacts; non-text source files are deferred to a follow-on loop.",
+          encoding: fetched.encoding,
+          mime_type: fetched.mimeType,
+        });
       }
 
+      const deliverable = fetched.content;
       const { extractHtmlFromDeliverable, extractCodeBlocksFromDeliverable, buildCodePreviewHtml, buildMarkdownPreviewHtml, detectUnfencedCode } = await import("./workspace-filing");
-      const title = env?.deliverableTitle || order.title;
+      const title = env.deliverableTitle || fetched.filename || "Untitled";
 
       let newHtml: string | null = extractHtmlFromDeliverable(deliverable);
       if (!newHtml) {
@@ -3320,14 +3347,19 @@ export async function registerRoutes(
       }
 
       if (!newHtml) {
-        return res.status(400).json({ message: "No renderable content found in deliverable" });
+        return res.status(400).json({ message: "No renderable content found in artifact" });
       }
 
       const reRenderLog = {
         timestamp: new Date().toISOString(),
         command: "re-render",
-        input: { workOrderId: order.id, title: order.title },
-        output: { message: `Preview re-rendered with updated engine`, status: "success" },
+        input: {
+          artifactId,
+          artifactFilename: fetched.filename,
+          artifactMime: fetched.mimeType,
+          title,
+        },
+        output: { message: `Preview re-rendered from artifact via FastAPI workspace seam`, status: "success" },
       };
 
       const existingLogs = Array.isArray(session.logs) ? session.logs : [];
@@ -3345,7 +3377,19 @@ export async function registerRoutes(
 
   /**
    * POST /api/sandbox-sessions/:id/publish — One-click publish sandbox HTML to GitHub Pages.
-   * Creates an artifact from the session HTML (or reuses existing), publishes it, returns public URL.
+   *
+   * Path B-b (ADR-035, 2026-05-11): no IWO3 `artifacts` row is written
+   * — sandbox is an internal operator utility per the ADR-035 carve-out
+   * and the IWO3 artifacts schema mismatch is a non-blocker once we
+   * stop writing to it. The publish outcome (publicUrl + slug + timing)
+   * is recorded in the sandbox session's `logs` and `result.publish`
+   * subfield; the session IS the record of the publish event.
+   *
+   * If GITHUB_TOKEN is missing, the underlying `publishToGitHubPages`
+   * helper throws an explicit "GITHUB_TOKEN env var is required for
+   * publishing" error. We propagate that as a clean 412 PRECONDITION
+   * REQUIRED so operators see a clear "provision a token" signal.
+   *
    * Body: { slug?: string } — auto-generated from session name if omitted.
    */
   app.post("/api/sandbox-sessions/:id/publish", isAuth, requireRole("operator"), async (req, res) => {
@@ -3369,61 +3413,68 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid slug. Use 3-128 chars: lowercase, numbers, hyphens." });
       }
 
-      // Check slug uniqueness
-      const existing = await storage.getArtifactBySlug(slug);
-      if (existing) {
-        // Re-publish: update the existing artifact's content and re-push
-        await storage.updateArtifact(existing.id, {
-          content: htmlContent,
-          name: `${sessionName}.html`,
-        });
-        const pubResult = await publishToGitHubPages(slug, htmlContent, `Update: ${sessionName}`);
-        if (!pubResult.success) {
-          return res.status(502).json({ message: "Failed to publish to GitHub Pages", error: pubResult.error });
+      // Path B-b: publish straight to GitHub Pages. The helper
+      // catches its own errors and returns {success, error} — token-
+      // missing is the most common failure shape and we surface it
+      // explicitly as 412 PRECONDITION REQUIRED so operators see a
+      // clear "provision a token" signal. Other publish failures
+      // surface as 502 with the upstream error shape.
+      const pubResult: { success: boolean; publicUrl?: string; error?: string } =
+        await publishToGitHubPages(
+          slug,
+          htmlContent,
+          `Sandbox publish: ${sessionName}`
+        );
+
+      if (!pubResult.success) {
+        const err = pubResult.error || "Unknown publish error";
+        if (err.includes("GITHUB_TOKEN")) {
+          return res.status(412).json({
+            message:
+              "Publish blocked: GITHUB_TOKEN env var is required for publishing. Provision a fine-grained PAT with `repo` scope and re-run.",
+            error: err,
+            kind: "github_token_missing",
+          });
         }
-        await storage.updateArtifact(existing.id, {
-          publishedAt: new Date(),
-          publishedUrl: pubResult.publicUrl!,
+        return res.status(502).json({
+          message: "Failed to publish to GitHub Pages",
+          error: err,
         });
-        return res.json({
-          message: "Updated and re-published",
+      }
+
+      // Record publish outcome on the session (logs + result.publish).
+      // No IWO3 artifact row is created — sandbox session IS the record.
+      const publishLog = {
+        timestamp: new Date().toISOString(),
+        command: "publish",
+        input: { slug, sessionName },
+        output: {
+          message: `Published to GitHub Pages`,
+          status: "success",
           publicUrl: pubResult.publicUrl,
           slug,
-          artifactId: existing.id,
-        });
-      }
+        },
+      };
 
-      // Create a new artifact from the sandbox HTML
-      const artifact = await storage.createArtifact({
-        name: `${sessionName}.html`,
-        type: "file",
-        mimeType: "text/html",
-        content: htmlContent,
-        sourceType: "sandbox",
-        sourceId: session.id,
-        tags: ["html", "sandbox", "published"],
-        createdBy: "system",
-      });
-
-      // Publish to GitHub Pages
-      const pubResult = await publishToGitHubPages(slug, htmlContent, `Publish: ${sessionName}`);
-      if (!pubResult.success) {
-        return res.status(502).json({ message: "Failed to publish to GitHub Pages", error: pubResult.error });
-      }
-
-      // Update artifact with publish metadata
-      await storage.updateArtifact(artifact.id, {
-        publishedSlug: slug,
-        publishedAt: new Date(),
-        publishedUrl: pubResult.publicUrl!,
-        publishPolicy: "public",
+      const existingLogs = Array.isArray(session.logs) ? session.logs : [];
+      const updatedResult = {
+        ...result,
+        publish: {
+          publicUrl: pubResult.publicUrl,
+          slug,
+          publishedAt: new Date().toISOString(),
+        },
+      };
+      await storage.updateSandboxSession(session.id, {
+        result: updatedResult,
+        logs: [...existingLogs, publishLog],
       });
 
       res.json({
         message: "Published successfully",
         publicUrl: pubResult.publicUrl,
         slug,
-        artifactId: artifact.id,
+        sessionId: session.id,
       });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to publish sandbox session", error: err.message });

@@ -270,3 +270,51 @@ The successor loop is a **sandbox-only** cross-service adapter. Reads work-order
 - The broader Node-IWO3 schema convergence question
 
 Any drift into generic Node/FastAPI data access unification is a stop-and-escalate trigger.
+
+## Path B-b — Shipped Shape (2026-05-11)
+
+The successor loop landed on `iwo3/main` with three operator-locked choices applied:
+
+### sourceId model — Option (a) Artifact UUID only
+
+`session.environment.sourceId` is now an IWO3 workspace artifact UUID, not a work-order UUID. The sandbox rerender route fetches the artifact's text content via a thin Node→FastAPI helper at `server/sandbox-crossservice.ts` calling the existing `GET /workspace/files/:id/content` route. No new FastAPI route was needed. No WO-preview seam was added. Auto-detect was rejected.
+
+### Publish recording — Option (a) Skip IWO3 artifact write
+
+The `storage.createArtifact` call (which was the IWO2-artifacts-schema crash point) was removed entirely. Successful publish now returns the GitHub Pages URL only; the publish outcome is recorded in the sandbox session's `logs` array and `result.publish` subfield. The sandbox session IS the record. No FastAPI workspace-write seam, no auth bridge.
+
+### GITHUB_TOKEN validation — Option (b) Validate up to missing-token boundary
+
+`publishToGitHubPages` returns `{success: false, error: "GITHUB_TOKEN env var is required..."}` when the token is missing. The sandbox publish route translates that specific error into **HTTP 412 PRECONDITION REQUIRED** with `kind: "github_token_missing"` so operators see a clear "provision a token" signal. Real-token provisioning is an operator follow-on, not a B-b loop deliverable.
+
+### Cross-service seam shape
+
+The single new module — `server/sandbox-crossservice.ts` — exports exactly one public function: `fetchSandboxArtifactContent(artifactId, actorUserId)`. It:
+
+- Looks up the operator's primary client_id via `client_memberships` (single-tenant V1 assumption)
+- Calls FastAPI at `process.env.IWO3_FASTAPI_BASE_URL || http://127.0.0.1:8000`
+- Authenticates via the FastAPI dev-auth headers (`X-IWO3-User` + `X-IWO3-Client`)
+- Returns `SandboxArtifactContent` on success or `SandboxArtifactReadError` (with `kind` discriminant) on failure
+
+**The module is intentionally not a generic platform adapter.** Module-level docstring + scope-lock comments call this out explicitly. The single export is sandbox-shaped.
+
+### Validated chain on IWO3 (2026-05-11)
+
+```text
+GET  /api/login                                 → 200 (dev auto-login, Klear owner)
+POST /api/sandbox-sessions                      → 201 (createdBy server-set)
+PUT  /api/sandbox-sessions/:id                  → 200 (environment.sourceId = artifact UUID)
+POST /api/sandbox-sessions/:id/rerender         → 200 (1745b HTML from markdown artifact)
+GET  /api/sandbox-sessions/:id/preview          → 200 (HTML served verbatim)
+POST /api/sandbox-sessions/:id/publish          → 412 (github_token_missing, clean operator signal)
+```
+
+8/8 sandbox chain steps now functional. The chain is operationally complete pending GITHUB_TOKEN provisioning for live publish.
+
+### Residual debt remaining after B-b
+
+1. **Auth bridge for hosted deploy.** The dev-header path the cross-service seam uses works for local validation only. Hosted deploy needs a real session-cookie ↔ FastAPI-bearer-token bridge. Deferred to the hosted-deploy loop.
+2. **21 client/src/* TS errors.** Unchanged (still deferred per D-NSA-4). Hard precondition for the React app's production build, addressed in the hosted-deploy loop.
+3. **WO-source-id rerender path.** Option (b) from the original pre-flight (`session.environment.sourceId = work-order UUID`) was deliberately not built. If the operational demand surfaces, a thin extension can add a narrow new FastAPI route `GET /work_orders/{id}/preview_content` — its own bounded follow-on loop.
+4. **Non-text artifact rendering.** Path B-b V1 only handles `encoding: utf-8` artifacts. Binary/image preview from base64-encoded artifacts is a follow-on if demand surfaces.
+5. **Single-tenant client_id assumption.** `fetchSandboxArtifactContent` picks the actor's first membership. A multi-tenant operator who needs sandbox sessions in different tenants would need explicit client_id selection. Path C concern, not B-b.
