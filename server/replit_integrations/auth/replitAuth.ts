@@ -159,21 +159,51 @@ export async function setupAuth(app: Express) {
       const existing = await authStorage.getUserByEmail(bootstrapEmail);
       if (!existing) {
         const hash = await bcrypt.hash(bootstrapPassword, 12);
-        // Node Storage Adaptation Darkmode (2026-05-11): IWO3 users
-        // table has no first_name/last_name + role lives on
-        // client_memberships. The upsert maps legacy first/last names
-        // into display_name; setUserRole writes to the first
-        // available membership row (logs a warning + returns
-        // gracefully if the user has no membership yet — bootstrap
-        // admin without a tenant binding is a Path B follow-on).
+        // Node Storage Adaptation Darkmode (2026-05-11, D-NSA-6
+        // revised 2026-05-11):
+        //
+        // The IWO2 "bootstrap admin" concept does NOT cleanly map
+        // onto IWO3's tenant-scoped identity model. IWO3 stores roles
+        // per-tenant in `client_memberships`; there is no top-level
+        // `users.role` for a "global admin." This path therefore
+        // provisions a **non-privileged bootstrap operator** with:
+        //
+        //   - a fresh, valid IWO3 uuid (the IWO2 slug "bootstrap-admin"
+        //     would fail uuid coercion on insert)
+        //   - email + password set so the operator can authenticate
+        //   - NO client_memberships row created
+        //
+        // `requireRole` will resolve this user to viewer-level until
+        // an admin (or the seeded Klear/FFAI owners) manually
+        // provisions a `client_memberships` row binding the bootstrap
+        // user to a tenant + role. The log line below is intentionally
+        // explicit about the non-privileged state so operators don't
+        // assume admin access from the env var being set.
+        //
+        // Full "real admin via env var" requires either:
+        //   (a) auto-creating a membership for the bootstrap user
+        //       against a designated tenant — needs a separate
+        //       BOOTSTRAP_ADMIN_CLIENT_ID env var; or
+        //   (b) deprecating this path entirely in favor of seeded
+        //       IWO3 owner accounts (recommended long-term).
+        //
+        // Either way is a follow-on loop. For now: provision the user
+        // safely + warn loudly.
+        const { randomUUID } = await import("crypto");
         await authStorage.upsertUser({
-          id: "bootstrap-admin",
+          id: randomUUID(),
           email: bootstrapEmail,
-          displayName: "Admin",
+          displayName: "Bootstrap Operator",
           passwordHash: hash,
         } as any);
-        await authStorage.setUserRole("bootstrap-admin", "admin");
-        console.log(`[auth] Bootstrap admin provisioned: ${bootstrapEmail}`);
+        console.warn(
+          `[auth] Bootstrap operator provisioned: ${bootstrapEmail} — ` +
+          `NON-PRIVILEGED (no client_membership). This account can ` +
+          `authenticate but every requireRole gate resolves to ` +
+          `viewer-level until a client_membership row is manually ` +
+          `created binding the user to a tenant + role. See ADR-035 ` +
+          `§D-NSA-6.`
+        );
       }
     } catch (err) {
       console.error("[auth] Failed to provision bootstrap admin:", err);

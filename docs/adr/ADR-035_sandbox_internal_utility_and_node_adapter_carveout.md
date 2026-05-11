@@ -1,11 +1,12 @@
 # ADR-035 — Sandbox as Internal Operator Utility + Node Storage Adapter Carve-Out
 
-**Status:** Accepted (2026-05-11)
+**Status:** Accepted with revisions (CODEX, 2026-05-11)
 **Authors:** CODEX (architect direction) + Claude Opus 4.7 (implementation)
 **Loops:** Sandbox Operational Darkmode (partial, stop-and-escalate) +
             Node Storage Adaptation Darkmode (this loop)
 **Predecessor:** ADR-002 (multi-client data architecture), ADR-014 (RBAC),
             ADR-015 (RLS enforcement mode), Loop 4 Phase 4.3 (FORCE RLS on 25 tables)
+**Successor:** Path B-b sandbox-only cross-service adapter (next bounded loop, scope-locked per §CODEX Disposition below)
 
 ## Context
 
@@ -191,6 +192,7 @@ viable on IWO3.
 
 Don't touch the broader Node storage layer. Instead: build a
 sandbox-specific Node storage helper that:
+
 - Reads work-order data via FastAPI (cross-service) instead of direct
   Drizzle.
 - Writes artifacts via FastAPI's `/workspace` route instead of direct
@@ -242,3 +244,29 @@ use case.
 - Sandbox route gate: `server/routes.ts:_canAccessSandboxSession`
 - Auth adapter: `server/replit_integrations/auth/storage.ts`
 - Role resolver: `server/routes.ts:requireRole` + `IWO3_ROLE_TO_LEGACY`
+
+## CODEX Disposition (2026-05-11)
+
+**Verdict:** ACCEPT WITH REVISIONS — accept the V1 partial ship; do not call sandbox "operational" beyond paste/preview yet; open Option B-b as the next bounded loop; keep hosted deploy as a separate loop after B-b, not folded into it.
+
+| Decision | Verdict | Implication |
+| --- | --- | --- |
+| D-NSA-1 (Path A-prime carve-out) | ACCEPT | Keep as V1 internal-operator-utility framing. Not the final tenancy model. |
+| D-NSA-2 (Successor preference) | ACCEPT WITH REVISIONS | Open Option B-b next. **Constraint: keep B-b sandbox-bounded. Do not let it become generic Node/FastAPI data access unification.** |
+| D-NSA-3 (Console spam) | ACCEPT | Residual debt, not loop-blocking. Leave alone for now. |
+| D-NSA-4 (Client React TS errors) | ACCEPT | Leave alone in this loop. **Make explicit gate in the later hosted-deploy loop. Do not forget them.** |
+| D-NSA-5 (Dev login binding) | ACCEPT | Keep dev auto-login bound to seeded Klear owner UUID — least confusing identity posture for now. |
+| D-NSA-6 (Bootstrap admin path) | ACCEPT WITH REVISIONS | Current warning-and-return is misleading. Either provision a real membership OR explicitly downgrade/document as non-privileged. **Revised implementation: bootstrap admin now provisions a fresh-UUID user with no membership + emits an explicit `NON-PRIVILEGED (no client_membership)` warning so operators don't assume admin access from env-var-only provisioning. Real-admin-via-env-var requires either auto-membership against a designated tenant OR deprecating this path entirely; both deferred to follow-on.** |
+| D-NSA-7 (Internal-utility framing) | ACCEPT | Keep the "internal operator utility" framing in UI surfaces. |
+
+**Explicit gate for the hosted-deploy follow-on loop (post-B-b):**
+The 21 client/src/* TS errors on `user.firstName/lastName/profileImageUrl/role` (carried in §Consequences "Negative" above) MUST be addressed before hosted deploy can ship — production `tsc` build of the React app will fail otherwise. This is a hard pre-condition, not an optional cleanup.
+
+**Path B-b scope lock (from CODEX revisions):**
+The successor loop is a **sandbox-only** cross-service adapter. Reads work-order data via FastAPI calls; writes artifacts via FastAPI `/workspace`. Does NOT touch:
+
+- Generic Node `server/storage.ts` methods unrelated to sandbox
+- Any non-sandbox client/server feature
+- The broader Node-IWO3 schema convergence question
+
+Any drift into generic Node/FastAPI data access unification is a stop-and-escalate trigger.
