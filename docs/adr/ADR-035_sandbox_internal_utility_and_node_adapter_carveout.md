@@ -314,7 +314,50 @@ POST /api/sandbox-sessions/:id/publish          → 412 (github_token_missing, c
 ### Residual debt remaining after B-b
 
 1. **Auth bridge for hosted deploy.** The dev-header path the cross-service seam uses works for local validation only. Hosted deploy needs a real session-cookie ↔ FastAPI-bearer-token bridge. Deferred to the hosted-deploy loop.
-2. **21 client/src/* TS errors.** Unchanged (still deferred per D-NSA-4). Hard precondition for the React app's production build, addressed in the hosted-deploy loop.
-3. **WO-source-id rerender path.** Option (b) from the original pre-flight (`session.environment.sourceId = work-order UUID`) was deliberately not built. If the operational demand surfaces, a thin extension can add a narrow new FastAPI route `GET /work_orders/{id}/preview_content` — its own bounded follow-on loop.
-4. **Non-text artifact rendering.** Path B-b V1 only handles `encoding: utf-8` artifacts. Binary/image preview from base64-encoded artifacts is a follow-on if demand surfaces.
-5. **Single-tenant client_id assumption.** `fetchSandboxArtifactContent` picks the actor's first membership. A multi-tenant operator who needs sandbox sessions in different tenants would need explicit client_id selection. Path C concern, not B-b.
+2. **21 client/src/* TS errors.** Unchanged (still deferred per D-NSA-4). **Hard precondition for the React app's production build — addressed in the TS-errors/UI loop that precedes hosted deploy** (per CODEX D-BB-5/D-BB-7).
+3. **Sandbox React UI page (`client/src/pages/sandbox.tsx`).** Still references the old WO-based source-id model and the old publish response shape (artifactId). Must be updated in lockstep with the TS-errors loop — **gating precondition for hosted deploy** per CODEX D-BB-7.
+4. **WO-source-id rerender path.** Option (b) from the original pre-flight (`session.environment.sourceId = work-order UUID`) was deliberately not built. **CODEX D-BB-5 explicitly deprioritized this** — no evidence yet that it's the highest-value operator win. Open only if a concrete demand surfaces.
+5. **Non-text artifact rendering.** Path B-b V1 only handles `encoding: utf-8` artifacts. Binary/image preview from base64-encoded artifacts is a follow-on if demand surfaces.
+6. **Single-tenant client_id assumption — local/dev posture only.** `fetchSandboxArtifactContent` picks the actor's first membership. Per CODEX D-BB-4: **this MUST NOT silently survive into hosted deploy.** The hosted-deploy loop is required to make tenant binding explicit — most likely via `session.environment.clientId` set at session creation or a per-request `X-IWO3-Client` header surfaced through the operator UI. Recorded here as a hard pre-condition for hosted-deploy scope.
+
+## CODEX Disposition on Path B-b (2026-05-11)
+
+**Verdict:** ACCEPT WITH REVISIONS — Path B-b is the canonical sandbox V1 cross-service seam; treat sandbox as operationally complete for local/dev use, with live publish gated only by token provisioning. Two revisions integrated:
+
+| Decision | Verdict | Action taken |
+| --- | --- | --- |
+| D-BB-1 (Seam shape) | ACCEPT | No change. Sandbox-bounded helper stands. No extra abstraction work. |
+| D-BB-2 (412 for missing token) | ACCEPT | No change. 412 matches the locked precondition model. |
+| D-BB-3 (Env var name) | ACCEPT | No change. `IWO3_FASTAPI_BASE_URL` with `FASTAPI_BASE_URL` fallback. |
+| D-BB-4 (Single-tenant first-membership) | ACCEPT WITH REVISIONS | **Local/dev posture only.** Recorded as a hard pre-condition for hosted-deploy in §Residual debt #6. Hosted deploy must make tenant binding explicit. |
+| D-BB-5 (Next-loop ordering) | ACCEPT | Open the next loop as: (1) TS errors + sandbox React UI updates, then (2) hosted deploy / auth bridge. Do NOT open the WO-source-id extension next. |
+| D-BB-6 (Console spam) | ACCEPT | No change. Stays deferred. Fold cleanup into hosted-deploy loop if it still matters then. |
+| D-BB-7 (Sandbox UI bundle scope) | ACCEPT WITH REVISIONS | **Bundle sandbox UI updates with the TS-errors loop, NOT with hosted deploy.** Cleaner pre-hosting gate: (a) fix client/src/* typing; (b) update sandbox page to artifact-UUID source model; (c) update publish response handling; (d) THEN hosted deploy / auth bridge. |
+
+## Next-Loop Ordering (Locked)
+
+Per CODEX D-BB-5 and D-BB-7, the next two bounded loops are sequenced:
+
+### Loop α — TS errors + sandbox React UI updates (next)
+
+Combined scope:
+
+- Fix the 21 `client/src/*` TS errors on `user.firstName/lastName/profileImageUrl/role`
+- Update `client/src/pages/sandbox.tsx`:
+  - Send artifact UUID (not work-order UUID) when linking a session
+  - Consume the new publish response shape (no `artifactId` field)
+- Validate `tsc` clean (production React build viable)
+- Stop. Do NOT roll hosted deploy into this loop.
+
+### Loop β — Hosted deploy + auth bridge (after Loop α)
+
+Combined scope, gated by Loop α:
+
+- Auth bridge: session-cookie ↔ FastAPI-bearer-token mapping
+- **Explicit tenant binding** for the cross-service seam (per D-BB-4 revision)
+- Hosted Node service on Railway (Dockerfile + railway.json second service)
+- Streamlit hop / operator entry surface decision
+- Live publish validation against an operator-provisioned `GITHUB_TOKEN`
+- Console-spam cleanup (per D-BB-6) if still operationally annoying
+
+Either loop can be scoped + opened by CODEX when ready. The WO-source-id rerender extension is NOT on the critical path — open only on concrete operator demand.
