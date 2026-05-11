@@ -320,6 +320,64 @@ def test_file_content_fetch_returns_text_inline() -> None:
 
 
 @iwo3_db
+def test_file_content_fetch_surfaces_pdf_extracted_text_as_utf8() -> None:
+    """Sandbox Everywhere Darkmode (2026-05-11) — PDF/PPTX/DOC artifacts
+    with pre-extracted text in `extracted_text` are returned as utf-8
+    with `extracted_from` set, so the sandbox rerender path can use
+    binary documents whose text has already been extracted upstream."""
+    with TestClient(app) as client:
+        outputs = _outputs_id(client)
+        f = client.post(
+            "/workspace/files",
+            json={
+                "workspace_folder_id": outputs,
+                "filename": _new_name("brief") + ".pdf",
+                "mime_type": "application/pdf",
+                "content_text": "Q1 board brief\n\nKey takeaway: …",
+            },
+            headers=_hdr(KLEAR_OPERATOR),
+        ).json()["file"]
+        r = client.get(
+            f"/workspace/files/{f['id']}/content",
+            headers=_hdr(KLEAR_OPERATOR),
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["encoding"] == "utf-8"
+        assert body["content"].startswith("Q1 board brief")
+        assert body["mime_type"] == "application/pdf"
+        assert body["extracted_from"] == "application/pdf"
+
+
+@iwo3_db
+def test_file_content_fetch_returns_base64_for_binary_pdf() -> None:
+    """Companion to the extracted-text test: a true binary PDF upload
+    with NO extracted text still returns the base64 path, not utf-8."""
+    import base64 as _b64
+    with TestClient(app) as client:
+        outputs = _outputs_id(client)
+        raw = _b64.b64encode(b"%PDF-1.4\n%fake-binary-no-text-here\n").decode()
+        f = client.post(
+            "/workspace/files",
+            json={
+                "workspace_folder_id": outputs,
+                "filename": _new_name("raw") + ".pdf",
+                "mime_type": "application/pdf",
+                "content_b64": raw,
+            },
+            headers=_hdr(KLEAR_OPERATOR),
+        ).json()["file"]
+        r = client.get(
+            f"/workspace/files/{f['id']}/content",
+            headers=_hdr(KLEAR_OPERATOR),
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["encoding"] == "base64"
+        assert body.get("extracted_from") is None
+
+
+@iwo3_db
 def test_file_content_fetch_returns_ref_for_output_package() -> None:
     """Beta-1 ε.2 Q9 — output_package://... files return ref encoding."""
     with TestClient(app) as client:

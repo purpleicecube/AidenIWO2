@@ -81,9 +81,21 @@ export function AppSidebar() {
       );
     });
 
-  const initials = user
-    ? `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U"
-    : "U";
+  const displayName =
+    (user as any)?.displayName || (user as any)?.firstName || user?.email || "";
+  const initials = (() => {
+    if (!user) return "U";
+    const name = (user as any)?.displayName || "";
+    if (name) {
+      const parts = name.trim().split(/\s+/).filter(Boolean);
+      const a = parts[0]?.[0] || "";
+      const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
+      const out = `${a}${b}`.toUpperCase();
+      if (out) return out;
+    }
+    const email = user?.email || "";
+    return (email[0] || "U").toUpperCase();
+  })();
 
   return (
     <Sidebar>
@@ -94,7 +106,7 @@ export function AppSidebar() {
               <Layers className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-tight">AIDEN_IWO2</span>
+              <span className="text-sm font-semibold tracking-tight">AIDEN_IWO3</span>
               <span className="text-xs text-muted-foreground">Orchestration Engine</span>
             </div>
           </div>
@@ -152,12 +164,12 @@ export function AppSidebar() {
         {user && (
           <div className="flex items-center gap-3">
             <Avatar className="w-8 h-8">
-              <AvatarImage src={user.profileImageUrl || undefined} />
+              <AvatarImage src={(user as any).profileImageUrl || undefined} />
               <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate" data-testid="text-user-name">
-                {user.firstName || user.email || "User"}
+                {displayName || "User"}
               </p>
               <Badge variant={roleBadgeVariant(userRole)} className="text-[10px] h-4 px-1.5" data-testid="text-user-role">
                 <Shield className="w-2.5 h-2.5 mr-0.5" />
@@ -170,7 +182,7 @@ export function AppSidebar() {
           </div>
         )}
         <div className="text-xs text-muted-foreground">
-          AIDEN_IWO2 v{healthData?.version || "..."}
+          AIDEN_IWO3 v{healthData?.version || "..."}
         </div>
       </SidebarFooter>
     </Sidebar>

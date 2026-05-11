@@ -3384,17 +3384,31 @@ export async function registerRoutes(
       }
 
       if (fetched.encoding !== "utf-8" || !fetched.content) {
+        // Sandbox Everywhere Darkmode (2026-05-11): the FastAPI surface
+        // now returns utf-8 for PDF/PPTX/DOC sources when extracted text
+        // is present. A non-utf-8 response on those mimes means the
+        // artifact has no extracted text — fail honestly rather than
+        // pretending the file is supported.
+        const isExtractableBinary = (fetched.mimeType || "").startsWith("application/") &&
+          (fetched.mimeType === "application/pdf" ||
+           fetched.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+           fetched.mimeType === "application/vnd.ms-powerpoint" ||
+           fetched.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+           fetched.mimeType === "application/msword");
         return res.status(400).json({
-          message:
-            "Linked artifact is not text-renderable. Path B-b V1 supports utf-8 text/markdown/code artifacts; non-text source files are deferred to a follow-on loop.",
+          message: isExtractableBinary
+            ? "Linked artifact is a binary source (PDF/PPT/DOC) with no extracted text on file. Re-upload with extraction enabled or attach a markdown/code source instead."
+            : "Linked artifact is not text-renderable. Sandbox supports md/html/code/text natively and PDF/PPT/DOC when extracted text is present.",
           encoding: fetched.encoding,
           mime_type: fetched.mimeType,
+          extracted_text_present: false,
         });
       }
 
       const deliverable = fetched.content;
       const { extractHtmlFromDeliverable, extractCodeBlocksFromDeliverable, buildCodePreviewHtml, buildMarkdownPreviewHtml, detectUnfencedCode } = await import("./workspace-filing");
       const title = env.deliverableTitle || fetched.filename || "Untitled";
+      const extractedFrom = fetched.extractedFrom || null;
 
       let newHtml: string | null = extractHtmlFromDeliverable(deliverable);
       if (!newHtml) {
@@ -3427,8 +3441,14 @@ export async function registerRoutes(
           artifactFilename: fetched.filename,
           artifactMime: fetched.mimeType,
           title,
+          extractedFrom,
         },
-        output: { message: `Preview re-rendered from artifact via FastAPI workspace seam`, status: "success" },
+        output: {
+          message: extractedFrom
+            ? `Preview re-rendered from ${extractedFrom} extracted text via FastAPI workspace seam`
+            : `Preview re-rendered from artifact via FastAPI workspace seam`,
+          status: "success",
+        },
       };
 
       const existingLogs = Array.isArray(session.logs) ? session.logs : [];
@@ -3549,6 +3569,138 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to publish sandbox session", error: err.message });
     }
   });
+
+  /**
+   * GET /api/sandbox-sessions/:id/export?format=pdf|pptx — Sandbox
+   * Everywhere Darkmode (2026-05-11). Best-effort HTML→PDF/PPTX export
+   * via the existing `server/scripts/html-to-{pdf,pptx}.cjs` Playwright
+   * scripts. Sandbox-bounded; not a generic export pipeline.
+   *
+   * Locally these scripts need `SKILLS_DIR`/`PLAYWRIGHT_PATH` to point
+   * at a `claude-office-skills` checkout with Playwright installed. On
+   * hosted Railway the container does NOT bundle Chromium or the
+   * skills tree, so this endpoint returns 412 `skills_unavailable`
+   * with an honest message. That residual is captured in the loop
+   * handback (preflight default 2).
+   */
+  app.get(
+    "/api/sandbox-sessions/:id/export",
+    isAuth,
+    requireRole("operator"),
+    async (req, res) => {
+      try {
+        const session = await storage.getSandboxSession(req.params.id);
+        if (!session) return res.status(404).json({ message: "Session not found" });
+        if (!_canAccessSandboxSession(req, session)) {
+          return res.status(404).json({ message: "Session not found" });
+        }
+        const result = session.result as any;
+        if (!result?.html || !result?.renderable) {
+          return res
+            .status(400)
+            .json({ message: "Session has no renderable HTML to export" });
+        }
+
+        const format = String(req.query.format || "").toLowerCase();
+        if (format !== "pdf" && format !== "pptx") {
+          return res
+            .status(400)
+            .json({ message: "Unknown format. Use ?format=pdf or ?format=pptx" });
+        }
+
+        const skillsDir =
+          process.env.SKILLS_DIR || "/home/virgina/claude-office-skills";
+        const playwrightPath =
+          process.env.PLAYWRIGHT_PATH ||
+          path.join(skillsDir, "node_modules/playwright");
+        const playwrightAvailable = fs.existsSync(playwrightPath);
+        const html2pptxAvailable = fs.existsSync(
+          path.join(skillsDir, "public/pptx/scripts/html2pptx.js")
+        );
+        const needsPptxAssets = format === "pptx" && !html2pptxAvailable;
+        if (!playwrightAvailable || needsPptxAssets) {
+          return res.status(412).json({
+            message:
+              "Sandbox export prerequisites missing: needs Playwright Chromium + claude-office-skills (and html2pptx for PPTX). Set SKILLS_DIR / PLAYWRIGHT_PATH or stop and escalate hosted export to a follow-on loop.",
+            kind: "skills_unavailable",
+            format,
+            skills_dir: skillsDir,
+            playwright_path: playwrightPath,
+            playwright_present: playwrightAvailable,
+            html2pptx_present: html2pptxAvailable,
+          });
+        }
+
+        const sessionName = session.name || `sandbox-${session.id.slice(0, 8)}`;
+        const tmpDir = fs.mkdtempSync(
+          path.join(require("os").tmpdir(), "iwo3-sandbox-export-")
+        );
+        const htmlPath = path.join(tmpDir, "input.html");
+        const outPath = path.join(
+          tmpDir,
+          `${slugify(sessionName) || "sandbox"}.${format}`
+        );
+        fs.writeFileSync(htmlPath, result.html, "utf-8");
+
+        const scriptPath = path.resolve(
+          process.cwd(),
+          "server/scripts",
+          format === "pdf" ? "html-to-pdf.cjs" : "html-to-pptx.cjs"
+        );
+        if (!fs.existsSync(scriptPath)) {
+          return res.status(412).json({
+            message: `Export script missing at ${scriptPath}.`,
+            kind: "skills_unavailable",
+            format,
+          });
+        }
+
+        const { spawn } = require("child_process") as typeof import("child_process");
+        const child = spawn(
+          process.execPath,
+          [scriptPath, "--input", htmlPath, "--output", outPath],
+          { env: { ...process.env, SKILLS_DIR: skillsDir, PLAYWRIGHT_PATH: playwrightPath } }
+        );
+        let stderr = "";
+        child.stderr.on("data", (d) => {
+          stderr += d.toString();
+        });
+        child.on("close", (code) => {
+          if (code !== 0 || !fs.existsSync(outPath)) {
+            return res.status(502).json({
+              message: `Export script failed (exit ${code})`,
+              kind: "export_failed",
+              format,
+              error: stderr.slice(0, 600),
+            });
+          }
+          const mime =
+            format === "pdf"
+              ? "application/pdf"
+              : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+          res.setHeader("Content-Type", mime);
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${path.basename(outPath)}"`
+          );
+          res.sendFile(outPath, () => {
+            try {
+              fs.unlinkSync(outPath);
+              fs.unlinkSync(htmlPath);
+              fs.rmdirSync(tmpDir);
+            } catch {
+              /* noop */
+            }
+          });
+        });
+      } catch (err: any) {
+        res.status(500).json({
+          message: "Failed to export sandbox session",
+          error: err.message,
+        });
+      }
+    }
+  );
 
   // ==================== Chat Sessions (GCC Memory Protocol) ====================
 

@@ -1,0 +1,54 @@
+# IWO3 Node/React sandbox runtime container — Sandbox Everywhere
+# Darkmode (2026-05-11). Hosts the canonical React sandbox UI plus the
+# Express server that exposes `/api/sandbox-sessions/*` and the auth
+# routes. Co-deploys alongside the FastAPI service (apps/api-fastapi/
+# Dockerfile). FastAPI remains the runtime/data-plane authority; this
+# container is the operator-facing sandbox surface only.
+#
+# Build context: REPO ROOT. Build with:
+#   docker build -f Dockerfile.node -t iwo3-node .
+#
+# What this image does NOT include:
+# - Playwright Chromium (so `/api/sandbox-sessions/:id/export` returns
+#   `412 skills_unavailable` until the operator either bundles the
+#   skills tree into the image or wires a separate render worker)
+# - claude-office-skills checkout (same reason)
+#
+# Auth: production deploys must set `BOOTSTRAP_ADMIN_PASSWORD`,
+# `SESSION_SECRET`, and `IWO3_DATABASE_URL`. The FastAPI counterpart
+# must be reachable from this container via `IWO3_FASTAPI_BASE_URL`.
+
+FROM node:20-bookworm-slim AS builder
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Install build-time deps (we run `npm run build` which uses tsx +
+# esbuild + vite to emit dist/index.cjs and dist/public/*).
+COPY package.json package-lock.json* ./
+RUN npm ci --include=dev --no-audit --no-fund
+
+COPY . .
+RUN npm run build && \
+    npm prune --omit=dev
+
+# ── runtime stage ─────────────────────────────────────────────────────
+FROM node:20-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copy production node_modules + built artefacts + the server-scripts
+# directory (needed at runtime by the export endpoint when skills are
+# present at SKILLS_DIR).
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server/scripts ./server/scripts
+COPY --from=builder /app/package.json ./package.json
+
+# Default port — Railway / hosts will inject $PORT. Express reads
+# process.env.PORT in server/index.ts.
+EXPOSE 5050
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5050)+'/api/health').then(r=>{if(r.status!==200)process.exit(1)}).catch(()=>process.exit(1))"
+
+CMD ["node", "dist/index.cjs"]

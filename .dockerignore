@@ -1,0 +1,26 @@
+# Root .dockerignore for the Node sandbox image (Dockerfile.node).
+# The Node build needs server/, client/, shared/, drizzle/, package*,
+# script/, etc., so we exclude only what's safe to leave out.
+.git
+.gitignore
+.github
+.vscode
+.idea
+.DS_Store
+node_modules
+dist
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.venv/
+**/*.pyc
+**/.env
+**/.env.local
+**/.coverage
+WS024_IWO3*
+docs/adr
+infra/local/*.log
+coverage
+.local/skills
+.cache

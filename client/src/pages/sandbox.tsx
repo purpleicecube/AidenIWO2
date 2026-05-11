@@ -35,6 +35,8 @@ import {
   ExternalLink,
   Copy,
   Check,
+  FileDown,
+  Presentation,
 } from "lucide-react";
 import SplitPane from "@/components/split-pane";
 import { ExpandablePanel } from "@/components/expandable-panel";
@@ -86,12 +88,12 @@ export default function SandboxPage() {
   const [selectedSession, setSelectedSession] = useState<SandboxSession | null>(null);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [newSourceId, setNewSourceId] = useState("");
   const [execCommand, setExecCommand] = useState("");
   const [execInput, setExecInput] = useState("");
   const [viewMode, setViewMode] = useState<"terminal" | "preview">("preview");
   const [iframeKey, setIframeKey] = useState(0);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
-  const [publishedArtifactId, setPublishedArtifactId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   const { data: sessions = [], isLoading } = useQuery<SandboxSession[]>({
@@ -101,13 +103,18 @@ export default function SandboxPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; description?: string; createdBy?: string }) =>
-      apiRequest("POST", "/api/sandbox-sessions", data),
+    mutationFn: (data: {
+      name: string;
+      description?: string;
+      createdBy?: string;
+      environment?: { sourceId?: string };
+    }) => apiRequest("POST", "/api/sandbox-sessions", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
       setShowNewDialog(false);
       setNewName("");
       setNewDesc("");
+      setNewSourceId("");
       toast({ title: "Sandbox session created" });
     },
   });
@@ -166,30 +173,67 @@ export default function SandboxPage() {
     },
   });
 
+  const exportSession = async (id: string, format: "pdf" | "pptx") => {
+    try {
+      const res = await fetch(`/api/sandbox-sessions/${id}/export?format=${format}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const j = await res.json();
+          detail = j.message || j.error || "";
+          if (j.kind === "skills_unavailable") {
+            toast({
+              title: "Export prerequisites missing",
+              description:
+                "Set SKILLS_DIR / PLAYWRIGHT_PATH to a claude-office-skills checkout, or use Publish to ship the HTML version.",
+              variant: "destructive",
+            });
+            return;
+          }
+        } catch {
+          /* noop */
+        }
+        toast({
+          title: `Export ${format.toUpperCase()} failed`,
+          description: detail || `HTTP ${res.status}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("content-disposition") || "";
+      const m = cd.match(/filename="([^"]+)"/);
+      a.download = m?.[1] || `sandbox.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: `${format.toUpperCase()} downloaded` });
+    } catch (err: any) {
+      toast({
+        title: `Export ${format.toUpperCase()} failed`,
+        description: err.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const publishMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest("POST", `/api/sandbox-sessions/${id}/publish`, {}),
     onSuccess: async (res) => {
       const data = await res.json();
       setPublishedUrl(data.publicUrl);
-      setPublishedArtifactId(data.artifactId);
+      queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
       toast({ title: "Published!", description: data.publicUrl });
     },
     onError: (err: any) => {
       toast({ title: "Publish failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const unpublishMutation = useMutation({
-    mutationFn: (artifactId: string) =>
-      apiRequest("POST", `/api/artifacts/${artifactId}/unpublish`, {}),
-    onSuccess: () => {
-      setPublishedUrl(null);
-      setPublishedArtifactId(null);
-      toast({ title: "Unpublished", description: "Page removed from GitHub Pages." });
-    },
-    onError: (err: any) => {
-      toast({ title: "Unpublish failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -243,10 +287,9 @@ export default function SandboxPage() {
                     className={`hover-elevate cursor-pointer ${isSelected ? "ring-2 ring-primary" : ""}`}
                     onClick={() => {
                       setSelectedSession(session);
-                      setPublishedUrl(null);
-                      setPublishedArtifactId(null);
-                      setCopiedUrl(false);
                       const result = session.result as any;
+                      setPublishedUrl(result?.publish?.publicUrl ?? null);
+                      setCopiedUrl(false);
                       if (result?.html && result?.renderable) {
                         setViewMode("preview");
                       } else {
@@ -413,6 +456,24 @@ export default function SandboxPage() {
                   >
                     <Eye className="w-3.5 h-3.5" />
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => exportSession(selectedSession.id, "pdf")}
+                    title="Export as PDF"
+                    data-testid="button-export-pdf"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => exportSession(selectedSession.id, "pptx")}
+                    title="Export as PPTX"
+                    data-testid="button-export-pptx"
+                  >
+                    <Presentation className="w-3.5 h-3.5" />
+                  </Button>
                   <div className="w-px h-4 bg-border mx-0.5" />
                   {publishedUrl ? (
                     <div className="flex items-center gap-1">
@@ -450,22 +511,18 @@ export default function SandboxPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          if (publishedArtifactId) {
-                            unpublishMutation.mutate(publishedArtifactId);
-                          }
-                        }}
-                        disabled={unpublishMutation.isPending || !publishedArtifactId}
-                        title="Remove from GitHub Pages"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 text-xs gap-1"
-                        data-testid="button-unpublish"
+                        onClick={() => publishMutation.mutate(selectedSession.id)}
+                        disabled={publishMutation.isPending}
+                        title="Re-publish (overwrite GitHub Pages page)"
+                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-500/10 text-xs gap-1"
+                        data-testid="button-republish"
                       >
-                        {unpublishMutation.isPending ? (
+                        {publishMutation.isPending ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <RotateCcw className="w-3.5 h-3.5" />
                         )}
-                        Unpublish
+                        Re-publish
                       </Button>
                     </div>
                   ) : (
@@ -651,6 +708,18 @@ export default function SandboxPage() {
               className="min-h-[80px]"
               data-testid="textarea-session-desc"
             />
+            <div className="space-y-1">
+              <Input
+                placeholder="Source artifact UUID (optional — workspace artifact to rerender)"
+                value={newSourceId}
+                onChange={(e) => setNewSourceId(e.target.value)}
+                data-testid="input-session-source-id"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Path B-b: a workspace artifact id. Md / HTML / code / text render directly;
+                PDF / PPTX render when extracted text is present.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewDialog(false)}>
@@ -659,10 +728,11 @@ export default function SandboxPage() {
             <Button
               onClick={() => {
                 if (newName.trim()) {
+                  const sourceId = newSourceId.trim();
                   createMutation.mutate({
                     name: newName.trim(),
                     description: newDesc.trim() || undefined,
-                    createdBy: "admin",
+                    environment: sourceId ? { sourceId } : undefined,
                   });
                 }
               }}

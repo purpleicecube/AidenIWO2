@@ -1067,6 +1067,11 @@ class FileContentResponse(BaseModel):
     storage_ref: Optional[str] = None
     truncated: bool = False
     size_bytes: int = 0
+    # Set when `content` is plain text extracted from a binary source
+    # (PDF/PPTX/etc.). Lets callers distinguish "native text" from
+    # "extracted text" without re-checking mime_type. None for native
+    # text/binary/ref responses. — Sandbox Everywhere Darkmode 2026-05-11.
+    extracted_from: Optional[str] = None
 
 
 _INLINE_TEXT_MIMES = {
@@ -1074,6 +1079,18 @@ _INLINE_TEXT_MIMES = {
     "application/json", "application/xml",
 }
 _INLINE_IMAGE_MIMES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+# Sandbox Everywhere Darkmode (2026-05-11): binary source mimes that
+# may carry pre-extracted plain text in `artifacts.extracted_text`
+# (no `b64:` prefix). When present we surface it as utf-8 so the
+# sandbox + memory-retrieval paths can use binary documents whose
+# text body has already been extracted upstream.
+_EXTRACTABLE_BINARY_MIMES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+}
 _MAX_INLINE_CHARS = 200_000   # ~200 KB
 _MAX_BASE64_CHARS = 4_000_000  # ~4 MB after decode
 
@@ -1166,6 +1183,23 @@ async def get_file_content(
             content=body,
             truncated=truncated,
             size_bytes=len(b64_body),
+        )
+
+    # Sandbox Everywhere Darkmode: binary source mime with pre-extracted
+    # plain text. Surface as utf-8 and tag `extracted_from` so callers
+    # know this is rerender-safe text content from a PDF/PPTX/DOC source.
+    if mime in _EXTRACTABLE_BINARY_MIMES and extracted:
+        truncated = len(extracted) > _MAX_INLINE_CHARS
+        body = extracted[:_MAX_INLINE_CHARS] if truncated else extracted
+        return FileContentResponse(
+            id=row["id"],
+            filename=row["filename"],
+            mime_type=mime,
+            encoding="utf-8",
+            content=body,
+            truncated=truncated,
+            size_bytes=len(extracted),
+            extracted_from=mime,
         )
 
     # Fallback: ref-only (rare path; should only fire for legacy rows).

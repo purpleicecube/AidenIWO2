@@ -490,3 +490,112 @@ DB state after accept:
 3. **Legacy IWO2 Express handlers for non-evaluator paths still exist** in `server/routes.ts` (process / retry / unblock / archive / kill / refile / etc.). They 500 on IWO3 schema when invoked. The React page has buttons for these. **Per CODEX D-AEP-A6 disposition: "visible-but-broken" is NOT a stable posture.** Cleanup is owned by Loop γ (evaluator/operator-action sweep), inserted between Loop α and Loop β per §Next-Loop Ordering — each button gets hidden, disabled with an explicit "not yet supported in IWO3" message, or rewired to FastAPI.
 4. **`order.tier1Result` / `order.tier2Result` / `order.gccMemory` / `order.bdmMarker`** field reads in the React page still query IWO2-shape fields. `QualityReviewSummary` has the fallback; other sections do not. Out of scope per minimal-unblocker rule; the sections degrade gracefully (TypeScript `as` casts return `undefined`/`null` rather than throw).
 5. **The 21 client/src/* TS errors** are unchanged. Loop α responsibility (hard pre-condition for hosted deploy).
+
+---
+
+## Sandbox Everywhere Darkmode (2026-05-11)
+
+### Loop posture
+
+This loop partially supersedes the α/γ/β ordering for sandbox-critical
+work only. It absorbs:
+
+- the **sandbox-critical** slice of Loop α (the React shell brand string
+  + role-display fix that hid the Sandbox menu link)
+- the **sandbox-critical** slice of Loop β (the Node service hosted
+  deploy artifacts)
+
+Loop γ remains scoped at the evaluator/operator-action button sweep and
+is **NOT** absorbed. Loop α retains the remaining 17 TS errors across
+dashboard / submit-order / user-management / work-order pages.
+
+### Locked positions
+
+1. **Canonical sandbox UI** is the React page at
+   `client/src/pages/sandbox.tsx`. There is no parallel Streamlit
+   sandbox surface and there must not be one.
+2. **Streamlit `/sandbox`** at `apps/console-streamlit/views/sandbox.py`
+   is a launcher / health card / setup-notes page only. It probes
+   `/api/health` on the Node service and renders a primary "Open
+   Sandbox ↗" link. Source URL: `IWO3_SANDBOX_URL` or
+   `IWO3_NODE_BASE_URL` env var, defaulting to `http://localhost:5050`.
+3. **Hosted reachability**: a second Railway service runs the Node/
+   React surface alongside the existing FastAPI service. `Dockerfile.node`
+   + `railway.node.json` ship at repo root. Operator runbook at
+   `docs/runbooks/sandbox_hosted_deploy.md`. Auth uses the existing
+   `BOOTSTRAP_ADMIN_PASSWORD` path.
+4. **Source artifact support**: md / html / code / text natively;
+   PDF / PPTX / DOCX **when** `artifacts.extracted_text` is populated
+   and not prefixed with `b64:`.
+5. **HTML→PDF / HTML→PPTX export** wires the existing repo scripts
+   (`server/scripts/html-to-{pdf,pptx}.cjs`) behind a new endpoint
+   `GET /api/sandbox-sessions/:id/export?format=pdf|pptx`. Returns
+   `412 skills_unavailable` when Playwright / claude-office-skills are
+   absent. **Local: works** with `SKILLS_DIR` + `PLAYWRIGHT_PATH` set.
+   **Hosted: 412** until the Railway image bundles or mounts those
+   dependencies (residual, captured below).
+6. **React shell fixes**: `AIDEN_IWO2 → AIDEN_IWO3` brand strings in
+   `app-sidebar.tsx`; user.firstName fallback to displayName/email;
+   `GET /api/auth/user` now returns `role` (mapped from the user's
+   highest-rank `client_memberships` role via the `IWO3_ROLE_TO_LEGACY`
+   table — owner/admin → admin, operator/agent_system → operator,
+   reviewer/viewer → viewer). The Sandbox menu link is no longer
+   hidden for operators.
+
+### Shipped shape
+
+| Surface | File | Status |
+| --- | --- | --- |
+| Canonical React sandbox | `client/src/pages/sandbox.tsx` | Aligned to Path B-b: dropped `publishedArtifactId` + broken unpublish flow, hydrate `publishedUrl` from `session.result.publish`, new-session dialog accepts artifact UUID, Re-publish button replaces Unpublish, Export PDF + Export PPTX buttons |
+| Sandbox cross-service helper | `server/sandbox-crossservice.ts` | `SandboxArtifactContent.extractedFrom?: string` added |
+| Sandbox rerender route | `server/routes.ts` | Surfaces `extractedFrom` on the rerender log; gives a specific "PDF/PPT/DOC with no extracted text" error when the binary path is empty |
+| Sandbox export route | `server/routes.ts` | New `GET /api/sandbox-sessions/:id/export?format=pdf|pptx` |
+| FastAPI content endpoint | `apps/api-fastapi/routes/workspace.py` | New `_EXTRACTABLE_BINARY_MIMES` branch returns utf-8 + `extracted_from=<mime>` for PDF/PPTX/DOC artifacts with populated `extracted_text` |
+| Auth user endpoint | `server/replit_integrations/auth/routes.ts` | Returns `{...user, role, effectiveRole}` so the React sidebar role gate stops defaulting to viewer |
+| React shell branding | `client/src/components/app-sidebar.tsx` | `AIDEN_IWO2` → `AIDEN_IWO3`; displayName-driven initials + footer name |
+| Streamlit launcher | `apps/console-streamlit/views/sandbox.py` | Launcher card + live Node health probe + local + hosted setup notes |
+| Hosted Node Dockerfile | `Dockerfile.node` (repo root) | Node 20 slim builder→runtime two-stage |
+| Hosted Node Railway config | `railway.node.json` (repo root) | Dockerfile builder, healthcheck `/api/health` |
+| Hosted Node ignore list | `.dockerignore` (repo root) | Trims context for Node image build |
+| Hosted Node operator runbook | `docs/runbooks/sandbox_hosted_deploy.md` | Service relationship diagram + env-var matrix + Streamlit wiring |
+
+### Tests
+
+- `apps/api-fastapi/tests/test_workspace_route.py`: +2 tests
+  (`test_file_content_fetch_surfaces_pdf_extracted_text_as_utf8`,
+  `test_file_content_fetch_returns_base64_for_binary_pdf`). Total
+  pytest = **555 passed / 1 skipped**.
+- Streamlit smoke = **27 passed** (25 view-imports + 2 app-loads).
+- `npx tsc --noEmit`: 17 errors on `client/src/pages/{dashboard,
+  submit-order, user-management, work-orders, work-order-detail}.tsx`
+  — **all pre-existing, none in sandbox.tsx or app-sidebar.tsx**.
+- `npm test` (vitest): 2 failures pre-existing and untouched by this
+  loop (state-machine transition count drift + lint-clean flag on
+  unrelated `test_work_orders_aep_route.py`). Not regressions.
+
+### Residual debt after Sandbox Everywhere
+
+1. **Hosted HTML→PDF / HTML→PPTX export** returns `412 skills_unavailable`
+   on Railway because the Node image is intentionally lean. Fix
+   options: bundle Playwright + skills into the Node image (~150 MB+
+   added) or stand up a dedicated render worker. Captured as Sandbox
+   Export Worker follow-on; not in scope here.
+2. **`SKILLS_DIR` defaults to `/home/virgina/claude-office-skills`** in
+   the script header. This is fine locally; operators outside that
+   path must set `SKILLS_DIR` + `PLAYWRIGHT_PATH` explicitly. Hard-
+   coded path is a known IWO2 carry-over that the render-worker loop
+   should normalize.
+3. **No live PDF/PPTX test data in IWO3** as of this loop. The
+   extracted-text utf-8 path is unit-tested via the synthetic
+   `mime_type=application/pdf, content_text="..."` shape but no real
+   PDF upload + extract chain has been exercised end-to-end on
+   `aiden_iwo3`.
+4. **17 remaining client/src/* TS errors** stay Loop α responsibility.
+   Sandbox + sidebar are now clean.
+5. **Single-tenant `client_id` assumption** in `sandbox-crossservice.ts`
+   (`getUserPrimaryClientId` returns the first membership) — same
+   condition as Path B-b §Residual debt #6 and AEP §Residual gap #2.
+6. **Two vitest pre-existing failures** (state-machine transition
+   count = 37 vs expected 36; lint-clean flag on
+   `test_work_orders_aep_route.py:92`) need a follow-up cleanup loop
+   to lock the canonical numbers in tests. Sandbox-untouched.

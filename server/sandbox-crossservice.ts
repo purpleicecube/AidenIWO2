@@ -66,6 +66,14 @@ export interface SandboxArtifactContent {
   storageRef?: string | null;
   truncated?: boolean;
   sizeBytes?: number;
+  /**
+   * Sandbox Everywhere Darkmode (2026-05-11): set to the source mime
+   * when `content` is plain text extracted from a binary source
+   * (PDF/PPTX/etc.). Lets the rerender route distinguish "native md/
+   * html/code" from "extracted text from a binary" so it can pick the
+   * right preview builder.
+   */
+  extractedFrom?: string | null;
 }
 
 export interface SandboxArtifactReadError {
@@ -162,6 +170,7 @@ export async function fetchSandboxArtifactContent(
     storage_ref?: string | null;
     truncated?: boolean;
     size_bytes?: number;
+    extracted_from?: string | null;
   };
 
   return {
@@ -173,5 +182,6 @@ export async function fetchSandboxArtifactContent(
     storageRef: data.storage_ref ?? null,
     truncated: data.truncated,
     sizeBytes: data.size_bytes,
+    extractedFrom: data.extracted_from ?? null,
   };
 }
