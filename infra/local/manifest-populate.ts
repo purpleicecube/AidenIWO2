@@ -41,6 +41,7 @@ const BETA_2_PHASE_0_3_VERSION = "iwo3@v0.13.0-beta-2-phase-0.3";
 const LOOP_ETA_VERSION = "iwo3@v0.14.0-loop-eta";
 const MEGALOOP_THETA_VERSION = "iwo3@v0.15.0-loop-theta";
 const LOOP_KAPPA_VERSION = "iwo3@v0.16.0-loop-kappa";
+const SANDBOX_INTERNAL_UTILITY_VERSION = "iwo3@v0.17.0-sandbox-internal-utility";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -110,6 +111,9 @@ const KNOWN_TABLES: ManifestEntry[] = [
 
   // Loop Kappa — Memory V1.5 canonical facts CRUD table (D-K2 hybrid)
   { name: "canonical_facts",            source: "iwo3_native", sourceVersion: LOOP_KAPPA_VERSION, ownedBy: "drizzle", notes: "Loop Kappa — Memory V1.5 canonical facts authoring source; FORCE RLS; clients.canonical_facts_blob becomes denormalized read cache rebuilt from this table when populated (folder fallback otherwise)" },
+
+  // Sandbox Operational Darkmode (2026-05-11) — IWO2-inherited Node sandbox path operationalized in IWO3 as an internal operator utility, NOT a tenant-scoped product surface. See ADR-035 for the carve-out + the Path B follow-on loop that will add client_id + RLS + auth-bridge.
+  { name: "sandbox_sessions",           source: "iwo2_parity",  sourceVersion: SANDBOX_INTERNAL_UTILITY_VERSION, ownedBy: "drizzle", notes: "Path A-prime (ADR-035) — IWO2-inherited global sandbox sessions; no client_id, no FORCE RLS; visibility/mutation gated at the Node route layer by creator-or-admin check against the authenticated user; tenant-scoping deferred to Path B follow-on loop" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

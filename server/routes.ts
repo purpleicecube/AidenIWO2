@@ -85,12 +85,34 @@ function getActor(req: Request): { actorId: string; actorEmail: string | null; a
   return {
     actorId: u?.id || "system",
     actorEmail: u?.email || null,
-    actorName: [u?.firstName, u?.lastName].filter(Boolean).join(" ") || u?.email || "system",
+    // IWO3 stores display_name; the IWO2-shape firstName/lastName
+    // fallback is kept so legacy actor-name callers still produce a
+    // useful string when an old object shape shows up.
+    actorName:
+      u?.displayName ||
+      [u?.firstName, u?.lastName].filter(Boolean).join(" ") ||
+      u?.email ||
+      "system",
   };
 }
 
 type Role = "admin" | "operator" | "viewer";
 const ROLE_HIERARCHY: Record<Role, number> = { admin: 3, operator: 2, viewer: 1 };
+
+// Node Storage Adaptation Darkmode (2026-05-11) — IWO3 roles map onto
+// the legacy three-tier hierarchy the Node app expects.
+// owner / admin → admin level (3); operator + agent_system → operator
+// level (2); reviewer + viewer → viewer level (1). Resolution lives
+// in `authStorage.getUserEffectiveRole` which scans every membership
+// row for the user and picks the highest-privilege one.
+const IWO3_ROLE_TO_LEGACY: Record<string, Role> = {
+  owner: "admin",
+  admin: "admin",
+  operator: "operator",
+  agent_system: "operator",
+  reviewer: "viewer",
+  viewer: "viewer",
+};
 
 function requireRole(minRole: Role): any {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -102,12 +124,26 @@ function requireRole(minRole: Role): any {
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
-    const userLevel = ROLE_HIERARCHY[(user.role as Role)] || 0;
+    // IWO3 source-of-truth: client_memberships.role. Fall back to a
+    // legacy on-user role only if the membership lookup is empty AND
+    // the user object happens to carry one (vestigial IWO2 shape).
+    const { authStorage } = await import("./replit_integrations/auth/storage");
+    const iwo3Role = await authStorage.getUserEffectiveRole(user.id);
+    const legacyRole: Role =
+      IWO3_ROLE_TO_LEGACY[iwo3Role] ||
+      ((user as any).role as Role) ||
+      "viewer";
+    const userLevel = ROLE_HIERARCHY[legacyRole] || 0;
     const requiredLevel = ROLE_HIERARCHY[minRole];
     if (userLevel < requiredLevel) {
-      return res.status(403).json({ message: `Forbidden: requires ${minRole} role` });
+      return res.status(403).json({
+        message: `Forbidden: requires ${minRole} role`,
+      });
     }
-    (req as any).appUser = user;
+    // Synthesize a `role` field on the appUser so downstream
+    // handlers that read appUser.role keep working without each
+    // having to re-resolve memberships.
+    (req as any).appUser = { ...user, role: legacyRole, iwo3Role };
     next();
   };
 }
@@ -3068,11 +3104,39 @@ export async function registerRoutes(
   });
 
   // ==================== Sandbox Session Routes ====================
+  //
+  // Sandbox Operational Darkmode (ADR-035, 2026-05-11) — Path A-prime
+  // tenancy carve-out. sandbox_sessions has no client_id and no FORCE
+  // RLS; instead the visibility/mutation gate is enforced here at the
+  // route layer via _canAccessSandboxSession (creator-or-admin only).
+  //
+  // The helper accepts the appUser populated by requireRole — every
+  // sandbox handler chains requireRole(...) which sets req.appUser
+  // before this gate runs. createdBy on POST is overridden with the
+  // authenticated user's id so a forged body cannot mask ownership.
 
-  app.get("/api/sandbox-sessions", isAuth, requireRole("viewer"), async (_req, res) => {
+  function _canAccessSandboxSession(
+    req: Request,
+    session: { createdBy?: string | null }
+  ): boolean {
+    const appUser = (req as any).appUser;
+    if (!appUser) return false;
+    if (appUser.role === "admin") return true;
+    return session.createdBy === appUser.id;
+  }
+
+  app.get("/api/sandbox-sessions", isAuth, requireRole("viewer"), async (req, res) => {
     try {
-      const sessions = await storage.getSandboxSessions();
-      res.json(sessions);
+      const appUser = (req as any).appUser;
+      const all = await storage.getSandboxSessions();
+      // Path A-prime gate: admins see all; everyone else sees only
+      // sessions they created. Filtering at the route layer rather than
+      // the storage layer keeps the storage adapter IWO2-compatible.
+      const visible =
+        appUser.role === "admin"
+          ? all
+          : all.filter((s) => s.createdBy === appUser.id);
+      res.json(visible);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch sandbox sessions" });
     }
@@ -3082,6 +3146,10 @@ export async function registerRoutes(
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!_canAccessSandboxSession(req, session)) {
+        // 404 (not 403) — don't leak existence to non-owners.
+        return res.status(404).json({ message: "Session not found" });
+      }
       res.json(session);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch session" });
@@ -3094,7 +3162,14 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid session data", errors: parsed.error.issues });
       }
-      const session = await storage.createSandboxSession(parsed.data);
+      const appUser = (req as any).appUser;
+      // Path A-prime: override any caller-supplied createdBy with the
+      // authenticated user id. The Zod schema's `createdBy` becomes a
+      // server-set field rather than a client-trusted one.
+      const session = await storage.createSandboxSession({
+        ...parsed.data,
+        createdBy: appUser.id,
+      });
       res.status(201).json(session);
     } catch (err) {
       res.status(500).json({ message: "Failed to create session" });
@@ -3105,6 +3180,9 @@ export async function registerRoutes(
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!_canAccessSandboxSession(req, session)) {
+        return res.status(404).json({ message: "Session not found" });
+      }
       const updated = await storage.updateSandboxSession(req.params.id, req.body);
       res.json(updated);
     } catch (err) {
@@ -3116,6 +3194,9 @@ export async function registerRoutes(
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!_canAccessSandboxSession(req, session)) {
+        return res.status(404).json({ message: "Session not found" });
+      }
       await storage.deleteSandboxSession(req.params.id);
       res.json({ success: true });
     } catch (err) {
@@ -3127,6 +3208,9 @@ export async function registerRoutes(
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!_canAccessSandboxSession(req, session)) {
+        return res.status(404).json({ message: "Session not found" });
+      }
 
       await storage.updateSandboxSession(req.params.id, {
         status: "running",
@@ -3161,6 +3245,9 @@ export async function registerRoutes(
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!_canAccessSandboxSession(req, session)) {
+        return res.status(404).json({ message: "Session not found" });
+      }
 
       const result = session.result as any;
       if (!result?.html || !result?.renderable) {
@@ -3189,6 +3276,9 @@ export async function registerRoutes(
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!_canAccessSandboxSession(req, session)) {
+        return res.status(404).json({ message: "Session not found" });
+      }
 
       const env = session.environment as any;
       const workOrderId = env?.sourceId;
@@ -3262,6 +3352,9 @@ export async function registerRoutes(
     try {
       const session = await storage.getSandboxSession(req.params.id);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!_canAccessSandboxSession(req, session)) {
+        return res.status(404).json({ message: "Session not found" });
+      }
 
       const result = session.result as any;
       if (!result?.html || !result?.renderable) {

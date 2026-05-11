@@ -325,9 +325,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserRole(id: string, role: string): Promise<User | undefined> {
+    // Node Storage Adaptation Darkmode (2026-05-11): IWO3 users have no
+    // role column; roles live in client_memberships. Delegate the
+    // write to authStorage.setUserRole which handles the membership
+    // table. Returns the user row unchanged.
+    const { authStorage } = await import("./replit_integrations/auth/storage");
+    await authStorage.setUserRole(id, role);
     const [user] = await db
       .update(users)
-      .set({ role, updatedAt: new Date() })
+      .set({ updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;
