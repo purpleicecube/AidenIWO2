@@ -18,7 +18,7 @@ and `work_order:update` on transitions is enforced inside the helper.
 from __future__ import annotations
 
 import json
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -1095,3 +1095,464 @@ async def redispatch_work_order(
     payload = result.model_dump()
     payload["redispatched"] = True
     return payload
+
+
+# ─── Aiden Evaluator Parity Loop (2026-05-11) ──────────────────────────
+#
+# Two new endpoints powering the IWO2-inherited React work-order detail
+# evaluator surface against IWO3 storage:
+#
+#   GET  /work_orders/{id}/evaluator_summary  — unified read assembling
+#       aiden_review (best-effort derived from audit) + done_contract +
+#       candidate_review + checklist + reopen_metadata.
+#   POST /work_orders/{id}/accept             — explicit operator-accept
+#       transition with rationale recorded under work_order.accepted.
+#
+# Per ADR-035 Aiden Evaluator Parity §Locked choices (D-AEP-1..4):
+#   • Aiden review = best-effort audit-derive with strict null fallback
+#   • Accept = thin dedicated route, NOT a generic transition overload
+#   • Auth surface is FastAPI; Node Express proxies to here
+#   • React UI updates are minimal-unblocker-only on the evaluator path
+
+
+# States from which an explicit operator-accept is meaningful. Locked
+# tight: only the operator-review-required state and the actively-
+# running state (in case operator decides to accept mid-flight rather
+# than wait for completion).
+_ACCEPTABLE_FROM = ("awaiting_operator", "processing")
+
+
+# Audit-event role tags that signal an Aiden-side quality/review
+# invocation. IWO3 doesn't have a structured per-WO review row; the
+# best-effort derive walks `action_audit_log` events of action
+# `llm.invoked` whose `metadata.agentRole` matches one of these.
+# Order is precedence (most-recent-wins inside each role match).
+_AIDEN_REVIEW_ROLES = (
+    "aiden_review_pm",
+    "pm_review",
+    "quality_review",
+    "aiden_quality",
+    "aiden_judge",
+)
+
+
+class AidenReviewSummary(BaseModel):
+    score: Optional[float] = None
+    recommendation: Optional[str] = None  # "approve" | "revise" | "block" | ...
+    issues: list[str] = Field(default_factory=list)
+    summary: Optional[str] = None
+    approved: Optional[bool] = None
+    flagged: Optional[bool] = None
+    source: str = "audit_derived"
+    audit_event_id: Optional[str] = None
+    audit_event_timestamp: Optional[str] = None
+    agent_role: Optional[str] = None
+
+
+class DoneContractState(BaseModel):
+    status: str
+    required_action: Optional[str] = None
+    current_step: Optional[str] = None
+
+
+class CandidateReviewState(BaseModel):
+    required: bool = False
+    package_id: Optional[str] = None
+    package_kind: Optional[str] = None
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ChecklistEntry(BaseModel):
+    timestamp: str
+    action: str
+    summary: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReopenMetadata(BaseModel):
+    last_reopen_at: str
+    last_reopen_reason: Optional[str] = None
+    reopen_count: int
+
+
+class EvaluatorSummaryResponse(BaseModel):
+    work_order: WorkOrderRow
+    aiden_review: Optional[AidenReviewSummary] = None
+    done_contract: DoneContractState
+    candidate_review: Optional[CandidateReviewState] = None
+    checklist: list[ChecklistEntry] = Field(default_factory=list)
+    reopen_metadata: Optional[ReopenMetadata] = None
+
+
+class AcceptRequest(BaseModel):
+    reason: Optional[str] = Field(
+        None,
+        max_length=500,
+        description=(
+            "Operator's accept rationale. Optional but recommended; "
+            "captured in the work_order.accepted audit event."
+        ),
+    )
+
+
+def _required_action_for_status(status: str) -> Optional[str]:
+    """Map a WO status to an operator-facing 'what's next' hint."""
+    return {
+        "pending": "Awaiting dispatch — click Run Aiden + Tier 2",
+        "processing": "Aiden is working; operator can amend via Edit or wait",
+        "awaiting_operator": "Operator review required — accept or send back",
+        "blocked": "Resolve the block, then redispatch",
+        "deferred": "Decision postponed — un-defer via transition",
+        "failed": "Reopen to retry",
+        "completed": None,
+        "done": None,
+        "cancelled": None,
+    }.get(status)
+
+
+@router.get(
+    "/{work_order_id}/evaluator_summary",
+    response_model=EvaluatorSummaryResponse,
+    dependencies=[Depends(require_permission_dep("work_order:read"))],
+)
+async def evaluator_summary(
+    work_order_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> EvaluatorSummaryResponse:
+    """Unified IWO3-native read powering the React work-order detail
+    evaluator surface. Single endpoint assembles the data slices the
+    React page would otherwise have to call ~5 separate endpoints for.
+
+    Aiden review is derived best-effort from `action_audit_log` per
+    D-AEP-1 (b) — strict `null` fallback when no relevant audit event
+    exists. No persistent quality-review-write surface is opened here;
+    the missing canonical review-state store is residual debt
+    tracked in ADR-035."""
+    # Base work order row.
+    wo_row = await conn.fetchrow(
+        """
+        SELECT id::text AS id,
+               client_id::text AS client_id,
+               title, description, type,
+               priority::text AS priority,
+               status::text AS status,
+               submitted_by_user_id::text AS submitted_by_user_id,
+               correlation_id,
+               created_at::text AS created_at,
+               updated_at::text AS updated_at
+          FROM work_orders WHERE id = $1
+        """,
+        work_order_id,
+    )
+    if wo_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "work_order_id": work_order_id},
+        )
+    wo = WorkOrderRow(**dict(wo_row))
+
+    # Audit log for this WO. Used for both the checklist AND the
+    # best-effort Aiden review derivation. Limit avoids pulling
+    # multi-thousand-row tail histories — evaluator UI only needs
+    # the recent timeline.
+    audit_rows = await conn.fetch(
+        """
+        SELECT id::text                  AS id,
+               action,
+               metadata,
+               actor_user_id::text       AS actor_user_id,
+               created_at::text          AS created_at
+          FROM action_audit_log
+         WHERE (target_type = 'work_order' AND target_id = $1)
+            OR (metadata->>'workOrderId' = $1)
+         ORDER BY created_at DESC
+         LIMIT 200
+        """,
+        work_order_id,
+    )
+
+    # ── Aiden review (best-effort audit derive; null fallback) ────────
+    aiden_review: Optional[AidenReviewSummary] = None
+    for row in audit_rows:
+        if row["action"] != "llm.invoked":
+            continue
+        md = row["metadata"]
+        if isinstance(md, str):
+            try:
+                md = json.loads(md)
+            except json.JSONDecodeError:
+                continue
+        if not isinstance(md, dict):
+            continue
+        agent_role = (md.get("agentRole") or "").lower()
+        if agent_role not in _AIDEN_REVIEW_ROLES:
+            continue
+        decision_kind = md.get("decisionKind") or md.get("recommendation")
+        score = md.get("score") or md.get("qualityScore")
+        try:
+            score_f = float(score) if score is not None else None
+        except (TypeError, ValueError):
+            score_f = None
+        issues_raw = md.get("issues") or md.get("qualityIssues") or []
+        issues = (
+            [str(i) for i in issues_raw if i is not None]
+            if isinstance(issues_raw, list)
+            else []
+        )
+        approved = None
+        flagged = None
+        if isinstance(decision_kind, str):
+            dk_lower = decision_kind.lower()
+            if "approve" in dk_lower or "accept" in dk_lower:
+                approved = True
+                flagged = False
+            elif "revise" in dk_lower or "block" in dk_lower or "reject" in dk_lower:
+                approved = False
+                flagged = True
+        aiden_review = AidenReviewSummary(
+            score=score_f,
+            recommendation=str(decision_kind) if decision_kind else None,
+            issues=issues,
+            summary=md.get("summary") or md.get("reviewSummary"),
+            approved=approved,
+            flagged=flagged,
+            source="audit_derived",
+            audit_event_id=row["id"],
+            audit_event_timestamp=row["created_at"],
+            agent_role=agent_role,
+        )
+        break  # most-recent wins (audit rows ordered DESC)
+
+    # ── Done-contract state ─────────────────────────────────────────
+    done_contract = DoneContractState(
+        status=wo.status,
+        required_action=_required_action_for_status(wo.status),
+        current_step=None,  # follow-on: derive from workflow_executions
+    )
+
+    # ── Candidate review (only if awaiting_operator on a gamma_* package) ─
+    candidate_review: Optional[CandidateReviewState] = None
+    if wo.status == "awaiting_operator":
+        pkg = await conn.fetchrow(
+            """
+            SELECT id::text AS id, output_kind::text AS output_kind
+              FROM output_packages
+             WHERE work_order_id = $1::uuid AND client_id = $2::uuid
+             ORDER BY created_at DESC LIMIT 1
+            """,
+            work_order_id,
+            ctx["client_id"],
+        )
+        if pkg is not None:
+            handoffs = await conn.fetch(
+                """
+                SELECT id::text                    AS id,
+                       status::text                AS status,
+                       candidate_status::text      AS candidate_status,
+                       external_destination,
+                       external_reference,
+                       created_at::text            AS created_at
+                  FROM output_handoffs
+                 WHERE output_package_id = $1::uuid
+                 ORDER BY created_at DESC
+                """,
+                pkg["id"],
+            )
+            candidate_review = CandidateReviewState(
+                required=len(handoffs) > 0,
+                package_id=pkg["id"],
+                package_kind=pkg["output_kind"],
+                candidates=[dict(h) for h in handoffs],
+            )
+
+    # ── Checklist / timeline ─────────────────────────────────────────
+    checklist: list[ChecklistEntry] = []
+    for row in audit_rows[:50]:  # cap the timeline to the recent 50
+        md = row["metadata"]
+        if isinstance(md, str):
+            try:
+                md = json.loads(md)
+            except json.JSONDecodeError:
+                md = {}
+        if not isinstance(md, dict):
+            md = {}
+        # Build a short human-readable summary per row.
+        action = row["action"]
+        summary: str
+        if action == "work_order.transitioned":
+            summary = f"WO moved {md.get('from', '?')} → {md.get('to', '?')}"
+        elif action == "work_order.reopened":
+            summary = f"WO reopened — reason: {md.get('reason') or '(none)'}"
+        elif action == "work_order.edited":
+            summary = (
+                "WO edited — fields: "
+                + ", ".join(md.get("changed_fields", []))
+            )
+        elif action == "work_order.redispatched":
+            summary = f"WO redispatched from {md.get('from_status', '?')}"
+        elif action == "work_order.accepted":
+            summary = f"Operator accepted — reason: {md.get('reason') or '(none)'}"
+        elif action == "llm.invoked":
+            role = md.get("agentRole", "?")
+            kind = md.get("decisionKind", "?")
+            summary = f"{role} produced {kind}"
+        elif action == "llm.failed":
+            summary = f"{md.get('agentRole', '?')} failed: {md.get('kind', '?')}"
+        elif action == "output_package.created":
+            summary = (
+                f"Output package created ({md.get('outputKind', '?')})"
+            )
+        elif action.startswith("adapter_dispatch."):
+            stage = action.removeprefix("adapter_dispatch.")
+            summary = f"Adapter handoff {stage}"
+        elif action == "memory.applied":
+            summary = "Memory bundle injected"
+        else:
+            summary = action.replace("_", " ").replace(".", " — ")
+        checklist.append(
+            ChecklistEntry(
+                timestamp=row["created_at"],
+                action=action,
+                summary=summary,
+                metadata=md if isinstance(md, dict) else {},
+            )
+        )
+
+    # ── Reopen metadata ─────────────────────────────────────────────
+    reopen_metadata: Optional[ReopenMetadata] = None
+    cycle_rows = await conn.fetch(
+        """
+        SELECT id::text                AS id,
+               trigger::text           AS trigger,
+               reason,
+               started_at::text        AS started_at
+          FROM execution_cycles
+         WHERE work_order_id = $1::uuid AND trigger = 'reopen'
+         ORDER BY started_at DESC
+        """,
+        work_order_id,
+    )
+    if cycle_rows:
+        latest = cycle_rows[0]
+        reopen_metadata = ReopenMetadata(
+            last_reopen_at=latest["started_at"],
+            last_reopen_reason=latest["reason"],
+            reopen_count=len(cycle_rows),
+        )
+
+    return EvaluatorSummaryResponse(
+        work_order=wo,
+        aiden_review=aiden_review,
+        done_contract=done_contract,
+        candidate_review=candidate_review,
+        checklist=checklist,
+        reopen_metadata=reopen_metadata,
+    )
+
+
+@router.post(
+    "/{work_order_id}/accept",
+    response_model=TransitionResponse,
+    dependencies=[Depends(require_permission_dep("work_order:update"))],
+)
+async def accept_work_order(
+    work_order_id: str,
+    body: AcceptRequest,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> TransitionResponse:
+    """Explicit operator-accept semantic — distinct from a generic
+    transition. The React evaluator UI presents 'Accept deliverable'
+    as a first-class action; this route gives that action a dedicated
+    audit footprint (`work_order.accepted`) separable from routine
+    `work_order.transitioned` events.
+
+    Allowed only from `awaiting_operator` or `processing`. Transitions
+    the WO to `completed` via the central transition helper, then
+    writes a `work_order.accepted` audit row with the operator's
+    rationale."""
+    row = await conn.fetchrow(
+        """
+        SELECT id::text AS id, status::text AS status
+          FROM work_orders
+         WHERE id = $1::uuid AND client_id = $2::uuid
+        """,
+        work_order_id,
+        ctx["client_id"],
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "work_order_id": work_order_id},
+        )
+    if row["status"] not in _ACCEPTABLE_FROM:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "not_acceptable",
+                "current_status": row["status"],
+                "allowed_from": list(_ACCEPTABLE_FROM),
+            },
+        )
+
+    try:
+        result = await transition_work_order(
+            conn,
+            work_order_id=work_order_id,
+            client_id=ctx["client_id"],
+            actor_user_id=ctx["user_id"],
+            to="completed",
+            reason=body.reason
+            or "Operator accepted deliverable via evaluator surface",
+        )
+    except PermissionDenied as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "permission_denied",
+                "permission": err.permission,
+                "reason": err.reason,
+                "role": err.role,
+            },
+        )
+    except IllegalTransition as err:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "illegal_transition",
+                "code": err.code,
+                "from": err.from_,
+                "to": err.to,
+            },
+        )
+
+    # Dedicated accept audit row — distinct from the routine
+    # work_order.transitioned event the transition helper just wrote.
+    # Forensically separable per D-AEP-2 ("semantic clarity matters").
+    await write_audit_row(
+        conn,
+        client_id=ctx["client_id"],
+        actor_user_id=ctx["user_id"],
+        event="work_order.accepted",
+        target_type="work_order",
+        target_id=work_order_id,
+        metadata={
+            "from_status": row["status"],
+            "reason": body.reason,
+            "transition_event": result["event"],
+        },
+    )
+
+    return TransitionResponse(
+        **{
+            "from": result["from"],
+            "to": result["to"],
+            "event": result["event"],
+            "cycle_id": result.get("cycle_id"),
+        }
+    )

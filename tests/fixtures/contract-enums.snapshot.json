@@ -418,6 +418,7 @@
       "tool_catalog.updated",
       "webhook.received",
       "webhook.signature_invalid",
+      "work_order.accepted",
       "work_order.archived",
       "work_order.auto_dispatch_attempted",
       "work_order.auto_dispatch_failed",
@@ -646,6 +647,9 @@
       "LOOP_XI_AUDIT_EVENTS": [
         "work_order.edited",
         "work_order.redispatched"
+      ],
+      "LOOP_AEP_AUDIT_EVENTS": [
+        "work_order.accepted"
       ]
     }
   },

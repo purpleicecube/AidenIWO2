@@ -361,3 +361,93 @@ Combined scope, gated by Loop α:
 - Console-spam cleanup (per D-BB-6) if still operationally annoying
 
 Either loop can be scoped + opened by CODEX when ready. The WO-source-id rerender extension is NOT on the critical path — open only on concrete operator demand.
+
+## Aiden Evaluator Parity Loop — Shipped Shape (2026-05-11)
+
+A separate bounded loop opened and closed the evaluator-parity gap distinct from the sandbox surface. Note this is technically outside ADR-035's original sandbox scope, but documented here because the loop reuses the same Express→FastAPI proxy posture B-b established and shares the four locked-choice discipline.
+
+### Four operator-locked choices
+
+| Lock | Choice | Implementation |
+| --- | --- | --- |
+| D-AEP-1 (Aiden review storage) | (b) best-effort audit-derive with strict `aiden_review: null` fallback | New `GET /work_orders/{id}/evaluator_summary` scans `action_audit_log` for `llm.invoked` events with `metadata.agentRole` in `{aiden_review_pm, pm_review, quality_review, aiden_quality, aiden_judge}`; most-recent-wins; null when no match. NO persistent review-write path opened. |
+| D-AEP-2 (Operator accept) | (a) thin new FastAPI route | New `POST /work_orders/{id}/accept` route. Dedicated `work_order.accepted` audit event distinct from the routine `work_order.transitioned`. State machine extended with `awaiting_operator → completed` spec (TS + Py parity). |
+| D-AEP-3 (React → FastAPI auth) | (b) Express proxy | New `server/fastapi-proxy.ts` module. Translates `req.user.claims.sub` → `X-IWO3-User` + first-membership client_id → `X-IWO3-Client` dev-auth headers. React session model unchanged. No client-side auth bridge opened. |
+| D-AEP-4 (TS error overlap with Loop α) | (a) minimal unblocker fixes only | Zero TS errors introduced. The 21 pre-existing client/src/* errors remain deferred to Loop α (hard pre-condition for hosted-deploy). |
+
+### Shipped surfaces
+
+- **FastAPI** (`apps/api-fastapi/routes/work_orders.py` — 2 new endpoints):
+  - `GET /work_orders/{id}/evaluator_summary` — unified read returning `{work_order, aiden_review, done_contract, candidate_review, checklist, reopen_metadata}`
+  - `POST /work_orders/{id}/accept` — explicit operator-accept with rationale, writes `work_order.accepted` audit row distinct from the routine transition event
+
+- **State machine** (`apps/api-fastapi/contracts/state_machines.py` + `packages/contracts/wo-wf/state_machines.ts`):
+  - New `awaiting_operator → completed` transition (event=`work_order.transitioned`, requires=`work_order:update`). The dedicated `work_order.accepted` audit event is written by the route handler on top of the transition.
+
+- **Audit vocabulary** (`packages/contracts/audit/events.ts`):
+  - New event `WORK_ORDER_ACCEPTED = "work_order.accepted"`
+  - New per-loop array `LOOP_AEP_AUDIT_EVENTS = [WORK_ORDER_ACCEPTED]`
+  - Contract snapshot regenerated: 148 audit events (was 147), 92 permission keys (unchanged), 49 db enums (unchanged)
+
+- **Express proxy** (`server/fastapi-proxy.ts` — new module, 138 lines):
+  - Single export `proxyToFastApi(fastapiPathFn, opts)`
+  - Sandbox-bounded scope (evaluator-only); explicit module-level scope-lock comment
+  - 7 paths wired through:
+    - `GET /api/work-orders/:id/evaluator-summary`
+    - `PUT /api/work-orders/:id` (inline edit)
+    - `POST /api/work-orders/:id/reopen`
+    - `POST /api/work-orders/:id/redispatch`
+    - `POST /api/work-orders/:id/accept`
+    - `POST /api/work-orders/:id/candidates/:recordId/select`
+    - `POST /api/work-orders/:id/candidates/:recordId/reject`
+  - Proxy routes registered BEFORE legacy Express handlers so Express's first-match wins
+
+- **React work-order detail page** (`client/src/pages/work-order-detail.tsx`):
+  - New `useQuery<EvaluatorSummary>` for `/api/work-orders/:id/evaluator-summary`
+  - `QualityReviewSummary` component extended with `aidenReviewFromSummary` prop; falls back to audit-derived review when IWO2-shape `order.gccMemory["gcc.metadata"].qualityReview` is absent
+  - `acceptMutation` re-pointed from `/api/work-orders/:id/unblock?reprocess=false` to `/api/work-orders/:id/accept` (Express proxy → FastAPI accept route)
+  - Zero new TS errors introduced
+
+### Validated chain on IWO3
+
+```text
+GET  /api/login                                                  → 200 (Klear owner)
+GET  /api/work-orders/:id/evaluator-summary                     → 200
+  work_order.status: awaiting_operator
+  aiden_review: { score: 0.68, recommendation: "revise",
+                  flagged: True, agent_role: "pm_review",
+                  source: "audit_derived" }
+  done_contract: { status: "awaiting_operator",
+                   required_action: "Operator review required — accept or send back" }
+  candidate_review: null
+  checklist entries: 1 (the seeded llm.invoked event)
+  reopen_metadata: null
+
+POST /api/work-orders/:id/accept (Express proxy → FastAPI)     → 200
+  body: { reason: "Loop AEP validation — accepting the deliverable." }
+  response: { from: "awaiting_operator", to: "completed",
+              event: "work_order.transitioned", cycle_id: null }
+
+DB state after accept:
+  work_orders.status = completed
+  audit events: ['llm.invoked', 'work_order.transitioned', 'work_order.accepted']
+                — three rows; `work_order.accepted` forensically
+                  separable from the routine transition event.
+```
+
+### Test coverage
+
+- **AEP pytest suite** (`apps/api-fastapi/tests/test_work_orders_aep_route.py`): 13/13 green
+  - `evaluator_summary`: basic shape, audit-derive happy path, alternative role-tag, unknown role doesn't match, cross-tenant 404, checklist contains audit rows
+  - `accept`: happy path from awaiting_operator, happy path from processing, no reason still works, rejected from completed, rejected from pending, viewer denied, cross-tenant 404
+- **Loop Xi suite**: 20/20 unchanged
+- **WO route base suite**: 20/20 unchanged
+- **Combined**: 53/53 across the three WO suites
+
+### Residual gaps after Aiden Evaluator Parity
+
+1. **No persistent quality-review-write surface.** Audit-derive is best-effort; downstream feature work that wants to PUT a structured review (separate from a generic llm.invoked event) needs its own bounded loop. Per D-AEP-1 lock, NOT opened here.
+2. **Same single-tenant `client_id` assumption as Path B-b.** The Express proxy uses the operator's first `client_memberships` row. Path B-b §Residual debt #6 already records this as a hard pre-condition for hosted deploy.
+3. **Legacy IWO2 Express handlers for non-evaluator paths still exist** in `server/routes.ts` (process / retry / unblock / archive / kill / refile / etc.). They 500 on IWO3 schema when invoked. The React page has buttons for these. Out of scope for this loop; queued for a future operator-action sweep.
+4. **`order.tier1Result` / `order.tier2Result` / `order.gccMemory` / `order.bdmMarker`** field reads in the React page still query IWO2-shape fields. `QualityReviewSummary` has the fallback; other sections do not. Out of scope per minimal-unblocker rule; the sections degrade gracefully (TypeScript `as` casts return `undefined`/`null` rather than throw).
+5. **The 21 client/src/* TS errors** are unchanged. Loop α responsibility (hard pre-condition for hosted deploy).

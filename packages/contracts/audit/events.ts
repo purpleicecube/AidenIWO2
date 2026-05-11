@@ -241,6 +241,16 @@ export const AUDIT_EVENTS = {
   WORK_ORDER_EDITED:        "work_order.edited",
   WORK_ORDER_REDISPATCHED:  "work_order.redispatched",
 
+  // Aiden Evaluator Parity Loop (2026-05-11) — explicit operator-accept
+  // semantic. The React evaluator UI surfaces "Accept deliverable" as a
+  // first-class action; rather than hide it inside a generic
+  // `work_order.transitioned`, this event captures the operator's
+  // deliberate accept-with-rationale forensically separable from the
+  // routine transition vocabulary. Carried by POST
+  // /work_orders/{id}/accept (Loop Xi-era recovery path
+  // companion). Metadata: from_status, reason (operator rationale).
+  WORK_ORDER_ACCEPTED:      "work_order.accepted",
+
   // Beta-2 phase 0.2 — auto-dispatch worker. Q1=B locked: worker is the
   // sole canonical authority for moving a `pending` WO into `processing`.
   // The worker writes one of these per WO it picks up per tick.
@@ -571,6 +581,13 @@ export const LOOP_KAPPA_AUDIT_EVENTS: readonly AuditEvent[] = [
 export const LOOP_XI_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.WORK_ORDER_EDITED,
   AUDIT_EVENTS.WORK_ORDER_REDISPATCHED,
+];
+
+// Aiden Evaluator Parity Loop (2026-05-11) — explicit operator-accept
+// route + unified evaluator_summary read endpoint. Only `accepted`
+// adds to the audit vocabulary; the read endpoint emits nothing.
+export const LOOP_AEP_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.WORK_ORDER_ACCEPTED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs

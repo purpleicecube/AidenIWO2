@@ -105,6 +105,14 @@ WORK_ORDER_TRANSITIONS: Final[tuple[TransitionSpec, ...]] = (
     TransitionSpec(from_="awaiting_operator", to="failed",
                    requires=("work_order:update",),
                    event="work_order.transitioned"),
+    # Aiden Evaluator Parity Loop (2026-05-11) — operator-accept happy
+    # path. POST /work_orders/{id}/accept writes a dedicated
+    # `work_order.accepted` audit event ON TOP of this routine
+    # transition for semantic separability per D-AEP-2 ("semantic
+    # clarity matters").
+    TransitionSpec(from_="awaiting_operator", to="completed",
+                   requires=("work_order:update",),
+                   event="work_order.transitioned"),
     # deferred → …
     TransitionSpec(from_="deferred", to="processing",
                    requires=("work_order:update",),

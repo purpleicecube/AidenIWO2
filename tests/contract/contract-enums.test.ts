@@ -89,7 +89,10 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // 2 audit events under LOOP_XI_AUDIT_EVENTS (work_order.edited /
     // work_order.redispatched; work_order.reopened was already locked).
     // Total: 145 + 2 = 147.
-    expect(snap.auditEvents.all.length).toBe(147);
+    // Aiden Evaluator Parity Loop (2026-05-11) — 1 new audit event
+    // under LOOP_AEP_AUDIT_EVENTS (work_order.accepted; the unified
+    // evaluator_summary read endpoint emits no audit). Total: 147 + 1 = 148.
+    expect(snap.auditEvents.all.length).toBe(148);
     // Loop Kappa added 5 RBAC keys (canonical_facts: read / create /
     // update / delete / set_severity). Total: 87 + 5 = 92.
     expect(snap.permissionKeys.length).toBe(92);
@@ -126,6 +129,9 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // work_order.redispatched; reopen reuses the existing
     // work_order.reopened from the WO transition vocabulary.
     expect(snap.auditEvents.byLoop.LOOP_XI_AUDIT_EVENTS.length).toBe(2);
+    // Aiden Evaluator Parity Loop — single new audit event
+    // (work_order.accepted) for the explicit operator-accept semantic.
+    expect(snap.auditEvents.byLoop.LOOP_AEP_AUDIT_EVENTS.length).toBe(1);
   });
 });
 

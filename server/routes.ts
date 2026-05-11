@@ -166,6 +166,75 @@ export async function registerRoutes(
     );
   }
 
+  // ─── Aiden Evaluator Parity Loop (2026-05-11) — FastAPI proxies ─────
+  //
+  // These 8 paths are routed to FastAPI's IWO3-native implementations
+  // BEFORE the legacy IWO2 Express handlers below get a chance to
+  // match them. The proxy translates the Express session into the
+  // FastAPI dev-auth headers (X-IWO3-User + X-IWO3-Client). Per
+  // ADR-035 §Path B-b / D-NSA-2 the broader Node `server/storage.ts`
+  // legacy paths stay deferred — those that still 500 against IWO3
+  // schema are non-evaluator-critical and remain residual debt.
+  //
+  // Hosted-deploy auth bridge is a follow-on concern (per D-BB-4
+  // tenant-binding gate + this loop's D-AEP-3 lock).
+  {
+    const { proxyToFastApi } = await import("./fastapi-proxy");
+    // Read paths — evaluator surface base + unified summary.
+    app.get(
+      "/api/work-orders/:id/evaluator-summary",
+      isAuth,
+      requireRole("viewer"),
+      proxyToFastApi((req) => `/work_orders/${req.params.id}/evaluator_summary`)
+    );
+    // Action paths — operator mutations. The proxy routes win over
+    // legacy IWO2 handlers that follow (Express picks first match).
+    app.put(
+      "/api/work-orders/:id",
+      isAuth,
+      requireRole("operator"),
+      proxyToFastApi((req) => `/work_orders/${req.params.id}`)
+    );
+    app.post(
+      "/api/work-orders/:id/reopen",
+      isAuth,
+      requireRole("operator"),
+      proxyToFastApi((req) => `/work_orders/${req.params.id}/reopen`)
+    );
+    app.post(
+      "/api/work-orders/:id/redispatch",
+      isAuth,
+      requireRole("operator"),
+      proxyToFastApi((req) => `/work_orders/${req.params.id}/redispatch`)
+    );
+    app.post(
+      "/api/work-orders/:id/accept",
+      isAuth,
+      requireRole("operator"),
+      proxyToFastApi((req) => `/work_orders/${req.params.id}/accept`)
+    );
+    // Candidate review proxies — FastAPI candidate_review.py exposes
+    // these against output_handoff ids, NOT work_order ids. The
+    // React UI uses recordId (handoff id) in the path, which is
+    // exactly the FastAPI shape — pass through.
+    app.post(
+      "/api/work-orders/:id/candidates/:recordId/select",
+      isAuth,
+      requireRole("operator"),
+      proxyToFastApi(
+        (req) => `/output_handoffs/${req.params.recordId}/select_candidate`
+      )
+    );
+    app.post(
+      "/api/work-orders/:id/candidates/:recordId/reject",
+      isAuth,
+      requireRole("operator"),
+      proxyToFastApi(
+        (req) => `/output_handoffs/${req.params.recordId}/reject_candidate`
+      )
+    );
+  }
+
   app.get("/api/health", async (_req, res) => {
     try {
       const uptime = Math.floor((Date.now() - startTime) / 1000);

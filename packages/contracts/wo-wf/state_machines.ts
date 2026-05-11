@@ -146,6 +146,16 @@ export const WORK_ORDER_TRANSITIONS: readonly TransitionSpec[] = [
     requires: ["work_order:update"],
     event: AUDIT_EVENTS.WORK_ORDER_TRANSITIONED,
   },
+  // Aiden Evaluator Parity Loop (2026-05-11) — operator-accept happy
+  // path. POST /work_orders/{id}/accept writes a dedicated
+  // `work_order.accepted` audit event ON TOP of this routine
+  // transition for semantic separability per D-AEP-2.
+  {
+    from: "awaiting_operator",
+    to: "completed",
+    requires: ["work_order:update"],
+    event: AUDIT_EVENTS.WORK_ORDER_TRANSITIONED,
+  },
   // deferred → …
   {
     from: "deferred",

@@ -404,7 +404,27 @@ function BlockedSummary({ order }: { order: WorkOrder }) {
   );
 }
 
-function QualityReviewSummary({ order }: { order: WorkOrder }) {
+function QualityReviewSummary({
+  order,
+  aidenReviewFromSummary,
+}: {
+  order: WorkOrder;
+  /**
+   * Aiden Evaluator Parity Loop (2026-05-11) — IWO3-native fallback.
+   * The IWO2 quality-review payload lives in
+   * `order.gccMemory["gcc.metadata"].qualityReview` + `order.bdmMarker`
+   * — neither column exists on the IWO3 work_orders schema. When
+   * those are absent, fall back to the best-effort audit-derived
+   * review from the unified evaluator_summary endpoint per ADR-035
+   * §Path B-b D-AEP-1 (b).
+   */
+  aidenReviewFromSummary?: {
+    score: number | null;
+    recommendation: string | null;
+    issues: string[];
+    flagged: boolean | null;
+  } | null;
+}) {
   const gcc = (order.gccMemory || {}) as Record<string, any>;
   const meta = gcc["gcc.metadata"] || {};
   const qr = meta.qualityReview as { score?: number; recommendation?: string; issues?: string[] } | undefined;
@@ -413,11 +433,23 @@ function QualityReviewSummary({ order }: { order: WorkOrder }) {
   const tier2 = order.tier2Result as Record<string, any> | null;
   const hasOutput = tier2 && !tier2.blocked && tier2.output;
 
-  if (!qr && !isQualityBlock) return null;
+  // IWO3-native fallback: synthesize a qr-shaped object from the
+  // audit-derived aiden_review when no IWO2-shape data is present.
+  const qrEffective: { score?: number; recommendation?: string; issues?: string[] } | undefined =
+    qr
+      ?? (aidenReviewFromSummary
+        ? {
+            score: aidenReviewFromSummary.score ?? undefined,
+            recommendation: aidenReviewFromSummary.recommendation ?? undefined,
+            issues: aidenReviewFromSummary.issues,
+          }
+        : undefined);
 
-  const score = qr?.score ?? 0;
-  const recommendation = qr?.recommendation || bdm?.type || "unknown";
-  const issues = qr?.issues || bdm?.issues || [];
+  if (!qrEffective && !isQualityBlock) return null;
+
+  const score = qrEffective?.score ?? 0;
+  const recommendation = qrEffective?.recommendation || bdm?.type || "unknown";
+  const issues = qrEffective?.issues || bdm?.issues || [];
   const reason = bdm?.reason || "";
 
   const isRevision = order.status === "awaiting_operator";
@@ -513,6 +545,63 @@ export default function WorkOrderDetail() {
     staleTime: 5000,
     refetchOnMount: "always",
     refetchInterval: order?.status === "processing" ? 5000 : 30000,
+  });
+
+  // Aiden Evaluator Parity Loop (2026-05-11) — unified IWO3-native
+  // read endpoint. Proxied through Express → FastAPI per ADR-035
+  // §Path B-b D-AEP-3 (Express proxy). Provides aiden_review (best-
+  // effort audit-derived; null fallback), done_contract,
+  // candidate_review, checklist, reopen_metadata in a single fetch.
+  // The legacy useQueries above stay live for the broad UI surface
+  // (logs/checklist/etc.) until Loop α absorbs them; this query
+  // powers the evaluator-section render specifically.
+  type EvaluatorSummary = {
+    work_order: WorkOrder;
+    aiden_review: {
+      score: number | null;
+      recommendation: string | null;
+      issues: string[];
+      summary: string | null;
+      approved: boolean | null;
+      flagged: boolean | null;
+      source: string;
+      audit_event_id: string | null;
+      audit_event_timestamp: string | null;
+      agent_role: string | null;
+    } | null;
+    done_contract: {
+      status: string;
+      required_action: string | null;
+      current_step: string | null;
+    };
+    candidate_review: {
+      required: boolean;
+      package_id: string | null;
+      package_kind: string | null;
+      candidates: Array<Record<string, unknown>>;
+    } | null;
+    checklist: Array<{
+      timestamp: string;
+      action: string;
+      summary: string;
+      metadata: Record<string, unknown>;
+    }>;
+    reopen_metadata: {
+      last_reopen_at: string;
+      last_reopen_reason: string | null;
+      reopen_count: number;
+    } | null;
+  };
+  const { data: evaluatorSummary } = useQuery<EvaluatorSummary>({
+    queryKey: ["/api/work-orders", params.id, "evaluator-summary"],
+    queryFn: () =>
+      fetch(`/api/work-orders/${params.id}/evaluator-summary`, {
+        credentials: "include",
+      }).then((r) => r.json()),
+    staleTime: 5000,
+    refetchOnMount: "always",
+    refetchInterval: order?.status === "processing" ? 5000 : 15000,
+    enabled: !!params.id,
   });
 
   usePageTitle(order?.title || "Work Order");
@@ -658,11 +747,18 @@ export default function WorkOrderDetail() {
     },
   });
 
+  // Aiden Evaluator Parity Loop (2026-05-11): swap the IWO2-shape
+  // /unblock+reprocess=false call for the explicit FastAPI-backed
+  // POST /api/work-orders/:id/accept route (Express proxy →
+  // FastAPI POST /work_orders/:id/accept). Preserves the dialog UX
+  // while routing action authority through FastAPI per ADR-035
+  // §Path B-b D-AEP-2 (explicit accept route, not transition overload).
   const acceptMutation = useMutation({
     mutationFn: () =>
-      apiRequest("POST", `/api/work-orders/${params.id}/unblock`, {
-        resolution: `Operator accepted deliverable despite Aiden quality review concerns.${acceptNotes.trim() ? ` Notes: ${acceptNotes.trim()}` : ""}`,
-        reprocess: false,
+      apiRequest("POST", `/api/work-orders/${params.id}/accept`, {
+        reason: acceptNotes.trim()
+          ? `Operator accepted deliverable. Notes: ${acceptNotes.trim()}`
+          : "Operator accepted deliverable via evaluator surface.",
       }),
     onSuccess: () => {
       invalidateOrderQueries();
@@ -1412,7 +1508,10 @@ export default function WorkOrderDetail() {
               </div>
 
               {(order.status === "awaiting_operator" || order.status === "blocked") && (
-                <QualityReviewSummary order={order} />
+                <QualityReviewSummary
+                  order={order}
+                  aidenReviewFromSummary={evaluatorSummary?.aiden_review ?? null}
+                />
               )}
 
               <CandidateReviewPanel order={order} />
