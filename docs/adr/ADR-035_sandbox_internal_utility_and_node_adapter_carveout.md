@@ -336,7 +336,7 @@ POST /api/sandbox-sessions/:id/publish          → 412 (github_token_missing, c
 
 ## Next-Loop Ordering (Locked)
 
-Per CODEX D-BB-5 and D-BB-7, the next two bounded loops are sequenced:
+Per CODEX D-BB-5 / D-BB-7 (Path B-b) and D-AEP-A5 / D-AEP-A6 (Aiden Evaluator Parity), the next three bounded loops are sequenced:
 
 ### Loop α — TS errors + sandbox React UI updates (next)
 
@@ -347,20 +347,59 @@ Combined scope:
   - Send artifact UUID (not work-order UUID) when linking a session
   - Consume the new publish response shape (no `artifactId` field)
 - Validate `tsc` clean (production React build viable)
-- Stop. Do NOT roll hosted deploy into this loop.
+- Stop. Do NOT roll hosted deploy into this loop. Do NOT absorb evaluator-page polish (D-AEP-A7 lock).
 
-### Loop β — Hosted deploy + auth bridge (after Loop α)
+### Loop γ — Evaluator/Operator-action sweep (after Loop α; before Loop β)
 
-Combined scope, gated by Loop α:
+Inserted per D-AEP-A5 + D-AEP-A6. Cleans up the legacy IWO2 React buttons that still call broken IWO2 Express handlers on the evaluator page. Per D-AEP-A6 "visible-but-broken is NOT a stable posture":
+
+For each legacy button (process / retry / archive / kill / refile / defer / repair / unblock-reissue / unblock-close):
+
+- **Hide** if the action has no IWO3-side equivalent and isn't operationally necessary, OR
+- **Disable with an explicit "not yet supported in IWO3" tooltip / inline message** if the action will eventually return, OR
+- **Rewire to FastAPI** where a bounded path already exists or can be added cheaply
+
+Scope-lock for Loop γ:
+
+- React work-order-detail page button cleanup only
+- No new FastAPI route work unless it's a thin proxy for an existing IWO3-native action
+- No Streamlit work
+- No hosted deploy work
+- No new operator-action vocabularies invented
+
+### Loop β — Hosted deploy + auth bridge (after Loop γ)
+
+Combined scope, gated by Loop α + Loop γ:
 
 - Auth bridge: session-cookie ↔ FastAPI-bearer-token mapping
-- **Explicit tenant binding** for the cross-service seam (per D-BB-4 revision)
+- **Explicit tenant binding** for the cross-service seam (per D-BB-4 + D-AEP-A5 revisions)
 - Hosted Node service on Railway (Dockerfile + railway.json second service)
 - Streamlit hop / operator entry surface decision
 - Live publish validation against an operator-provisioned `GITHUB_TOKEN`
 - Console-spam cleanup (per D-BB-6) if still operationally annoying
 
 Either loop can be scoped + opened by CODEX when ready. The WO-source-id rerender extension is NOT on the critical path — open only on concrete operator demand.
+
+## CODEX Disposition on Aiden Evaluator Parity Loop (2026-05-11)
+
+**Verdict:** ACCEPT WITH REVISIONS — accept the shipped loop; keep the explicit review-role allowlist; keep the dual audit events; insert a new bounded evaluator/operator-action sweep loop (Loop γ) before hosted deploy; do NOT let Loop α sprawl into evaluator parity part two.
+
+| Decision | Verdict | Action taken |
+| --- | --- | --- |
+| D-AEP-A1 (Audit-derive role-tag allowlist) | ACCEPT WITH REVISIONS | Keep the explicit allowlist as canonical V1. NO fuzzy `contains("review")` heuristic. **Inline comment added in `routes/work_orders.py:_AIDEN_REVIEW_ROLES` documenting the posture: extend only from observed audit evidence when a real miss appears, not speculatively.** |
+| D-AEP-A2 (Express-proxy module scope) | ACCEPT | No change. Convention-based scope-lock comments in `server/fastapi-proxy.ts` are sufficient. No lint enforcement loop opened. |
+| D-AEP-A3 (State-machine extension scope) | ACCEPT | No change. `awaiting_operator → completed` is the right kind of narrow lifecycle addition for a first-class accept action. |
+| D-AEP-A4 (Dual-write `accepted` + `transitioned`) | ACCEPT | No change. Transition tells you what changed; accept tells you why in evaluator semantics. Do not collapse them. |
+| D-AEP-A5 (Next-loop ordering update) | ACCEPT WITH REVISIONS | **Loop γ inserted between Loop α and Loop β** (see §Next-Loop Ordering above). The evaluator surface still has visible legacy buttons that 500 on IWO3; clean those before hosted deploy. |
+| D-AEP-A6 (Legacy IWO2 React buttons posture) | ACCEPT WITH REVISIONS | **"Visible-but-broken" is NOT a stable posture.** Loop γ owns the cleanup per three-option playbook (hide / disable-with-explicit-message / rewire-to-FastAPI). |
+| D-AEP-A7 (Loop α scope growth) | ACCEPT | Loop α stays scoped to TS/build + sandbox React only. Evaluator-page polish belongs in Loop γ, not in Loop α. |
+
+**Bottom line per CODEX:**
+
+- Accept the AEP loop as shipped
+- Keep the explicit review-role allowlist + the dual audit events
+- Insert Loop γ (evaluator/operator-action sweep) before hosted deploy
+- Loop α does not grow to absorb evaluator parity part two
 
 ## Aiden Evaluator Parity Loop — Shipped Shape (2026-05-11)
 
@@ -448,6 +487,6 @@ DB state after accept:
 
 1. **No persistent quality-review-write surface.** Audit-derive is best-effort; downstream feature work that wants to PUT a structured review (separate from a generic llm.invoked event) needs its own bounded loop. Per D-AEP-1 lock, NOT opened here.
 2. **Same single-tenant `client_id` assumption as Path B-b.** The Express proxy uses the operator's first `client_memberships` row. Path B-b §Residual debt #6 already records this as a hard pre-condition for hosted deploy.
-3. **Legacy IWO2 Express handlers for non-evaluator paths still exist** in `server/routes.ts` (process / retry / unblock / archive / kill / refile / etc.). They 500 on IWO3 schema when invoked. The React page has buttons for these. Out of scope for this loop; queued for a future operator-action sweep.
+3. **Legacy IWO2 Express handlers for non-evaluator paths still exist** in `server/routes.ts` (process / retry / unblock / archive / kill / refile / etc.). They 500 on IWO3 schema when invoked. The React page has buttons for these. **Per CODEX D-AEP-A6 disposition: "visible-but-broken" is NOT a stable posture.** Cleanup is owned by Loop γ (evaluator/operator-action sweep), inserted between Loop α and Loop β per §Next-Loop Ordering — each button gets hidden, disabled with an explicit "not yet supported in IWO3" message, or rewired to FastAPI.
 4. **`order.tier1Result` / `order.tier2Result` / `order.gccMemory` / `order.bdmMarker`** field reads in the React page still query IWO2-shape fields. `QualityReviewSummary` has the fallback; other sections do not. Out of scope per minimal-unblocker rule; the sections degrade gracefully (TypeScript `as` casts return `undefined`/`null` rather than throw).
 5. **The 21 client/src/* TS errors** are unchanged. Loop α responsibility (hard pre-condition for hosted deploy).

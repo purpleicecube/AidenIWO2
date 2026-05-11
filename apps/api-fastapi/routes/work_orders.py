@@ -1127,6 +1127,14 @@ _ACCEPTABLE_FROM = ("awaiting_operator", "processing")
 # best-effort derive walks `action_audit_log` events of action
 # `llm.invoked` whose `metadata.agentRole` matches one of these.
 # Order is precedence (most-recent-wins inside each role match).
+#
+# CODEX disposition (D-AEP-A1, 2026-05-11): the explicit allowlist is
+# the canonical V1 set. Do NOT broaden to a fuzzy
+# `agentRole.contains("review")` heuristic — that overmatches
+# arbitrary downstream agent roles. Extend this allowlist ONLY from
+# observed audit evidence when a real miss appears (i.e., an
+# operator reports a missing review they expected to see), not
+# speculatively.
 _AIDEN_REVIEW_ROLES = (
     "aiden_review_pm",
     "pm_review",
