@@ -129,6 +129,31 @@ async def get_tenant_scoped_connection(
             await tx.rollback()
             raise
         else:
+            # Defense-in-depth (2026-05-12 silent-fail fix): if any
+            # post-write hook poisoned the outer transaction without
+            # propagating an exception (e.g. a failed query inside a
+            # savepoint-less helper), Postgres translates COMMIT to
+            # ROLLBACK silently and the client sees a 2xx with the
+            # write discarded. Probe txid_current() before committing;
+            # if Postgres reports the transaction is aborted, surface
+            # a 500 instead of silently dropping the work.
+            try:
+                await conn.fetchval("SELECT 1")
+            except asyncpg.exceptions.InFailedSQLTransactionError:
+                await tx.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail={
+                        "error": "transaction_aborted_during_handler",
+                        "message": (
+                            "Outer transaction entered aborted state "
+                            "before commit. A post-write hook likely "
+                            "issued a query that failed without "
+                            "savepoint isolation. Write was rolled "
+                            "back; check server logs for the offender."
+                        ),
+                    },
+                )
             await tx.commit()
 
 

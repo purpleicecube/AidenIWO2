@@ -378,6 +378,51 @@ def test_file_content_fetch_returns_base64_for_binary_pdf() -> None:
 
 
 @iwo3_db
+def test_post_write_hook_failure_does_not_silently_drop_write() -> None:
+    """Regression (2026-05-12) — when a post-write hook (in this case
+    the canonical_facts refresh) issues a query that fails at the DB
+    level, the outer transaction enters InFailedSQLTransactionError
+    state. Before the savepoint fix, Postgres translated the
+    subsequent COMMIT to a ROLLBACK silently and the client got a
+    201 with the INSERT discarded. The fix wraps the hook body in a
+    savepoint so its failure can't poison the outer transaction.
+
+    Validates the bug observed against hosted Railway where
+    migration 0026 (canonical_facts table) hadn't been applied yet:
+    every folder/file create returned 2xx but nothing persisted."""
+    from unittest.mock import patch
+
+    async def _fake_count(conn, *, client_id):
+        return await conn.fetchval(
+            "SELECT count(*) FROM canonical_facts_does_not_exist "
+            "WHERE client_id = $1::uuid",
+            client_id,
+        )
+
+    with patch(
+        "memory.canonical_facts.count_active_canonical_facts", _fake_count
+    ):
+        with TestClient(app) as client:
+            outputs = _outputs_id(client)
+            name = _new_name("post_write_hook_repro")
+            resp = client.post(
+                "/workspace/folders",
+                json={"parent_folder_id": outputs, "name": name},
+                headers=_hdr(KLEAR_OPERATOR),
+            )
+            assert resp.status_code == 201, resp.text
+            folder = resp.json()["folder"]
+            tree = client.get(
+                "/workspace/tree", headers=_hdr(KLEAR_OPERATOR)
+            ).json()
+            persisted = any(f["id"] == folder["id"] for f in tree["folders"])
+            assert persisted, (
+                "Folder INSERT was lost to silent COMMIT-as-ROLLBACK. "
+                "Post-write hook failures must not poison the outer tx."
+            )
+
+
+@iwo3_db
 def test_file_content_fetch_dereferences_output_package_to_markdown() -> None:
     """Sandbox Everywhere follow-on (2026-05-12) — Outputs/ artifacts
     that point at `output_package://...` are dereferenced to markdown

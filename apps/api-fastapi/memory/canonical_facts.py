@@ -63,27 +63,49 @@ async def refresh_canonical_facts_for_tenant_hybrid(
     workspace folder must keep working without a forced migration.
     Adoption of the CRUD UI is voluntary and per-tenant; switchover
     is automatic on the first INSERT into `canonical_facts`.
+
+    Post-write hook isolation (2026-05-12 silent-fail fix): the
+    entire body runs inside a SAVEPOINT so any DB failure here —
+    including pre-migration `canonical_facts does not exist` on a
+    partially-migrated tenant — rolls back to the savepoint and
+    leaves the caller's outer transaction clean. Without this belt,
+    a failed query inside this hook poisoned the outer transaction
+    on hosted Railway, causing Postgres to silently translate the
+    subsequent COMMIT to a ROLLBACK — losing the caller's INSERT
+    while the HTTP response was already 201.
     """
     try:
-        active_count = await count_active_canonical_facts(
-            conn, client_id=client_id
-        )
+        async with conn.transaction():
+            try:
+                active_count = await count_active_canonical_facts(
+                    conn, client_id=client_id
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "refresh_canonical_facts_for_tenant_hybrid: count failed "
+                    "for client_id=%s, falling back to folder path: %s",
+                    client_id,
+                    exc,
+                )
+                # Re-raise so the savepoint rolls back cleanly. The
+                # outer try/except below catches + returns None.
+                raise
+
+            if active_count > 0:
+                return await refresh_canonical_facts_from_table(
+                    conn, client_id=client_id
+                )
+            return await refresh_canonical_facts_for_tenant(
+                conn, client_id=client_id
+            )
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "refresh_canonical_facts_for_tenant_hybrid: count failed "
-            "for client_id=%s, falling back to folder path: %s",
+            "refresh_canonical_facts_for_tenant_hybrid: savepoint-isolated "
+            "refresh failed for client_id=%s: %s",
             client_id,
             exc,
         )
-        active_count = 0
-
-    if active_count > 0:
-        return await refresh_canonical_facts_from_table(
-            conn, client_id=client_id
-        )
-    return await refresh_canonical_facts_for_tenant(
-        conn, client_id=client_id
-    )
+        return None
 
 
 async def refresh_canonical_facts_for_tenant(
