@@ -720,10 +720,18 @@ def _render_file_overflow(
         )
         if sandbox_source == "local-default":
             st.caption(
-                "Opens the local Node sandbox (set `IWO3_SANDBOX_URL` for hosted)."
+                "⚠ Defaulting to `http://localhost:5050`. If this Streamlit is "
+                "talking to a hosted FastAPI, the local Node sandbox won't have "
+                "this artifact and the preview will fail. Set "
+                "`IWO3_SANDBOX_URL` to a Node service that shares the same "
+                "Postgres as this Streamlit's API base."
             )
         else:
-            st.caption("Opens the canonical Node sandbox in a new tab.")
+            st.caption(
+                "Opens the canonical Node sandbox in a new tab. The Node service "
+                "must share the same Postgres as this Streamlit for the artifact "
+                "to be reachable."
+            )
 
         st.divider()
         if st.button(

@@ -125,6 +125,13 @@ export default function SandboxPage() {
   // /sandbox?source=<artifact_uuid> creates a fresh session bound to
   // that workspace artifact, fires the rerender, then rewrites the
   // URL to ?session=<new_id> so a refresh stays sticky.
+  //
+  // Rerender errors are surfaced visibly: a toast tells the operator
+  // what failed, and the error detail is persisted into the session's
+  // logs by appending a synthetic log entry. Without this, a failed
+  // handoff (e.g. cross-environment artifact not found, binary with no
+  // extracted text) left the operator staring at a session that LOOKS
+  // created but has no preview — easy to misread as "broken sandbox".
   const [sourceHandled, setSourceHandled] = useState(false);
   useEffect(() => {
     if (sourceHandled) return;
@@ -133,6 +140,7 @@ export default function SandboxPage() {
     if (!sourceId) return;
     setSourceHandled(true);
     (async () => {
+      let sessionId: string | null = null;
       try {
         const createRes = await apiRequest("POST", "/api/sandbox-sessions", {
           name: `Review: ${sourceId.slice(0, 8)}`,
@@ -140,18 +148,62 @@ export default function SandboxPage() {
           environment: { sourceId },
         });
         const session = await createRes.json();
+        sessionId = session.id as string;
         try {
           await apiRequest(
             "POST",
-            `/api/sandbox-sessions/${session.id}/rerender`,
+            `/api/sandbox-sessions/${sessionId}/rerender`,
           );
-        } catch {
-          /* sandbox UI surfaces re-render errors */
+        } catch (rerenderErr: any) {
+          // Parse the rerender response so the operator gets the
+          // specific failure (not_found / no_tenant / binary no
+          // extracted_text / etc.) instead of a generic toast.
+          let detail = rerenderErr?.message || "Unknown rerender failure";
+          let kind: string | undefined;
+          try {
+            const body = JSON.parse(detail.split(": ").slice(1).join(": "));
+            if (body?.message) detail = body.message;
+            if (body?.kind) kind = body.kind;
+          } catch {
+            /* leave detail as-is */
+          }
+          toast({
+            title: "Preview rerender failed",
+            description: kind ? `${detail} (kind: ${kind})` : detail,
+            variant: "destructive",
+          });
+          // Persist the error into the session so the terminal log
+          // shows what went wrong rather than a phantom empty state.
+          try {
+            const existing = await fetch(
+              `/api/sandbox-sessions/${sessionId}`,
+              { credentials: "include" },
+            ).then((r) => r.json());
+            const errorLog = {
+              timestamp: new Date().toISOString(),
+              command: "re-render",
+              input: { sourceId },
+              output: {
+                status: "error",
+                message: detail,
+                kind: kind || "rerender_failed",
+              },
+            };
+            const logs = Array.isArray(existing.logs)
+              ? [...existing.logs, errorLog]
+              : [errorLog];
+            await apiRequest("PUT", `/api/sandbox-sessions/${sessionId}`, {
+              status: "failed",
+              logs,
+            });
+          } catch {
+            /* best-effort log persistence */
+          }
         }
         queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
         const url = new URL(window.location.href);
         url.searchParams.delete("source");
-        url.searchParams.set("session", session.id);
+        url.searchParams.set("session", sessionId!);
         window.history.replaceState({}, "", url.toString());
       } catch (err: any) {
         toast({
@@ -641,54 +693,97 @@ export default function SandboxPage() {
               </div>
 
               <div className="p-3 border-b space-y-2">
-                <h4 className="text-xs font-medium flex items-center gap-1">
-                  <Terminal className="w-3 h-3" />
-                  Execute Command
-                </h4>
-                <Input
-                  placeholder="Command (e.g., test-workflow, validate-config)"
-                  value={execCommand}
-                  onChange={(e) => setExecCommand(e.target.value)}
-                  data-testid="input-exec-command"
-                />
-                <Textarea
-                  placeholder="Input data (optional JSON or text)..."
-                  value={execInput}
-                  onChange={(e) => setExecInput(e.target.value)}
-                  className="min-h-[60px] font-mono text-xs"
-                  data-testid="textarea-exec-input"
-                />
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      executeMutation.mutate({
-                        id: selectedSession.id,
-                        command: execCommand || "execute",
-                        input: execInput,
-                      })
-                    }
-                    disabled={executeMutation.isPending}
-                    data-testid="button-execute"
-                  >
-                    {executeMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    ) : (
-                      <Play className="w-4 h-4 mr-1" />
-                    )}
-                    Run
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => resetMutation.mutate(selectedSession.id)}
-                    disabled={resetMutation.isPending}
-                    data-testid="button-reset-session"
-                  >
-                    <RotateCcw className="w-4 h-4 mr-1" />
-                    Reset
-                  </Button>
-                </div>
+                {((selectedSession.environment as any)?.sourceId) ? (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-medium flex items-center gap-1">
+                      <RotateCcw className="w-3 h-3" />
+                      Review Session
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      This session is bound to workspace artifact{" "}
+                      <code className="text-[10px]">
+                        {((selectedSession.environment as any).sourceId as string).slice(0, 8)}…
+                      </code>
+                      . Use Re-render to refresh the preview from the source. Execute Command is hidden because this session is for review, not arbitrary execution.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => rerenderMutation.mutate(selectedSession.id)}
+                        disabled={rerenderMutation.isPending}
+                        data-testid="button-rerender-review"
+                      >
+                        {rerenderMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-4 h-4 mr-1" />
+                        )}
+                        Re-render
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => resetMutation.mutate(selectedSession.id)}
+                        disabled={resetMutation.isPending}
+                        data-testid="button-reset-session"
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h4 className="text-xs font-medium flex items-center gap-1">
+                      <Terminal className="w-3 h-3" />
+                      Execute Command
+                    </h4>
+                    <Input
+                      placeholder="Command (e.g., test-workflow, validate-config)"
+                      value={execCommand}
+                      onChange={(e) => setExecCommand(e.target.value)}
+                      data-testid="input-exec-command"
+                    />
+                    <Textarea
+                      placeholder="Input data (optional JSON or text)..."
+                      value={execInput}
+                      onChange={(e) => setExecInput(e.target.value)}
+                      className="min-h-[60px] font-mono text-xs"
+                      data-testid="textarea-exec-input"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          executeMutation.mutate({
+                            id: selectedSession.id,
+                            command: execCommand || "execute",
+                            input: execInput,
+                          })
+                        }
+                        disabled={executeMutation.isPending}
+                        data-testid="button-execute"
+                      >
+                        {executeMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4 mr-1" />
+                        )}
+                        Run
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => resetMutation.mutate(selectedSession.id)}
+                        disabled={resetMutation.isPending}
+                        data-testid="button-reset-session"
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        Reset
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex-1 overflow-auto p-3">

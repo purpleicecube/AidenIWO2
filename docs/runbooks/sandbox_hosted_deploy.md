@@ -106,3 +106,23 @@ export PLAYWRIGHT_PATH=$SKILLS_DIR/node_modules/playwright
 ```
 
 are set in the Node process's environment before `npm run dev`.
+
+## Cross-environment handoff gotcha
+
+The Streamlit launcher + the workspace "Review in Sandbox ↗" link
+both build URLs of the shape `{IWO3_SANDBOX_URL}/sandbox?source=<id>`.
+The React sandbox at that target then asks **its own** FastAPI for the
+artifact content. **Both Streamlit and the React Node service must
+point at the SAME Postgres** for this to work — otherwise the artifact
+UUID resolves on Streamlit's side but doesn't exist on the Node side's
+DB, and the rerender returns `not_found`.
+
+Failure modes this produces and how they surface now:
+- Streamlit Cloud (hosted) + `IWO3_SANDBOX_URL=http://localhost:5050`
+  → sandbox session created, rerender fails with `not_found`, operator
+  sees a destructive toast + an error log entry in the session
+- Streamlit local + hosted Node sandbox → same shape, opposite direction
+
+Correct setups:
+- Streamlit hosted + Node hosted (both on the same Railway Postgres)
+- Streamlit local + Node local (both on `aiden_iwo3` at `127.0.0.1:5434`)
