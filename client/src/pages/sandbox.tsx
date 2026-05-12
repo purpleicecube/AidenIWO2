@@ -121,6 +121,48 @@ export default function SandboxPage() {
     }
   }, [sessions, selectedSession?.id]);
 
+  // Cross-surface deep-link from Streamlit (or any external page):
+  // /sandbox?source=<artifact_uuid> creates a fresh session bound to
+  // that workspace artifact, fires the rerender, then rewrites the
+  // URL to ?session=<new_id> so a refresh stays sticky.
+  const [sourceHandled, setSourceHandled] = useState(false);
+  useEffect(() => {
+    if (sourceHandled) return;
+    const params = new URLSearchParams(window.location.search);
+    const sourceId = params.get("source");
+    if (!sourceId) return;
+    setSourceHandled(true);
+    (async () => {
+      try {
+        const createRes = await apiRequest("POST", "/api/sandbox-sessions", {
+          name: `Review: ${sourceId.slice(0, 8)}`,
+          description: `Created from external link (source=${sourceId})`,
+          environment: { sourceId },
+        });
+        const session = await createRes.json();
+        try {
+          await apiRequest(
+            "POST",
+            `/api/sandbox-sessions/${session.id}/rerender`,
+          );
+        } catch {
+          /* sandbox UI surfaces re-render errors */
+        }
+        queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
+        const url = new URL(window.location.href);
+        url.searchParams.delete("source");
+        url.searchParams.set("session", session.id);
+        window.history.replaceState({}, "", url.toString());
+      } catch (err: any) {
+        toast({
+          title: "Could not create sandbox session",
+          description: err?.message || "External link handoff failed",
+          variant: "destructive",
+        });
+      }
+    })();
+  }, [sourceHandled, toast]);
+
   const createMutation = useMutation({
     mutationFn: (data: {
       name: string;

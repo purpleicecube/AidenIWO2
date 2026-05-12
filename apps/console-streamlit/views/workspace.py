@@ -27,12 +27,26 @@ backend PUT this loop). Preview-only.
 from __future__ import annotations
 
 import base64
+import os
 from typing import Any, Optional
 
 import streamlit as st
 
 from api_client import APIError
 from shell import page_requires_api
+
+
+def _resolve_sandbox_base_url() -> tuple[str, str]:
+    """Return (base_url, source) for the canonical Node sandbox surface.
+    Mirrors views/sandbox.py logic so the workspace handoff lands on
+    the same URL operators see on the launcher page.
+    """
+    env_url = os.environ.get("IWO3_SANDBOX_URL") or os.environ.get(
+        "IWO3_NODE_BASE_URL"
+    )
+    if env_url:
+        return env_url.rstrip("/"), "env"
+    return "http://localhost:5050", "local-default"
 
 
 try:
@@ -695,6 +709,21 @@ def _render_file_overflow(
                 st.rerun()
             except APIError as err:
                 st.error(f"{err.detail}")
+
+        st.divider()
+        sandbox_base, sandbox_source = _resolve_sandbox_base_url()
+        sandbox_url = f"{sandbox_base}/sandbox?source={file_row['id']}"
+        st.link_button(
+            "Review in Sandbox ↗",
+            sandbox_url,
+            use_container_width=True,
+        )
+        if sandbox_source == "local-default":
+            st.caption(
+                "Opens the local Node sandbox (set `IWO3_SANDBOX_URL` for hosted)."
+            )
+        else:
+            st.caption("Opens the canonical Node sandbox in a new tab.")
 
         st.divider()
         if st.button(
