@@ -378,6 +378,83 @@ def test_file_content_fetch_returns_base64_for_binary_pdf() -> None:
 
 
 @iwo3_db
+def test_file_content_fetch_dereferences_output_package_to_markdown() -> None:
+    """Sandbox Everywhere follow-on (2026-05-12) — Outputs/ artifacts
+    that point at `output_package://...` are dereferenced to markdown
+    so the sandbox preview can review deliverables before finalize."""
+    import asyncio
+    import asyncpg
+    import os
+    import uuid as _uuid
+
+    KLEAR_CLIENT_UUID = _uuid.UUID(KLEAR_CLIENT)
+
+    async def _seed_package_and_artifact() -> tuple[str, str]:
+        conn = await asyncpg.connect(os.environ["IWO3_DATABASE_URL"])
+        try:
+            pkg_id = str(_uuid.uuid4())
+            await conn.execute(
+                """
+                INSERT INTO output_packages
+                  (id, client_id, output_kind, title, summary,
+                   status, priority, content_blocks)
+                VALUES ($1::uuid, $2::uuid, 'gamma_pptx', $3, $4,
+                        'draft', 'medium', $5::jsonb)
+                """,
+                pkg_id,
+                KLEAR_CLIENT_UUID,
+                "Review Test Package",
+                "A short summary line.",
+                '{"sections":[{"title":"Intro","body":"Hello world."},'
+                '{"title":"Next","body":"More content."}]}',
+            )
+            # Create a workspace artifact that points at the package
+            # the way the auto-routing path does.
+            with TestClient(app) as client:
+                outputs = _outputs_id(client)
+            art_id = str(_uuid.uuid4())
+            await conn.execute(
+                """
+                INSERT INTO artifacts
+                  (id, client_id, source_type, content_class, mime_type,
+                   filename, storage_ref, extracted_text,
+                   workspace_folder_id, created_by_user_id)
+                VALUES ($1::uuid, $2::uuid, 'generated'::artifact_source_type,
+                        'c1'::artifact_content_class,
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        $3, $4, '', $5::uuid, $6::uuid)
+                """,
+                art_id,
+                KLEAR_CLIENT_UUID,
+                "Review Test Package.pptx",
+                f"output_package://{pkg_id}",
+                outputs,
+                _uuid.UUID(KLEAR_OPERATOR),
+            )
+            return art_id, pkg_id
+        finally:
+            await conn.close()
+
+    art_id, pkg_id = asyncio.run(_seed_package_and_artifact())
+
+    with TestClient(app) as client:
+        r = client.get(
+            f"/workspace/files/{art_id}/content",
+            headers=_hdr(KLEAR_OPERATOR),
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["encoding"] == "utf-8"
+    assert body["extracted_from"] == "output_package:gamma_pptx"
+    md = body["content"]
+    assert "# Review Test Package" in md
+    assert "_Output Package — gamma_pptx_" in md
+    assert "A short summary line." in md
+    assert "## Intro" in md and "Hello world." in md
+    assert "## Next" in md and "More content." in md
+
+
+@iwo3_db
 def test_file_content_fetch_returns_ref_for_output_package() -> None:
     """Beta-1 ε.2 Q9 — output_package://... files return ref encoding."""
     with TestClient(app) as client:

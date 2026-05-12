@@ -1095,6 +1095,72 @@ _MAX_INLINE_CHARS = 200_000   # ~200 KB
 _MAX_BASE64_CHARS = 4_000_000  # ~4 MB after decode
 
 
+def _serialize_output_package_to_markdown(
+    *,
+    title: Optional[str],
+    summary: Optional[str],
+    output_kind: Optional[str],
+    content_blocks: object,
+) -> str:
+    """Flatten an `output_packages` row to reviewable markdown.
+
+    The canonical content_blocks shape is `{"sections": [{"title", "body"}, ...]}`.
+    Unknown shapes fall back to a `code fence` of the raw JSON so the
+    sandbox preview still has something to render rather than blank.
+    Sandbox Everywhere Darkmode follow-on (2026-05-12).
+    """
+    import json as _json
+
+    blocks = content_blocks
+    if isinstance(blocks, str):
+        try:
+            blocks = _json.loads(blocks)
+        except Exception:  # noqa: BLE001
+            blocks = {}
+    if not isinstance(blocks, dict):
+        blocks = {}
+
+    lines: list[str] = []
+    if title:
+        lines.append(f"# {title}")
+        lines.append("")
+    if output_kind:
+        lines.append(f"_Output Package — {output_kind}_")
+        lines.append("")
+    if summary:
+        lines.append(summary.strip())
+        lines.append("")
+
+    sections = blocks.get("sections")
+    if isinstance(sections, list) and sections:
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            sec_title = section.get("title")
+            sec_body = section.get("body")
+            if sec_title:
+                lines.append(f"## {sec_title}")
+                lines.append("")
+            if sec_body:
+                lines.append(str(sec_body).strip())
+                lines.append("")
+    elif blocks:
+        # Unknown shape — surface the raw JSON in a fenced block so the
+        # operator can still see what's in the package without us
+        # silently returning a blank preview.
+        lines.append("## Raw content_blocks")
+        lines.append("")
+        lines.append("```json")
+        lines.append(_json.dumps(blocks, indent=2)[:_MAX_INLINE_CHARS])
+        lines.append("```")
+        lines.append("")
+    else:
+        lines.append("_(output package has empty content_blocks)_")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
 @router.get(
     "/files/{file_id}/content",
     response_model=FileContentResponse,
@@ -1141,19 +1207,66 @@ async def get_file_content(
     mime = row["mime_type"] or "application/octet-stream"
     extracted = row["extracted_text"] or ""
 
-    # output_package:// → ref-only response. Client deep-links via the
-    # Output Packages surface, which has the full deliverable + handoff
-    # state. Returning the markdown here would diverge from the
-    # canonical output package source over time.
+    # output_package:// → dereference to the canonical output_packages
+    # row and serialize content_blocks to markdown so the sandbox /
+    # preview path can review deliverables before they're finalized.
+    # Single-source-of-truth preserved: we read from the package, we
+    # do not copy. RLS scoping is the same `client_id` policy that
+    # gates this connection, so cross-tenant package reads are
+    # rejected at the DB. Sandbox Everywhere Darkmode follow-on
+    # (2026-05-12).
     if storage_ref.startswith("output_package://"):
+        package_uuid = storage_ref[len("output_package://"):]
+        package_row = None
+        try:
+            package_row = await conn.fetchrow(
+                """
+                SELECT id::text         AS id,
+                       output_kind::text AS output_kind,
+                       title,
+                       summary,
+                       content_blocks
+                  FROM output_packages
+                 WHERE id = $1::uuid
+                """,
+                package_uuid,
+            )
+        except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+            package_row = None
+
+        if package_row is None:
+            # Orphaned or cross-tenant ref. Surface ref-only so the
+            # caller can deep-link to the (probably missing) Output
+            # Packages page rather than silently return a 200 with no
+            # body.
+            return FileContentResponse(
+                id=row["id"],
+                filename=row["filename"],
+                mime_type=mime,
+                encoding="ref",
+                storage_ref=storage_ref,
+                content=None,
+                size_bytes=len(extracted),
+            )
+
+        markdown = _serialize_output_package_to_markdown(
+            title=package_row["title"],
+            summary=package_row["summary"],
+            output_kind=package_row["output_kind"],
+            content_blocks=package_row["content_blocks"],
+        )
+        truncated = len(markdown) > _MAX_INLINE_CHARS
+        body = markdown[:_MAX_INLINE_CHARS] if truncated else markdown
         return FileContentResponse(
             id=row["id"],
             filename=row["filename"],
             mime_type=mime,
-            encoding="ref",
+            encoding="utf-8",
+            content=body,
             storage_ref=storage_ref,
-            content=None,
-            size_bytes=len(extracted),
+            truncated=truncated,
+            size_bytes=len(markdown),
+            extracted_from=f"output_package:{package_row['output_kind']}",
         )
 
     # Inline-stored text/markdown/json/csv — return as utf-8 string.
