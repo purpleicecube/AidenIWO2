@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -101,6 +101,25 @@ export default function SandboxPage() {
     staleTime: 5000,
     refetchOnMount: "always",
   });
+
+  // Deep-link from /workspace "Review in Sandbox" → /sandbox?session=<id>.
+  // When that query param resolves to a real session, auto-select it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("session");
+    if (!target || selectedSession?.id === target) return;
+    const match = sessions.find((s) => s.id === target);
+    if (!match) return;
+    setSelectedSession(match);
+    const result = match.result as any;
+    setPublishedUrl(result?.publish?.publicUrl ?? null);
+    setCopiedUrl(false);
+    if (result?.html && result?.renderable) {
+      setViewMode("preview");
+    } else {
+      setViewMode("terminal");
+    }
+  }, [sessions, selectedSession?.id]);
 
   const createMutation = useMutation({
     mutationFn: (data: {

@@ -56,7 +56,9 @@ import {
   Presentation,
   Globe,
   Upload,
+  FlaskConical,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import SplitPane from "@/components/split-pane";
 import { ExpandablePanel } from "@/components/expandable-panel";
 
@@ -242,6 +244,40 @@ export default function WorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/artifacts"] });
       setSelectedArtifact(null);
       toast({ title: "File deleted" });
+    },
+  });
+
+  const [, setLocation] = useLocation();
+
+  const reviewInSandboxMutation = useMutation({
+    mutationFn: async (file: Artifact) => {
+      const createRes = await apiRequest("POST", "/api/sandbox-sessions", {
+        name: `Review: ${file.name || "artifact"}`,
+        description: `Review of workspace artifact ${file.id}`,
+        environment: { sourceId: file.id, deliverableTitle: file.name },
+      });
+      const session = await createRes.json();
+      try {
+        await apiRequest(
+          "POST",
+          `/api/sandbox-sessions/${session.id}/rerender`,
+        );
+      } catch {
+        // The session still exists even if rerender fails; sandbox
+        // page surfaces the error via its own re-render mutation.
+      }
+      return session.id as string;
+    },
+    onSuccess: (sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sandbox-sessions"] });
+      setLocation(`/sandbox?session=${sessionId}`);
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Review in Sandbox failed",
+        description: err?.message || "Could not create sandbox session",
+        variant: "destructive",
+      });
     },
   });
 
@@ -716,6 +752,14 @@ export default function WorkspacePage() {
                           <DropdownMenuItem onClick={() => openEditor(file)}>
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => reviewInSandboxMutation.mutate(file)}
+                            disabled={reviewInSandboxMutation.isPending}
+                            data-testid={`file-review-sandbox-${file.id}`}
+                          >
+                            <FlaskConical className="w-4 h-4 mr-2" />
+                            Review in Sandbox
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
