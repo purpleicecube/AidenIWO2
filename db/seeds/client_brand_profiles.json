@@ -1,0 +1,85 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-00000000b001",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "paletteJson": {
+      "primary": "#8B49E2",
+      "secondary": "#091C53",
+      "accent": "#A61CC8",
+      "neutrals": {
+        "bg": "#F3F4FA",
+        "text": "#0A0A0A",
+        "muted": "#37517E"
+      },
+      "gradient": {
+        "from": "#8B49E2",
+        "to": "#37517E"
+      }
+    },
+    "fontsJson": {
+      "heading": "Lexend SemiBold",
+      "body": "Barlow Regular",
+      "fallbacks": ["Arial", "Helvetica", "sans-serif"]
+    },
+    "logoArtifactId": null,
+    "voiceBrief": "Confident, technical, RIMS/insurance-domain native. Speak to operations leaders who care about claims throughput, compliance, and measurable risk-adjusted outcomes. Avoid generic SaaS marketing language; lead with what Klear.ai actually does (claims intelligence + RIMS operations) and the metrics that matter to risk and ops leaders.",
+    "icpSummary": "Mid-market and enterprise property & casualty (P&C) insurance carriers, MGAs/MGUs, and commercial brokers with claims operations of meaningful complexity. Decision makers: VP/Director Claims, Chief Risk Officer, Head of Operations, Risk Management Information Systems (RIMS) lead. Pain points: legacy claims systems with poor data hygiene, slow first-notice-of-loss → resolution cycles, unstructured adjuster notes, lack of portfolio-level loss-trend visibility, RMIS implementations stalled or under-utilized. Klear.ai sells: AI-driven claims intelligence + RMIS operations layer that ingests existing carrier/TPA data, surfaces leakage and fraud patterns, accelerates adjuster decisions, and produces audit-ready reporting. Not a generic enterprise SaaS; not a smart-city platform; not a public-sector vendor.",
+    "requiresBrandQa": true,
+    "templateHandlesJson": {
+      "pptx": ["00000000-0000-4000-8000-000010000001"],
+      "pdf": [
+        "00000000-0000-4000-8000-000010000002",
+        "00000000-0000-4000-8000-000010000003"
+      ]
+    },
+    "designInputSourcesJson": {
+      "stitch": true,
+      "figma": false,
+      "twentyfirst": false,
+      "default_for_html": "stitch"
+    },
+    "brandTerms": [
+      "Klear.ai",
+      "Klear AI",
+      "Klear",
+      "klear ai",
+      "klear.ai",
+      "klear",
+      "RMIS",
+      "Klear RIMS",
+      "Klear Claims",
+      "Klear claims intelligence"
+    ],
+    "revision": 1
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000b002",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "paletteJson": {},
+    "fontsJson": {},
+    "logoArtifactId": null,
+    "voiceBrief": null,
+    "icpSummary": null,
+    "requiresBrandQa": false,
+    "templateHandlesJson": {
+      "pptx": ["00000000-0000-4000-8000-000020000001"],
+      "pdf": ["00000000-0000-4000-8000-000020000002"]
+    },
+    "designInputSourcesJson": {
+      "stitch": false,
+      "figma": false,
+      "twentyfirst": false,
+      "default_for_html": null
+    },
+    "brandTerms": [
+      "FreedomForge.AI",
+      "FreedomForge",
+      "FF.AI",
+      "FFAI",
+      "ffai",
+      "freedomforge.ai",
+      "freedom forge"
+    ],
+    "revision": 1
+  }
+]

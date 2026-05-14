@@ -10,7 +10,23 @@ import {
 } from "drizzle-orm/pg-core";
 import { clients } from "./clients";
 
-export const outputKindEnum = pgEnum("output_kind", ["pptx", "pdf", "other"]);
+// Loop CAP-A Φ.0a — broadened from {pptx, pdf, other} to add the
+// abstract format intents the branded-chain orchestrator (Loops
+// CAP-B → CAP-G) needs to route HTML / DOCX / MD requests through
+// the same template-profile machinery. Migration 0029.
+//
+// Ordering follows live DB enumsortorder: the Loop 1 trio ({pptx, pdf,
+// other}) keeps its original position; the three additive values land
+// at the end. The Python mirror at apps/api-fastapi/contracts/enums.py
+// preserves this order; enum-parity test enforces it byte-for-byte.
+export const outputKindEnum = pgEnum("output_kind", [
+  "pptx",
+  "pdf",
+  "other",
+  "html",
+  "docx",
+  "md",
+]);
 
 export const renderEngineEnum = pgEnum("render_engine", [
   "gamma",

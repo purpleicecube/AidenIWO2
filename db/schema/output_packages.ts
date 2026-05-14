@@ -28,6 +28,11 @@ export const outputPackageStatusEnum = pgEnum("output_package_status", [
 // Note: enum DB name is `output_package_kind` to avoid a clash with the
 // existing `output_kind` enum that Loop 1 created for `template_profiles`.
 // The column is still named `output_kind` on `output_packages`.
+//
+// Loop CAP-A Φ.0b — broadened with six new concrete delivery-target
+// kinds for sandbox-local HTML / DOCX / MD renders and the three
+// design-input HTML render lanes (Stitch / Figma / 21st-Magic).
+// Migration 0030.
 export const outputPackageKindEnum = pgEnum("output_package_kind", [
   "gamma_pptx",
   "gamma_pdf",
@@ -40,6 +45,12 @@ export const outputPackageKindEnum = pgEnum("output_package_kind", [
   "stitch_handoff",
   "designlab_handoff",
   "generic",
+  "sandbox_html",
+  "sandbox_docx",
+  "sandbox_md",
+  "stitch_html_render",
+  "figma_html_render",
+  "twentyfirst_html_render",
 ]);
 
 /**

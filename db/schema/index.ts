@@ -54,3 +54,6 @@ export * from "./tool_tags";
 
 // Loop Kappa — Memory V1.5 canonical facts CRUD table
 export * from "./canonical_facts";
+
+// Loop CAP-A Φ.1 — per-tenant brand profile (curated brand truth)
+export * from "./client_brand_profiles";

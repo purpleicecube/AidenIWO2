@@ -329,6 +329,14 @@ export const AUDIT_EVENTS = {
   CANONICAL_FACTS_CREATED: "canonical_facts.created",
   CANONICAL_FACTS_UPDATED: "canonical_facts.updated",
   CANONICAL_FACTS_DELETED: "canonical_facts.deleted",
+
+  // Loop CAP-A Φ.1 — per-tenant brand profile lifecycle.
+  // client.brand_profile_created          — first row insert for a tenant
+  // client.brand_profile_updated          — any field changed (revision bumps in same tx)
+  // client.brand_profile_revision_bumped  — explicit revision-only bump (e.g. cache invalidation)
+  CLIENT_BRAND_PROFILE_CREATED:         "client.brand_profile_created",
+  CLIENT_BRAND_PROFILE_UPDATED:         "client.brand_profile_updated",
+  CLIENT_BRAND_PROFILE_REVISION_BUMPED: "client.brand_profile_revision_bumped",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -588,6 +596,17 @@ export const LOOP_XI_AUDIT_EVENTS: readonly AuditEvent[] = [
 // adds to the audit vocabulary; the read endpoint emits nothing.
 export const LOOP_AEP_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.WORK_ORDER_ACCEPTED,
+];
+
+// Loop CAP-A Φ.1 — per-tenant brand profile lifecycle. Three events
+// for the create / update / revision-bump cycle. CRUD endpoints land
+// in a later CAP loop (Φ.5 / Φ.6 may surface read; explicit operator
+// CRUD is a follow-on UI loop). These event names are locked here so
+// downstream code can emit them without per-loop vocabulary churn.
+export const LOOP_CAP_A_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.CLIENT_BRAND_PROFILE_CREATED,
+  AUDIT_EVENTS.CLIENT_BRAND_PROFILE_UPDATED,
+  AUDIT_EVENTS.CLIENT_BRAND_PROFILE_REVISION_BUMPED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs

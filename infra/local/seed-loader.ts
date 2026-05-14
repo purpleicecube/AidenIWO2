@@ -65,6 +65,22 @@ interface SeedTemplateProfile {
   status: string;
 }
 
+// Loop CAP-A Φ.1 — per-tenant brand profile (one row per tenant).
+interface SeedClientBrandProfile {
+  id: string;
+  clientId: string;
+  paletteJson: unknown;
+  fontsJson: unknown;
+  logoArtifactId: string | null;
+  voiceBrief: string | null;
+  icpSummary: string | null;
+  requiresBrandQa: boolean;
+  templateHandlesJson: unknown;
+  designInputSourcesJson: unknown;
+  brandTerms: string[];
+  revision: number;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Loop 2 — multi-client data shapes
 // ──────────────────────────────────────────────────────────────────────────
@@ -285,6 +301,63 @@ async function upsertMemberships(
          status = EXCLUDED.status,
          updated_at = now()`,
       [r.clientId, r.userId, r.role, r.status]
+    );
+  }
+}
+
+/**
+ * Loop CAP-A Φ.1 — client_brand_profiles seed upsert.
+ *
+ * Table is RLS-FORCEd; we set app.current_client_id per row before
+ * INSERT (same pattern as upsertSubAgentTools / Loop Eta).
+ *
+ * UNIQUE (client_id) enforces one row per tenant; ON CONFLICT keys
+ * on the constraint so re-running the seed updates the row in place.
+ */
+async function upsertClientBrandProfiles(
+  c: PoolClient,
+  rows: SeedClientBrandProfile[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(`SELECT set_config('app.current_client_id', $1, true)`, [
+      r.clientId,
+    ]);
+    await c.query(
+      `INSERT INTO client_brand_profiles
+         (id, client_id, palette_json, fonts_json, logo_artifact_id,
+          voice_brief, icp_summary, requires_brand_qa,
+          template_handles_json, design_input_sources_json,
+          brand_terms, revision)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, $5,
+               $6, $7, $8,
+               $9::jsonb, $10::jsonb,
+               $11::text[], $12)
+       ON CONFLICT ON CONSTRAINT client_brand_profiles_client_id_uniq DO UPDATE SET
+         palette_json = EXCLUDED.palette_json,
+         fonts_json = EXCLUDED.fonts_json,
+         logo_artifact_id = EXCLUDED.logo_artifact_id,
+         voice_brief = EXCLUDED.voice_brief,
+         icp_summary = EXCLUDED.icp_summary,
+         requires_brand_qa = EXCLUDED.requires_brand_qa,
+         template_handles_json = EXCLUDED.template_handles_json,
+         design_input_sources_json = EXCLUDED.design_input_sources_json,
+         brand_terms = EXCLUDED.brand_terms,
+         revision = EXCLUDED.revision,
+         updated_at = now()`,
+      [
+        r.id,
+        r.clientId,
+        JSON.stringify(r.paletteJson ?? {}),
+        JSON.stringify(r.fontsJson ?? {}),
+        r.logoArtifactId,
+        r.voiceBrief,
+        r.icpSummary,
+        r.requiresBrandQa,
+        JSON.stringify(r.templateHandlesJson ?? {}),
+        JSON.stringify(r.designInputSourcesJson ?? {}),
+        r.brandTerms,
+        r.revision,
+      ]
     );
   }
 }
@@ -1103,6 +1176,11 @@ async function main(): Promise<void> {
   const toolCatalogRows = loadJson<SeedToolCatalog[]>(
     "db/seeds/tool_catalog.json"
   );
+  // Loop CAP-A Φ.1 — brand profiles are reference seed (orchestration
+  // spine reads from these for every branded WO). Logo FK is nullable.
+  const clientBrandProfileRows = loadJson<SeedClientBrandProfile[]>(
+    "db/seeds/client_brand_profiles.json"
+  );
 
   // Operational seeds — held when scope=reference.
   const users = referenceOnly
@@ -1168,6 +1246,10 @@ async function main(): Promise<void> {
     await upsertUsers(c, users);
     await upsertMemberships(c, memberships);
     await upsertTemplateProfiles(c, templates);
+    // Loop CAP-A Φ.1 — brand profiles after templates (template_handles_json
+    // references template_profile_id values; not a hard FK but logically
+    // depends on templates existing).
+    await upsertClientBrandProfiles(c, clientBrandProfileRows);
     await upsertPromptProfiles(c, promptProfiles);
     await upsertPromptProfileVersions(c, promptProfileVersions);
     await upsertRepositoryBindings(c, repositoryBindings);
@@ -1217,6 +1299,7 @@ async function main(): Promise<void> {
         llm_configs: llmConfigsRows.length,
         tool_catalog: toolCatalogRows.length,
         sub_agent_tools: subAgentToolsRows.length,
+        client_brand_profiles: clientBrandProfileRows.length,
       },
       sources: {
         clients: "db/seeds/clients.json",
@@ -1241,6 +1324,7 @@ async function main(): Promise<void> {
         llm_configs: "db/seeds/llm_configs.json",
         tool_catalog: "db/seeds/tool_catalog.json",
         sub_agent_tools: "db/seeds/sub_agent_tools.json",
+        client_brand_profiles: "db/seeds/client_brand_profiles.json",
       },
     };
     writeFileSync(

@@ -147,7 +147,10 @@
     "output_kind": [
       "pptx",
       "pdf",
-      "other"
+      "other",
+      "html",
+      "docx",
+      "md"
     ],
     "output_package_kind": [
       "gamma_pptx",
@@ -160,7 +163,13 @@
       "figma_handoff",
       "stitch_handoff",
       "designlab_handoff",
-      "generic"
+      "generic",
+      "sandbox_html",
+      "sandbox_docx",
+      "sandbox_md",
+      "stitch_html_render",
+      "figma_html_render",
+      "twentyfirst_html_render"
     ],
     "output_package_status": [
       "draft",
@@ -345,6 +354,9 @@
       "channel_message.send_queued",
       "channel_message.sent",
       "chat_session.updated",
+      "client.brand_profile_created",
+      "client.brand_profile_revision_bumped",
+      "client.brand_profile_updated",
       "client.settings_updated",
       "credential.encrypted",
       "credential.rotated",
@@ -650,6 +662,11 @@
       ],
       "LOOP_AEP_AUDIT_EVENTS": [
         "work_order.accepted"
+      ],
+      "LOOP_CAP_A_AUDIT_EVENTS": [
+        "client.brand_profile_created",
+        "client.brand_profile_updated",
+        "client.brand_profile_revision_bumped"
       ]
     }
   },
