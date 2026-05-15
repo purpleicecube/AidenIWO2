@@ -57,3 +57,6 @@ export * from "./canonical_facts";
 
 // Loop CAP-A Φ.1 — per-tenant brand profile (curated brand truth)
 export * from "./client_brand_profiles";
+
+// Loop CAP-E Φ.7 — global output-surface routing registry
+export * from "./output_surface_routes";

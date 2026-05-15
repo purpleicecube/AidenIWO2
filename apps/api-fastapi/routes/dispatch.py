@@ -62,6 +62,13 @@ from runtime.template_resolver import (
     TemplateResolution,
     resolve_template_for_client,
 )
+from runtime.aiden_branded_intent import (
+    BrandedIntent,
+    detect_branded_intent,
+)
+from runtime.tier_1_aiden import (
+    AidenWorkflowBrief,
+)
 from wo_wf.transitions import (
     IllegalTransition,
     PermissionDenied,
@@ -320,6 +327,80 @@ async def dispatch_work_order(
                 a.message if a else "(no message returned)"
             ),
         )
+
+    # Loop CAP-E Φ.8 — branded-intent classification + chain routing.
+    # Runs only when Aiden chose work_order_brief (the default for
+    # output-bearing intake). When the deterministic detector finds
+    # branded intent AND output_surface_routes has a matching chain,
+    # this overrides decision_kind to "workflow_brief" with the
+    # resolved chain key, and the existing workflow_brief branch
+    # below handles instantiation. P7 / D8 / D14 locks honored.
+    # Detector always emits `aiden.branded_intent_detected` audit;
+    # may also emit multi_template_disambiguated +
+    # template_clarification_requested.
+    if decision.decision_kind == "work_order_brief":
+        existing_ro_raw = wo.get("requested_outputs")
+        existing_ro: Optional[dict] = None
+        if isinstance(existing_ro_raw, dict):
+            existing_ro = existing_ro_raw
+        elif isinstance(existing_ro_raw, str):
+            try:
+                existing_ro = json.loads(existing_ro_raw)
+            except (json.JSONDecodeError, ValueError):
+                existing_ro = None
+        explicit_template_id = (
+            existing_ro.get("template_profile_id")
+            if isinstance(existing_ro, dict)
+            else None
+        )
+        explicit_kind = (
+            existing_ro.get("output_kind")
+            if isinstance(existing_ro, dict)
+            else None
+        )
+        try:
+            intent = await detect_branded_intent(
+                conn,
+                client_id=ctx["client_id"],
+                intake_text=intake_text,
+                actor_user_id=ctx["user_id"],
+                explicit_template_profile_id=(
+                    str(explicit_template_id) if explicit_template_id else None
+                ),
+                explicit_output_kind=(
+                    str(explicit_kind) if explicit_kind else None
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            # Detector failure must not block dispatch; fall through
+            # to existing single-shot path. Detector emits its own
+            # audit on the way out via the helper.
+            intent = None  # type: ignore[assignment]
+
+        if intent is not None and intent.is_branded and intent.workflow_key:
+            # Override Aiden's choice. Build a workflow_brief decision
+            # carrying the resolved chain key + key intent fields in
+            # step_inputs for downstream visibility.
+            from dataclasses import replace as _dc_replace
+
+            new_workflow_brief = AidenWorkflowBrief(
+                workflow_template_key=intent.workflow_key,
+                step_inputs={
+                    "branded_intent_detected": True,
+                    "detected_brand_keywords": list(intent.detected_brand_keywords),
+                    "detected_output_kind": intent.detected_output_kind,
+                    "detected_design_input_source": intent.detected_design_input_source,
+                    "selected_template_profile_id": intent.selected_template_profile_id,
+                    "primary_adapter_key": intent.primary_adapter_key,
+                    "fallback_adapter_keys": list(intent.fallback_adapter_keys),
+                },
+            )
+            decision = _dc_replace(
+                decision,
+                decision_kind="workflow_brief",
+                workflow_brief=new_workflow_brief,
+                work_order_brief=None,
+            )
 
     await _safe_transition_processing(
         conn,

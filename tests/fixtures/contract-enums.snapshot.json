@@ -333,6 +333,9 @@
       "adapter_dispatch.watchdog_expired_stale_poll",
       "adapter_policy.created",
       "adapter_policy.updated",
+      "aiden.branded_intent_detected",
+      "aiden.multi_template_disambiguated",
+      "aiden.template_clarification_requested",
       "aiden.tool_called",
       "aiden.tool_failed",
       "artifact.deleted",
@@ -685,6 +688,11 @@
         "darla.qa_passed",
         "darla.qa_needs_revision",
         "darla.qa_blocked"
+      ],
+      "LOOP_CAP_E_PHI8_AUDIT_EVENTS": [
+        "aiden.branded_intent_detected",
+        "aiden.multi_template_disambiguated",
+        "aiden.template_clarification_requested"
       ]
     }
   },

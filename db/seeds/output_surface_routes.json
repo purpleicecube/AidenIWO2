@@ -1,0 +1,82 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-00000000e001",
+    "outputKind": "pptx",
+    "isBranded": true,
+    "designInputSource": null,
+    "workflowKey": "cap_branded_pptx",
+    "primaryAdapterKey": "gamma",
+    "fallbackAdapterKeys": ["sandbox_pptx"],
+    "notes": "Loop CAP-E Φ.7 — branded PPTX → cap_branded_pptx chain. Primary Gamma; fallback sandbox_pptx (CAP-F Φ.9 ships local python-pptx renderer)."
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000e002",
+    "outputKind": "pdf",
+    "isBranded": true,
+    "designInputSource": null,
+    "workflowKey": "cap_branded_pdf",
+    "primaryAdapterKey": "gamma",
+    "fallbackAdapterKeys": ["sandbox_pdf"],
+    "notes": "Loop CAP-E Φ.7 — branded PDF → cap_branded_pdf chain. Primary Gamma; fallback sandbox_pdf (CAP-F)."
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000e003",
+    "outputKind": "html",
+    "isBranded": true,
+    "designInputSource": null,
+    "workflowKey": "cap_branded_html",
+    "primaryAdapterKey": "sandbox_html",
+    "fallbackAdapterKeys": [],
+    "notes": "Loop CAP-E Φ.7 — branded HTML self-contained → cap_branded_html chain. Local renderer ships in CAP-F Φ.9; no fallback (sandbox_html IS the local-only path)."
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000e004",
+    "outputKind": "html",
+    "isBranded": true,
+    "designInputSource": "stitch",
+    "workflowKey": "cap_branded_html_stitch",
+    "primaryAdapterKey": "stitch_html_render",
+    "fallbackAdapterKeys": ["sandbox_html"],
+    "notes": "Loop CAP-E Φ.7 — branded HTML w/ Stitch design input → cap_branded_html_stitch chain. Stitch MCP shipped via Theta; fallback to local self-contained when Stitch unavailable."
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000e005",
+    "outputKind": "html",
+    "isBranded": true,
+    "designInputSource": "figma",
+    "workflowKey": "cap_branded_html_figma",
+    "primaryAdapterKey": "figma_html_render",
+    "fallbackAdapterKeys": ["sandbox_html"],
+    "notes": "Loop CAP-E Φ.7 — branded HTML w/ Figma design input → cap_branded_html_figma chain. Figma adapter availability gated by client_adapter_configs (Q-PG-8); fallback local."
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000e006",
+    "outputKind": "html",
+    "isBranded": true,
+    "designInputSource": "twentyfirst",
+    "workflowKey": "cap_branded_html_21st",
+    "primaryAdapterKey": "twentyfirst_html_render",
+    "fallbackAdapterKeys": ["sandbox_html"],
+    "notes": "Loop CAP-E Φ.7 — branded HTML w/ 21st-Magic design input → cap_branded_html_21st chain. 21st MCP available globally per session."
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000e007",
+    "outputKind": "docx",
+    "isBranded": true,
+    "designInputSource": null,
+    "workflowKey": "cap_branded_docx",
+    "primaryAdapterKey": "sandbox_docx",
+    "fallbackAdapterKeys": [],
+    "notes": "Loop CAP-E Φ.7 — branded DOCX → cap_branded_docx chain. Local python-docx renderer ships in CAP-F Φ.9."
+  },
+  {
+    "id": "00000000-0000-4000-8000-00000000e008",
+    "outputKind": "md",
+    "isBranded": true,
+    "designInputSource": null,
+    "workflowKey": "cap_branded_md",
+    "primaryAdapterKey": "sandbox_md",
+    "fallbackAdapterKeys": [],
+    "notes": "Loop CAP-E Φ.7 — branded MD → cap_branded_md chain. Local Jinja2 markdown renderer ships in CAP-F Φ.9."
+  }
+]

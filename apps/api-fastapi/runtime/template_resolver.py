@@ -106,9 +106,20 @@ _TEMPLATED_INTENT_RE = re.compile(
 
 # Heuristic: detect requested output kind so we can prefer templates
 # of the right kind when both sides are available.
+#
+# Loop CAP-E Φ.8 — extended to cover the full broadened
+# template_profiles.output_kind enum (Loop CAP-A Φ.0a / migration 0029):
+# pptx | pdf | html | docx | md | other. CAP-B handback flagged that
+# CAP-B's resolver only supported pptx/pdf detection; CAP-C seeded
+# branded chains for html/docx/md and CAP-E activates them, so the
+# detector now needs to cover those surfaces. `other` stays None
+# because there's no positive token signal for "other" intake.
 _OUTPUT_KIND_TOKENS = {
     "pptx": ("pptx", "ppt", "powerpoint", "deck", "slide", "slides", "presentation", "pitch deck", "intro deck"),
-    "pdf": ("pdf", "rmis", "claims report"),
+    "pdf":  ("pdf", "rmis", "claims report"),
+    "html": ("html", "landing page", "landing-page", "web page", "webpage", "site page", "microsite", "mini-site"),
+    "docx": ("docx", "word doc", "word document", "ms word", "microsoft word"),
+    "md":   ("markdown", "md file", ".md", "readme", "sop md"),
 }
 
 
@@ -205,14 +216,30 @@ def _label_from_contract(content_contract: Any, profile_key: str) -> str:
 
 
 def _detect_output_kind(intake_norm: str) -> Optional[str]:
-    """Return 'pptx' or 'pdf' when intake clearly signals one. Otherwise
-    None (don't filter — keep all templates in scope)."""
-    pptx_hits = sum(1 for tok in _OUTPUT_KIND_TOKENS["pptx"] if tok in intake_norm)
-    pdf_hits = sum(1 for tok in _OUTPUT_KIND_TOKENS["pdf"] if tok in intake_norm)
-    if pptx_hits and not pdf_hits:
-        return "pptx"
-    if pdf_hits and not pptx_hits:
-        return "pdf"
+    """Return one of 'pptx' | 'pdf' | 'html' | 'docx' | 'md' when
+    intake clearly signals it. Returns None on ambiguous intake (>1
+    kind matched) OR no kind detected — caller (resolver / branded-
+    intent detector) treats None as "no kind preference / keep all
+    templates in scope".
+
+    Loop CAP-E Φ.8 — extended from {pptx, pdf} to cover the full
+    broadened enum so html / docx / md branded chains can route
+    correctly. Selection rule: pick the kind with positive hits when
+    no other kind also has hits; ties → None (ambiguous)."""
+    hits: dict[str, int] = {}
+    for kind, tokens in _OUTPUT_KIND_TOKENS.items():
+        n = sum(1 for tok in tokens if tok in intake_norm)
+        if n > 0:
+            hits[kind] = n
+    if len(hits) == 1:
+        return next(iter(hits))
+    if len(hits) > 1:
+        # >1 kind matched. Pick the one with strictly more hits;
+        # tie → None (genuinely ambiguous).
+        ordered = sorted(hits.items(), key=lambda kv: kv[1], reverse=True)
+        if ordered[0][1] > ordered[1][1]:
+            return ordered[0][0]
+        return None
     return None
 
 

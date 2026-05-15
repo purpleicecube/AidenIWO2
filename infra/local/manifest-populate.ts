@@ -43,6 +43,7 @@ const MEGALOOP_THETA_VERSION = "iwo3@v0.15.0-loop-theta";
 const LOOP_KAPPA_VERSION = "iwo3@v0.16.0-loop-kappa";
 const SANDBOX_INTERNAL_UTILITY_VERSION = "iwo3@v0.17.0-sandbox-internal-utility";
 const LOOP_CAP_A_VERSION = "iwo3@v0.18.0-loop-cap-a";
+const LOOP_CAP_E_VERSION = "iwo3@v0.19.0-loop-cap-e";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -118,6 +119,9 @@ const KNOWN_TABLES: ManifestEntry[] = [
 
   // Loop CAP-A Φ.1 — per-tenant brand profile. One row per client_id. Read by the orchestration spine (Loops CAP-B → CAP-G) for grounding pre-fetch, branded-intent detection, content brief grounding, brand QA, and intelligent delivery template selection. FORCE RLS canonical pattern.
   { name: "client_brand_profiles",      source: "iwo3_native", sourceVersion: LOOP_CAP_A_VERSION, ownedBy: "drizzle", notes: "Loop CAP-A Φ.1 — per-tenant curated brand truth (palette, fonts, voice, ICP, template_handles per output_kind, brand_terms for Aiden detector, design_input_sources for Stitch/Figma/21st HTML lanes); FORCE RLS; UNIQUE (client_id); broadened output_kind enum (Φ.0a) keys template_handles_json" },
+
+  // Loop CAP-E Φ.7 — global output-surface routing registry. Maps (output_kind, is_branded, design_input_source) → workflow_key + adapter chain. No FORCE RLS — registry is global, not tenant-scoped. iwo3_app SELECT only (writes happen via drizzle migrations / seed loader running as superuser).
+  { name: "output_surface_routes",      source: "iwo3_native", sourceVersion: LOOP_CAP_E_VERSION, ownedBy: "drizzle", notes: "Loop CAP-E Φ.7 — global routing registry; (output_kind, is_branded, design_input_source) → workflow_key + primary_adapter_key + fallback_adapter_keys[]; no RLS (registry is global); iwo3_app SELECT only" },
 ];
 
 // Tables that exist in the database but are deliberately NOT tracked

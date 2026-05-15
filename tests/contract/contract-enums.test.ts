@@ -97,7 +97,10 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // .updated / .revision_bumped). Total: 148 + 3 = 151.
     // Loop CAP-D — Φ.5 ships 4 Paul events + Φ.6 ships 3 Darla
     // events. Total: 151 + 7 = 158.
-    expect(snap.auditEvents.all.length).toBe(158);
+    // Loop CAP-E — Φ.8 ships 3 Aiden branded-intent events
+    // (detected / multi_template_disambiguated / template_clarification_requested).
+    // Total: 158 + 3 = 161.
+    expect(snap.auditEvents.all.length).toBe(161);
     // Loop Kappa added 5 RBAC keys (canonical_facts: read / create /
     // update / delete / set_severity). Total: 87 + 5 = 92.
     expect(snap.permissionKeys.length).toBe(92);
@@ -147,6 +150,10 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // Loop CAP-D Φ.6 — three Darla brand-QA verdict audit events
     // (qa_passed / qa_needs_revision / qa_blocked).
     expect(snap.auditEvents.byLoop.LOOP_CAP_D_PHI6_AUDIT_EVENTS.length).toBe(3);
+    // Loop CAP-E Φ.8 — three Aiden branded-intent classification
+    // events (detected always-on; multi_template_disambiguated and
+    // template_clarification_requested branch-specific).
+    expect(snap.auditEvents.byLoop.LOOP_CAP_E_PHI8_AUDIT_EVENTS.length).toBe(3);
   });
 });
 

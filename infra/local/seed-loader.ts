@@ -81,6 +81,18 @@ interface SeedClientBrandProfile {
   revision: number;
 }
 
+// Loop CAP-E Φ.7 — global output-surface routing registry row.
+interface SeedOutputSurfaceRoute {
+  id: string;
+  outputKind: string;
+  isBranded: boolean;
+  designInputSource: string | null;
+  workflowKey: string;
+  primaryAdapterKey: string;
+  fallbackAdapterKeys: string[];
+  notes: string | null;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Loop 2 — multi-client data shapes
 // ──────────────────────────────────────────────────────────────────────────
@@ -357,6 +369,45 @@ async function upsertClientBrandProfiles(
         JSON.stringify(r.designInputSourcesJson ?? {}),
         r.brandTerms,
         r.revision,
+      ]
+    );
+  }
+}
+
+/**
+ * Loop CAP-E Φ.7 — output_surface_routes seed upsert.
+ *
+ * Global registry; no FORCE RLS. Idempotent via the unique
+ * constraint on (output_kind, is_branded, COALESCE(design_input_source, 'none')).
+ */
+async function upsertOutputSurfaceRoutes(
+  c: PoolClient,
+  rows: SeedOutputSurfaceRoute[]
+): Promise<void> {
+  for (const r of rows) {
+    await c.query(
+      `INSERT INTO output_surface_routes
+         (id, output_kind, is_branded, design_input_source,
+          workflow_key, primary_adapter_key, fallback_adapter_keys, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8)
+       ON CONFLICT (id) DO UPDATE SET
+         output_kind = EXCLUDED.output_kind,
+         is_branded = EXCLUDED.is_branded,
+         design_input_source = EXCLUDED.design_input_source,
+         workflow_key = EXCLUDED.workflow_key,
+         primary_adapter_key = EXCLUDED.primary_adapter_key,
+         fallback_adapter_keys = EXCLUDED.fallback_adapter_keys,
+         notes = EXCLUDED.notes,
+         updated_at = now()`,
+      [
+        r.id,
+        r.outputKind,
+        r.isBranded,
+        r.designInputSource,
+        r.workflowKey,
+        r.primaryAdapterKey,
+        r.fallbackAdapterKeys,
+        r.notes,
       ]
     );
   }
@@ -1181,6 +1232,12 @@ async function main(): Promise<void> {
   const clientBrandProfileRows = loadJson<SeedClientBrandProfile[]>(
     "db/seeds/client_brand_profiles.json"
   );
+  // Loop CAP-E Φ.7 — output-surface routing registry. Global (not
+  // tenant-scoped). Reference seed; always loaded so dispatch +
+  // Aiden Tier 1 always have routes available.
+  const outputSurfaceRouteRows = loadJson<SeedOutputSurfaceRoute[]>(
+    "db/seeds/output_surface_routes.json"
+  );
 
   // Operational seeds — held when scope=reference.
   const users = referenceOnly
@@ -1250,6 +1307,8 @@ async function main(): Promise<void> {
     // references template_profile_id values; not a hard FK but logically
     // depends on templates existing).
     await upsertClientBrandProfiles(c, clientBrandProfileRows);
+    // Loop CAP-E Φ.7 — output-surface routes (global registry).
+    await upsertOutputSurfaceRoutes(c, outputSurfaceRouteRows);
     await upsertPromptProfiles(c, promptProfiles);
     await upsertPromptProfileVersions(c, promptProfileVersions);
     await upsertRepositoryBindings(c, repositoryBindings);
@@ -1300,6 +1359,7 @@ async function main(): Promise<void> {
         tool_catalog: toolCatalogRows.length,
         sub_agent_tools: subAgentToolsRows.length,
         client_brand_profiles: clientBrandProfileRows.length,
+        output_surface_routes: outputSurfaceRouteRows.length,
       },
       sources: {
         clients: "db/seeds/clients.json",
@@ -1325,6 +1385,7 @@ async function main(): Promise<void> {
         tool_catalog: "db/seeds/tool_catalog.json",
         sub_agent_tools: "db/seeds/sub_agent_tools.json",
         client_brand_profiles: "db/seeds/client_brand_profiles.json",
+        output_surface_routes: "db/seeds/output_surface_routes.json",
       },
     };
     writeFileSync(

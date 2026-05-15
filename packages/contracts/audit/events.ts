@@ -355,6 +355,21 @@ export const AUDIT_EVENTS = {
   DARLA_QA_PASSED:          "darla.qa_passed",
   DARLA_QA_NEEDS_REVISION:  "darla.qa_needs_revision",
   DARLA_QA_BLOCKED:         "darla.qa_blocked",
+
+  // Loop CAP-E Φ.8 — Aiden Tier 1 branded-intent classification.
+  // detected — every dispatch where the deterministic detector ran
+  //            (regardless of branded outcome; sources_used metadata
+  //            carries the verdict + matched brand_terms).
+  // multi_template_disambiguated — fired when multiple template
+  //            candidates existed for the (output_kind) on this
+  //            tenant and Aiden's selected_template_profile_id
+  //            collapsed to one. Q-PG-9 / D14 path.
+  // template_clarification_requested — fired when intent is templated
+  //            but Aiden cannot disambiguate; chat-side picker
+  //            (Eta phase 1.6 pattern) takes over.
+  AIDEN_BRANDED_INTENT_DETECTED:        "aiden.branded_intent_detected",
+  AIDEN_MULTI_TEMPLATE_DISAMBIGUATED:   "aiden.multi_template_disambiguated",
+  AIDEN_TEMPLATE_CLARIFICATION_REQUESTED: "aiden.template_clarification_requested",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -649,6 +664,15 @@ export const LOOP_CAP_D_PHI6_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.DARLA_QA_PASSED,
   AUDIT_EVENTS.DARLA_QA_NEEDS_REVISION,
   AUDIT_EVENTS.DARLA_QA_BLOCKED,
+];
+
+// Loop CAP-E Φ.8 — Aiden Tier 1 branded-intent classification audit
+// vocabulary. `detected` always fires (verdict in metadata); the other
+// two are branch-specific.
+export const LOOP_CAP_E_PHI8_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.AIDEN_BRANDED_INTENT_DETECTED,
+  AUDIT_EVENTS.AIDEN_MULTI_TEMPLATE_DISAMBIGUATED,
+  AUDIT_EVENTS.AIDEN_TEMPLATE_CLARIFICATION_REQUESTED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs
