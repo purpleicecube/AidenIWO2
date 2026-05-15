@@ -360,6 +360,9 @@
       "client.settings_updated",
       "credential.encrypted",
       "credential.rotated",
+      "darla.qa_blocked",
+      "darla.qa_needs_revision",
+      "darla.qa_passed",
       "data_source_binding.created",
       "data_source_binding.revoked",
       "execution_cycle.started",
@@ -401,6 +404,10 @@
       "output_package.rejected",
       "output_package.submitted",
       "output_package.validated",
+      "paul.candidate_selected",
+      "paul.delivery_decided",
+      "paul.fallback_adapter_invoked",
+      "paul.template_variant_chosen",
       "permission.created",
       "permission_grant.created",
       "permission_grant.revoked",
@@ -667,6 +674,17 @@
         "client.brand_profile_created",
         "client.brand_profile_updated",
         "client.brand_profile_revision_bumped"
+      ],
+      "LOOP_CAP_D_PHI5_AUDIT_EVENTS": [
+        "paul.delivery_decided",
+        "paul.template_variant_chosen",
+        "paul.candidate_selected",
+        "paul.fallback_adapter_invoked"
+      ],
+      "LOOP_CAP_D_PHI6_AUDIT_EVENTS": [
+        "darla.qa_passed",
+        "darla.qa_needs_revision",
+        "darla.qa_blocked"
       ]
     }
   },

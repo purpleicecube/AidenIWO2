@@ -45,6 +45,8 @@ import {
   LOOP_XI_AUDIT_EVENTS,
   LOOP_AEP_AUDIT_EVENTS,
   LOOP_CAP_A_AUDIT_EVENTS,
+  LOOP_CAP_D_PHI5_AUDIT_EVENTS,
+  LOOP_CAP_D_PHI6_AUDIT_EVENTS,
 } from "../../packages/contracts/audit/events";
 
 export interface ContractSnapshot {
@@ -119,6 +121,8 @@ export function loadAuditEvents(): ContractSnapshot["auditEvents"] {
       LOOP_XI_AUDIT_EVENTS: [...LOOP_XI_AUDIT_EVENTS],
       LOOP_AEP_AUDIT_EVENTS: [...LOOP_AEP_AUDIT_EVENTS],
       LOOP_CAP_A_AUDIT_EVENTS: [...LOOP_CAP_A_AUDIT_EVENTS],
+      LOOP_CAP_D_PHI5_AUDIT_EVENTS: [...LOOP_CAP_D_PHI5_AUDIT_EVENTS],
+      LOOP_CAP_D_PHI6_AUDIT_EVENTS: [...LOOP_CAP_D_PHI6_AUDIT_EVENTS],
     },
   };
 }

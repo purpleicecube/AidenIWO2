@@ -337,6 +337,24 @@ export const AUDIT_EVENTS = {
   CLIENT_BRAND_PROFILE_CREATED:         "client.brand_profile_created",
   CLIENT_BRAND_PROFILE_UPDATED:         "client.brand_profile_updated",
   CLIENT_BRAND_PROFILE_REVISION_BUMPED: "client.brand_profile_revision_bumped",
+
+  // Loop CAP-D Φ.5 — Paul intelligent delivery decision lifecycle.
+  // Paul wraps the mechanical adapter call: picks template variant
+  // from `client_brand_profiles.template_handles_json[output_kind]`,
+  // chooses primary adapter vs fallback chain, applies candidate-
+  // review policy, recovers from adapter failure.
+  PAUL_DELIVERY_DECIDED:        "paul.delivery_decided",
+  PAUL_TEMPLATE_VARIANT_CHOSEN: "paul.template_variant_chosen",
+  PAUL_CANDIDATE_SELECTED:      "paul.candidate_selected",
+  PAUL_FALLBACK_ADAPTER_INVOKED: "paul.fallback_adapter_invoked",
+
+  // Loop CAP-D Φ.6 — Darla brand QA gate verdicts. Three verdicts
+  // (pass | needs_revision | block) map to three distinct events so
+  // operators can filter audit history by verdict without parsing
+  // metadata. `block` halts publish + opens a revision execution_cycle.
+  DARLA_QA_PASSED:          "darla.qa_passed",
+  DARLA_QA_NEEDS_REVISION:  "darla.qa_needs_revision",
+  DARLA_QA_BLOCKED:         "darla.qa_blocked",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -607,6 +625,30 @@ export const LOOP_CAP_A_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.CLIENT_BRAND_PROFILE_CREATED,
   AUDIT_EVENTS.CLIENT_BRAND_PROFILE_UPDATED,
   AUDIT_EVENTS.CLIENT_BRAND_PROFILE_REVISION_BUMPED,
+];
+
+// Loop CAP-D Φ.5 — Paul intelligent delivery audit vocabulary.
+// One `paul.delivery_decided` per chain `deliver` step + per direct
+// dispatch path that routes through Paul. The other three are
+// branch-specific: variant_chosen when multi-template tenants
+// disambiguate; candidate_selected when policy=candidate_review;
+// fallback_adapter_invoked when primary adapter fails or is gated
+// by missing credentials.
+export const LOOP_CAP_D_PHI5_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.PAUL_DELIVERY_DECIDED,
+  AUDIT_EVENTS.PAUL_TEMPLATE_VARIANT_CHOSEN,
+  AUDIT_EVENTS.PAUL_CANDIDATE_SELECTED,
+  AUDIT_EVENTS.PAUL_FALLBACK_ADAPTER_INVOKED,
+];
+
+// Loop CAP-D Φ.6 — Darla brand QA gate audit vocabulary. Three
+// distinct events (one per verdict) so operators can filter audit
+// history by verdict without parsing metadata. `block` halts publish
+// and opens a revision execution_cycle.
+export const LOOP_CAP_D_PHI6_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.DARLA_QA_PASSED,
+  AUDIT_EVENTS.DARLA_QA_NEEDS_REVISION,
+  AUDIT_EVENTS.DARLA_QA_BLOCKED,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs
