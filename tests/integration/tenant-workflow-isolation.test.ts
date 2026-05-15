@@ -37,28 +37,52 @@ describeIwo3("Loop 3 Phase 1 — tenant workflow isolation", () => {
     await pool.end();
   });
 
-  it("Klear Operator sees only the Klear workflow", async () => {
+  // Loop CAP-C / Φ.4 added 8 branded chain workflows per tenant
+  // (cap_branded_*). Counts updated below to reflect the new floor.
+  // Tenant isolation invariant unchanged — operators still see only
+  // their own tenant's workflows.
+  const KLEAR_WORKFLOW_KEYS = [
+    "cap_branded_docx",
+    "cap_branded_html",
+    "cap_branded_html_21st",
+    "cap_branded_html_figma",
+    "cap_branded_html_stitch",
+    "cap_branded_md",
+    "cap_branded_pdf",
+    "cap_branded_pptx",
+    "weekly_marketing_brief",
+  ];
+  const FFAI_WORKFLOW_KEYS = [
+    "bench_report_v1",
+    "cap_branded_docx",
+    "cap_branded_html",
+    "cap_branded_html_21st",
+    "cap_branded_html_figma",
+    "cap_branded_html_stitch",
+    "cap_branded_md",
+    "cap_branded_pdf",
+    "cap_branded_pptx",
+  ];
+
+  it("Klear Operator sees only Klear workflows (CAP-C: 1 legacy + 8 branded chains)", async () => {
     const { rows } = await pool.query<{ key: string }>(LIST_WORKFLOWS_FOR_USER, [
       OPERATOR_KLEAR,
     ]);
-    expect(rows.map((r) => r.key)).toEqual(["weekly_marketing_brief"]);
+    expect(rows.map((r) => r.key).sort()).toEqual(KLEAR_WORKFLOW_KEYS);
   });
 
-  it("FFAI Operator sees only the FFAI workflow", async () => {
+  it("FFAI Operator sees only FFAI workflows (CAP-C: 1 legacy + 8 branded chain mirrors)", async () => {
     const { rows } = await pool.query<{ key: string }>(LIST_WORKFLOWS_FOR_USER, [
       OPERATOR_FFAI,
     ]);
-    expect(rows.map((r) => r.key)).toEqual(["bench_report_v1"]);
+    expect(rows.map((r) => r.key).sort()).toEqual(FFAI_WORKFLOW_KEYS);
   });
 
-  it("super (owner on both) sees both workflows", async () => {
+  it("super (owner on both) sees both tenants' workflows (18 total post-CAP-C)", async () => {
     const { rows } = await pool.query<{ key: string }>(LIST_WORKFLOWS_FOR_USER, [
       SUPER,
     ]);
-    expect(rows.map((r) => r.key).sort()).toEqual([
-      "bench_report_v1",
-      "weekly_marketing_brief",
-    ]);
+    expect(rows).toHaveLength(KLEAR_WORKFLOW_KEYS.length + FFAI_WORKFLOW_KEYS.length);
   });
 
   it("intruder sees zero workflows", async () => {
@@ -66,16 +90,17 @@ describeIwo3("Loop 3 Phase 1 — tenant workflow isolation", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("Klear Operator sees only Klear workflow templates (tenant scope is transitive)", async () => {
+  it("Klear Operator sees only Klear workflow templates — tenant scope transitive (CAP-C: 9 = 1 legacy + 8 branded chain v1)", async () => {
     const { rows } = await pool.query<{
       workflow_key: string;
       version: string;
       designation: string;
     }>(LIST_TEMPLATES_FOR_USER, [OPERATOR_KLEAR]);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].workflow_key).toBe("weekly_marketing_brief");
-    expect(rows[0].version).toBe("1");
-    expect(rows[0].designation).toBe("IWO | Klear.ai");
+    expect(rows).toHaveLength(KLEAR_WORKFLOW_KEYS.length);
+    for (const r of rows) {
+      expect(r.designation).toBe("IWO | Klear.ai");
+      expect(r.version).toBe("1");
+    }
   });
 
   it("intruder sees zero workflow templates", async () => {

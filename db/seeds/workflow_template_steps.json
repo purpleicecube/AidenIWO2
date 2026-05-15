@@ -6,8 +6,14 @@
     "stepOrder": 1,
     "displayName": "Research RMIS market landscape",
     "assignedSubAgentKey": "mark",
-    "promptRef": { "kind": "client_profile", "profileKey": "klear_brand_v1", "version": "1" },
-    "retryPolicy": { "maxRetries": 2 },
+    "promptRef": {
+      "kind": "client_profile",
+      "profileKey": "klear_brand_v1",
+      "version": "1"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
     "timeoutMs": 60000,
     "toolIds": []
   },
@@ -18,8 +24,13 @@
     "stepOrder": 2,
     "displayName": "Assemble six-section brief",
     "assignedSubAgentKey": "mark",
-    "promptRef": { "kind": "inline", "text": "Compose the weekly brief using the Klear six-section structure." },
-    "retryPolicy": { "maxRetries": 2 },
+    "promptRef": {
+      "kind": "inline",
+      "text": "Compose the weekly brief using the Klear six-section structure."
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
     "timeoutMs": 90000,
     "toolIds": []
   },
@@ -30,8 +41,13 @@
     "stepOrder": 3,
     "displayName": "PM Alpha quality review",
     "assignedSubAgentKey": "pm_alpha",
-    "promptRef": { "kind": "inline", "text": "Review the brief for tone, structure, and forbidden words." },
-    "retryPolicy": { "maxRetries": 1 },
+    "promptRef": {
+      "kind": "inline",
+      "text": "Review the brief for tone, structure, and forbidden words."
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
     "timeoutMs": 60000,
     "toolIds": []
   },
@@ -42,8 +58,13 @@
     "stepOrder": 1,
     "displayName": "Gather latest benchmark data",
     "assignedSubAgentKey": "agent_system",
-    "promptRef": { "kind": "inline", "text": "Pull last month's benchmark run summaries from the FFAI rest binding." },
-    "retryPolicy": { "maxRetries": 3 },
+    "promptRef": {
+      "kind": "inline",
+      "text": "Pull last month's benchmark run summaries from the FFAI rest binding."
+    },
+    "retryPolicy": {
+      "maxRetries": 3
+    },
     "timeoutMs": 60000,
     "toolIds": []
   },
@@ -54,8 +75,14 @@
     "stepOrder": 2,
     "displayName": "Synthesize four-section findings",
     "assignedSubAgentKey": "mark",
-    "promptRef": { "kind": "client_profile", "profileKey": "ffai_brand_v1", "version": "1" },
-    "retryPolicy": { "maxRetries": 2 },
+    "promptRef": {
+      "kind": "client_profile",
+      "profileKey": "ffai_brand_v1",
+      "version": "1"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
     "timeoutMs": 120000,
     "toolIds": []
   },
@@ -66,9 +93,1278 @@
     "stepOrder": 3,
     "displayName": "PM Alpha quality review",
     "assignedSubAgentKey": "pm_alpha",
-    "promptRef": { "kind": "inline", "text": "Review the report for clarity and benchmark-trade-off pairing." },
-    "retryPolicy": { "maxRetries": 1 },
+    "promptRef": {
+      "kind": "inline",
+      "text": "Review the report for clarity and benchmark-trade-off pairing."
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
     "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000010",
+    "templateId": "00000000-0000-4000-8000-000071000010",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (PPTX)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000011",
+    "templateId": "00000000-0000-4000-8000-000071000010",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Tom \u2014 branded render (PPTX)",
+    "assignedSubAgentKey": "tom_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000012",
+    "templateId": "00000000-0000-4000-8000-000071000010",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (PPTX)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000013",
+    "templateId": "00000000-0000-4000-8000-000071000010",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (PPTX)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000014",
+    "templateId": "00000000-0000-4000-8000-000071000011",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (PDF)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000015",
+    "templateId": "00000000-0000-4000-8000-000071000011",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Tom \u2014 branded render (PDF)",
+    "assignedSubAgentKey": "tom_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000016",
+    "templateId": "00000000-0000-4000-8000-000071000011",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (PDF)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000017",
+    "templateId": "00000000-0000-4000-8000-000071000011",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (PDF)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000018",
+    "templateId": "00000000-0000-4000-8000-000071000012",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000019",
+    "templateId": "00000000-0000-4000-8000-000071000012",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML)",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000020",
+    "templateId": "00000000-0000-4000-8000-000071000012",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000021",
+    "templateId": "00000000-0000-4000-8000-000071000012",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000022",
+    "templateId": "00000000-0000-4000-8000-000071000013",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML (stitch))",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000023",
+    "templateId": "00000000-0000-4000-8000-000071000013",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML (stitch))",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000024",
+    "templateId": "00000000-0000-4000-8000-000071000013",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML (stitch))",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch",
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000025",
+    "templateId": "00000000-0000-4000-8000-000071000013",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML (stitch))",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch",
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000026",
+    "templateId": "00000000-0000-4000-8000-000071000014",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML (figma))",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000027",
+    "templateId": "00000000-0000-4000-8000-000071000014",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML (figma))",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000028",
+    "templateId": "00000000-0000-4000-8000-000071000014",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML (figma))",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma",
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000029",
+    "templateId": "00000000-0000-4000-8000-000071000014",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML (figma))",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma",
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000030",
+    "templateId": "00000000-0000-4000-8000-000071000015",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML (twentyfirst))",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000031",
+    "templateId": "00000000-0000-4000-8000-000071000015",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML (twentyfirst))",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000032",
+    "templateId": "00000000-0000-4000-8000-000071000015",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML (twentyfirst))",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst",
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000033",
+    "templateId": "00000000-0000-4000-8000-000071000015",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML (twentyfirst))",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst",
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000034",
+    "templateId": "00000000-0000-4000-8000-000071000016",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (DOCX)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000035",
+    "templateId": "00000000-0000-4000-8000-000071000016",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Sop \u2014 branded render (DOCX)",
+    "assignedSubAgentKey": "sop_master_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000036",
+    "templateId": "00000000-0000-4000-8000-000071000016",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (DOCX)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000037",
+    "templateId": "00000000-0000-4000-8000-000071000016",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (DOCX)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000038",
+    "templateId": "00000000-0000-4000-8000-000071000017",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (MD)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000039",
+    "templateId": "00000000-0000-4000-8000-000071000017",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Sop \u2014 branded render (MD)",
+    "assignedSubAgentKey": "sop_master_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000040",
+    "templateId": "00000000-0000-4000-8000-000071000017",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (MD)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000041",
+    "templateId": "00000000-0000-4000-8000-000071000017",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (MD)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000050",
+    "templateId": "00000000-0000-4000-8000-000071000020",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (PPTX)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000051",
+    "templateId": "00000000-0000-4000-8000-000071000020",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Tom \u2014 branded render (PPTX)",
+    "assignedSubAgentKey": "tom_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000052",
+    "templateId": "00000000-0000-4000-8000-000071000020",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (PPTX)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000053",
+    "templateId": "00000000-0000-4000-8000-000071000020",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (PPTX)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000054",
+    "templateId": "00000000-0000-4000-8000-000071000021",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (PDF)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000055",
+    "templateId": "00000000-0000-4000-8000-000071000021",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Tom \u2014 branded render (PDF)",
+    "assignedSubAgentKey": "tom_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000056",
+    "templateId": "00000000-0000-4000-8000-000071000021",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (PDF)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000057",
+    "templateId": "00000000-0000-4000-8000-000071000021",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (PDF)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000058",
+    "templateId": "00000000-0000-4000-8000-000071000022",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000059",
+    "templateId": "00000000-0000-4000-8000-000071000022",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML)",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000060",
+    "templateId": "00000000-0000-4000-8000-000071000022",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000061",
+    "templateId": "00000000-0000-4000-8000-000071000022",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000062",
+    "templateId": "00000000-0000-4000-8000-000071000023",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML (stitch))",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000063",
+    "templateId": "00000000-0000-4000-8000-000071000023",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML (stitch))",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000064",
+    "templateId": "00000000-0000-4000-8000-000071000023",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML (stitch))",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch",
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000065",
+    "templateId": "00000000-0000-4000-8000-000071000023",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML (stitch))",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch",
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000066",
+    "templateId": "00000000-0000-4000-8000-000071000024",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML (figma))",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000067",
+    "templateId": "00000000-0000-4000-8000-000071000024",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML (figma))",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000068",
+    "templateId": "00000000-0000-4000-8000-000071000024",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML (figma))",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma",
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000069",
+    "templateId": "00000000-0000-4000-8000-000071000024",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML (figma))",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma",
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000070",
+    "templateId": "00000000-0000-4000-8000-000071000025",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (HTML (twentyfirst))",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000071",
+    "templateId": "00000000-0000-4000-8000-000071000025",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Hank \u2014 branded render (HTML (twentyfirst))",
+    "assignedSubAgentKey": "hank_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000072",
+    "templateId": "00000000-0000-4000-8000-000071000025",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (HTML (twentyfirst))",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst",
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000073",
+    "templateId": "00000000-0000-4000-8000-000071000025",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (HTML (twentyfirst))",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst",
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000074",
+    "templateId": "00000000-0000-4000-8000-000071000026",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (DOCX)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000075",
+    "templateId": "00000000-0000-4000-8000-000071000026",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Sop \u2014 branded render (DOCX)",
+    "assignedSubAgentKey": "sop_master_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000076",
+    "templateId": "00000000-0000-4000-8000-000071000026",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (DOCX)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000077",
+    "templateId": "00000000-0000-4000-8000-000071000026",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (DOCX)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000078",
+    "templateId": "00000000-0000-4000-8000-000071000027",
+    "stepKey": "content_brief",
+    "stepOrder": 1,
+    "displayName": "Mark \u2014 branded content brief (MD)",
+    "assignedSubAgentKey": "mark_tier_2",
+    "promptRef": {
+      "kind": "branded_content_brief",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 120000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000079",
+    "templateId": "00000000-0000-4000-8000-000071000027",
+    "stepKey": "render",
+    "stepOrder": 2,
+    "displayName": "Sop \u2014 branded render (MD)",
+    "assignedSubAgentKey": "sop_master_tier_2",
+    "promptRef": {
+      "kind": "branded_render",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 180000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000080",
+    "templateId": "00000000-0000-4000-8000-000071000027",
+    "stepKey": "brand_qa",
+    "stepOrder": 3,
+    "displayName": "Darla \u2014 brand QA gate (MD)",
+    "assignedSubAgentKey": "darla_tier_2",
+    "promptRef": {
+      "kind": "brand_qa_gate",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null,
+      "deferredFullGate": "phi6"
+    },
+    "retryPolicy": {
+      "maxRetries": 1
+    },
+    "timeoutMs": 60000,
+    "toolIds": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000072000081",
+    "templateId": "00000000-0000-4000-8000-000071000027",
+    "stepKey": "deliver",
+    "stepOrder": 4,
+    "displayName": "Paul \u2014 intelligent delivery (MD)",
+    "assignedSubAgentKey": "paul_tier_2",
+    "promptRef": {
+      "kind": "intelligent_delivery",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null,
+      "deferredFullLlm": "phi5",
+      "deferredAdapterRegistry": "phi7"
+    },
+    "retryPolicy": {
+      "maxRetries": 2
+    },
+    "timeoutMs": 90000,
     "toolIds": []
   }
 ]

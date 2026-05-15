@@ -14,5 +14,135 @@
     "displayName": "FreedomForge.AI Benchmark Report v1",
     "description": "Four-section benchmark report: setup, findings, trade-offs, next steps.",
     "status": "active"
+  },
+
+  {
+    "id": "00000000-0000-4000-8000-000070000010",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_pptx",
+    "displayName": "Branded PPTX (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → Tom (PPTX render) → Darla (brand QA gate) → Paul (intelligent delivery). Aiden routes branded PPTX intent here once Φ.8 ships; full execution requires Φ.5 (Paul LLM) + Φ.6 (Darla gate) + Φ.7 (output-surface registry).",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000011",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_pdf",
+    "displayName": "Branded PDF (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → Tom (PDF render) → Darla → Paul.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000012",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_html",
+    "displayName": "Branded HTML — self-contained (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → Hank (local self-contained HTML render) → Darla → Paul. No external design input source.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000013",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_html_stitch",
+    "displayName": "Branded HTML — Stitch design input (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → Hank (consume Stitch MCP design output) → Darla → Paul. Stitch MCP shipped via MegaLoop Theta; Klear default per design_input_sources_json.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000014",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_html_figma",
+    "displayName": "Branded HTML — Figma design input (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → Hank (consume Figma MCP design output) → Darla → Paul. Figma adapter availability gated by client_adapter_configs.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000015",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_html_21st",
+    "displayName": "Branded HTML — 21st-Magic design input (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → Hank (consume 21st-Magic MCP design output) → Darla → Paul. 21st-Magic MCP available globally per session.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000016",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_docx",
+    "displayName": "Branded DOCX (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → SOP Master (DOCX authoring) → Darla → Paul. Local python-docx renderer ships in Φ.9.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000017",
+    "clientId": "00000000-0000-4000-8000-00000000c001",
+    "key": "cap_branded_md",
+    "displayName": "Branded MD (Klear)",
+    "description": "Loop CAP-C branded chain: Mark → SOP Master (markdown authoring) → Darla → Paul. Local Jinja2 markdown renderer ships in Φ.9.",
+    "status": "active"
+  },
+
+  {
+    "id": "00000000-0000-4000-8000-000070000020",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_pptx",
+    "displayName": "Branded PPTX (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI. FF brand profile is currently a skeleton (requires_brand_qa=false per Q-PG-7); chain definition stages for activation when FF brand assets land.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000021",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_pdf",
+    "displayName": "Branded PDF (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000022",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_html",
+    "displayName": "Branded HTML — self-contained (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000023",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_html_stitch",
+    "displayName": "Branded HTML — Stitch design input (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI. FF design_input_sources_json currently has stitch=false; chain stages for activation.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000024",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_html_figma",
+    "displayName": "Branded HTML — Figma design input (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000025",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_html_21st",
+    "displayName": "Branded HTML — 21st-Magic design input (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000026",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_docx",
+    "displayName": "Branded DOCX (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI.",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000070000027",
+    "clientId": "00000000-0000-4000-8000-00000000c002",
+    "key": "cap_branded_md",
+    "displayName": "Branded MD (FF.AI)",
+    "description": "Loop CAP-C branded chain mirror for FF.AI.",
+    "status": "active"
   }
 ]

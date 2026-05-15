@@ -24,5 +24,327 @@
     },
     "status": "published",
     "publishedAt": "2026-04-19T00:00:00.000Z"
+  },
+
+  {
+    "id": "00000000-0000-4000-8000-000071000010",
+    "workflowId": "00000000-0000-4000-8000-000070000010",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded PPTX chain v1 (Klear). 4-step orchestration: Mark → Tom → Darla → Paul.",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null,
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "tom_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000011",
+    "workflowId": "00000000-0000-4000-8000-000070000011",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded PDF chain v1 (Klear).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null,
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "tom_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000012",
+    "workflowId": "00000000-0000-4000-8000-000070000012",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML chain v1 (Klear, self-contained).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null,
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000013",
+    "workflowId": "00000000-0000-4000-8000-000070000013",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML (Stitch) chain v1 (Klear).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch",
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000014",
+    "workflowId": "00000000-0000-4000-8000-000070000014",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML (Figma) chain v1 (Klear).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma",
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "figma_mcp_credentials"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000015",
+    "workflowId": "00000000-0000-4000-8000-000070000015",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML (21st-Magic) chain v1 (Klear).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst",
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000016",
+    "workflowId": "00000000-0000-4000-8000-000070000016",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded DOCX chain v1 (Klear).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null,
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "sop_master_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000017",
+    "workflowId": "00000000-0000-4000-8000-000070000017",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded MD chain v1 (Klear).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null,
+      "requiresBrandQa": true,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "sop_master_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+
+  {
+    "id": "00000000-0000-4000-8000-000071000020",
+    "workflowId": "00000000-0000-4000-8000-000070000020",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded PPTX chain v1 (FF.AI mirror). FF brand profile is skeleton today (requires_brand_qa=false per Q-PG-7); chain stages for activation when FF brand assets land.",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_pptx",
+      "outputKind": "pptx",
+      "designInputSource": null,
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "tom_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000021",
+    "workflowId": "00000000-0000-4000-8000-000070000021",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded PDF chain v1 (FF.AI mirror).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_pdf",
+      "outputKind": "pdf",
+      "designInputSource": null,
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "tom_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000022",
+    "workflowId": "00000000-0000-4000-8000-000070000022",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML chain v1 (FF.AI mirror, self-contained).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html",
+      "outputKind": "html",
+      "designInputSource": null,
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000023",
+    "workflowId": "00000000-0000-4000-8000-000070000023",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML (Stitch) chain v1 (FF.AI mirror).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html_stitch",
+      "outputKind": "html",
+      "designInputSource": "stitch",
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000024",
+    "workflowId": "00000000-0000-4000-8000-000070000024",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML (Figma) chain v1 (FF.AI mirror).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html_figma",
+      "outputKind": "html",
+      "designInputSource": "figma",
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets", "figma_mcp_credentials"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000025",
+    "workflowId": "00000000-0000-4000-8000-000070000025",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded HTML (21st-Magic) chain v1 (FF.AI mirror).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_html_21st",
+      "outputKind": "html",
+      "designInputSource": "twentyfirst",
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "hank_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000026",
+    "workflowId": "00000000-0000-4000-8000-000070000026",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded DOCX chain v1 (FF.AI mirror).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_docx",
+      "outputKind": "docx",
+      "designInputSource": null,
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "sop_master_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000071000027",
+    "workflowId": "00000000-0000-4000-8000-000070000027",
+    "version": "1",
+    "description": "Loop CAP-C / Φ.4 — branded MD chain v1 (FF.AI mirror).",
+    "config": {
+      "category": "branded_chain",
+      "chainKey": "cap_branded_md",
+      "outputKind": "md",
+      "designInputSource": null,
+      "requiresBrandQa": false,
+      "contentBriefSubAgent": "mark_tier_2",
+      "renderSubAgent": "sop_master_tier_2",
+      "brandQaSubAgent": "darla_tier_2",
+      "deliverySubAgent": "paul_tier_2",
+      "deferredPhases": ["paul_full_llm_phi5", "darla_gate_mode_phi6", "output_surface_registry_phi7", "aiden_branded_intent_phi8", "render_adapter_phi9", "ff_brand_assets"]
+    },
+    "status": "published",
+    "publishedAt": "2026-05-15T00:00:00.000Z"
   }
 ]
