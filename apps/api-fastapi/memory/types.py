@@ -12,6 +12,7 @@ from typing import Literal, Optional
 
 
 MemorySourceKind = Literal[
+    "client_grounding",     # Loop CAP-B Φ.3 — operator-curated brand truth
     "canonical_facts",
     "path_targeted",        # Loop Kappa — operator named a workspace path
     "folder_listing",       # Loop Kappa — synthesized directory map
@@ -41,6 +42,13 @@ MemorySourceKind = Literal[
 # rank above semantic_retrieval — Mu adds capability without
 # replacing deterministic-first posture (V3 brief constraint).
 SOURCE_PRIORITY: dict[str, int] = {
+    # Loop CAP-B Φ.3 — tenant-curated brand truth from
+    # `client_brand_profiles` (palette, fonts, voice, ICP, brand terms).
+    # Outranks canonical_facts because brand profile is operator-
+    # authored ground truth; canonical_facts is correctional. Pre-
+    # fetched at dispatch-time only (not in chat path); emitted via
+    # `surface="dispatch_prefetch"` audit (D12 lock).
+    "client_grounding": 0,   # brand profile pre-fetch (CAP-B); never truncated
     "canonical_facts": 1,    # never truncated; char-truncated to fit if alone exceeds
     "path_targeted": 2,      # explicit operator path intent
     "folder_listing": 3,     # synthesized directory map
@@ -85,7 +93,17 @@ MEMORY_BUDGET_TIER_2: int = 1500     # Sub-agent invocation
 # so the audit writer + tests share one vocabulary. D-L3 default
 # (accepted): same memory.applied event family with a `surface` field;
 # no event-name proliferation.
-Surface = Literal["chat", "tier_1_5_pm", "tier_2_subagent"]
+Surface = Literal[
+    "chat",
+    "tier_1_5_pm",
+    "tier_2_subagent",
+    # Loop CAP-B Φ.3 — emitted by `prefetch_dispatch_grounding`
+    # immediately before the Tier-2 subagent bundle assembles. One
+    # `memory.applied` row per branded WO dispatch; sources_used list
+    # carries exactly one `client_grounding` source (or zero if the
+    # tenant has no brand profile yet).
+    "dispatch_prefetch",
+]
 
 # 4 chars per token approximation — same heuristic used by tier_1_aiden
 # for budget pre-flight. The real provider count is logged after.

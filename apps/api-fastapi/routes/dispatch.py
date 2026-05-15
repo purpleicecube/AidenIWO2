@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 
 from adapter.dispatch import DispatchError, dispatch_gamma_for_package
 from authz.audit_writer import write_audit_row
+from memory.dispatch_grounding import prefetch_dispatch_grounding
 from memory.wrappers import (
     memory_context_builder_for_subagent,
     memory_context_builder_for_workflow,
@@ -56,6 +57,10 @@ from runtime.tier_2_subagents import (
     execute_step_run,
     invoke_tier_2,
     produce_output_package,
+)
+from runtime.template_resolver import (
+    TemplateResolution,
+    resolve_template_for_client,
 )
 from wo_wf.transitions import (
     IllegalTransition,
@@ -93,6 +98,105 @@ class DispatchResponse(BaseModel):
     clarification_question: Optional[str] = None
     handoff_id: Optional[str] = None
     error: Optional[str] = None
+
+
+async def _maybe_resolve_template_into_wo(
+    conn: asyncpg.Connection,
+    *,
+    work_order: dict,
+    client_id: str,
+    intake_text: str,
+) -> Optional[TemplateResolution]:
+    """Loop CAP-B Φ.2 — wire the shared template resolver into dispatch.
+
+    The dispatch path needs the same deterministic intake-keyword
+    template match the chat path runs at routes/aiden.py post-
+    classification. WOs submitted without an explicit template (e.g.
+    via Submit Order without picker, or via auto-dispatch from a
+    natural-language chat that pre-dates the chat-route resolver)
+    arrive here with `requested_outputs.template_profile_id == NULL`,
+    forcing `dispatch_gamma_for_package` to fire with NULL template
+    ref and Gamma to fall back to defaults — the very failure mode
+    that triggered the orchestration CAP.
+
+    This helper:
+      1. Reads the live `requested_outputs` shape (single jsonb object
+         per migration 0019 — invariant, AC-21).
+      2. Skips if a `template_profile_id` is already present (operator
+         picked one in Submit Order, or chat-route resolver already
+         fired). Idempotent.
+      3. Otherwise calls `resolve_template_for_client` with the WO
+         intake (title + description). Same resolver chat uses.
+      4. On a `matched` resolution, UPDATEs the WO's
+         `requested_outputs` to the single-object shape
+         `{output_kind, template_profile_id}` so the existing
+         propagation block downstream picks it up naturally.
+
+    Returns the resolution (or None when skipped) for caller-side
+    audit / instrumentation.
+
+    Honors:
+      - D11 — uses `template_profiles.output_kind` enum, no new routing enum.
+      - D13 — `requested_outputs` stays single-object; no promotion.
+      - P2  — chat and dispatch routes share the same resolver callable.
+    """
+    # Read existing requested_outputs (jsonb single object). The wo
+    # row dict carries it as a JSON string OR a dict depending on the
+    # asyncpg codec wiring; accept both.
+    existing_raw: Any = work_order.get("requested_outputs")
+    existing: Optional[dict] = None
+    if isinstance(existing_raw, dict):
+        existing = existing_raw
+    elif isinstance(existing_raw, str):
+        try:
+            existing = json.loads(existing_raw)
+        except (json.JSONDecodeError, ValueError):
+            existing = None
+
+    if isinstance(existing, dict) and existing.get("template_profile_id"):
+        # Already resolved upstream (Submit Order picker or chat route).
+        return None
+
+    try:
+        resolution = await resolve_template_for_client(
+            conn,
+            client_id=client_id,
+            intake_text=intake_text,
+        )
+    except Exception:  # noqa: BLE001
+        # Resolver is best-effort over a pure-LLM baseline. Never
+        # block dispatch on resolver failures (matches chat route's
+        # same try/except posture in routes/aiden.py).
+        return None
+
+    if resolution.kind != "matched" or resolution.match is None:
+        return resolution
+
+    new_shape = {
+        "output_kind": resolution.match.output_kind,
+        "template_profile_id": resolution.match.template_profile_id,
+    }
+    # Merge with any other keys the operator put in requested_outputs
+    # (defensive: no current writers add extras, but preserve them).
+    if isinstance(existing, dict):
+        merged = dict(existing)
+        merged.update(new_shape)
+    else:
+        merged = new_shape
+
+    await conn.execute(
+        """
+        UPDATE work_orders
+           SET requested_outputs = $2::jsonb,
+               updated_at = now()
+         WHERE id = $1::uuid
+           AND client_id = $3::uuid
+        """,
+        work_order["id"],
+        json.dumps(merged),
+        client_id,
+    )
+    return resolution
 
 
 async def _safe_transition_processing(
@@ -136,10 +240,11 @@ async def dispatch_work_order(
     try:
         wo = await conn.fetchrow(
             """
-            SELECT id::text         AS id,
+            SELECT id::text                 AS id,
                    title,
                    description,
-                   status::text     AS status
+                   status::text             AS status,
+                   requested_outputs::text  AS requested_outputs
               FROM work_orders
              WHERE id = $1::uuid AND client_id = $2::uuid
             """,
@@ -227,6 +332,36 @@ async def dispatch_work_order(
     if decision.decision_kind == "work_order_brief":
         brief = decision.work_order_brief
         assert brief is not None
+
+        # Loop CAP-B Φ.2 — wire shared template_resolver into dispatch.
+        # If the WO didn't carry an explicit template (Submit Order
+        # picker or chat-route resolver), run the same deterministic
+        # resolver here against the WO intake (title + description).
+        # On a `matched` resolution this UPDATEs `requested_outputs`
+        # to the live single-object shape; the existing propagation
+        # block downstream picks `template_profile_id` up unchanged.
+        # No-op when the WO already carries a template — idempotent.
+        await _maybe_resolve_template_into_wo(
+            conn,
+            work_order=dict(wo),
+            client_id=ctx["client_id"],
+            intake_text=intake_text,
+        )
+
+        # Loop CAP-B Φ.3 — pre-fetch tenant brand grounding before
+        # the Tier-2 bundle assembles. The prefetch helper emits its
+        # own `memory.applied surface=dispatch_prefetch` audit row
+        # and returns a `MemorySource(kind=client_grounding)` (or
+        # None if the tenant has no meaningful brand profile yet).
+        # The source is prepended to the Tier-2 bundle's sources
+        # (slot 0, above canonical_facts) so Tom sees brand truth
+        # before any retrieved content.
+        grounding_source = await prefetch_dispatch_grounding(
+            conn,
+            client_id=ctx["client_id"],
+            actor_user_id=ctx["user_id"],
+        )
+
         # Loop Lambda — assemble a Tier-2 memory bundle before invoking
         # the sub-agent. Fresh assembly per invocation (D-L2 default);
         # Tier-1 chat bundle NOT propagated. Bypass / no_sources falls
@@ -238,6 +373,9 @@ async def dispatch_work_order(
             sub_agent_role=brief.assigned_role,
             intake_text=intake_text,
             actor_user_id=ctx["user_id"],
+            prefetch_sources=(
+                [grounding_source] if grounding_source else None
+            ),
         )
         try:
             envelope = await invoke_tier_2(

@@ -48,13 +48,22 @@ def test_per_surface_total_under_wo_ceiling() -> None:
 # ── Surface vocabulary ───────────────────────────────────────────
 
 
-def test_surface_literal_has_three_values() -> None:
-    """Surface = Literal['chat', 'tier_1_5_pm', 'tier_2_subagent'].
+def test_surface_literal_has_four_values() -> None:
+    """Surface vocabulary closed set:
+        chat              — Tier-1 aiden_chat (Loop Iota)
+        tier_1_5_pm       — PM elaboration (Loop Lambda)
+        tier_2_subagent   — Tier-2 invocation (Loop Lambda)
+        dispatch_prefetch — dispatch-time brand grounding (Loop CAP-B Φ.3)
     Locked here so audit-row consumers can rely on the closed set.
     """
     # Literal types don't expose values directly; check via __args__.
     args = Surface.__args__  # type: ignore[attr-defined]
-    assert set(args) == {"chat", "tier_1_5_pm", "tier_2_subagent"}
+    assert set(args) == {
+        "chat",
+        "tier_1_5_pm",
+        "tier_2_subagent",
+        "dispatch_prefetch",
+    }
 
 
 # ── memory_context_builder accepts surface kwarg with default 'chat' ─

@@ -141,6 +141,7 @@ async def memory_context_builder_for_subagent(
     sub_agent_role: str,
     intake_text: str,
     actor_user_id: Optional[str] = None,
+    prefetch_sources: Optional[list] = None,
 ) -> MemoryBundle:
     """Assemble a memory bundle for a Tier-2 sub-agent invocation.
 
@@ -156,6 +157,15 @@ async def memory_context_builder_for_subagent(
     here is the WO description (or step input payload), NOT the
     operator's chat message. The wrapper does not propagate any
     Tier-1 chat bundle.
+
+    Loop CAP-B Φ.3 — `prefetch_sources` carries any dispatch-time
+    pre-fetched sources (currently `client_grounding` from
+    `prefetch_dispatch_grounding`). They are prepended to the
+    assembler output before validation + budget allocation. Distinct
+    `surface=dispatch_prefetch` audit row is emitted by the prefetch
+    helper independently; this wrapper still emits its own
+    `surface=tier_2_subagent` audit covering the full assembled
+    bundle (which includes the grounding source).
     """
     if actor_user_id:
         operator_id = actor_user_id
@@ -178,4 +188,5 @@ async def memory_context_builder_for_subagent(
         surface="tier_2_subagent",
         budget=MEMORY_BUDGET_TIER_2,
         extra_metadata=extra,
+        prefetch_sources=prefetch_sources,
     )

@@ -207,6 +207,7 @@ async def memory_context_builder(
     surface: Surface = "chat",
     budget: int = MEMORY_BUDGET_TOKENS,
     extra_metadata: Optional[dict] = None,
+    prefetch_sources: Optional[list[MemorySource]] = None,
 ) -> MemoryBundle:
     """Assemble a memory bundle for ONE memory-injecting LLM call.
 
@@ -308,6 +309,16 @@ async def memory_context_builder(
         client_id=client_id,
         user_id=user_id,
     )
+
+    # Loop CAP-B Φ.3 — prepend dispatch-prefetch sources (currently
+    # only `client_grounding` from `prefetch_dispatch_grounding`).
+    # Caller fetched these BEFORE the central builder ran and emitted
+    # its own `surface=dispatch_prefetch` audit row separately.
+    # Validator + budget allocator treat them as ordinary sources;
+    # SOURCE_PRIORITY puts client_grounding at slot 0 (above canonical
+    # facts) so it's first in the rendered block.
+    if prefetch_sources:
+        raw_sources = list(prefetch_sources) + raw_sources
 
     if not raw_sources:
         elapsed = int((time.monotonic() - started) * 1000)

@@ -83,8 +83,12 @@ def allocate(
             remaining -= src.tokens
             continue
         # Doesn't fit. Decide truncate vs drop.
-        if src.kind == "canonical_facts":
-            # Never drop canonical_facts. Truncate to remaining.
+        # Loop CAP-B Φ.3 — `client_grounding` joins canonical_facts as
+        # a never-drop kind. Brand profile is operator-curated truth;
+        # losing it silently would defeat the dispatch-prefetch
+        # purpose. Truncate at char level if it alone exceeds budget.
+        if src.kind in ("canonical_facts", "client_grounding"):
+            # Never drop. Truncate to remaining.
             new_text = truncate_to_tokens(src.text, remaining)
             new_tokens = estimate_tokens(new_text)
             kept.append(
@@ -185,6 +189,15 @@ def render_block(sources: list[MemorySource]) -> str:
     parts: list[str] = ["[MEMORY CONTEXT — tenant-validated]"]
     parts.append("")
     parts.append(_GROUNDING_RULES_PREAMBLE)
+
+    # Loop CAP-B Φ.3 — render brand profile FIRST. Outranks canonical
+    # facts (operator-curated truth precedes correctional facts). One
+    # consolidated section even when multiple client_grounding sources
+    # are passed (defensive — the prefetch typically yields exactly 1).
+    if "client_grounding" in sections:
+        parts.append("\n## CLIENT BRAND PROFILE (curated tenant truth)")
+        for src in sections["client_grounding"]:
+            parts.append(src.text.rstrip())
 
     if "canonical_facts" in sections:
         parts.append("\n## CANONICAL FACTS (authoritative)")
