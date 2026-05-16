@@ -52,6 +52,7 @@ from routes import (
 from workers.poll_worker import poll_worker_loop
 from workers.telegram_worker import telegram_worker_loop
 from workers.wo_dispatch_worker import wo_dispatch_worker_loop
+from workers.workflow_step_worker import workflow_step_worker_loop
 
 
 log = logging.getLogger("iwo3.main")
@@ -67,15 +68,23 @@ async def lifespan(app: FastAPI):
     wo_dispatch_task = asyncio.create_task(
         wo_dispatch_worker_loop(get_db_pool())
     )
+    # BUG-067 — auto-advance worker for multi-step workflow chains.
+    # Without this, every `workflow_brief` dispatch creates the chain
+    # but the 4 step_runs sit `pending` forever (no UI button, no
+    # other worker picks them up).
+    workflow_step_task = asyncio.create_task(
+        workflow_step_worker_loop(get_db_pool())
+    )
     try:
         yield
     finally:
-        for t in (worker_task, telegram_task, wo_dispatch_task):
+        for t in (worker_task, telegram_task, wo_dispatch_task, workflow_step_task):
             t.cancel()
         for t, name in (
             (worker_task, "poll_worker"),
             (telegram_task, "telegram_worker"),
             (wo_dispatch_task, "wo_dispatch_worker"),
+            (workflow_step_task, "workflow_step_worker"),
         ):
             try:
                 await t

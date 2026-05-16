@@ -718,6 +718,62 @@ def main() -> None:
                                     f"⚠️ {r.get('error')}"
                                 )
 
+                # BUG-067 — operator-controlled advance of a multi-step
+                # workflow_brief chain. The background workflow_step_worker
+                # advances pending step_runs every 10s automatically; this
+                # button is for operators who want to step through manually
+                # (mid-chain inspection, debugging, or to fire a step before
+                # the next worker tick). Shows for any WO in `processing`;
+                # the route returns 404 with a friendly hint when the WO
+                # has no running workflow_execution (e.g. single-step
+                # `work_order_brief` dispatches).
+                if st.button(
+                    "Run next step",
+                    key=f"advance-step-{wo.id}",
+                    help=(
+                        "Advance the next pending step in this WO's "
+                        "running workflow chain. Returns the step "
+                        "outcome and whether more steps remain. The "
+                        "background worker also advances pending steps "
+                        "every ~10s without operator action."
+                    ),
+                ):
+                    with st.spinner("running next step…"):
+                        try:
+                            r = api.run_next_workflow_step_by_wo(wo.id)
+                        except APIError as err:
+                            if err.status_code == 404:
+                                d = err.detail or {}
+                                st.info(
+                                    f"⏸ {d.get('hint', d)}"
+                                )
+                            else:
+                                st.error(
+                                    f"❌ {err.status_code} — {err.detail}"
+                                )
+                            r = None
+                    if r:
+                        if r.get("ok"):
+                            if r.get("workflow_finished"):
+                                st.success(
+                                    "✅ workflow finished — all steps "
+                                    "complete"
+                                )
+                            else:
+                                pkg_id = r.get("output_package_id")
+                                pkg_suffix = (
+                                    f" → output_package `{pkg_id}`"
+                                    if pkg_id else ""
+                                )
+                                st.success(
+                                    f"✅ advanced `{r.get('step_key')}` "
+                                    f"(step_run `{r.get('step_run_id')}`)"
+                                    f"{pkg_suffix}"
+                                )
+                            st.rerun()
+                        else:
+                            st.warning(f"⚠️ {r.get('error')}")
+
                 if st.button(
                     "Render via Gamma",
                     key=f"render-{wo.id}",

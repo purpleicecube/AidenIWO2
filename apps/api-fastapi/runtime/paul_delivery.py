@@ -282,6 +282,13 @@ async def invoke_paul_delivery(
 
     paul_intake = "\n\n".join(paul_intake_parts)
 
+    # BUG-068 — same universal pattern as Darla brand_qa: append the
+    # runtime-enforced intelligent_delivery mode contract so the LLM
+    # gets the exact metadata.outcome + adapter_key requirements
+    # regardless of which persona prompt the resolver returns.
+    from runtime.tier_2_subagents import (  # noqa: PLC0415 — local to avoid cycle
+        TIER_2_MODE_CONTRACT_INTELLIGENT_DELIVERY,
+    )
     envelope = await invoke_tier_2(
         conn,
         role="paul_tier_2",
@@ -297,6 +304,7 @@ async def invoke_paul_delivery(
         client_id=client_id,
         actor_user_id=actor_user_id,
         memory_block=memory_block,
+        mode_contract=TIER_2_MODE_CONTRACT_INTELLIGENT_DELIVERY,
         transport=transport,
     )
 

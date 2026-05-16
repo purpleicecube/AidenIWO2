@@ -201,13 +201,23 @@ Schema:
     "content_markdown": "the deliverable, as markdown",
     "summary": "one-line summary of what you produced",
     "output_kind": "gamma_pptx | gamma_pdf | generic",
-    "metadata": { ... sub-agent specific fields ... }
+    "metadata": { ... sub-agent specific fields — see mode contract appended below when applicable ... }
   },
   "tool_call": {
     "tool_name": "<one of the tools assigned to you>",
     "args": { ... }
   }
 }
+
+The JSON schema in this section is THE contract — it SUPERSEDES any
+other "OUTPUT FORMAT", "DECISION SCHEMA", or JSON example that may
+appear earlier in this system prompt. BUG-068 — Klear/FFAI Tier-2
+personas were ported from IWO2 and some include obsolete IWO2-era
+output shapes (`phase` / `decision` / `mode` / `assigned_agent` /
+fields like `score` / `verdict` / `assessment` at the top level) with
+no `decision_kind` discriminator. Those shapes are DEAD. Ignore them.
+The runtime validates against `decision_kind` + `content_envelope`;
+any other shape fails closed.
 
 Only include the subobject matching `decision_kind`. Output JSON ONLY,
 no commentary, no markdown fences.
@@ -223,9 +233,13 @@ You must respond with a strict JSON object of the form:
     "content_markdown": "the deliverable, as markdown",
     "summary": "one-line summary of what you produced",
     "output_kind": "gamma_pptx | gamma_pdf | generic",
-    "metadata": { ... sub-agent specific fields ... }
+    "metadata": { ... sub-agent specific fields — see mode contract appended below when applicable ... }
   }
 }
+
+The schema above SUPERSEDES any obsolete IWO2-era OUTPUT FORMAT block
+that may appear earlier in this system prompt (see BUG-068). Producing
+any other shape fails closed.
 
 You have already exhausted your tool-call budget for this work order;
 do NOT request another tool. Compose the final deliverable using
@@ -236,6 +250,98 @@ no commentary, no fences.
 # Back-compat: legacy callers / docs may still reference the original
 # constant name. Resolves to the dual-mode schema (tool_call enabled).
 TIER_2_OUTPUT_SCHEMA = TIER_2_OUTPUT_SCHEMA_BASE
+
+
+# BUG-068 — mode-specific metadata contracts. The IWO3 runtime
+# REQUIRES specific metadata.* fields when a Tier-2 sub-agent is
+# invoked in a structured mode (Darla's brand_attestation, Paul's
+# intelligent_delivery, future modes). Tenants frequently ported
+# IWO2 persona prompts that don't describe these metadata fields,
+# so the LLM emits a content_envelope without them and the runtime
+# parser fails closed. Solution: keep the persona prompt about voice
+# / role guidance only, and APPEND the mode contract from this
+# runtime registry whenever a structured-mode call is made.
+#
+# Pattern: persona_prompt + TIER_2_OUTPUT_SCHEMA_BASE + mode_contract
+#
+# The contract names the exact metadata.* fields with types + allowed
+# values, and explicitly tells the LLM to ignore any conflicting
+# `metadata` description from the persona prompt.
+
+TIER_2_MODE_CONTRACT_BRAND_ATTESTATION = """
+
+# Brand-attestation mode contract (runtime-enforced)
+
+You have been invoked in `brand_attestation` mode (signalled by
+`content_blocks.qa_mode = "brand_attestation"` in the user message).
+Override any persona-level scoring or critique format — for this turn
+you MUST populate `content_envelope.metadata` with exactly these fields:
+
+  - overall: "pass" | "needs_revision" | "block"   (REQUIRED)
+  - palette_pass: bool                              (REQUIRED)
+  - fonts_pass:   bool                              (REQUIRED)
+  - voice_pass:   bool                              (REQUIRED)
+  - asset_pass:   bool                              (REQUIRED)
+  - notes:        array of ≤ 8 short actionable strings  (REQUIRED on
+                  "needs_revision" / "block"; may be [] on "pass")
+
+Verdict semantics:
+  - pass            — all four pass flags true; deliverable ships.
+  - needs_revision  — one or more pass flags false but recoverable;
+                      render step regenerates using `notes` as feedback.
+  - block           — egregious violation (off-brand colors, wrong
+                      product domain, brand-confusion risk, prohibited
+                      content); operator adjudicates. Use sparingly;
+                      prefer `needs_revision` when the issue is fixable.
+
+`content_markdown` may still contain prose review notes for human
+readers, but the runtime ONLY reads `metadata.overall` + per-criterion
+flags. A response missing `metadata.overall` (or one not in the three
+allowed values) is treated as `block` with parse-failure notes.
+"""
+
+
+TIER_2_MODE_CONTRACT_INTELLIGENT_DELIVERY = """
+
+# Intelligent-delivery mode contract (runtime-enforced)
+
+You have been invoked in `intelligent` delivery mode (signalled by
+`content_blocks.delivery_mode = "intelligent"` in the user message).
+Override any persona-level handoff prose — for this turn you MUST
+populate `content_envelope.metadata` with exactly these fields:
+
+  - outcome: "primary_dispatch" | "fallback_dispatch" | "blocked"  (REQUIRED)
+  - template_profile_id:    UUID string of the chosen template, or null on "blocked"
+  - adapter_key:            chosen adapter key (must match either
+                            `content_blocks.primary_adapter_key` OR
+                            one of `content_blocks.fallback_adapter_keys`)
+  - fallback_adapter_keys:  ordered array of adapter keys to try if
+                            the chosen adapter fails (may be [])
+  - decision_reason:        short string explaining the choice
+  - candidate_choice:       optional candidate_id when candidate-review
+                            policy was active (rare — leave null otherwise)
+
+The base Tier-2 envelope ALSO requires `content_envelope.content_markdown`
+to be a non-empty string — the runtime parser rejects with
+`output_malformed: content_markdown missing or empty` otherwise. For
+intelligent-delivery mode, `content_markdown` is for human readers only
+(audit log + operator review); the actual delivery decision lives in
+`metadata`. A 1-2 sentence summary is sufficient — e.g.:
+  "Dispatching package <id> via <adapter_key> with template
+  <profile_key>. Brand attestation: <pass|needs_revision|block>."
+
+Rules:
+  - When the package already carries a `template_profile_id` AND the
+    tenant has only one registered variant for that output_kind, the
+    decision is deterministic: outcome="primary_dispatch", adapter_key
+    = primary_adapter_key, template_profile_id = the existing one.
+  - When multiple template variants exist, choose by content fit +
+    any brand-attestation signal present in the intake.
+  - Use "blocked" only when no path is viable — operator must adjudicate.
+
+A response missing `metadata.outcome` (or one not in the three allowed
+values) is treated as `blocked` with parse-failure notes.
+"""
 
 
 @dataclass(frozen=True)
@@ -484,6 +590,7 @@ async def _invoke_tier_2_once(
     actor_user_id: Optional[str],
     disable_tool_call: bool,
     memory_block: str = "",
+    mode_contract: str = "",
     transport=None,
 ) -> Tier2Decision:
     """Single Tier 2 round-trip. Returns either an envelope (final
@@ -493,7 +600,13 @@ async def _invoke_tier_2_once(
 
     `disable_tool_call=True` swaps in the no-tool-call schema so the
     LLM is forced to compose a final envelope (used after the cap is
-    reached)."""
+    reached).
+
+    `mode_contract` (BUG-068) — optional runtime-enforced metadata
+    contract appended after the base schema. Use one of the
+    `TIER_2_MODE_CONTRACT_*` constants when invoking Tier-2 in a
+    structured mode (Darla brand_attestation, Paul intelligent_delivery,
+    future modes). Empty string preserves the legacy behavior."""
     schema = (
         TIER_2_OUTPUT_SCHEMA_NO_TOOL_CALL
         if disable_tool_call
@@ -507,10 +620,17 @@ async def _invoke_tier_2_once(
     # tenant-validated facts appear at the top of the system message.
     # Empty string is the safe default — Iota/Kappa Tier-2 behavior
     # preserved for callers that don't yet pass memory.
+    #
+    # BUG-068 — append the mode_contract AFTER the base schema so the
+    # mode-specific metadata requirements are the last thing the LLM
+    # reads. Mirrors the Aiden/PM "always-append runtime contract"
+    # pattern (BUG-065/066): persona is voice/role guidance only;
+    # structured-output contracts are runtime-enforced.
+    composed_schema = schema + (mode_contract or "")
     if memory_block:
-        system_prompt = memory_block + "\n\n" + base_role_prompt + schema
+        system_prompt = memory_block + "\n\n" + base_role_prompt + composed_schema
     else:
-        system_prompt = base_role_prompt + schema
+        system_prompt = base_role_prompt + composed_schema
 
     user_msg = json.dumps(
         {"intake_text": intake_text, "content_blocks": content_blocks}
@@ -609,6 +729,7 @@ async def invoke_tier_2(
     client_id: str,
     actor_user_id: Optional[str],
     memory_block: str = "",
+    mode_contract: str = "",
     transport=None,
 ) -> Tier2OutputEnvelope:
     """Run a Tier 2 sub-agent end-to-end, including up to
@@ -697,6 +818,7 @@ async def invoke_tier_2(
             actor_user_id=actor_user_id,
             disable_tool_call=disable_tool_call,
             memory_block=memory_block,
+            mode_contract=mode_contract,
             transport=transport,
         )
 

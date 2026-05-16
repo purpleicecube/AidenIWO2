@@ -49,7 +49,13 @@ PM_TIER_15_ROLE = "pm_tier_15"
 PM_CONTRACT_VERSION = "v1.alpha"
 
 
-PM_SYSTEM_PROMPT = """You are PM, the Tier 1.5 Workflow Coordinator for IWO3.
+# BUG-065 — split the PM system prompt into a role-description portion
+# and a strict output-schema portion. Tenants may override the role
+# portion (via `llm_configs.system_prompt`) to customize voice or
+# domain guidance, but the output schema is the runtime contract that
+# `_parse_step_plan` validates and MUST always be appended. Mirrors
+# the pattern Tier-2 uses (DEFAULT_SYSTEM_PROMPTS + TIER_2_OUTPUT_SCHEMA_*).
+PM_BASE_ROLE_PROMPT = """You are PM, the Tier 1.5 Workflow Coordinator for IWO3.
 
 Aiden (Tier 1) has classified an intake as a multi-step workflow and
 picked a workflow_template. Your job is to take Aiden's draft step
@@ -62,6 +68,14 @@ You will receive:
   - template_key          the chosen workflow_template_key
   - template_steps        ordered list of {step_key, sub_agent_role, description}
   - aiden_step_inputs     {step_key: {...}} draft inputs from Aiden
+"""
+
+
+PM_OUTPUT_SCHEMA = """
+
+# Output contract (do not deviate — appended by the runtime to
+# guarantee the parser-validated shape regardless of any tenant
+# `llm_configs.system_prompt` override that does not include it).
 
 Respond with strict JSON:
 
@@ -75,6 +89,15 @@ Respond with strict JSON:
   ]
 }
 
+The JSON schema in this section is THE contract — it SUPERSEDES any
+other "OUTPUT FORMAT", "DECISION SCHEMA", or JSON example that may
+appear earlier in this system prompt. BUG-068 — Klear's seeded PM
+Alpha prompt was IWO2-ported and describes per-step evaluation
+criteria but does NOT emit `step_plan`. Ignore any IWO2-era scoring
+shape (`score`, `verdict`, `next_action`, etc.) at the top level. The
+runtime validates against `step_plan`; any other shape fails
+`plan_malformed`.
+
 Rules:
 - Produce one step_plan entry per template_step, in the same order.
 - assigned_role values should match the corresponding template step's
@@ -84,6 +107,11 @@ Rules:
 - input must be a non-empty object the named sub-agent can act on.
 - Output JSON ONLY. No commentary, no markdown fences.
 """
+
+
+# Composed default used when no tenant override is present. Kept under
+# the historical name so any external readers still resolve it.
+PM_SYSTEM_PROMPT = PM_BASE_ROLE_PROMPT + PM_OUTPUT_SCHEMA
 
 
 class PmError(Exception):
@@ -424,21 +452,35 @@ async def instantiate_workflow_from_brief(
         )
         raise PmError("credential_missing", str(exc))
 
-    user_msg = json.dumps(
-        {
-            "intake_text": intake_text,
-            "aiden_summary": aiden_summary,
-            "template_key": template_key,
-            "template_steps": [
-                {
-                    "step_key": s.step_key,
-                    "sub_agent_role": s.assigned_sub_agent_key,
-                    "description": s.display_name,
-                }
-                for s in steps
-            ],
-            "aiden_step_inputs": brief.step_inputs,
-        }
+    # Groq's JSON-mode validator (and OpenAI's, when strict) requires
+    # the literal word "json" to appear somewhere in the request
+    # messages whenever response_format=json_object is set. The
+    # `json.dumps(...)` payload below produces JSON *syntax* but not
+    # the literal text "json", so we lead with a short instruction
+    # that satisfies the guard regardless of whether a tenant's custom
+    # system_prompt happens to include the word. This is belt + braces
+    # over PM_SYSTEM_PROMPT (which does mention JSON) because the
+    # config_resolver fallback path can substitute the aiden_tier_1
+    # system_prompt when no pm_tier_15 row exists for the tenant.
+    user_msg = (
+        "Respond strictly as a JSON object matching the schema "
+        "described in the system prompt. Inputs follow:\n"
+        + json.dumps(
+            {
+                "intake_text": intake_text,
+                "aiden_summary": aiden_summary,
+                "template_key": template_key,
+                "template_steps": [
+                    {
+                        "step_key": s.step_key,
+                        "sub_agent_role": s.assigned_sub_agent_key,
+                        "description": s.display_name,
+                    }
+                    for s in steps
+                ],
+                "aiden_step_inputs": brief.step_inputs,
+            }
+        )
     )
     options = dict(cfg.options or {})
     options.setdefault("max_tokens", resolve_max_tokens(cfg.options))
@@ -448,7 +490,17 @@ async def instantiate_workflow_from_brief(
     # the wrapper supplies one. Empty string is the safe default
     # (preserves Iota/Kappa Tier-1 behavior unchanged for callers
     # that don't yet pass memory).
-    base_system_prompt = cfg.system_prompt or PM_SYSTEM_PROMPT
+    #
+    # BUG-065 — always append PM_OUTPUT_SCHEMA to whatever role prompt
+    # we end up with. Tenants may have customized `cfg.system_prompt`
+    # (e.g. Klear's IWO2-ported PM Alpha prompt is 5650 chars and does
+    # NOT include the strict {"step_plan":[...]} contract that
+    # `_parse_step_plan` validates). Appending the schema unconditionally
+    # mirrors the Tier-2 pattern (DEFAULT_SYSTEM_PROMPTS[role] +
+    # TIER_2_OUTPUT_SCHEMA_BASE) and guarantees the runtime contract
+    # holds regardless of tenant prompt customization.
+    base_role_prompt = cfg.system_prompt or PM_BASE_ROLE_PROMPT
+    base_system_prompt = base_role_prompt + PM_OUTPUT_SCHEMA
     if memory_block:
         composed_system_prompt = memory_block + "\n\n" + base_system_prompt
     else:

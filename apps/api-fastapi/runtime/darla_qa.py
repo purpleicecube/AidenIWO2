@@ -235,6 +235,16 @@ async def invoke_darla_qa(
         )
     darla_intake = "\n\n".join(darla_intake_parts)
 
+    # BUG-068 — append the runtime-enforced brand_attestation mode
+    # contract so the LLM gets the exact metadata.overall + per-criterion
+    # field requirements regardless of what's in the tenant's persona
+    # prompt. Tenants that ported IWO2 Darla personas often omit the
+    # IWO3 brand_attestation contract; without this append the LLM
+    # emits a generic content_envelope and `_parse_attestation` fails
+    # closed with "Darla output did not match the structured contract".
+    from runtime.tier_2_subagents import (  # noqa: PLC0415 — local to avoid cycle
+        TIER_2_MODE_CONTRACT_BRAND_ATTESTATION,
+    )
     envelope = await invoke_tier_2(
         conn,
         role="darla_tier_2",
@@ -247,6 +257,7 @@ async def invoke_darla_qa(
         client_id=client_id,
         actor_user_id=actor_user_id,
         memory_block=memory_block,
+        mode_contract=TIER_2_MODE_CONTRACT_BRAND_ATTESTATION,
         transport=transport,
     )
 

@@ -24,3 +24,7 @@ os.environ.setdefault("IWO3_TELEGRAM_WORKER_DISABLED", "true")
 # 30s-tick worker out of pytest TestClient lifespans so it doesn't
 # move pending → processing on rows other tests are exercising.
 os.environ.setdefault("IWO3_WO_DISPATCH_WORKER_DISABLED", "true")
+# BUG-067 — workflow step auto-advance worker. Same posture: keep
+# the 10s-tick worker out of pytest TestClient lifespans so it
+# doesn't advance step_runs other tests are exercising.
+os.environ.setdefault("IWO3_WORKFLOW_STEP_WORKER_DISABLED", "true")

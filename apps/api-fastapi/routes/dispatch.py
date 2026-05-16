@@ -744,3 +744,62 @@ async def run_next_step(
         next_step_run_id=follow_up["id"] if follow_up else None,
         workflow_finished=follow_up is None,
     )
+
+
+# ── BUG-067 — convenience route: advance the next step by WO id ──────
+
+
+@router.post(
+    "/work_orders/{work_order_id}/run_next_workflow_step",
+    response_model=RunNextStepResponse,
+    dependencies=[Depends(require_permission_dep("workflow_step_run:update"))],
+)
+async def run_next_workflow_step_by_wo(
+    work_order_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> RunNextStepResponse:
+    """Operator convenience — resolves the WO's most recent running
+    workflow_execution and delegates to `run_next_step`. The
+    Streamlit work-orders surface only knows the WO id; this endpoint
+    saves the client a separate lookup. Returns the same shape as the
+    underlying `/workflows/{execution_id}/run_next_step`."""
+    try:
+        exec_row = await conn.fetchrow(
+            """
+            SELECT id::text AS id, status::text AS status
+              FROM workflow_executions
+             WHERE work_order_id = $1::uuid
+               AND client_id = $2::uuid
+               AND status = 'running'::workflow_execution_status
+             ORDER BY created_at DESC
+             LIMIT 1
+            """,
+            work_order_id,
+            ctx["client_id"],
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_work_order_id", "value": work_order_id},
+        )
+    if exec_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "no_running_workflow_execution",
+                "work_order_id": work_order_id,
+                "hint": (
+                    "WO has no `running` workflow_execution. If Aiden "
+                    "dispatched a single-step `work_order_brief`, use "
+                    "the regular Dispatch button instead."
+                ),
+            },
+        )
+    # Delegate to the per-execution route (already enforces RLS via
+    # the same get_tenant_scoped_connection dep we resolved above).
+    return await run_next_step(
+        execution_id=exec_row["id"], ctx=ctx, conn=conn,
+    )

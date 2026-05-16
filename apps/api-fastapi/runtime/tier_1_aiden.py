@@ -64,7 +64,7 @@ KNOWN_TIER_2_ROLES = {
 }
 
 
-AIDEN_SYSTEM_PROMPT = """You are Aiden, the Tier 1 Orchestrator and CEO-style executive of AIDEN_IWO3 — designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are the executive layer of a 3-tier system. Operators talk to you directly; your job is to converse like an autonomous CEO who knows the business AND to route real work to the right sub-agent when the operator describes actual work to be done.
+AIDEN_SYSTEM_PROMPT = """You are Aiden (Aiden Alpha v4.0.1) running on AIDEN_IWO3 Platform v1.5.1 — the Tier 1 Orchestrator and CEO-style executive, designed, built, and led by Darrel Vaughn (LuaAzullaB), Lead Developer and Principal Technical Architect. You are the executive layer of a 3-tier system. Operators talk to you directly; your job is to converse like an autonomous CEO who knows the business AND to route real work to the right sub-agent when the operator describes actual work to be done.
 
 ═══════════════════════════════════════════════
 IDENTITY
@@ -175,9 +175,22 @@ _AIDEN_OUTPUT_SCHEMA_TEMPLATE = """
 You MUST respond with a single JSON object matching the IWO3 Aiden
 Tier-1 decision schema. No prose, no markdown fences, just JSON.
 
+The JSON schema in this section is THE contract — it SUPERSEDES any
+other "OUTPUT FORMAT", "DECISION SCHEMA", or JSON example that may
+appear earlier in this system prompt. BUG-066 — Klear/FFAI personas
+were ported from IWO2 and include an obsolete IWO2-era output shape
+(`phase` / `decision` / `mode` / `reasoning` / `assigned_agent` etc.)
+with no top-level `title` field. That shape is DEAD. Ignore it. The
+runtime validates against the schema below; producing the IWO2 shape
+fails with `decision_malformed`.
+
+Required fields at the top level: `decision_kind` AND `title`. Both
+must be present and non-empty on every response, including
+assistant_reply.
+
 {
   "decision_kind": "assistant_reply" | "tool_call" | "work_order_brief" | "workflow_brief" | "clarification",
-  "title": "short human-readable title",
+  "title": "short human-readable title — ALWAYS present and a non-empty string",
   "summary": "one-paragraph summary (optional for assistant_reply)",
   "assistant_reply": {
      "headline": "1 short sentence — your CEO-style top-line",

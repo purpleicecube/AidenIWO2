@@ -6,6 +6,8 @@ shelling into env."""
 from __future__ import annotations
 
 import os
+import time
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 import asyncpg
@@ -23,11 +25,19 @@ from llm.credentials import env_var_from_credential_ref
 
 router = APIRouter(tags=["health"])
 
+# Process boot time — captured once at import. Used to compute uptime
+# on /healthz so the System Health KPI tile can render an Uptime card
+# without a separate endpoint or external scrape.
+_PROCESS_STARTED_AT = datetime.now(timezone.utc)
+_PROCESS_STARTED_MONOTONIC = time.monotonic()
+
 
 class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+    started_at: str
+    uptime_seconds: int
 
 
 class ReadyResponse(BaseModel):
@@ -61,18 +71,30 @@ class LlmHealthResponse(BaseModel):
     per_wo_ceiling: int
 
 
+def _build_health_response() -> HealthResponse:
+    uptime = int(time.monotonic() - _PROCESS_STARTED_MONOTONIC)
+    return HealthResponse(
+        status="ok",
+        service="iwo3-api-fastapi",
+        # 2026-05-16 — bumped from "0.0.1" scaffold marker to track the
+        # canonical app version in package.json so /healthz returns a
+        # number operators can match against the Streamlit footer +
+        # the MCP-client handshake. Bump in lockstep with package.json
+        # going forward.
+        version="1.5.1",
+        started_at=_PROCESS_STARTED_AT.isoformat(),
+        uptime_seconds=uptime,
+    )
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    return HealthResponse(
-        status="ok", service="iwo3-api-fastapi", version="0.0.1"
-    )
+    return _build_health_response()
 
 
 @router.get("/healthz", response_model=HealthResponse)
 async def healthz() -> HealthResponse:
-    return HealthResponse(
-        status="ok", service="iwo3-api-fastapi", version="0.0.1"
-    )
+    return _build_health_response()
 
 
 @router.get("/readyz", response_model=ReadyResponse)
