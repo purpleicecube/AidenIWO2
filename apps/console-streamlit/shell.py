@@ -525,7 +525,7 @@ def render_sidebar_footer() -> None:
             <div class="role">{tenant_label}<span class="iwo3-chip-admin">{role}</span></div>
           </div>
         </div>
-        <div class="iwo3-footer">AIDEN_IWO3 v1.2.3</div>
+        <div class="iwo3-footer">AIDEN_IWO3 v1.5.1</div>
         """,
         unsafe_allow_html=True,
     )
@@ -543,6 +543,20 @@ def page_requires_api() -> Optional[ApiClient]:
     if api is None:
         st.info("Open **Dashboard** first — the shell sets the auth context.")
         return api
+    # BUG-004 — self-heal pre-fix session state: an ApiClient instance
+    # constructed before the auto-refresh fix has no `_refresh_token`
+    # attribute (or it's None) even though session_state still holds
+    # the operator's refresh_token from /auth/login. Hydrate it here
+    # so the next 401-expired triggers a transparent refresh instead
+    # of forcing a sign-out/sign-in cycle.
+    stored_refresh = st.session_state.get("iwo3_refresh_token")
+    if stored_refresh and getattr(api, "_refresh_token", None) is None:
+        try:
+            api.set_refresh_token(stored_refresh)
+        except AttributeError:
+            # Pre-fix ApiClient won't have set_refresh_token. Setting
+            # the attribute directly is the safe fallback.
+            api._refresh_token = stored_refresh
     _render_top_right_home_link()
     return api
 

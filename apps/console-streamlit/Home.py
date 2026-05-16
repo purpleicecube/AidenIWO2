@@ -367,7 +367,11 @@ def _set_jwt_session(
     access_token: str,
     refresh_token: str,
 ) -> None:
-    api = ApiClient(base_url=base_url, access_token=access_token)
+    api = ApiClient(
+        base_url=base_url,
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
     tenant_label = _DEFAULT_TENANT_LABEL
     role = "member"
     try:
@@ -439,6 +443,20 @@ def _render_public_landing() -> None:
         )
         st.markdown('<div class="iwo3-login-wrap">', unsafe_allow_html=True)
         with st.form("iwo3-landing-login", border=False):
+            tenant_choices = list(TENANT_LABELS.items())
+            tenant_default_idx = next(
+                (i for i, (cid, _) in enumerate(tenant_choices) if cid == _DEFAULT_CLIENT_ID),
+                0,
+            )
+            tenant_idx = st.selectbox(
+                "Tenant",
+                options=list(range(len(tenant_choices))),
+                format_func=lambda i: tenant_choices[i][1],
+                index=tenant_default_idx,
+                key="iwo3_login_tenant_idx",
+                label_visibility="collapsed",
+            )
+            chosen_client_id = tenant_choices[tenant_idx][0]
             email = st.text_input(
                 "Email",
                 key="iwo3_login_email",
@@ -460,12 +478,12 @@ def _render_public_landing() -> None:
                 tokens = api.login(
                     email=email.strip(),
                     password=password,
-                    client_id=_DEFAULT_CLIENT_ID,
+                    client_id=chosen_client_id,
                 )
                 _set_jwt_session(
                     base_url=base_url,
                     email=email.strip(),
-                    client_id=_DEFAULT_CLIENT_ID,
+                    client_id=chosen_client_id,
                     access_token=tokens["access_token"],
                     refresh_token=tokens["refresh_token"],
                 )

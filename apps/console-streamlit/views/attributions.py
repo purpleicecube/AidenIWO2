@@ -1260,19 +1260,16 @@ def main() -> None:
     st.html(_CSS)
     st.html('<div class="iwo3-attr-wrap">')
 
-    if st.button("← Back", key="attr-back", type="tertiary"):
-        # Authenticated callers came from the Tier Overview surface;
-        # public/anonymous callers came from the landing page. The
-        # Tier Overview switch_page is the existing legacy default;
-        # if it's unreachable (no auth context), Streamlit raises
-        # which Streamlit's own runtime handles by ignoring.
-        try:
-            st.switch_page("views/tier_overview.py")
-        except Exception:  # noqa: BLE001
-            try:
-                st.switch_page("Home.py")
-            except Exception:  # noqa: BLE001
-                pass
+    # Authenticated callers came from the Tier Overview surface;
+    # public/anonymous callers came from the landing page. Use a real
+    # anchor so the browser resolves the route at the URL layer — this
+    # works in both routers, where st.switch_page would raise in the
+    # public router (only landing + attributions are registered).
+    back_href = "/tier_overview" if st.session_state.get("iwo3_logged_in") else "/"
+    st.html(
+        f'<a class="iwo3-attr-back" href="{back_href}" target="_self">'
+        f'← Back</a>'
+    )
 
     st.html(
         '<h1 class="iwo3-attr-title">Attribution Register</h1>'

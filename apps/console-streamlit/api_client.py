@@ -141,9 +141,11 @@ class ApiClient:
         user_id: Optional[str] = None,
         client_id: Optional[str] = None,
         access_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._headers: dict[str, str] = {}
+        self._refresh_token: Optional[str] = refresh_token
         if access_token:
             self.set_bearer_token(access_token)
         else:
@@ -162,8 +164,52 @@ class ApiClient:
         self._headers.pop("X-IWO3-Client", None)
         self._headers["Authorization"] = f"Bearer {access_token}"
 
+    def set_refresh_token(self, refresh_token: Optional[str]) -> None:
+        self._refresh_token = refresh_token
+
     def clear_auth(self) -> None:
         self._headers.clear()
+        self._refresh_token = None
+
+    def _is_expired_401(self, status_code: int, detail: Any) -> bool:
+        """BUG-004 — detect FastAPI's specific expired-token 401 shape
+        so _request can attempt a single transparent refresh before
+        surfacing the failure to the caller."""
+        if status_code != 401:
+            return False
+        if not isinstance(detail, dict):
+            return False
+        return (
+            detail.get("error") == "invalid_token"
+            and detail.get("kind") == "expired"
+        )
+
+    def _try_refresh_access_token(self) -> bool:
+        """POST /auth/refresh using the stored refresh_token. On
+        success, updates the bearer header in place and returns True.
+        On failure (no refresh token, or refresh also expired/revoked),
+        returns False — the caller surfaces the original 401."""
+        if not self._refresh_token:
+            return False
+        url = f"{self._base_url}/auth/refresh"
+        try:
+            r = httpx.post(
+                url,
+                json={"refresh_token": self._refresh_token},
+                timeout=30.0,
+            )
+        except httpx.HTTPError:
+            return False
+        if r.status_code != 200:
+            return False
+        try:
+            new_access = r.json().get("access_token")
+        except Exception:  # noqa: BLE001
+            return False
+        if not new_access:
+            return False
+        self.set_bearer_token(new_access)
+        return True
 
     def _request(
         self,
@@ -172,6 +218,7 @@ class ApiClient:
         *,
         params: Optional[dict] = None,
         json: Optional[dict] = None,
+        _retry: bool = True,
     ) -> Any:
         url = f"{self._base_url}{path}"
         try:
@@ -181,7 +228,7 @@ class ApiClient:
                 params=params,
                 json=json,
                 headers=self._headers,
-                timeout=10.0,
+                timeout=30.0,
             )
         except httpx.HTTPError as err:
             raise APIError(
@@ -192,6 +239,21 @@ class ApiClient:
                 detail = r.json().get("detail", r.text)
             except Exception:  # noqa: BLE001
                 detail = r.text
+            # BUG-004 — transparent token refresh on expired-only 401.
+            # _retry guard prevents an infinite loop if refresh
+            # succeeds but the retried request still 401s (which would
+            # mean the underlying authz check is failing for a reason
+            # other than expiry — surface the failure honestly).
+            if (
+                _retry
+                and self._is_expired_401(r.status_code, detail)
+                and self._try_refresh_access_token()
+            ):
+                return self._request(
+                    method, path,
+                    params=params, json=json,
+                    _retry=False,
+                )
             raise APIError(status_code=r.status_code, detail=detail, url=url)
         return r.json()
 
@@ -535,6 +597,14 @@ class ApiClient:
     def run_next_workflow_step(self, execution_id: str) -> dict[str, Any]:
         return self._request(
             "POST", f"/workflows/{execution_id}/run_next_step"
+        )
+
+    def run_next_workflow_step_by_wo(self, wo_id: str) -> dict[str, Any]:
+        """BUG-067 — operator convenience: look up the WO's latest
+        running workflow_execution server-side and advance one step
+        without the client having to know the execution_id."""
+        return self._request(
+            "POST", f"/work_orders/{wo_id}/run_next_workflow_step"
         )
 
     def render_work_order(self, wo_id: str) -> dict[str, Any]:
