@@ -209,23 +209,39 @@ def _normalize_role_for_matrix(raw: str) -> Optional[str]:
     return None
 
 
+def _surface_label(output_kind: str, design_input_source: Optional[str]) -> str:
+    """Canonical surface label used across BOTH the per-role surfaces
+    list AND the degraded-surfaces list. When a chain carries a
+    design_input_source, the label is `kind+design` (so html chains
+    distinguish self / stitch / figma / 21st); otherwise just `kind`.
+    Using one labeling scheme everywhere keeps the degraded-of-total
+    count dimensionally correct."""
+    if design_input_source:
+        return f"{output_kind}+{design_input_source}"
+    return output_kind
+
+
 async def _load_surface_coverage(
     conn: asyncpg.Connection,
 ) -> dict[str, list[str]]:
     """Per-role surface coverage derived from the branded chain
-    workflow_template_steps. Returns {role_key: [output_kind, ...]}.
+    workflow_template_steps. Returns {role_key: [surface_label, ...]}
+    where surface_label is `kind+design` when the chain has a
+    design_input_source, else `kind` — same scheme
+    `_load_degraded_surfaces_from_routes` uses so the
+    degraded-of-total count makes sense (no more "2 of 1 surfaces").
 
     The chain's `render` step's assigned_sub_agent_key carries the
     role that renders for each output_kind. Mark (content_brief),
-    Darla (brand_qa), and Paul (deliver) are the same across all
-    chains, so their surface coverage is the union of all branded
-    output_kinds present.
+    Darla (brand_qa), and Paul (deliver) appear in every chain, so
+    their surface coverage is the union of all branded variants.
     """
     rows = await conn.fetch(
         """
         SELECT wts.assigned_sub_agent_key,
                wts.step_key,
-               (wt.config->>'outputKind')::text AS output_kind
+               (wt.config->>'outputKind')::text AS output_kind,
+               (wt.config->>'designInputSource')::text AS design_input_source
           FROM workflow_template_steps wts
           JOIN workflow_templates wt ON wt.id = wts.template_id
           JOIN workflows w ON w.id = wt.workflow_id
@@ -240,7 +256,11 @@ async def _load_surface_coverage(
         ok = r["output_kind"]
         if not ok:
             continue
-        surfaces.setdefault(role, set()).add(ok)
+        # Treat config-side "null"/"None"/empty as no design input.
+        dis = r["design_input_source"]
+        if dis in (None, "", "null", "None"):
+            dis = None
+        surfaces.setdefault(role, set()).add(_surface_label(ok, dis))
     return {k: sorted(v) for k, v in surfaces.items()}
 
 
@@ -249,8 +269,9 @@ async def _load_degraded_surfaces_from_routes(
 ) -> dict[str, list[str]]:
     """Per-role degraded-surface list. A role surface is degraded when
     its branded chain's primary adapter is in _DEGRADED_ADAPTER_KEYS.
-    For Paul (delivery), this is the per-output_kind degraded list
-    (his decisions route through these adapters)."""
+    Labels use the same `_surface_label` scheme as
+    `_load_surface_coverage` so the degraded-of-total count is
+    dimensionally correct."""
     rows = await conn.fetch(
         """
         SELECT output_kind, design_input_source, primary_adapter_key, fallback_adapter_keys
@@ -261,12 +282,10 @@ async def _load_degraded_surfaces_from_routes(
     degraded_kinds_per_role: dict[str, set[str]] = {}
     for r in rows:
         if r["primary_adapter_key"] in _DEGRADED_ADAPTER_KEYS:
-            # The render step carries the kind-specific role; Paul
-            # is universal across all chains. Mark these as Paul's
-            # degraded surfaces + the render role's degraded surfaces.
             ok = r["output_kind"]
             design = r["design_input_source"]
-            label = ok if not design else f"{ok}+{design}"
+            label = _surface_label(ok, design)
+            # Paul (delivery) sees every chain — mark his degraded set.
             degraded_kinds_per_role.setdefault("paul_tier_2", set()).add(label)
             # Map render role from the chain spec (mirrors CAP-C):
             # html → hank_tier_2; pptx/pdf → tom_tier_2; docx/md → sop_master_tier_2
@@ -377,14 +396,15 @@ async def build_sub_agent_wiring_status(
 
     roles_out: list[dict[str, Any]] = []
     for role_key in _CANONICAL_ROLE_KEYS:
-        # `direct_work_order_path` — only Tier-2 KNOWN roles are
-        # directly assignable on Aiden's work_order_brief path.
-        # Aiden + PM are always on direct path conceptually (they're
-        # the orchestrators).
-        direct = role_key in KNOWN_TIER_2_ROLES or role_key in {
-            "aiden_tier_1",
-            "pm_tier_15",
-        }
+        # `direct_work_order_path` — Tier-2 KNOWN roles are directly
+        # assignable on Aiden's work_order_brief path. Aiden Tier-1 is
+        # itself the routing layer (operator-facing intake → decision),
+        # so it counts as direct. PM Tier-1.5 is NOT direct — PM is
+        # reached only through `decision_kind="workflow_brief"`, not
+        # via direct operator assignment. Spec lock:
+        # IWO3_SUBAGENT_WIRING_MATRIX_AND_STATUS_SURFACE_v0.1.0 §Matrix
+        # row for `pm_tier_15` ("No direct operator assignment").
+        direct = role_key in KNOWN_TIER_2_ROLES or role_key == "aiden_tier_1"
         in_workflow = role_key in workflow_roles
         in_branded = role_key in branded_chain_roles
         surfaces = surface_coverage.get(role_key, [])

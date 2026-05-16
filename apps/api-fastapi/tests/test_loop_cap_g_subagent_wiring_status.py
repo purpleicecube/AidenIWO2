@@ -323,3 +323,81 @@ def test_legacy_seed_labels_constant_includes_mandated_labels() -> None:
     from the live matrix. Lock that the constant includes these."""
     for legacy in ("mark", "pm_alpha", "agent_system"):
         assert legacy in _LEGACY_SEED_LABELS
+
+
+# ── Post-CAP-G truth-surface revisions (CODEX 2026-05-16 findings) ─
+
+
+@iwo3_db
+def test_pm_tier_15_is_not_on_direct_work_order_path(db_url: str) -> None:
+    """Per IWO3_SUBAGENT_WIRING_MATRIX_AND_STATUS_SURFACE spec
+    `pm_tier_15` row reads "No direct operator assignment". PM is
+    reached only through `decision_kind="workflow_brief"`, never via
+    direct Aiden assignment. Lock test against regression.
+
+    Aiden (tier_1) IS direct (it's the routing layer itself).
+    """
+
+    async def run() -> None:
+        conn = await _open_tenant_conn(db_url, client_id=KLEAR_CLIENT)
+        try:
+            status = await build_sub_agent_wiring_status(
+                conn, client_id=KLEAR_CLIENT
+            )
+            by_key = {r["role_key"]: r for r in status["roles"]}
+            assert by_key["pm_tier_15"]["direct_work_order_path"] is False, (
+                "pm_tier_15 must NOT be flagged direct_work_order_path "
+                "(reached via workflow_brief, not direct assignment)"
+            )
+            assert by_key["aiden_tier_1"]["direct_work_order_path"] is True, (
+                "aiden_tier_1 is the routing layer itself — direct path stands"
+            )
+        finally:
+            await conn.close()
+
+    asyncio.run(run())
+
+
+@iwo3_db
+def test_surface_labels_use_consistent_kind_plus_design_scheme(db_url: str) -> None:
+    """Surface labels in both `roles[].surfaces` and the degraded
+    list use the same `_surface_label` scheme: `kind+design` when a
+    chain carries design_input_source, else just `kind`. This makes
+    the degraded-of-total count dimensionally correct (no more
+    "2 of 1 surfaces" nonsense for Hank's html chains)."""
+
+    async def run() -> None:
+        conn = await _open_tenant_conn(db_url, client_id=KLEAR_CLIENT)
+        try:
+            status = await build_sub_agent_wiring_status(
+                conn, client_id=KLEAR_CLIENT
+            )
+            by_key = {r["role_key"]: r for r in status["roles"]}
+            # Hank handles 4 html chain variants (self / stitch / figma / 21st);
+            # all should appear in surfaces using the kind+design scheme.
+            hank_surfaces = set(by_key["hank_tier_2"]["surfaces"])
+            assert hank_surfaces == {
+                "html",
+                "html+stitch",
+                "html+figma",
+                "html+twentyfirst",
+            }
+            # Degraded surfaces for Hank = the figma + 21st variants.
+            # Reason should report "2 of 4 surfaces" (dimensionally
+            # correct), NOT "2 of 1 surfaces".
+            assert by_key["hank_tier_2"]["degraded"] is True
+            reason = by_key["hank_tier_2"]["degraded_reason"] or ""
+            assert "2 of 4 surfaces" in reason, (
+                f"expected '2 of 4 surfaces' in reason; got: {reason}"
+            )
+            # Tom: 2 surfaces (pptx, pdf), 0 degraded (Gamma primary).
+            assert set(by_key["tom_tier_2"]["surfaces"]) == {"pptx", "pdf"}
+            assert by_key["tom_tier_2"]["degraded"] is False
+            # SOP Master: 2 surfaces (docx, md), 1 degraded (docx).
+            assert set(by_key["sop_master_tier_2"]["surfaces"]) == {"docx", "md"}
+            sop_reason = by_key["sop_master_tier_2"]["degraded_reason"] or ""
+            assert "1 of 2 surfaces" in sop_reason
+        finally:
+            await conn.close()
+
+    asyncio.run(run())
