@@ -39,6 +39,7 @@ from routes import (
     health,
     llm,
     output_packages,
+    system_status,
     template_profiles,
     tenants,
     tool_locker,
@@ -124,3 +125,4 @@ app.include_router(canonical_facts_routes.router)
 app.include_router(chat_sessions.router)
 app.include_router(auth_routes.router)
 app.include_router(webhooks.router)
+app.include_router(system_status.router)

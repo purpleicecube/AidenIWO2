@@ -168,6 +168,31 @@ async def _recent_work_orders(
     }
 
 
+# ── Loop CAP-G CLOSEOUT Slice C — sub-agent wiring status tool ───
+
+
+async def _sub_agent_wiring_status(
+    conn: asyncpg.Connection,
+    args: dict[str, Any],
+    client_id: str,
+) -> dict[str, Any]:
+    """Live sub-agent wiring + degraded-surface matrix for the active
+    tenant. Aiden uses this to answer questions like "which sub-agents
+    are wired into branded chains right now?", "is 21st live or
+    fallback-only?", "is Darla actually wired?" — without hallucinating.
+
+    Computed from runtime truth (llm_configs / KNOWN_TIER_2_ROLES /
+    workflow_template_steps / output_surface_routes / audit log).
+    Excludes legacy seed labels (`mark`, `pm_alpha`, `agent_system`)
+    per IWO3_SUBAGENT_WIRING_MATRIX_AND_STATUS_SURFACE_v0.1.0."""
+    from .subagent_wiring import build_sub_agent_wiring_status  # noqa: PLC0415
+
+    return await build_sub_agent_wiring_status(
+        conn,
+        client_id=client_id,
+    )
+
+
 # ── Registry ─────────────────────────────────────────────────────────
 
 
@@ -217,6 +242,26 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
             "additionalProperties": False,
         },
         handler=_recent_work_orders,
+    ),
+    "sub_agent_wiring_status": ToolDefinition(
+        name="sub_agent_wiring_status",
+        description=(
+            "Live sub-agent wiring + degraded-surface matrix for the "
+            "active tenant. Use whenever an operator asks which "
+            "sub-agents are wired right now, which surfaces are "
+            "degraded, whether Darla / Paul / Hank / etc. are "
+            "currently part of branded chains, or whether a render "
+            "surface (Stitch / Figma / 21st / PDF / DOCX) runs "
+            "natively or via fallback. NEVER guess sub-agent status; "
+            "always call this tool. Returns per-role rows with: "
+            "role_key, display_name, layer, llm_enabled, "
+            "direct_work_order_path, workflow_path, branded_chain_path, "
+            "surfaces, degraded, degraded_reason, last_invoked_at, "
+            "last_success_at, last_failure_at. Excludes legacy seed "
+            "labels (mark, pm_alpha, agent_system)."
+        ),
+        args_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        handler=_sub_agent_wiring_status,
     ),
 }
 

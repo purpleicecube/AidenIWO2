@@ -1222,6 +1222,209 @@ async def execute_step_run(
     )
 
 
+# ── Loop CAP-G CLOSEOUT Slice A — Darla revision-cycle wire-up ──
+
+
+# 2-cycle cap per O-002 (CAP risk register). Two attempts total: the
+# initial brand_qa run plus at most one revision. After the second
+# `needs_revision` verdict in a row, the chain halts with
+# `needs_revision_capped` and the deliver step is skipped — operator
+# must re-dispatch to start a new execution_cycle.
+DARLA_REVISION_CAP = 2
+
+
+async def _get_darla_revision_count(
+    conn: asyncpg.Connection, *, execution_id: str
+) -> int:
+    """Read the current Darla revision counter from
+    workflow_executions.executive_review jsonb. Returns 0 when no
+    prior revisions have run."""
+    raw = await conn.fetchval(
+        """
+        SELECT executive_review::text
+          FROM workflow_executions
+         WHERE id = $1::uuid
+        """,
+        execution_id,
+    )
+    if not raw:
+        return 0
+    try:
+        review = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return 0
+    if not isinstance(review, dict):
+        return 0
+    return int(review.get("darla_revision_count") or 0)
+
+
+async def _append_darla_attempt_metadata(
+    conn: asyncpg.Connection,
+    *,
+    execution_id: str,
+    attempt_payload: dict,
+) -> None:
+    """Append a Darla attempt record to
+    workflow_executions.executive_review.darla_attempts[]. Keeps
+    full per-attempt audit history outside the step_run row (which
+    gets reset on each cycle)."""
+    # lint:bypass-rls-explain="workflow_executions is RLS-protected via the tenant-scoped conn; helper runs under the same conn used to load the execution row"
+    await conn.execute(
+        """
+        UPDATE workflow_executions
+           SET executive_review = COALESCE(executive_review, '{}'::jsonb)
+                                  || jsonb_build_object(
+                                    'darla_attempts',
+                                    COALESCE(executive_review->'darla_attempts', '[]'::jsonb)
+                                    || jsonb_build_array($2::jsonb)
+                                  ),
+               updated_at = now()
+         WHERE id = $1::uuid
+        """,
+        execution_id,
+        json.dumps(attempt_payload),
+    )
+
+
+async def _increment_darla_revision_count(
+    conn: asyncpg.Connection, *, execution_id: str, new_count: int
+) -> None:
+    # lint:bypass-rls-explain="workflow_executions tenant-scoped via conn"
+    await conn.execute(
+        """
+        UPDATE workflow_executions
+           SET executive_review = COALESCE(executive_review, '{}'::jsonb)
+                                  || jsonb_build_object('darla_revision_count', $2::int),
+               updated_at = now()
+         WHERE id = $1::uuid
+        """,
+        execution_id,
+        new_count,
+    )
+
+
+async def _set_darla_final_verdict(
+    conn: asyncpg.Connection,
+    *,
+    execution_id: str,
+    final_verdict: str,
+    final_attempt: int,
+) -> None:
+    # lint:bypass-rls-explain="workflow_executions tenant-scoped via conn"
+    await conn.execute(
+        """
+        UPDATE workflow_executions
+           SET executive_review = COALESCE(executive_review, '{}'::jsonb)
+                                  || jsonb_build_object(
+                                    'darla_final_verdict', $2::text,
+                                    'darla_final_attempt', $3::int
+                                  ),
+               updated_at = now()
+         WHERE id = $1::uuid
+        """,
+        execution_id,
+        final_verdict,
+        final_attempt,
+    )
+
+
+async def _reset_render_step_for_revision(
+    conn: asyncpg.Connection,
+    *,
+    execution_id: str,
+    current_step_order: int,
+    revision_notes: list,
+    attempt: int,
+) -> None:
+    """Reset the render step (step_order = current - 1) back to
+    `pending` with Darla's revision notes injected into the step's
+    input payload. Clears output (which carried the prior render's
+    outputPackageId) so the render dispatcher produces a fresh package
+    on re-run."""
+    # lint:bypass-rls-explain="workflow_step_runs has no client_id column; nested-parent RLS via execution_id"
+    await conn.execute(
+        """
+        UPDATE workflow_step_runs
+           SET status = 'pending'::workflow_step_run_status,
+               input = COALESCE(input, '{}'::jsonb)
+                       || jsonb_build_object(
+                         'darla_revision_notes', $3::jsonb,
+                         'darla_revision_attempt', $4::int
+                       ),
+               output = NULL,
+               started_at = NULL,
+               completed_at = NULL,
+               updated_at = now()
+         WHERE execution_id = $1::uuid
+           AND step_order = ($2::int - 1)
+        """,
+        execution_id,
+        current_step_order,
+        json.dumps(revision_notes),
+        attempt,
+    )
+
+
+async def _reset_brand_qa_step_for_revision(
+    conn: asyncpg.Connection, *, step_run_id: str
+) -> None:
+    """Reset THIS brand_qa step back to pending so it re-runs after
+    the render step's revision pass. The per-attempt verdict + notes
+    are preserved on workflow_executions.executive_review.darla_attempts[]
+    so resetting this row does not lose audit history."""
+    # lint:bypass-rls-explain="workflow_step_runs nested-parent RLS via execution_id"
+    await conn.execute(
+        """
+        UPDATE workflow_step_runs
+           SET status = 'pending'::workflow_step_run_status,
+               output = NULL,
+               started_at = NULL,
+               completed_at = NULL,
+               updated_at = now()
+         WHERE id = $1::uuid
+        """,
+        step_run_id,
+    )
+
+
+async def _skip_downstream_steps(
+    conn: asyncpg.Connection,
+    *,
+    execution_id: str,
+    after_step_order: int,
+    reason: str,
+    verdict: str,
+    attempt: int,
+) -> None:
+    """Mark every pending step in this execution with step_order >
+    after_step_order as `skipped`. Used on terminal Darla verdicts
+    (block, needs_revision_capped) so the deliver step does not run
+    and the chain halts mechanically."""
+    # lint:bypass-rls-explain="workflow_step_runs nested-parent RLS via execution_id"
+    await conn.execute(
+        """
+        UPDATE workflow_step_runs
+           SET status = 'skipped'::workflow_step_run_status,
+               output = jsonb_build_object(
+                 'step_kind', 'skipped',
+                 'reason', $3::text,
+                 'darla_verdict', $4::text,
+                 'darla_attempt', $5::int
+               ),
+               completed_at = now(),
+               updated_at = now()
+         WHERE execution_id = $1::uuid
+           AND step_order > $2::int
+           AND status = 'pending'::workflow_step_run_status
+        """,
+        execution_id,
+        after_step_order,
+        reason,
+        verdict,
+        attempt,
+    )
+
+
 # ── Loop CAP-F wire-up ───────────────────────────────────────────
 
 
@@ -1234,19 +1437,38 @@ async def _find_prior_step_output_package_id(
     """Find the most recent prior step_run's output_package_id within
     the same workflow_execution. Branded chains produce a package at
     the render step (order 2); brand_qa (order 3) and deliver
-    (order 4) both consume it."""
-    return await conn.fetchval(
+    (order 4) both consume it.
+
+    workflow_step_runs has no `output_package_id` column — the
+    generic Tier-2 produce_output_package writer stores the id in
+    `output.outputPackageId`. Read from there. Also falls back to
+    output_packages.workflow_execution_id lookup when step_run.output
+    is missing the id (defensive)."""
+    pkg_id = await conn.fetchval(
         """
-        SELECT sr.output_package_id::text
+        SELECT sr.output->>'outputPackageId'
           FROM workflow_step_runs sr
          WHERE sr.execution_id = $1::uuid
            AND sr.step_order < $2::int
-           AND sr.output_package_id IS NOT NULL
+           AND sr.output ? 'outputPackageId'
          ORDER BY sr.step_order DESC
          LIMIT 1
         """,
         execution_id,
         step_order,
+    )
+    if pkg_id:
+        return pkg_id
+    # Defensive fallback: look up via output_packages directly.
+    return await conn.fetchval(
+        """
+        SELECT id::text
+          FROM output_packages
+         WHERE workflow_execution_id = $1::uuid
+         ORDER BY created_at DESC
+         LIMIT 1
+        """,
+        execution_id,
     )
 
 
@@ -1257,20 +1479,24 @@ async def _persist_branded_step_completion(
     output_package_id: Optional[str],
     output_json: dict,
 ) -> None:
+    """Mark step_run completed. `output_package_id` is preserved on
+    the step_run.output jsonb (workflow_step_runs has no dedicated
+    column — see _find_prior_step_output_package_id docstring)."""
+    # Surface package id in the output payload for downstream lookups.
+    if output_package_id is not None and "outputPackageId" not in output_json:
+        output_json = {**output_json, "outputPackageId": output_package_id}
     # lint:bypass-rls-explain="workflow_step_runs has no client_id column; tenant scoping enforced by parent workflow_executions RLS policy (Loop 4 Phase 4.3 nested-parent pattern)"
     await conn.execute(
         """
         UPDATE workflow_step_runs
            SET status = 'completed'::workflow_step_run_status,
                output = $2::jsonb,
-               output_package_id = $3::uuid,
                completed_at = now(),
                updated_at = now()
          WHERE id = $1::uuid
         """,
         step_run_id,
         json.dumps(output_json),
-        output_package_id,
     )
 
 
@@ -1390,20 +1616,142 @@ async def _execute_branded_chain_step(
             )
             raise
 
-        await _persist_branded_step_completion(
+        # CAP-G CLOSEOUT Slice A — Darla revision-cycle wire-up.
+        # `pass`   → mark this step completed; deliver runs next.
+        # `needs_revision` within 2-cycle cap → record attempt on
+        #   workflow_executions.metadata, reset render + this brand_qa
+        #   step both to pending with revision notes, increment counter.
+        #   The next run_next_step call picks up the render step (lower
+        #   step_order) and re-runs the cycle.
+        # `needs_revision` at cap → mark this step failed (cap_exceeded);
+        #   mark deliver as skipped; workflow halts mechanically.
+        # `block`  → mark this step failed; mark deliver as skipped;
+        #   workflow halts mechanically with operator-visible verdict.
+        verdict = attestation.overall
+        revision_count = await _get_darla_revision_count(
+            conn, execution_id=execution_id
+        )
+        attestation_payload = {
+            "verdict": verdict,
+            "palette_pass": attestation.palette_pass,
+            "fonts_pass": attestation.fonts_pass,
+            "voice_pass": attestation.voice_pass,
+            "asset_pass": attestation.asset_pass,
+            "notes": list(attestation.notes),
+            "attempt": revision_count + 1,
+        }
+        await _append_darla_attempt_metadata(
             conn,
-            step_run_id=step_run_id,
-            output_package_id=prior_pkg_id,
-            output_json={
-                "step_kind": "brand_qa",
-                "verdict": attestation.overall,
-                "palette_pass": attestation.palette_pass,
-                "fonts_pass": attestation.fonts_pass,
-                "voice_pass": attestation.voice_pass,
-                "asset_pass": attestation.asset_pass,
-                "notes": list(attestation.notes),
-                "scored_package_id": prior_pkg_id,
-            },
+            execution_id=execution_id,
+            attempt_payload=attestation_payload,
+        )
+
+        if verdict == "pass":
+            await _persist_branded_step_completion(
+                conn,
+                step_run_id=step_run_id,
+                output_package_id=prior_pkg_id,
+                output_json={
+                    "step_kind": "brand_qa",
+                    "verdict": "pass",
+                    "palette_pass": attestation.palette_pass,
+                    "fonts_pass": attestation.fonts_pass,
+                    "voice_pass": attestation.voice_pass,
+                    "asset_pass": attestation.asset_pass,
+                    "notes": list(attestation.notes),
+                    "scored_package_id": prior_pkg_id,
+                    "attempt": revision_count + 1,
+                },
+            )
+            return _synthetic_branded_step_result(
+                role=assigned_role, output_package_id=prior_pkg_id
+            )
+
+        if verdict == "block":
+            # Terminal: brand-QA blocked. Persist verdict; skip deliver.
+            await _persist_branded_step_failure(
+                conn,
+                step_run_id=step_run_id,
+                error_json={
+                    "step_kind": "brand_qa",
+                    "verdict": "block",
+                    "cap_exceeded": False,
+                    "palette_pass": attestation.palette_pass,
+                    "fonts_pass": attestation.fonts_pass,
+                    "voice_pass": attestation.voice_pass,
+                    "asset_pass": attestation.asset_pass,
+                    "notes": list(attestation.notes),
+                    "scored_package_id": prior_pkg_id,
+                    "attempt": revision_count + 1,
+                },
+            )
+            await _skip_downstream_steps(
+                conn,
+                execution_id=execution_id,
+                after_step_order=step_order,
+                reason="brand_qa_blocked",
+                verdict=verdict,
+                attempt=revision_count + 1,
+            )
+            await _set_darla_final_verdict(
+                conn,
+                execution_id=execution_id,
+                final_verdict="block",
+                final_attempt=revision_count + 1,
+            )
+            return _synthetic_branded_step_result(
+                role=assigned_role, output_package_id=prior_pkg_id
+            )
+
+        # verdict == "needs_revision"
+        if revision_count + 1 >= DARLA_REVISION_CAP:
+            # Cap exceeded. Persist + skip deliver + mark halted.
+            await _persist_branded_step_failure(
+                conn,
+                step_run_id=step_run_id,
+                error_json={
+                    "step_kind": "brand_qa",
+                    "verdict": "needs_revision",
+                    "cap_exceeded": True,
+                    "attempt": revision_count + 1,
+                    "cap": DARLA_REVISION_CAP,
+                    "notes": list(attestation.notes),
+                    "scored_package_id": prior_pkg_id,
+                },
+            )
+            await _skip_downstream_steps(
+                conn,
+                execution_id=execution_id,
+                after_step_order=step_order,
+                reason="brand_qa_revision_cap_exceeded",
+                verdict=verdict,
+                attempt=revision_count + 1,
+            )
+            await _set_darla_final_verdict(
+                conn,
+                execution_id=execution_id,
+                final_verdict="needs_revision_capped",
+                final_attempt=revision_count + 1,
+            )
+            return _synthetic_branded_step_result(
+                role=assigned_role, output_package_id=prior_pkg_id
+            )
+
+        # Within cap → reset render step + this brand_qa to pending
+        # with revision notes; increment counter; let next
+        # run_next_step pick up the reset render step.
+        await _reset_render_step_for_revision(
+            conn,
+            execution_id=execution_id,
+            current_step_order=step_order,
+            revision_notes=list(attestation.notes),
+            attempt=revision_count + 1,
+        )
+        await _reset_brand_qa_step_for_revision(
+            conn, step_run_id=step_run_id
+        )
+        await _increment_darla_revision_count(
+            conn, execution_id=execution_id, new_count=revision_count + 1
         )
         return _synthetic_branded_step_result(
             role=assigned_role, output_package_id=prior_pkg_id
