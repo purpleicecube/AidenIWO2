@@ -61,5 +61,77 @@
     "description": "CRM record create / update / delete. Mutations disallowed by default in v0.",
     "contractVersion": "v0",
     "status": "beta"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000010",
+    "adapterKey": "sandbox_pptx",
+    "displayName": "Sandbox PPTX (local python-pptx)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — local PPTX render via python-pptx. Used as Gamma fallback for branded_pptx_chain. Brand palette + heading font applied to title slides.",
+    "contractVersion": "v0",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000011",
+    "adapterKey": "sandbox_pdf",
+    "displayName": "Sandbox PDF (local stub)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — local PDF render stub. Emits adapter_unavailable until fpdf2 / weasyprint dep is provisioned.",
+    "contractVersion": "v0",
+    "status": "beta"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000012",
+    "adapterKey": "sandbox_html",
+    "displayName": "Sandbox HTML (local stdlib)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — local self-contained HTML render via stdlib f-string template + brand palette/fonts injected as CSS custom properties. Used as fallback for all branded HTML chains (self, Stitch, Figma, 21st).",
+    "contractVersion": "v0",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000013",
+    "adapterKey": "sandbox_docx",
+    "displayName": "Sandbox DOCX (local stub)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — local DOCX render stub. Emits adapter_unavailable until python-docx dep is provisioned.",
+    "contractVersion": "v0",
+    "status": "beta"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000014",
+    "adapterKey": "sandbox_md",
+    "displayName": "Sandbox MD (local stdlib)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — local markdown render via stdlib. Wraps body with brand frontmatter (palette + voice signal).",
+    "contractVersion": "v0",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000015",
+    "adapterKey": "stitch_html_render",
+    "displayName": "Stitch HTML render (MCP)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — wraps the Theta-shipped Stitch MCP into a render adapter. Output wrapped in IWO3 brand-frame HTML. Falls back to sandbox_html when Stitch MCP unreachable.",
+    "contractVersion": "v0",
+    "status": "active"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000016",
+    "adapterKey": "figma_html_render",
+    "displayName": "Figma HTML render (MCP stub)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — Figma render adapter stub. No server-side Figma MCP provisioned yet (Q-PG-8 deferred). Falls back to sandbox_html.",
+    "contractVersion": "v0",
+    "status": "beta"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000080000017",
+    "adapterKey": "twentyfirst_html_render",
+    "displayName": "21st-Magic HTML render (MCP stub)",
+    "category": "design_render",
+    "description": "Loop CAP-F Φ.9 — 21st-Magic render adapter stub. The mcp__magic__* tools are Claude-Code-side, not server-side. Falls back to sandbox_html.",
+    "contractVersion": "v0",
+    "status": "beta"
   }
 ]

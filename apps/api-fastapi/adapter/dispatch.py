@@ -300,6 +300,132 @@ async def _insert_handoff(
     return handoff_id
 
 
+async def dispatch_for_adapter(
+    conn: asyncpg.Connection,
+    *,
+    adapter_key: str,
+    output_package_id: str,
+    client_id: str,
+    actor_user_id: Optional[str],
+    fallback_adapter_keys: Optional[list[str]] = None,
+    transport: Optional[httpx.AsyncBaseTransport] = None,
+) -> "DispatchResult":
+    """Loop CAP-F Φ.9 — universal dispatch router.
+
+    Routes to the right per-adapter dispatcher by `adapter_key`. When
+    the primary adapter raises `DispatchError("adapter_unavailable", ...)`,
+    falls through to each entry in `fallback_adapter_keys` in order
+    until one succeeds. Re-raises if all attempts fail.
+
+    Used by Paul (CAP-D) via the chain-runtime `deliver` step
+    (execute_step_run wire-up) so Paul's decision is honored without
+    each call-site repeating the routing logic.
+    """
+    # Late imports — sandbox + mcp renderer modules import this file's
+    # private helpers (_load_package_and_template / _insert_handoff /
+    # _resolve_adapter_catalog_id), so importing them at the top of
+    # this file would create a cycle.
+    from .sandbox_renderers import (
+        dispatch_sandbox_docx_for_package,
+        dispatch_sandbox_html_for_package,
+        dispatch_sandbox_md_for_package,
+        dispatch_sandbox_pdf_for_package,
+        dispatch_sandbox_pptx_for_package,
+    )
+    from .mcp_renderers import (
+        dispatch_figma_html_render_for_package,
+        dispatch_stitch_html_render_for_package,
+        dispatch_twentyfirst_html_render_for_package,
+    )
+
+    routes = {
+        "gamma": lambda: dispatch_gamma_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            transport=transport,
+        ),
+        "sandbox_pptx": lambda: dispatch_sandbox_pptx_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+        "sandbox_pdf": lambda: dispatch_sandbox_pdf_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+        "sandbox_html": lambda: dispatch_sandbox_html_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+        "sandbox_docx": lambda: dispatch_sandbox_docx_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+        "sandbox_md": lambda: dispatch_sandbox_md_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+        "stitch_html_render": lambda: dispatch_stitch_html_render_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+        "figma_html_render": lambda: dispatch_figma_html_render_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+        "twentyfirst_html_render": lambda: dispatch_twentyfirst_html_render_for_package(
+            conn,
+            output_package_id=output_package_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+        ),
+    }
+
+    keys_to_try: list[str] = [adapter_key]
+    if fallback_adapter_keys:
+        keys_to_try.extend(fallback_adapter_keys)
+
+    last_error: Optional[DispatchError] = None
+    for key in keys_to_try:
+        fn = routes.get(key)
+        if fn is None:
+            last_error = DispatchError(
+                "unknown_adapter_key", f"no router entry for adapter_key={key}"
+            )
+            continue
+        try:
+            return await fn()
+        except DispatchError as exc:
+            last_error = exc
+            if exc.kind != "adapter_unavailable":
+                # Hard error from this adapter — don't try fallbacks.
+                raise
+            # adapter_unavailable → try the next fallback.
+            continue
+
+    if last_error is not None:
+        raise last_error
+    raise DispatchError(
+        "no_adapters_attempted",
+        f"empty adapter chain for output_package {output_package_id}",
+    )
+
+
 async def dispatch_gamma_for_package(
     conn: asyncpg.Connection,
     *,

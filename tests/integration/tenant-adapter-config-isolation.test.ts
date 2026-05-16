@@ -76,7 +76,7 @@ describeIwo3("Loop 3 Phase 2 — tenant adapter-config isolation", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("adapter_catalog is tenant-agnostic — all users (even unauthenticated reads) see the same seven kinds", async () => {
+  it("adapter_catalog is tenant-agnostic — all users see the same kinds (Loop 3: 7 base; Loop CAP-F: +8 render adapters = 15)", async () => {
     const { rows } = await pool.query<{ adapter_key: string }>(
       `SELECT adapter_key FROM adapter_catalog ORDER BY adapter_key`
     );
@@ -85,9 +85,17 @@ describeIwo3("Loop 3 Phase 2 — tenant adapter-config isolation", () => {
       "crm",
       "email_campaign",
       "figma",
+      "figma_html_render",
       "gamma",
       "google_drive",
+      "sandbox_docx",
+      "sandbox_html",
+      "sandbox_md",
+      "sandbox_pdf",
+      "sandbox_pptx",
       "stitch",
+      "stitch_html_render",
+      "twentyfirst_html_render",
     ]);
   });
 });

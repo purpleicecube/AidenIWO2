@@ -1071,6 +1071,31 @@ async def execute_step_run(
         step_run_id,
     )
 
+    # Loop CAP-F wire-up — special-case branded-chain step kinds.
+    # `brand_qa` step → call Darla helper (CAP-D Φ.6) against the prior
+    #                   step's output_package; persist BrandAttestation
+    # `deliver` step  → call Paul helper (CAP-D Φ.5) against the prior
+    #                   render step's output_package; use Paul's decision
+    #                   to dispatch via the unified router (CAP-F Φ.9);
+    #                   persist PaulDecision + DispatchResult
+    # Other step kinds fall through to the generic invoke_tier_2 path.
+    if row["step_key"] in ("brand_qa", "deliver"):
+        return await _execute_branded_chain_step(
+            conn,
+            step_run_id=step_run_id,
+            execution_id=row["execution_id"],
+            step_key=row["step_key"],
+            step_order=row["step_order"],
+            work_order_id=row["work_order_id"],
+            display_name=row["display_name"],
+            assigned_role=role,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            intake_text=intake_text,
+            input_payload=input_payload,
+            memory_block=memory_block,
+        )
+
     try:
         envelope = await invoke_tier_2(
             conn,
@@ -1194,4 +1219,292 @@ async def execute_step_run(
         prompt_tokens=0,
         completion_tokens=0,
         total_tokens=0,
+    )
+
+
+# ── Loop CAP-F wire-up ───────────────────────────────────────────
+
+
+async def _find_prior_step_output_package_id(
+    conn: asyncpg.Connection,
+    *,
+    execution_id: str,
+    step_order: int,
+) -> Optional[str]:
+    """Find the most recent prior step_run's output_package_id within
+    the same workflow_execution. Branded chains produce a package at
+    the render step (order 2); brand_qa (order 3) and deliver
+    (order 4) both consume it."""
+    return await conn.fetchval(
+        """
+        SELECT sr.output_package_id::text
+          FROM workflow_step_runs sr
+         WHERE sr.execution_id = $1::uuid
+           AND sr.step_order < $2::int
+           AND sr.output_package_id IS NOT NULL
+         ORDER BY sr.step_order DESC
+         LIMIT 1
+        """,
+        execution_id,
+        step_order,
+    )
+
+
+async def _persist_branded_step_completion(
+    conn: asyncpg.Connection,
+    *,
+    step_run_id: str,
+    output_package_id: Optional[str],
+    output_json: dict,
+) -> None:
+    # lint:bypass-rls-explain="workflow_step_runs has no client_id column; tenant scoping enforced by parent workflow_executions RLS policy (Loop 4 Phase 4.3 nested-parent pattern)"
+    await conn.execute(
+        """
+        UPDATE workflow_step_runs
+           SET status = 'completed'::workflow_step_run_status,
+               output = $2::jsonb,
+               output_package_id = $3::uuid,
+               completed_at = now(),
+               updated_at = now()
+         WHERE id = $1::uuid
+        """,
+        step_run_id,
+        json.dumps(output_json),
+        output_package_id,
+    )
+
+
+async def _persist_branded_step_failure(
+    conn: asyncpg.Connection,
+    *,
+    step_run_id: str,
+    error_json: dict,
+) -> None:
+    # lint:bypass-rls-explain="workflow_step_runs has no client_id column; nested-parent RLS via execution_id"
+    await conn.execute(
+        """
+        UPDATE workflow_step_runs
+           SET status = 'failed'::workflow_step_run_status,
+               output = $2::jsonb,
+               completed_at = now(),
+               updated_at = now()
+         WHERE id = $1::uuid
+        """,
+        step_run_id,
+        json.dumps(error_json),
+    )
+
+
+def _synthetic_branded_step_result(
+    *,
+    role: str,
+    output_package_id: Optional[str],
+) -> Tier2InvocationResult:
+    """For brand_qa / deliver step kinds, the helpers (Darla / Paul)
+    don't produce a `Tier2OutputEnvelope` in the standard sense.
+    Return a synthetic invocation result so the existing run_next_step
+    caller can read `.output_package_id` without special-casing."""
+    return Tier2InvocationResult(
+        role=role,
+        output_envelope=Tier2OutputEnvelope(
+            content_markdown="",
+            summary="",
+            output_kind="",
+            metadata={"branded_chain_step": True},
+        ),
+        output_package_id=output_package_id,
+        provider="",
+        model="",
+        latency_ms=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+    )
+
+
+async def _execute_branded_chain_step(
+    conn: asyncpg.Connection,
+    *,
+    step_run_id: str,
+    execution_id: str,
+    step_key: str,
+    step_order: int,
+    work_order_id: Optional[str],
+    display_name: str,
+    assigned_role: str,
+    client_id: str,
+    actor_user_id: Optional[str],
+    intake_text: str,
+    input_payload: dict,
+    memory_block: str,
+) -> Tier2InvocationResult:
+    """Loop CAP-F wire-up — dispatch brand_qa + deliver step kinds
+    through the CAP-D helpers (Darla, Paul) and the CAP-F adapter
+    router. Other step kinds go through the generic invoke_tier_2
+    path at the caller site."""
+    # Lazy imports to avoid circular import (paul_delivery + darla_qa
+    # import from this module).
+    from .darla_qa import invoke_darla_qa
+    from .paul_delivery import invoke_paul_delivery
+    from adapter.dispatch import DispatchError, dispatch_for_adapter
+
+    prior_pkg_id = await _find_prior_step_output_package_id(
+        conn, execution_id=execution_id, step_order=step_order
+    )
+    if prior_pkg_id is None:
+        await _persist_branded_step_failure(
+            conn,
+            step_run_id=step_run_id,
+            error_json={
+                "kind": "no_prior_package",
+                "step_key": step_key,
+                "step_order": step_order,
+                "execution_id": execution_id,
+            },
+        )
+        raise Tier2Error(
+            "no_prior_package",
+            f"branded chain {step_key} step has no prior output_package in execution {execution_id}",
+        )
+
+    if step_key == "brand_qa":
+        try:
+            attestation = await invoke_darla_qa(
+                conn,
+                output_package_id=prior_pkg_id,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                work_order_id=work_order_id,
+                intake_text=intake_text,
+                memory_block=memory_block,
+            )
+        except Exception as exc:
+            await _persist_branded_step_failure(
+                conn,
+                step_run_id=step_run_id,
+                error_json={
+                    "kind": getattr(exc, "kind", "unknown"),
+                    "error": str(exc),
+                    "step_key": step_key,
+                },
+            )
+            raise
+
+        await _persist_branded_step_completion(
+            conn,
+            step_run_id=step_run_id,
+            output_package_id=prior_pkg_id,
+            output_json={
+                "step_kind": "brand_qa",
+                "verdict": attestation.overall,
+                "palette_pass": attestation.palette_pass,
+                "fonts_pass": attestation.fonts_pass,
+                "voice_pass": attestation.voice_pass,
+                "asset_pass": attestation.asset_pass,
+                "notes": list(attestation.notes),
+                "scored_package_id": prior_pkg_id,
+            },
+        )
+        return _synthetic_branded_step_result(
+            role=assigned_role, output_package_id=prior_pkg_id
+        )
+
+    # step_key == "deliver"
+    # Resolve primary + fallback adapter chain from the input_payload
+    # (populated by CAP-E Φ.8 dispatch routing when the workflow_brief
+    # decision was instantiated).
+    primary_adapter_key = (
+        input_payload.get("primary_adapter_key") or "gamma"
+    )
+    fallback_adapter_keys = list(
+        input_payload.get("fallback_adapter_keys") or []
+    )
+    output_kind = input_payload.get("detected_output_kind") or "pptx"
+
+    try:
+        paul_decision = await invoke_paul_delivery(
+            conn,
+            output_package_id=prior_pkg_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            output_kind=output_kind,
+            primary_adapter_key=primary_adapter_key,
+            fallback_adapter_keys=fallback_adapter_keys,
+            work_order_id=work_order_id,
+            intake_text=intake_text,
+            memory_block=memory_block,
+        )
+    except Exception as exc:
+        await _persist_branded_step_failure(
+            conn,
+            step_run_id=step_run_id,
+            error_json={
+                "kind": getattr(exc, "kind", "unknown"),
+                "error": str(exc),
+                "step_key": step_key,
+                "phase": "paul_decision",
+            },
+        )
+        raise
+
+    if paul_decision.outcome == "blocked":
+        await _persist_branded_step_completion(
+            conn,
+            step_run_id=step_run_id,
+            output_package_id=prior_pkg_id,
+            output_json={
+                "step_kind": "deliver",
+                "outcome": "blocked",
+                "decision_reason": paul_decision.decision_reason,
+                "adapter_key": paul_decision.adapter_key,
+            },
+        )
+        return _synthetic_branded_step_result(
+            role=assigned_role, output_package_id=prior_pkg_id
+        )
+
+    # Dispatch via the router; honors Paul's adapter_key + falls back
+    # through fallback_adapter_keys on adapter_unavailable.
+    try:
+        dispatch_result = await dispatch_for_adapter(
+            conn,
+            adapter_key=paul_decision.adapter_key,
+            output_package_id=prior_pkg_id,
+            client_id=client_id,
+            actor_user_id=actor_user_id,
+            fallback_adapter_keys=list(paul_decision.fallback_adapter_keys),
+        )
+    except DispatchError as exc:
+        await _persist_branded_step_failure(
+            conn,
+            step_run_id=step_run_id,
+            error_json={
+                "kind": exc.kind,
+                "error": exc.detail,
+                "step_key": step_key,
+                "phase": "adapter_dispatch",
+                "paul_outcome": paul_decision.outcome,
+                "primary_adapter_key": paul_decision.adapter_key,
+            },
+        )
+        raise
+
+    await _persist_branded_step_completion(
+        conn,
+        step_run_id=step_run_id,
+        output_package_id=prior_pkg_id,
+        output_json={
+            "step_kind": "deliver",
+            "outcome": paul_decision.outcome,
+            "decision_reason": paul_decision.decision_reason,
+            "adapter_key": paul_decision.adapter_key,
+            "fallback_adapter_keys": list(paul_decision.fallback_adapter_keys),
+            "template_profile_id": paul_decision.template_profile_id,
+            "dispatched_adapter_key": dispatch_result.adapter_key,
+            "handoff_id": dispatch_result.handoff_id,
+            "external_reference": dispatch_result.external_reference,
+        },
+    )
+    return _synthetic_branded_step_result(
+        role=assigned_role, output_package_id=prior_pkg_id
     )
