@@ -19,14 +19,20 @@
     "fontsJson": {
       "heading": "Lexend SemiBold",
       "body": "Barlow Regular",
-      "fallbacks": ["Arial", "Helvetica", "sans-serif"]
+      "fallbacks": [
+        "Arial",
+        "Helvetica",
+        "sans-serif"
+      ]
     },
     "logoArtifactId": null,
     "voiceBrief": "Confident, technical, RIMS/insurance-domain native. Speak to operations leaders who care about claims throughput, compliance, and measurable risk-adjusted outcomes. Avoid generic SaaS marketing language; lead with what Klear.ai actually does (claims intelligence + RIMS operations) and the metrics that matter to risk and ops leaders.",
-    "icpSummary": "Mid-market and enterprise property & casualty (P&C) insurance carriers, MGAs/MGUs, and commercial brokers with claims operations of meaningful complexity. Decision makers: VP/Director Claims, Chief Risk Officer, Head of Operations, Risk Management Information Systems (RIMS) lead. Pain points: legacy claims systems with poor data hygiene, slow first-notice-of-loss → resolution cycles, unstructured adjuster notes, lack of portfolio-level loss-trend visibility, RMIS implementations stalled or under-utilized. Klear.ai sells: AI-driven claims intelligence + RMIS operations layer that ingests existing carrier/TPA data, surfaces leakage and fraud patterns, accelerates adjuster decisions, and produces audit-ready reporting. Not a generic enterprise SaaS; not a smart-city platform; not a public-sector vendor.",
+    "icpSummary": "Mid-market and enterprise property & casualty (P&C) insurance carriers, MGAs/MGUs, and commercial brokers with claims operations of meaningful complexity. Decision makers: VP/Director Claims, Chief Risk Officer, Head of Operations, Risk Management Information Systems (RIMS) lead. Pain points: legacy claims systems with poor data hygiene, slow first-notice-of-loss \u2192 resolution cycles, unstructured adjuster notes, lack of portfolio-level loss-trend visibility, RMIS implementations stalled or under-utilized. Klear.ai sells: AI-driven claims intelligence + RMIS operations layer that ingests existing carrier/TPA data, surfaces leakage and fraud patterns, accelerates adjuster decisions, and produces audit-ready reporting. Not a generic enterprise SaaS; not a smart-city platform; not a public-sector vendor.",
     "requiresBrandQa": true,
     "templateHandlesJson": {
-      "pptx": ["00000000-0000-4000-8000-000010000001"],
+      "pptx": [
+        "00000000-0000-4000-8000-000010000001"
+      ],
       "pdf": [
         "00000000-0000-4000-8000-000010000002",
         "00000000-0000-4000-8000-000010000003"
@@ -55,21 +61,53 @@
   {
     "id": "00000000-0000-4000-8000-00000000b002",
     "clientId": "00000000-0000-4000-8000-00000000c002",
-    "paletteJson": {},
-    "fontsJson": {},
+    "paletteJson": {
+      "primary": "#2563EB",
+      "accent": "#1E40AF",
+      "neutrals": {
+        "bg": "#F8FAFC",
+        "text": "#0F172A",
+        "muted": "#475569"
+      },
+      "gradient": {
+        "from": "#2563EB",
+        "to": "#1E3A8A"
+      }
+    },
+    "fontsJson": {
+      "heading": {
+        "family": "Inter",
+        "weight": "600"
+      },
+      "body": {
+        "family": "Inter",
+        "weight": "400"
+      },
+      "mono": {
+        "family": "JetBrains Mono"
+      }
+    },
     "logoArtifactId": null,
-    "voiceBrief": null,
-    "icpSummary": null,
-    "requiresBrandQa": false,
+    "voiceBrief": "Practical, warm, no-BS, action-oriented. FFAI talks to scrappy founders and small-team operators \u2014 never with jargon, hype, or agency-speak. Tone is the experienced friend who hands you a clear roadmap instead of buzzwords: 'battle-tested playbooks, friendly AI mentors, done-for-you automation.' Anchor phrases: 'Quit guessing \u2014 start building'; 'turns uncertainty into action'; 'from spark to scale'; 'concept to customer'; 'idea to impact'. Avoid: tech-stack name-dropping, vague AI hype, agency-speak, over-promising on outcomes. Prefer: concrete next steps, plain English, encouragement that respects the operator's intelligence.",
+    "icpSummary": "FFAI serves five overlapping personas: (1) Career-leavers who want to start a business but don't have the idea yet \u2014 need the Idea Generator + ranked validation. (2) Concept-holders who have a 'great idea' and need to make it real \u2014 need the 200-point Deep Dive validation + step-by-step Launch Path. (3) Existing small-business operators stuck on sales, cash flow, marketing, or tech \u2014 need targeted AI assists (Budget Forecast Model, Marketing Funnel Blueprint, Live Ops Monitoring) plugged into specific weak points. (4) Concept-holders who want to help people but aren't sure if anyone needs/wants/will pay for it \u2014 need demand testing + lightweight prototyping. (5) Mid-sized businesses + marketing teams ready to adopt AI but not sure where to start \u2014 need a roadmap that fits their existing tools, people, and goals (consulting engagement). Across all five: price-conscious, time-poor, hype-averse, looking for one connected place instead of a maze of scattered apps and pricey agencies.",
+    "requiresBrandQa": true,
     "templateHandlesJson": {
-      "pptx": ["00000000-0000-4000-8000-000020000001"],
-      "pdf": ["00000000-0000-4000-8000-000020000002"]
+      "pptx": [
+        "00000000-0000-4000-8000-000020000001"
+      ],
+      "pdf": [
+        "00000000-0000-4000-8000-000020000002"
+      ]
     },
     "designInputSourcesJson": {
-      "stitch": false,
-      "figma": false,
-      "twentyfirst": false,
-      "default_for_html": null
+      "primary_source": "WS009_FFAI_TCM_2026-05-16",
+      "documents": [
+        "FreedomForge.AI: Overview of Directives.pdf",
+        "FFAI Sales Pitch.docx",
+        "WHY USE FFAI Website.docx",
+        "FFAI Future Build Concept.docx"
+      ],
+      "note": "Brand palette + fonts inferred from FFAI's Napkin-rendered directive diagrams; refine when the FFAI team supplies an official brand book."
     },
     "brandTerms": [
       "FreedomForge.AI",
@@ -78,8 +116,26 @@
       "FFAI",
       "ffai",
       "freedomforge.ai",
-      "freedom forge"
+      "freedom forge",
+      "The Internal Brain",
+      "TIB",
+      "TRACE Analyzer",
+      "TRACE",
+      "FFAI Website",
+      "FFAI Consulting",
+      "FFAI Products & Services",
+      "Quick Scan",
+      "200-Point Deep Dive",
+      "36-point validation",
+      "Idea Generator Beacon",
+      "Launch Path",
+      "Budget Forecast Model",
+      "Marketing Funnel Blueprint",
+      "Live Ops Monitoring",
+      "Aiden Zephyr",
+      "Jamie Forge"
     ],
-    "revision": 1
+    "revision": 2,
+    "notes": "BUG-069: populated from WS009 FFAI brand inputs. Palette + fonts inferred from Napkin-rendered directive diagrams; refine when FFAI team supplies an official brand book."
   }
 ]

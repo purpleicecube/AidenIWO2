@@ -97,7 +97,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
 async function createClient(config: McpConfig): Promise<Client> {
   const transport = await createTransport(config);
   const client = new Client(
-    { name: "aiden-iwo", version: "1.2.3" },
+    { name: "aiden-iwo", version: "1.5.1" },
     { capabilities: {} }
   );
   await withTimeout(client.connect(transport), MCP_TIMEOUT_MS, "connection");
