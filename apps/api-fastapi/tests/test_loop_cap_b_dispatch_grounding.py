@@ -117,10 +117,16 @@ def test_klear_grounding_returns_client_grounding_source(db_url: str) -> None:
 
 
 @iwo3_db
-def test_ffai_skeleton_returns_none_grounding(db_url: str) -> None:
-    """FFAI brand profile is a skeleton (only template_handles +
-    brand_terms; no palette / fonts / voice / ICP). Skeleton-row gate
-    in `_has_meaningful_grounding` returns None."""
+def test_ffai_returns_populated_grounding(db_url: str) -> None:
+    """FFAI brand profile is populated post-BUG-069 (2026-05-16
+    backfilled FFAI from WS009: palette + fonts + voice + ICP +
+    template handles + brand terms). Prefetch must return a
+    `client_grounding` MemorySource. The skeleton-branch coverage that
+    the original CAP-B test exercised (returning None when only
+    template_handles + brand_terms exist) is no longer reachable
+    through this tenant; a separate slice should re-cover it via a
+    dedicated test tenant or a unit test on `_has_meaningful_grounding`.
+    """
 
     async def run() -> None:
         clear_all_caches()
@@ -130,10 +136,10 @@ def test_ffai_skeleton_returns_none_grounding(db_url: str) -> None:
                 conn,
                 client_id=FFAI_CLIENT,
             )
-            # FFAI seed has only brand_terms + template_handles (no
-            # palette, fonts, voice, ICP). Single-line text → gate
-            # returns None.
-            assert source is None
+            assert source is not None
+            assert source.kind == "client_grounding"
+            assert source.client_id == FFAI_CLIENT
+            assert source.metadata.get("match_kind") == "tenant_brand_profile"
         finally:
             await conn.close()
 
@@ -178,10 +184,17 @@ def test_audit_row_emitted_with_dispatch_prefetch_surface(db_url: str) -> None:
 
 
 @iwo3_db
-def test_audit_emitted_even_when_skeleton_grounding(db_url: str) -> None:
-    """FFAI skeleton produces no source but the audit row still fires
-    (with empty sources_used). Operator should be able to confirm via
-    audit that prefetch ran for every dispatch — AC-5."""
+def test_audit_emitted_for_ffai_prefetch(db_url: str) -> None:
+    """Every prefetch call emits exactly one `memory.applied` audit row
+    regardless of whether grounding was found — AC-5. Pre-BUG-069 this
+    test paired with the FFAI-skeleton-returns-None case to prove the
+    audit fires even on empty grounding; post-BUG-069 FFAI returns a
+    populated source, so this is now equivalent to the KLEAR-side
+    audit test but preserved as a per-tenant smoke (different
+    tenant_id, different connection, ensures audit isn't
+    Klear-coupled). The empty-grounding audit invariant should be
+    re-covered in a separate slice via a dedicated test tenant or
+    a unit test."""
 
     async def run() -> None:
         clear_all_caches()
@@ -197,14 +210,14 @@ def test_audit_emitted_even_when_skeleton_grounding(db_url: str) -> None:
                 conn,
                 client_id=FFAI_CLIENT,
             )
-            assert source is None
+            assert source is not None
         finally:
             await conn.close()
 
         n = await _count_dispatch_prefetch_audit_rows(
             db_url, client_id=FFAI_CLIENT, since=since
         )
-        assert n == 1, "audit row must fire even when grounding empty"
+        assert n == 1, "audit row must fire on every prefetch call"
 
     import asyncio
     asyncio.run(run())
