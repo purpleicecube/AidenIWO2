@@ -1145,15 +1145,35 @@ def _serialize_output_package_to_markdown(
                 lines.append(str(sec_body).strip())
                 lines.append("")
     elif blocks:
-        # Unknown shape — surface the raw JSON in a fenced block so the
-        # operator can still see what's in the package without us
-        # silently returning a blank preview.
-        lines.append("## Raw content_blocks")
-        lines.append("")
-        lines.append("```json")
-        lines.append(_json.dumps(blocks, indent=2)[:_MAX_INLINE_CHARS])
-        lines.append("```")
-        lines.append("")
+        # BUG-072 (2026-05-17): Tier-2 sub-agent envelopes (sop_master_tier_2,
+        # mark_tier_2, etc.) ship `content_blocks` with a different shape
+        # than the canonical `{sections: [...]}` — they use
+        # `{prompt, summary, metadata, content_markdown}` where
+        # `content_markdown` is the rendered deliverable. Before BUG-072
+        # this renderer didn't recognize those keys and fell through to
+        # the raw-JSON dump, which made operator review of every Tier-2
+        # output read as garbage. The fix probes the common alternate
+        # body keys in priority order; raw JSON dump stays as the last-
+        # resort safety net for genuinely unknown shapes.
+        body_md: Optional[str] = None
+        for body_key in ("content_markdown", "markdown", "prompt"):
+            candidate = blocks.get(body_key)
+            if isinstance(candidate, str) and candidate.strip():
+                body_md = candidate.strip()
+                break
+        if body_md is not None:
+            lines.append(body_md)
+            lines.append("")
+        else:
+            # Unknown shape — surface the raw JSON in a fenced block so the
+            # operator can still see what's in the package without us
+            # silently returning a blank preview.
+            lines.append("## Raw content_blocks")
+            lines.append("")
+            lines.append("```json")
+            lines.append(_json.dumps(blocks, indent=2)[:_MAX_INLINE_CHARS])
+            lines.append("```")
+            lines.append("")
     else:
         lines.append("_(output package has empty content_blocks)_")
         lines.append("")

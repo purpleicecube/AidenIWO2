@@ -690,3 +690,94 @@ def test_get_folder_contents_returns_children_and_files() -> None:
         body = r.json()
         assert any(c["id"] == sub for c in body["children"])
         assert any(file["id"] == f["id"] for file in body["files"])
+
+
+# ── BUG-072 regression: renderer must recognize Tier-2 envelope shape ─────
+
+
+def test_serialize_output_package_recognizes_content_markdown_key() -> None:
+    """BUG-072 (2026-05-17): Tier-2 sub-agent envelopes ship
+    content_blocks as `{prompt, summary, metadata, content_markdown}`
+    where content_markdown is the rendered deliverable. The renderer
+    must surface that markdown directly, NOT dump the raw JSON as
+    'Raw content_blocks'. Pre-fix the SOP-rendering path produced
+    operator-unusable garbage in the Workspace preview."""
+    from routes.workspace import _serialize_output_package_to_markdown
+
+    md = _serialize_output_package_to_markdown(
+        title="Create SOP for FF.AI Partner Onboarding",
+        summary="Provided FF.AI Partner Onboarding SOP document.",
+        output_kind="generic",
+        content_blocks={
+            "prompt": "# FF.AI Partner Onboarding SOP\n\n## 1. Introduction\nPurpose and scope.\n",
+            "summary": "Provided FF.AI Partner Onboarding SOP document.",
+            "metadata": {},
+            "content_markdown": "# FF.AI Partner Onboarding SOP\n\n## 1. Introduction\nPurpose and scope.\n",
+        },
+    )
+    # MUST surface the real markdown.
+    assert "# FF.AI Partner Onboarding SOP" in md
+    assert "## 1. Introduction" in md
+    assert "Purpose and scope." in md
+    # MUST NOT dump raw JSON as a "Raw content_blocks" fence.
+    assert "## Raw content_blocks" not in md
+    assert "```json" not in md
+
+
+def test_serialize_output_package_prefers_sections_over_content_markdown() -> None:
+    """Order of precedence is sections (canonical) > content_markdown
+    (Tier-2 fallback). When both are present, sections wins."""
+    from routes.workspace import _serialize_output_package_to_markdown
+
+    md = _serialize_output_package_to_markdown(
+        title="Both shapes present",
+        summary=None,
+        output_kind="generic",
+        content_blocks={
+            "sections": [{"title": "Canonical", "body": "from sections"}],
+            "content_markdown": "# Fallback\nfrom content_markdown\n",
+        },
+    )
+    assert "## Canonical" in md
+    assert "from sections" in md
+    assert "## Fallback" not in md
+    assert "from content_markdown" not in md
+
+
+def test_serialize_output_package_recognizes_prompt_key_as_fallback() -> None:
+    """Some legacy Tier-2 envelopes (or older sub-agents) ship only
+    `prompt` as the body key. Must be recognized when content_markdown
+    is absent. (sop_master_tier_2 actually ships both as duplicates;
+    this test pins the prompt-only path defensively.)"""
+    from routes.workspace import _serialize_output_package_to_markdown
+
+    md = _serialize_output_package_to_markdown(
+        title="Prompt-only envelope",
+        summary=None,
+        output_kind="generic",
+        content_blocks={
+            "prompt": "# Real content\n\nBody text.\n",
+            "summary": "x",
+            "metadata": {},
+        },
+    )
+    assert "# Real content" in md
+    assert "Body text." in md
+    assert "## Raw content_blocks" not in md
+
+
+def test_serialize_output_package_falls_back_to_raw_for_truly_unknown_shape() -> None:
+    """Last-resort behavior preserved — if NONE of sections /
+    content_markdown / markdown / prompt are present, the raw JSON
+    dump still fires so operators see what's actually in the package."""
+    from routes.workspace import _serialize_output_package_to_markdown
+
+    md = _serialize_output_package_to_markdown(
+        title="Mystery shape",
+        summary=None,
+        output_kind="generic",
+        content_blocks={"some_weird_key": {"nested": "value"}},
+    )
+    assert "## Raw content_blocks" in md
+    assert "```json" in md
+    assert "some_weird_key" in md
