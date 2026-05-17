@@ -533,6 +533,88 @@ def _render_file_card(
         _render_file_overflow(api, file_row, all_folders, can_write, can_delete)
 
 
+# ── Search + sort toolbar helpers (operators sort large output folders
+# by date / name / type; default is newest-first because the Outputs
+# folder fills up faster than operators can alphabetize) ──────────────
+
+
+SORT_CHOICES: tuple[str, ...] = (
+    "Newest first (created)",
+    "Oldest first (created)",
+    "Recently modified",
+    "Name A → Z",
+    "Name Z → A",
+    "Type",
+)
+
+
+def _file_sort_key_factory(choice: str):  # noqa: ANN202
+    if choice == "Newest first (created)":
+        return (lambda f: f.get("created_at") or "", True)
+    if choice == "Oldest first (created)":
+        return (lambda f: f.get("created_at") or "", False)
+    if choice == "Recently modified":
+        return (lambda f: f.get("updated_at") or f.get("created_at") or "", True)
+    if choice == "Name Z → A":
+        return (lambda f: (f.get("filename") or "").lower(), True)
+    if choice == "Type":
+        return (lambda f: ((f.get("mime_type") or "").lower(), (f.get("filename") or "").lower()), False)
+    # Default: Name A → Z
+    return (lambda f: (f.get("filename") or "").lower(), False)
+
+
+def _folder_sort_key_factory(choice: str):  # noqa: ANN202
+    # Folders never have mime_type. Map "Type" → Name A→Z for folders.
+    if choice == "Newest first (created)":
+        return (lambda f: f.get("created_at") or "", True)
+    if choice == "Oldest first (created)":
+        return (lambda f: f.get("created_at") or "", False)
+    if choice == "Recently modified":
+        return (lambda f: f.get("updated_at") or f.get("created_at") or "", True)
+    if choice == "Name Z → A":
+        return (lambda f: (f.get("name") or "").lower(), True)
+    # Default: Name A → Z (also covers "Type" for folders)
+    return (lambda f: (f.get("name") or "").lower(), False)
+
+
+def _sort_files(files: list[dict[str, Any]], choice: str) -> list[dict[str, Any]]:
+    key_fn, reverse = _file_sort_key_factory(choice)
+    return sorted(files, key=key_fn, reverse=reverse)
+
+
+def _sort_folders(folders: list[dict[str, Any]], choice: str) -> list[dict[str, Any]]:
+    key_fn, reverse = _folder_sort_key_factory(choice)
+    return sorted(folders, key=key_fn, reverse=reverse)
+
+
+def _render_grid_toolbar(
+    selected_id: str,
+    *,
+    total_folders: int,
+    total_files: int,
+) -> tuple[str, str]:
+    """Renders the search input + sort dropdown above the grid.
+    Returns (search_query, sort_choice). State is keyed per folder so
+    moving between folders preserves per-folder search context."""
+    search_col, sort_col = st.columns([3, 2], gap="small")
+    with search_col:
+        search_query = st.text_input(
+            "Search this folder",
+            key=f"ws-search-{selected_id}",
+            placeholder=f"🔎 Filter {total_folders + total_files} item(s) by name…",
+            label_visibility="collapsed",
+        )
+    with sort_col:
+        sort_choice = st.selectbox(
+            "Sort by",
+            options=SORT_CHOICES,
+            index=0,  # default = Newest first
+            key=f"ws-sort-{selected_id}",
+            label_visibility="collapsed",
+        )
+    return (search_query or "").strip(), sort_choice
+
+
 def _render_grid(
     api,  # noqa: ANN001
     *,
@@ -544,9 +626,11 @@ def _render_grid(
     can_write: bool,
     can_delete: bool,
 ) -> None:
+    # Folders stay above files (file-explorer convention) but within
+    # each group the order respects whatever sort the caller pre-applied.
     items: list[tuple[str, dict[str, Any]]] = []
-    items.extend(("folder", f) for f in sorted(folders, key=lambda x: x["name"].lower()))
-    items.extend(("file", f) for f in sorted(files, key=lambda x: (x.get("filename") or "").lower()))
+    items.extend(("folder", f) for f in folders)
+    items.extend(("file", f) for f in files)
 
     if not items:
         st.markdown(
@@ -1142,8 +1226,38 @@ def main() -> None:
         can_write=can_write,
     )
 
-    child_folders = sorted(children_map.get(selected_id, []), key=lambda x: x["name"].lower())
-    own_files = sorted(files_map.get(selected_id, []), key=lambda x: (x.get("filename") or "").lower())
+    raw_folders = children_map.get(selected_id, [])
+    raw_files = files_map.get(selected_id, [])
+
+    # Toolbar: search + sort (default Newest first).
+    search_query, sort_choice = _render_grid_toolbar(
+        selected_id,
+        total_folders=len(raw_folders),
+        total_files=len(raw_files),
+    )
+
+    # Apply search filter (case-insensitive substring on folder.name /
+    # file.filename). Scoped to current folder only; global search
+    # would be a follow-on.
+    q = search_query.lower()
+    if q:
+        filtered_folders = [f for f in raw_folders if q in (f.get("name") or "").lower()]
+        filtered_files = [f for f in raw_files if q in (f.get("filename") or "").lower()]
+        hits = len(filtered_folders) + len(filtered_files)
+        total = len(raw_folders) + len(raw_files)
+        if hits == 0:
+            st.info(
+                f"No items match '{search_query}' in this folder "
+                f"({total} item(s) total). Clear the search to see everything."
+            )
+        else:
+            st.caption(f"Showing {hits} of {total} item(s) matching '{search_query}'.")
+    else:
+        filtered_folders = list(raw_folders)
+        filtered_files = list(raw_files)
+
+    child_folders = _sort_folders(filtered_folders, sort_choice)
+    own_files = _sort_files(filtered_files, sort_choice)
 
     _render_grid(
         api,

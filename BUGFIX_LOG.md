@@ -1290,6 +1290,27 @@ surfaced as a follow-on auth-UX issue on the retry attempt.
 
 ---
 
+## Session — IWO3 Workspace UX (2026-05-17)
+
+Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
+
+### BUG-070: Workspace folder grid has no sort + no search — outputs pile up unorderable (Medium)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-17 |
+| Severity | Medium (every operator viewing a folder with > ~10 items hits this; the Outputs folder fills with multi-attempt branded chain artifacts and there is no way to find the latest render) |
+| Status | Fixed, verified |
+| Files | `apps/console-streamlit/views/workspace.py` |
+| Symptom | Operator on `localhost:8504/workspace` opened the Outputs folder (containing ~30 items — many near-duplicate names like "Mark — branded content brief (PPTX)") and reported: *"why is there no way to sort the Workspace content - it should be organized by date by default but also should be sortable and searchable"*. The grid was alphabetical-by-name only; no toolbar; no way to find the most recent render among many same-titled cards. |
+| Root Cause | `views/workspace.py::_render_grid` sorted both folders and files alphabetically by name (lines 548-549 pre-fix). The caller at the bottom of `main()` also pre-sorted alphabetically. No search input, no sort dropdown, no toolbar surface at all. The API surface had everything needed already: `routes/workspace.py` `list_workspace_files` SELECT returns `created_at::text` + `updated_at::text` per row alongside `filename` + `mime_type`. Pure UI gap; backend data was there the whole time. |
+| Fix | Added a per-folder toolbar above the grid in `views/workspace.py`. Two controls: (a) **search input** — `st.text_input` with `🔎 Filter N item(s) by name…` placeholder; case-insensitive substring filter against `folder.name` for folders and `file.filename` for files; renders a `Showing X of Y item(s) matching '…'` caption when active, or a friendly info banner when zero matches. (b) **sort dropdown** — `st.selectbox` with six options: `Newest first (created)` (default), `Oldest first (created)`, `Recently modified`, `Name A → Z`, `Name Z → A`, `Type`. Folders use the same vocabulary but fall back to alpha for "Type" (folders have no mime_type). Folders stay above files in the grid (file-explorer convention) but within each group the order respects the chosen sort. Two new helpers: `_sort_files(files, choice)` + `_sort_folders(folders, choice)` consume key-fn + reverse tuples from `_file_sort_key_factory` / `_folder_sort_key_factory`. Toolbar state is keyed per folder (`ws-search-{folder_id}` + `ws-sort-{folder_id}`) so moving between folders preserves per-folder search/sort context. Default sort changed from alphabetical to **Newest first (created)** because the Outputs folder fills up faster than operators can alphabetize. |
+| Verified | Streamlit view-import smoke 25/25 still green. Live: `/workspace` returns 200; refresh shows the toolbar above the grid; typing into search filters live; sort dropdown switches order in place. No backend or schema change required — the existing `/workspace/tree` and `/workspace/folders/{id}` responses already include `created_at` + `updated_at` per row, the UI just wasn't using them. |
+| Files Changed | `apps/console-streamlit/views/workspace.py` (~75 lines: 2 sort-key factories + 2 sort helpers + `_render_grid_toolbar` + caller refactor + tuple of SORT_CHOICES; pre-fix alphabetical pre-sort removed from both `_render_grid` body and the main() call site) |
+| Related | **Scope notes (intentional residuals):** (1) Search is **folder-scoped only** — searches only the current folder, not the entire workspace tree. Global cross-folder search is an additive follow-on (would want a separate `?global=true` toggle or an "Include subfolders" checkbox). (2) **No mime-type filter chips** (e.g. "PPTX only / PDF only / HTML only" pills) — sort-by-Type already groups them together, but explicit chips would be a third toolbar row if operators want faceted filtering. Skipped for first pass. (3) Toolbar appears on **every folder including the root** — could conditionally hide when item count < 5 to reduce visual noise, but operators may still want search even for small folders. Leaving on by default. |
+
+---
+
 ## Summary
 
 Per-session bug counts are the count of unique `BUG-###` IDs first
@@ -1320,7 +1341,8 @@ row.
 | Bugs fixed (IWO3 Dashboard Recent-WO Click Auth Loss, 2026-05-10) | 1 | 0 | 1 | 0 | 0 |
 | Bugs fixed (IWO3 Loop Xi Recovery Gate Too Narrow, 2026-05-10) | 1 | 0 | 0 | 1 | 0 |
 | Bugs fixed (IWO3 FFAI Tenant Onboarding + Auth Polish, 2026-05-16) | 9 | 0 | 7 | 2 | 0 |
-| **Total bugs fixed (unique BUG-IDs)** | **64** | **9** | **38** | **16** | **1** |
+| Bugs fixed (IWO3 Workspace UX, 2026-05-17) | 1 | 0 | 0 | 1 | 0 |
+| **Total bugs fixed (unique BUG-IDs)** | **65** | **9** | **38** | **17** | **1** |
 | Feature implementations (Session 6, 2026-03-07) | 3 | — | — | — | — |
 | Feature implementations (Session 12b, 2026-03-25) | 1 | — | — | — | — |
 | Feature implementations (Session 14, 2026-03-27/28) | 3 | — | — | — | — |
@@ -1333,7 +1355,7 @@ row.
 - Gaps in numbering are intentional (e.g. `BUG-043`..`BUG-047` were
   tracked locally during a loop that ultimately closed without
   shipping a separate fix). Do not reuse retired numbers; advance to
-  the next free `BUG-###` (currently `BUG-070`) when filing a new
+  the next free `BUG-###` (currently `BUG-071`) when filing a new
   entry.
 - Follow-up patches on a prior bug should use a labeled re-entry
   (e.g. `### BUG-050 Extension: ...`, `### BUG-053 Hardened: ...`)
