@@ -313,6 +313,143 @@ async def dispatch_one_wo(
                 )
                 return "assistant_reply"
 
+            # Tool-call → execute → re-invoke loop. Mirrors the chat-
+            # route pattern at routes/aiden.py:408-464 with WO semantics:
+            #   1. Execute the requested tool on the live tenant-scoped
+            #      connection. `execute_tool` writes its own audit row
+            #      via the standard sub_agent.tool_called / .failed
+            #      vocabulary (Loop Eta), so we do not double-audit.
+            #   2. Re-invoke Aiden Tier-1 once with the tool result
+            #      injected as context. The followup decision REPLACES
+            #      the current one; existing handlers (clarification,
+            #      assistant_reply, work_order_brief, workflow_brief,
+            #      and the trailing unknown-handler) catch it
+            #      naturally.
+            #   3. Cap at 1 round-trip. If the followup also returns
+            #      tool_call, the existing decision_kind_unknown handler
+            #      catches it — the cap is enforced implicitly without
+            #      a second branch here.
+            #   4. Tool failures and followup-invoke failures audit
+            #      work_order.auto_dispatch_failed with explicit stage
+            #      labels; return strings keep run_one_tick's per-tick
+            #      bucket counts truthful.
+            if decision.decision_kind == "tool_call" and decision.tool_call:
+                from runtime.aiden_tools import (  # local to avoid cycle
+                    ToolExecutionError,
+                    ToolNotFoundError,
+                    execute_tool,
+                )
+
+                tool_call = decision.tool_call
+                try:
+                    tool_result = await execute_tool(
+                        conn,
+                        tool_name=tool_call.tool_name,
+                        args=tool_call.args,
+                        client_id=client_id,
+                        actor_user_id=actor,
+                    )
+                except (ToolNotFoundError, ToolExecutionError) as exc:
+                    await write_audit_row(
+                        conn,
+                        client_id=client_id,
+                        actor_user_id=actor,
+                        event="work_order.auto_dispatch_failed",
+                        target_type="work_order",
+                        target_id=wo["id"],
+                        metadata={
+                            "stage": "tool_call",
+                            "tool_name": tool_call.tool_name,
+                            "kind": type(exc).__name__,
+                            "detail": str(exc),
+                        },
+                    )
+                    return "tool_failed"
+
+                followup_intake = (
+                    f"{intake_text}\n\n"
+                    f"[TOOL RESULT — {tool_call.tool_name}]\n"
+                    f"{json.dumps(tool_result, default=str, indent=2)}\n"
+                    f"[END TOOL RESULT]\n\n"
+                    f"Compose your final decision using the data above. "
+                    f"Do not call another tool."
+                )
+                try:
+                    decision = await invoke_aiden_tier_1(
+                        conn,
+                        intake_text=followup_intake,
+                        client_id=client_id,
+                        actor_user_id=actor,
+                        work_order_id=wo["id"],
+                    )
+                except (
+                    AidenNoConfig,
+                    AidenInvocationError,
+                    LlmBudgetExceeded,
+                ) as exc:
+                    await write_audit_row(
+                        conn,
+                        client_id=client_id,
+                        actor_user_id=actor,
+                        event="work_order.auto_dispatch_failed",
+                        target_type="work_order",
+                        target_id=wo["id"],
+                        metadata={
+                            "stage": "tool_call_followup",
+                            "tool_name": tool_call.tool_name,
+                            "kind": getattr(exc, "kind", type(exc).__name__),
+                            "detail": str(exc),
+                        },
+                    )
+                    return "followup_failed"
+
+                # Followup may itself be clarification / assistant_reply.
+                # Re-run the same short-circuit handlers so those paths
+                # behave identically whether they were the first decision
+                # or the followup decision.
+                if decision.decision_kind == "clarification":
+                    await write_audit_row(
+                        conn,
+                        client_id=client_id,
+                        actor_user_id=actor,
+                        event="work_order.auto_dispatch_succeeded",
+                        target_type="work_order",
+                        target_id=wo["id"],
+                        metadata={
+                            "decision_kind": "clarification",
+                            "via_tool_call": tool_call.tool_name,
+                            "question": (
+                                decision.clarification.question
+                                if decision.clarification
+                                else None
+                            ),
+                        },
+                    )
+                    return "clarification"
+                if decision.decision_kind == "assistant_reply":
+                    await write_audit_row(
+                        conn,
+                        client_id=client_id,
+                        actor_user_id=actor,
+                        event="work_order.auto_dispatch_succeeded",
+                        target_type="work_order",
+                        target_id=wo["id"],
+                        metadata={
+                            "decision_kind": "assistant_reply",
+                            "via_tool_call": tool_call.tool_name,
+                            "headline": (
+                                decision.assistant_reply.headline
+                                if decision.assistant_reply
+                                else None
+                            ),
+                        },
+                    )
+                    return "assistant_reply"
+                # Otherwise fall through with the new decision; the
+                # transition_work_order + work_order_brief / workflow_brief
+                # handlers below handle it. A second tool_call hits the
+                # trailing decision_kind_unknown handler (1-round-trip cap).
+
             # Move to processing. IllegalTransition is non-fatal — the
             # WO may have been transitioned by another path concurrently.
             try:
