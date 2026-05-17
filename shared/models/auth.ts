@@ -42,6 +42,34 @@ export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
 /**
+ * Client-side view of the authenticated user.
+ *
+ * `/api/auth/user` (server/replit_integrations/auth/routes.ts) returns
+ * the DB user spread with a `role` (legacy alias mapped from the
+ * per-tenant `client_memberships.role` via `IWO3_ROLE_TO_LEGACY`) plus
+ * `effectiveRole` (the raw IWO3 role). The legacy React surface in
+ * `client/src/pages/*.tsx` reads `role` directly; this type makes that
+ * contract explicit.
+ *
+ * `firstName / lastName / profileImageUrl` are kept as optional
+ * forward-compat fields. They were removed from the `users` table in
+ * the 2026-05-11 IWO3 schema reshape and are NOT returned by the
+ * server today; legacy pages that still reference them must treat the
+ * values as undefined and fall back to `displayName` for naming and
+ * to initials for the avatar. A future slice can either delete those
+ * code paths or backfill the columns — until then, this type lets
+ * `tsc` compile against the current shape without runtime risk
+ * (server is the source of truth for what's actually present).
+ */
+export type AuthUser = User & {
+  role?: "admin" | "operator" | "viewer";
+  effectiveRole?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  profileImageUrl?: string | null;
+};
+
+/**
  * Client memberships — per-tenant role binding. IWO3-native (Loop 1).
  * Node needs read access here so `requireRole` can derive the operator's
  * effective role without relying on the non-existent `users.role` column.

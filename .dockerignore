@@ -1,6 +1,11 @@
-# Root .dockerignore for the Node sandbox image (Dockerfile.node).
-# The Node build needs server/, client/, shared/, drizzle/, package*,
-# script/, etc., so we exclude only what's safe to leave out.
+# Root .dockerignore — applies to ALL image builds against this repo
+# (Railway resolves the .dockerignore alongside the build context root,
+# which for the api-fastapi service is the repo root). Keep this lean
+# enough that the api-fastapi Dockerfile's `COPY .local/skills/` works:
+# `.local/skills/` is the IWO2-parity skills bundle (~17 dirs) shipped
+# into the container at /app/.local/skills/ for runtime use by Aiden's
+# tool-call loop. The Node sandbox image (Dockerfile.node) doesn't
+# need .local/skills/ but tolerates its presence in the build context.
 .git
 .gitignore
 .github
@@ -22,5 +27,4 @@ WS024_IWO3*
 docs/adr
 infra/local/*.log
 coverage
-.local/skills
 .cache

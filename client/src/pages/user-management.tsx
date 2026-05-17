@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Shield, Users, Loader2, Trash2, Send, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { User } from "@shared/models/auth";
+import type { AuthUser } from "@shared/models/auth";
 
-function roleBadgeVariant(role: string) {
+function roleBadgeVariant(role: string | undefined) {
   if (role === "admin") return "default" as const;
   if (role === "operator") return "secondary" as const;
   return "outline" as const;
@@ -25,7 +25,7 @@ export default function UserManagementPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: users, isLoading } = useQuery<User[]>({
+  const { data: users, isLoading } = useQuery<AuthUser[]>({
     queryKey: ["/api/admin/users"],
   });
 
