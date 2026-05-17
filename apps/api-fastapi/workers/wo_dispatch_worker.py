@@ -577,6 +577,36 @@ async def dispatch_one_wo(
                         "handoff_id": handoff_id,
                     },
                 )
+
+                # BUG-071 hot-fix (2026-05-17): auto-complete the WO
+                # for non-gamma output kinds. gamma_* packages get
+                # advanced to `completed` by the poll_worker when the
+                # Gamma handoff lands; every other kind (generic,
+                # sandbox_*, *_html_render, etc.) had no completion
+                # trigger, so the WO stayed in `processing` forever
+                # even though Tier-2 had already produced the
+                # deliverable. The operator-visible symptom was Aiden
+                # honestly reporting "still processing" in chat for a
+                # WO whose deliverable was sitting in
+                # output_packages.content_blocks ready to read.
+                if not envelope.output_kind.startswith("gamma_"):
+                    try:
+                        await transition_work_order(
+                            conn,
+                            work_order_id=wo["id"],
+                            client_id=client_id,
+                            actor_user_id=actor,
+                            to="completed",
+                            reason=(
+                                f"auto_complete:package_kind="
+                                f"{envelope.output_kind}"
+                            ),
+                        )
+                    except IllegalTransition:
+                        # Operator already moved it concurrently;
+                        # not an error.
+                        pass
+
                 return "work_order_brief"
 
             if decision.decision_kind == "workflow_brief":

@@ -262,6 +262,112 @@ def test_tool_call_followup_work_order_brief_proceeds_to_package(
             stage="decision_kind_unknown",
         )
         assert n_unknown == 0, f"unexpected decision_kind_unknown audit; got {n_unknown}"
+        # BUG-071 hot-fix: non-gamma package auto-completes the WO.
+        # Generic stub envelope → WO must end in `completed`.
+        raw = await asyncpg.connect(db_url)
+        try:
+            final_status = await raw.fetchval(
+                "SELECT status FROM work_orders WHERE id=$1",
+                wo_id,
+            )
+        finally:
+            await raw.close()
+        assert final_status == "completed", (
+            f"BUG-071: generic-kind package must auto-complete WO; "
+            f"got status={final_status}"
+        )
+
+    asyncio.run(run())
+
+
+@iwo3_db
+def test_gamma_kind_does_not_auto_complete_wo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """BUG-071 hot-fix complement: gamma_* output_kinds must NOT
+    auto-complete the WO from the worker. gamma_* completion is
+    driven by the poll_worker when the Gamma handoff lands. This
+    test seeds a fresh WO, mocks Aiden to return work_order_brief
+    directly (no tool_call to keep it focused), uses a gamma_pptx
+    stub envelope, and asserts the WO stays in `processing`."""
+
+    async def run() -> None:
+        db_url = os.environ["IWO3_DATABASE_URL"]
+        wo_id = await _seed_pending_wo(db_url, KLEAR_CLIENT)
+
+        from runtime import tier_1_aiden as t1
+        from runtime import tier_2_subagents
+        from memory import wrappers as memw
+        from adapter import dispatch as adapter_dispatch
+
+        stub = _SequencedTier1([_build_work_order_brief_decision()])
+        monkeypatch.setattr(t1, "invoke_aiden_tier_1", stub)
+
+        @dataclass(frozen=True)
+        class _GammaEnvelope:
+            output_kind: str = "gamma_pptx"
+
+        async def fake_tier_2(conn, **kwargs):
+            return _GammaEnvelope()
+
+        monkeypatch.setattr(tier_2_subagents, "invoke_tier_2", fake_tier_2)
+
+        synthetic_pkg_id = str(uuid.uuid4())
+
+        async def fake_produce_pkg(conn, **kwargs):
+            return synthetic_pkg_id
+
+        monkeypatch.setattr(
+            tier_2_subagents, "produce_output_package", fake_produce_pkg
+        )
+
+        @dataclass(frozen=True)
+        class _StubBundle:
+            block: str | None = None
+
+        async def fake_subagent_bundle(conn, **kwargs):
+            return _StubBundle()
+
+        monkeypatch.setattr(
+            memw, "memory_context_builder_for_subagent", fake_subagent_bundle
+        )
+
+        # gamma_* triggers a Gamma handoff attempt; stub it cleanly
+        # so the worker doesn't try to hit a real Gamma instance.
+        @dataclass(frozen=True)
+        class _StubHandoff:
+            handoff_id: str = str(uuid.uuid4())
+
+        async def fake_gamma(conn, **kwargs):
+            return _StubHandoff()
+
+        monkeypatch.setattr(
+            adapter_dispatch, "dispatch_gamma_for_package", fake_gamma
+        )
+
+        pool = await asyncpg.create_pool(db_url, min_size=1, max_size=2)
+        try:
+            from workers.wo_dispatch_worker import dispatch_one_wo
+
+            result = await dispatch_one_wo(pool, wo_id, KLEAR_CLIENT)
+        finally:
+            await pool.close()
+
+        assert result == "work_order_brief"
+        # WO must NOT have auto-completed — gamma_* completion is the
+        # poll_worker's job.
+        raw = await asyncpg.connect(db_url)
+        try:
+            final_status = await raw.fetchval(
+                "SELECT status FROM work_orders WHERE id=$1",
+                wo_id,
+            )
+        finally:
+            await raw.close()
+        assert final_status == "processing", (
+            f"BUG-071: gamma_* must NOT auto-complete WO from the "
+            f"worker; got status={final_status} (expected processing)"
+        )
 
     asyncio.run(run())
 
