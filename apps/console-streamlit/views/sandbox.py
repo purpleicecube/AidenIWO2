@@ -71,7 +71,29 @@ c1, c2 = st.columns([3, 2])
 
 with c1:
     st.markdown("### Open the canonical sandbox")
-    st.write("Click **Open Sandbox** to launch the Node/React sandbox in a new tab.")
+    # The Node app requires a browser session cookie. First-time
+    # operators get a 302 redirect to a login screen when they click
+    # straight to /sandbox, which looks like the sandbox is "broken."
+    # The dev-bypass (NODE_ENV=development) sets the cookie + redirects
+    # to /; surface that as the first step so the click flow is
+    # deterministic. Hosted deploys disable the dev-bypass and use the
+    # BOOTSTRAP_ADMIN_PASSWORD path documented in Hosted setup below.
+    base = sandbox_url.replace("/sandbox", "")
+    login_url = base + "/api/login"
+    st.markdown("**Step 1 — sign in (first visit only):**")
+    st.link_button(
+        "Sign in to Node app (dev bypass) ↗",
+        login_url,
+        type="secondary",
+        help=(
+            "Opens /api/login in a new tab. Dev-only bypass: sets the "
+            "session cookie + redirects to /. Hosted deploys block this "
+            "route — use the BOOTSTRAP_ADMIN_PASSWORD email/password "
+            "form instead."
+        ),
+    )
+    st.caption(login_url)
+    st.markdown("**Step 2 — open the sandbox:**")
     st.link_button("Open Sandbox ↗", sandbox_url, type="primary")
     st.code(sandbox_url, language="text")
     if source == "env":
