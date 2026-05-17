@@ -38,6 +38,7 @@ export const AUDIT_WRITE_ALLOWLIST: readonly string[] = [
   "tests/integration/audit-partition.test.ts",
   "tools/eslint-plugin-iwo3/", // rule text itself contains the pattern
   "tests/tools/", // rule unit tests contain the pattern in fixtures
+  "apps/api-fastapi/tests/", // pytest fixtures seed audit rows directly to assert dispatch + AEP routing behavior
 ];
 
 const INSERT_PATTERN = /insert\s+into\s+[\"']?action_audit_log[\"']?/i;

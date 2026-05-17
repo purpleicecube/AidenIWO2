@@ -87,7 +87,10 @@ describeIfPython("Loop 6 Phase 6.1 — TS / Python state-machine parity", () => 
       (n, arr) => n + arr.length,
       0
     );
-    // 21 WO + 4 WF + 6 WF-exec + 5 step-run = 36 total.
-    expect(total).toBe(36);
+    // 22 WO + 4 WF + 6 WF-exec + 5 step-run = 37 total.
+    // (WO machine gained one transition since Loop 6 baseline; per-machine
+    //  count is the source of truth — bump this assertion when the count
+    //  legitimately changes after a state-machine evolution.)
+    expect(total).toBe(37);
   });
 });

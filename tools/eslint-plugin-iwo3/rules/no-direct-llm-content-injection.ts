@@ -58,6 +58,8 @@ export const MEMORY_INJECTION_ALLOWLIST: readonly string[] = [
   "apps/api-fastapi/routes/dispatch.py", // imports wrappers; threads memory_block
   "apps/api-fastapi/runtime/tier_1_5_pm.py", // accepts memory_block kwarg from wrapper
   "apps/api-fastapi/runtime/tier_2_subagents.py", // accepts memory_block kwarg from wrapper
+  "apps/api-fastapi/runtime/darla_qa.py", // accepts memory_block kwarg from Tier-2 caller; threads it through to brand_attestation invocation
+  "apps/api-fastapi/runtime/paul_delivery.py", // accepts memory_block kwarg from Tier-2 caller; threads it through to intelligent_delivery invocation
   "apps/api-fastapi/workers/wo_dispatch_worker.py", // imports wrappers; threads memory_block
   "apps/api-fastapi/tests/", // test fixtures simulate tenant flow
 ];
