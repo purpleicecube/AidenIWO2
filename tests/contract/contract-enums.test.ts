@@ -100,10 +100,16 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // Loop CAP-E — Φ.8 ships 3 Aiden branded-intent events
     // (detected / multi_template_disambiguated / template_clarification_requested).
     // Total: 158 + 3 = 161.
-    expect(snap.auditEvents.all.length).toBe(161);
+    // Sandbox-Hosted-In-App β.0 ships 6 audit events under
+    // LOOP_SANDBOX_BETA_0_AUDIT_EVENTS (sandbox.evaluated /
+    // .tested / .under_review / .accepted / .rejected / .reopened).
+    // Total: 161 + 6 = 167.
+    expect(snap.auditEvents.all.length).toBe(167);
     // Loop Kappa added 5 RBAC keys (canonical_facts: read / create /
     // update / delete / set_severity). Total: 87 + 5 = 92.
-    expect(snap.permissionKeys.length).toBe(92);
+    // Sandbox-Hosted-In-App β.0 added 4 RBAC keys (sandbox: evaluate /
+    // test / review / accept). Total: 92 + 4 = 96.
+    expect(snap.permissionKeys.length).toBe(96);
     // Every locked per-loop array carries the right shape.
     expect(snap.auditEvents.byLoop.LOOP_2_AUDIT_EVENTS.length).toBe(12);
     expect(snap.auditEvents.byLoop.LOOP_3_PHASE_1_AUDIT_EVENTS.length).toBe(13);
@@ -154,6 +160,10 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // events (detected always-on; multi_template_disambiguated and
     // template_clarification_requested branch-specific).
     expect(snap.auditEvents.byLoop.LOOP_CAP_E_PHI8_AUDIT_EVENTS.length).toBe(3);
+    // Sandbox-Hosted-In-App β.0 — six acceptance state machine
+    // audit events (one per non-terminal transition + one each for
+    // the terminal accepted/rejected states).
+    expect(snap.auditEvents.byLoop.LOOP_SANDBOX_BETA_0_AUDIT_EVENTS.length).toBe(6);
   });
 });
 

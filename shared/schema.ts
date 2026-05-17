@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, integer, boolean, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, integer, boolean, customType, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -926,6 +926,17 @@ export const sandboxSessions = pgTable("sandbox_sessions", {
   createdBy: text("created_by").default("system"),
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
+  // β.0 foundation (migration 0033, ADR-036). client_id is nullable
+  // during the transition; β.x cutover will NOT NULL it once the
+  // Node sandbox path passes tenant context and FORCE RLS is on.
+  clientId: uuid("client_id"),
+  // β-line acceptance state machine (per ADR-036 + D-B2). Vocabulary
+  // mirrored in packages/contracts/sandbox/state_machines.ts and
+  // enforced at the DB layer by a CHECK constraint.
+  acceptanceState: text("acceptance_state").notNull().default("uploaded"),
+  acceptedByUserId: varchar("accepted_by_user_id"),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  reviewNotes: text("review_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -936,6 +947,11 @@ export const insertSandboxSessionSchema = createInsertSchema(sandboxSessions).om
   logs: true,
   result: true,
   completedAt: true,
+  // β.0 acceptance surface — populated through the workflow, never
+  // by the operator's insert payload.
+  acceptanceState: true,
+  acceptedByUserId: true,
+  acceptedAt: true,
   createdAt: true,
   updatedAt: true,
 });

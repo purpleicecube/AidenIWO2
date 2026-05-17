@@ -542,105 +542,133 @@
     "id": "00000000-0000-4000-8000-0000a0000078",
     "permissionKey": "template_profile:read",
     "displayName": "Read template profiles",
-    "description": "Read tenant-scoped template_profiles. Beta-2 phase 0.1 — populates the Submit Order template selector.",
+    "description": "Read tenant-scoped template_profiles. Beta-2 phase 0.1 \u2014 populates the Submit Order template selector.",
     "scope": "tenant"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000079",
     "permissionKey": "tool_catalog:read",
     "displayName": "Read tool catalog",
-    "description": "Read the tenant-agnostic tool_catalog rows. Loop Eta phase 0 — populates the Sub-Agents Tool Access checkbox grid.",
+    "description": "Read the tenant-agnostic tool_catalog rows. Loop Eta phase 0 \u2014 populates the Sub-Agents Tool Access checkbox grid.",
     "scope": "global"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000080",
     "permissionKey": "tool_catalog:write",
     "displayName": "Write tool catalog",
-    "description": "Create, update, or disable tool_catalog rows. Loop Eta phase 0 — admin-only metadata management.",
+    "description": "Create, update, or disable tool_catalog rows. Loop Eta phase 0 \u2014 admin-only metadata management.",
     "scope": "global"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000081",
     "permissionKey": "sub_agent_tool:read",
     "displayName": "Read sub-agent tool assignments",
-    "description": "Read sub_agent_tools rows for this tenant. Loop Eta phase 0 — required by GET /llm/configs/{id}/tools.",
+    "description": "Read sub_agent_tools rows for this tenant. Loop Eta phase 0 \u2014 required by GET /llm/configs/{id}/tools.",
     "scope": "tenant"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000082",
     "permissionKey": "sub_agent_tool:assign",
     "displayName": "Assign tools to sub-agents",
-    "description": "Toggle sub_agent_tools rows for this tenant. Loop Eta phase 0 — drives PUT /llm/configs/{id}/tools/{tool_key}.",
+    "description": "Toggle sub_agent_tools rows for this tenant. Loop Eta phase 0 \u2014 drives PUT /llm/configs/{id}/tools/{tool_key}.",
     "scope": "tenant"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000083",
     "permissionKey": "tool_catalog:create",
     "displayName": "Create tool catalog rows",
-    "description": "Deploy a new tool into the global tool_catalog. MegaLoop Theta — admin-only POST /tool_catalog.",
+    "description": "Deploy a new tool into the global tool_catalog. MegaLoop Theta \u2014 admin-only POST /tool_catalog.",
     "scope": "global"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000084",
     "permissionKey": "tool_catalog:update",
     "displayName": "Update tool catalog rows",
-    "description": "Edit any tool_catalog row in the global registry. MegaLoop Theta — admin-only PUT /tool_catalog/{tool_key}.",
+    "description": "Edit any tool_catalog row in the global registry. MegaLoop Theta \u2014 admin-only PUT /tool_catalog/{tool_key}.",
     "scope": "global"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000085",
     "permissionKey": "tool_catalog:delete",
     "displayName": "Delete tool catalog rows",
-    "description": "Remove a tool from the global registry. MegaLoop Theta — admin-only DELETE /tool_catalog/{tool_key}.",
+    "description": "Remove a tool from the global registry. MegaLoop Theta \u2014 admin-only DELETE /tool_catalog/{tool_key}.",
     "scope": "global"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000086",
     "permissionKey": "tool_catalog:import_skill",
     "displayName": "Import filesystem skill into catalog",
-    "description": "Scan IWO3_SKILLS_DIR/{dirName}/SKILL.md and create a tool_catalog row from it. MegaLoop Theta — admin-only POST /tool_catalog/import_skill.",
+    "description": "Scan IWO3_SKILLS_DIR/{dirName}/SKILL.md and create a tool_catalog row from it. MegaLoop Theta \u2014 admin-only POST /tool_catalog/import_skill.",
     "scope": "global"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000087",
     "permissionKey": "tool_catalog:test_mcp",
     "displayName": "Test MCP server connectivity",
-    "description": "Open an ad-hoc MCP session and list its tools. MegaLoop Theta — admin-only POST /tool_catalog/mcp/test_connection. Audit-logged on every call.",
+    "description": "Open an ad-hoc MCP session and list its tools. MegaLoop Theta \u2014 admin-only POST /tool_catalog/mcp/test_connection. Audit-logged on every call.",
     "scope": "global"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000088",
     "permissionKey": "canonical_facts:read",
     "displayName": "Read canonical facts",
-    "description": "List and view the tenant's canonical_facts table rows. Loop Kappa — GET /canonical_facts.",
+    "description": "List and view the tenant's canonical_facts table rows. Loop Kappa \u2014 GET /canonical_facts.",
     "scope": "tenant"
   },
   {
     "id": "00000000-0000-4000-8000-0000a0000089",
     "permissionKey": "canonical_facts:create",
     "displayName": "Create canonical facts",
-    "description": "Author a new canonical fact entry. Triggers tenant blob refresh + canonical_facts_revision bump. Loop Kappa — POST /canonical_facts.",
+    "description": "Author a new canonical fact entry. Triggers tenant blob refresh + canonical_facts_revision bump. Loop Kappa \u2014 POST /canonical_facts.",
     "scope": "tenant"
   },
   {
     "id": "00000000-0000-4000-8000-0000a000008a",
     "permissionKey": "canonical_facts:update",
     "displayName": "Update canonical facts",
-    "description": "Edit an existing canonical fact body or activation flag. Triggers blob refresh. Loop Kappa — PATCH /canonical_facts/{id}.",
+    "description": "Edit an existing canonical fact body or activation flag. Triggers blob refresh. Loop Kappa \u2014 PATCH /canonical_facts/{id}.",
     "scope": "tenant"
   },
   {
     "id": "00000000-0000-4000-8000-0000a000008b",
     "permissionKey": "canonical_facts:delete",
     "displayName": "Delete canonical facts",
-    "description": "Soft-delete (is_active=false) a canonical fact row. Triggers blob refresh. Loop Kappa — DELETE /canonical_facts/{id}.",
+    "description": "Soft-delete (is_active=false) a canonical fact row. Triggers blob refresh. Loop Kappa \u2014 DELETE /canonical_facts/{id}.",
     "scope": "tenant"
   },
   {
     "id": "00000000-0000-4000-8000-0000a000008c",
     "permissionKey": "canonical_facts:set_severity",
     "displayName": "Set canonical fact severity",
-    "description": "Adjust severity (critical/high/medium/low) on an existing canonical fact. Loop Kappa — PATCH /canonical_facts/{id} with severity field.",
+    "description": "Adjust severity (critical/high/medium/low) on an existing canonical fact. Loop Kappa \u2014 PATCH /canonical_facts/{id} with severity field.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a000008d",
+    "permissionKey": "sandbox:evaluate",
+    "displayName": "Evaluate sandbox artifact",
+    "description": "Run the automatic evaluation pass on a sandbox session's artifact (metadata, extracted text preview, filetype confirmation). \u03b2.0 foundation \u2014 per-action gate per D-B6.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a000008e",
+    "permissionKey": "sandbox:test",
+    "displayName": "Test sandbox artifact",
+    "description": "Run filetype-specific checks on a sandbox session's artifact (page count, font availability, link validity, etc.). \u03b2.0 foundation \u2014 per-action gate per D-B6.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a000008f",
+    "permissionKey": "sandbox:review",
+    "displayName": "Review sandbox artifact",
+    "description": "Open a sandbox session for review and attest to its quality. Read-only acceptance signal \u2014 does not accept. \u03b2.0 foundation \u2014 per-action gate per D-B6.",
+    "scope": "tenant"
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000a0000090",
+    "permissionKey": "sandbox:accept",
+    "displayName": "Accept sandbox artifact",
+    "description": "Privileged terminal: mark a sandbox session as accepted (or rejected). Acceptance gates downstream dispatch per D-B7. \u03b2.0 foundation \u2014 per-action gate per D-B6.",
     "scope": "tenant"
   }
 ]

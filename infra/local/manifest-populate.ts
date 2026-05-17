@@ -44,6 +44,7 @@ const LOOP_KAPPA_VERSION = "iwo3@v0.16.0-loop-kappa";
 const SANDBOX_INTERNAL_UTILITY_VERSION = "iwo3@v0.17.0-sandbox-internal-utility";
 const LOOP_CAP_A_VERSION = "iwo3@v0.18.0-loop-cap-a";
 const LOOP_CAP_E_VERSION = "iwo3@v0.19.0-loop-cap-e";
+const SANDBOX_BETA_0_VERSION = "iwo3@v0.20.0-sandbox-hosted-in-app-beta-0";
 
 const KNOWN_TABLES: ManifestEntry[] = [
   // Loop 1 — foundation
@@ -115,7 +116,8 @@ const KNOWN_TABLES: ManifestEntry[] = [
   { name: "canonical_facts",            source: "iwo3_native", sourceVersion: LOOP_KAPPA_VERSION, ownedBy: "drizzle", notes: "Loop Kappa — Memory V1.5 canonical facts authoring source; FORCE RLS; clients.canonical_facts_blob becomes denormalized read cache rebuilt from this table when populated (folder fallback otherwise)" },
 
   // Sandbox Operational Darkmode (2026-05-11) — IWO2-inherited Node sandbox path operationalized in IWO3 as an internal operator utility, NOT a tenant-scoped product surface. See ADR-035 for the carve-out + the Path B follow-on loop that will add client_id + RLS + auth-bridge.
-  { name: "sandbox_sessions",           source: "iwo2_parity",  sourceVersion: SANDBOX_INTERNAL_UTILITY_VERSION, ownedBy: "drizzle", notes: "Path A-prime (ADR-035) — IWO2-inherited global sandbox sessions; no client_id, no FORCE RLS; visibility/mutation gated at the Node route layer by creator-or-admin check against the authenticated user; tenant-scoping deferred to Path B follow-on loop" },
+  // β.0 update (2026-05-17, migration 0033, ADR-036): adds the acceptance state-machine surface (acceptance_state, accepted_by_user_id, accepted_at, review_notes) + nullable client_id column. RLS posture intentionally unchanged here — the FORCE RLS cutover is a separate β.x slice that must land in lockstep with Node-side tenant-context plumbing per ADR-036 §Tenancy cutover plan.
+  { name: "sandbox_sessions",           source: "iwo2_parity",  sourceVersion: SANDBOX_BETA_0_VERSION, ownedBy: "drizzle", notes: "Path B-β.0 (ADR-036) — IWO2-inherited sandbox sessions extended with acceptance state machine (uploaded/evaluating/tested/under_review/accepted/rejected/reopened) + nullable client_id. RLS still OFF until β.x cutover; route-layer gating from ADR-035 still authoritative for the carve-out window" },
 
   // Loop CAP-A Φ.1 — per-tenant brand profile. One row per client_id. Read by the orchestration spine (Loops CAP-B → CAP-G) for grounding pre-fetch, branded-intent detection, content brief grounding, brand QA, and intelligent delivery template selection. FORCE RLS canonical pattern.
   { name: "client_brand_profiles",      source: "iwo3_native", sourceVersion: LOOP_CAP_A_VERSION, ownedBy: "drizzle", notes: "Loop CAP-A Φ.1 — per-tenant curated brand truth (palette, fonts, voice, ICP, template_handles per output_kind, brand_terms for Aiden detector, design_input_sources for Stitch/Figma/21st HTML lanes); FORCE RLS; UNIQUE (client_id); broadened output_kind enum (Φ.0a) keys template_handles_json" },

@@ -370,6 +370,18 @@ export const AUDIT_EVENTS = {
   AIDEN_BRANDED_INTENT_DETECTED:        "aiden.branded_intent_detected",
   AIDEN_MULTI_TEMPLATE_DISAMBIGUATED:   "aiden.multi_template_disambiguated",
   AIDEN_TEMPLATE_CLARIFICATION_REQUESTED: "aiden.template_clarification_requested",
+
+  // Sandbox-Hosted-In-App β.0 — acceptance state machine vocabulary
+  // (ADR-036 + D-B2 + D-B7). One event per state transition into a
+  // non-terminal state (evaluated, tested, under_review, reopened) +
+  // one each for the terminal states (accepted, rejected). β.1+
+  // wires the actual writers; β.0 registers vocabulary only.
+  SANDBOX_EVALUATED:    "sandbox.evaluated",
+  SANDBOX_TESTED:       "sandbox.tested",
+  SANDBOX_UNDER_REVIEW: "sandbox.under_review",
+  SANDBOX_ACCEPTED:     "sandbox.accepted",
+  SANDBOX_REJECTED:     "sandbox.rejected",
+  SANDBOX_REOPENED:     "sandbox.reopened",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -689,3 +701,17 @@ export const LOOP_ETA_PROMPT_PROVENANCE = {
 
 export type LoopEtaPromptProvenance =
   (typeof LOOP_ETA_PROMPT_PROVENANCE)[keyof typeof LOOP_ETA_PROMPT_PROVENANCE];
+
+// Sandbox-Hosted-In-App β.0 — acceptance state machine audit
+// vocabulary. ADR-036 §"Audit vocabulary"; D-B2 (state set) + D-B7
+// (dispatch-time enforcement) + D-B6 (per-action gating). β.0
+// registers names only; β.1+ wires writers in the FastAPI sandbox
+// route surface via the standard writeAuditRow path.
+export const LOOP_SANDBOX_BETA_0_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.SANDBOX_EVALUATED,
+  AUDIT_EVENTS.SANDBOX_TESTED,
+  AUDIT_EVENTS.SANDBOX_UNDER_REVIEW,
+  AUDIT_EVENTS.SANDBOX_ACCEPTED,
+  AUDIT_EVENTS.SANDBOX_REJECTED,
+  AUDIT_EVENTS.SANDBOX_REOPENED,
+];

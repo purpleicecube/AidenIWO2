@@ -851,81 +851,356 @@
     "role": "agent_system",
     "permissionKey": "external_execution_result:create"
   },
-  { "role": "owner",     "permissionKey": "channel_auth_code:issue"  },
-  { "role": "owner",     "permissionKey": "channel_identity:read"    },
-  { "role": "owner",     "permissionKey": "channel_identity:revoke"  },
-  { "role": "admin",     "permissionKey": "channel_auth_code:issue"  },
-  { "role": "admin",     "permissionKey": "channel_identity:read"    },
-  { "role": "admin",     "permissionKey": "channel_identity:revoke"  },
-  { "role": "operator",  "permissionKey": "channel_auth_code:issue"  },
-  { "role": "operator",  "permissionKey": "channel_identity:read"    },
-  { "role": "reviewer",  "permissionKey": "channel_identity:read"    },
-  { "role": "agent_system", "permissionKey": "channel_identity:read" },
-  { "role": "owner",        "permissionKey": "workspace:read"    },
-  { "role": "owner",        "permissionKey": "workspace:write"   },
-  { "role": "owner",        "permissionKey": "workspace:delete"  },
-  { "role": "admin",        "permissionKey": "workspace:read"    },
-  { "role": "admin",        "permissionKey": "workspace:write"   },
-  { "role": "admin",        "permissionKey": "workspace:delete"  },
-  { "role": "operator",     "permissionKey": "workspace:read"    },
-  { "role": "operator",     "permissionKey": "workspace:write"   },
-  { "role": "reviewer",     "permissionKey": "workspace:read"    },
-  { "role": "viewer",       "permissionKey": "workspace:read"    },
-  { "role": "agent_system", "permissionKey": "workspace:read"    },
-  { "role": "agent_system", "permissionKey": "workspace:write"   },
-  { "role": "owner",        "permissionKey": "llm_config:write"  },
-  { "role": "owner",        "permissionKey": "llm_config:delete" },
-  { "role": "admin",        "permissionKey": "llm_config:write"  },
-  { "role": "admin",        "permissionKey": "llm_config:delete" },
-  { "role": "operator",     "permissionKey": "llm_config:write"  },
-  { "role": "owner",        "permissionKey": "template_profile:read" },
-  { "role": "admin",        "permissionKey": "template_profile:read" },
-  { "role": "operator",     "permissionKey": "template_profile:read" },
-  { "role": "agent_system", "permissionKey": "template_profile:read" },
-  { "role": "viewer",       "permissionKey": "template_profile:read" },
-  { "role": "agent_system", "permissionKey": "work_order:submit"     },
-  { "role": "owner",        "permissionKey": "tool_catalog:read"      },
-  { "role": "owner",        "permissionKey": "tool_catalog:write"     },
-  { "role": "owner",        "permissionKey": "sub_agent_tool:read"    },
-  { "role": "owner",        "permissionKey": "sub_agent_tool:assign"  },
-  { "role": "admin",        "permissionKey": "tool_catalog:read"      },
-  { "role": "admin",        "permissionKey": "tool_catalog:write"     },
-  { "role": "admin",        "permissionKey": "sub_agent_tool:read"    },
-  { "role": "admin",        "permissionKey": "sub_agent_tool:assign"  },
-  { "role": "operator",     "permissionKey": "tool_catalog:read"      },
-  { "role": "operator",     "permissionKey": "sub_agent_tool:read"    },
-  { "role": "reviewer",     "permissionKey": "tool_catalog:read"      },
-  { "role": "reviewer",     "permissionKey": "sub_agent_tool:read"    },
-  { "role": "viewer",       "permissionKey": "tool_catalog:read"      },
-  { "role": "viewer",       "permissionKey": "sub_agent_tool:read"    },
-  { "role": "agent_system", "permissionKey": "tool_catalog:read"      },
-  { "role": "agent_system", "permissionKey": "sub_agent_tool:read"    },
-
-  { "role": "owner", "permissionKey": "tool_catalog:create"        },
-  { "role": "owner", "permissionKey": "tool_catalog:update"        },
-  { "role": "owner", "permissionKey": "tool_catalog:delete"        },
-  { "role": "owner", "permissionKey": "tool_catalog:import_skill"  },
-  { "role": "owner", "permissionKey": "tool_catalog:test_mcp"      },
-  { "role": "admin", "permissionKey": "tool_catalog:create"        },
-  { "role": "admin", "permissionKey": "tool_catalog:update"        },
-  { "role": "admin", "permissionKey": "tool_catalog:delete"        },
-  { "role": "admin", "permissionKey": "tool_catalog:import_skill"  },
-  { "role": "admin", "permissionKey": "tool_catalog:test_mcp"      },
-
-  { "role": "owner",        "permissionKey": "canonical_facts:read"          },
-  { "role": "owner",        "permissionKey": "canonical_facts:create"        },
-  { "role": "owner",        "permissionKey": "canonical_facts:update"        },
-  { "role": "owner",        "permissionKey": "canonical_facts:delete"        },
-  { "role": "owner",        "permissionKey": "canonical_facts:set_severity"  },
-  { "role": "admin",        "permissionKey": "canonical_facts:read"          },
-  { "role": "admin",        "permissionKey": "canonical_facts:create"        },
-  { "role": "admin",        "permissionKey": "canonical_facts:update"        },
-  { "role": "admin",        "permissionKey": "canonical_facts:delete"        },
-  { "role": "admin",        "permissionKey": "canonical_facts:set_severity"  },
-  { "role": "operator",     "permissionKey": "canonical_facts:read"          },
-  { "role": "operator",     "permissionKey": "canonical_facts:create"        },
-  { "role": "operator",     "permissionKey": "canonical_facts:update"        },
-  { "role": "reviewer",     "permissionKey": "canonical_facts:read"          },
-  { "role": "viewer",       "permissionKey": "canonical_facts:read"          },
-  { "role": "agent_system", "permissionKey": "canonical_facts:read"          }
+  {
+    "role": "owner",
+    "permissionKey": "channel_auth_code:issue"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "channel_identity:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "channel_identity:revoke"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "channel_auth_code:issue"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "channel_identity:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "channel_identity:revoke"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "channel_auth_code:issue"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "channel_identity:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "channel_identity:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "channel_identity:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workspace:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workspace:write"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "workspace:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workspace:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workspace:write"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "workspace:delete"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workspace:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "workspace:write"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "workspace:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "workspace:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workspace:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "workspace:write"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "llm_config:write"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "llm_config:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "llm_config:write"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "llm_config:delete"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "llm_config:write"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "template_profile:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "template_profile:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "template_profile:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "template_profile:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "template_profile:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "work_order:submit"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "tool_catalog:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "tool_catalog:write"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "sub_agent_tool:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "sub_agent_tool:assign"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "tool_catalog:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "tool_catalog:write"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "sub_agent_tool:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "sub_agent_tool:assign"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "tool_catalog:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "sub_agent_tool:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "tool_catalog:read"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "sub_agent_tool:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "tool_catalog:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "sub_agent_tool:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "tool_catalog:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "sub_agent_tool:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "tool_catalog:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "tool_catalog:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "tool_catalog:delete"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "tool_catalog:import_skill"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "tool_catalog:test_mcp"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "tool_catalog:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "tool_catalog:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "tool_catalog:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "tool_catalog:import_skill"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "tool_catalog:test_mcp"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "canonical_facts:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "canonical_facts:create"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "canonical_facts:update"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "canonical_facts:delete"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "canonical_facts:set_severity"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "canonical_facts:read"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "canonical_facts:create"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "canonical_facts:update"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "canonical_facts:delete"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "canonical_facts:set_severity"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "canonical_facts:read"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "canonical_facts:create"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "canonical_facts:update"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "canonical_facts:read"
+  },
+  {
+    "role": "viewer",
+    "permissionKey": "canonical_facts:read"
+  },
+  {
+    "role": "agent_system",
+    "permissionKey": "canonical_facts:read"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "sandbox:evaluate"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "sandbox:evaluate"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "sandbox:evaluate"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "sandbox:test"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "sandbox:test"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "sandbox:test"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "sandbox:review"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "sandbox:review"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "sandbox:review"
+  },
+  {
+    "role": "reviewer",
+    "permissionKey": "sandbox:review"
+  },
+  {
+    "role": "owner",
+    "permissionKey": "sandbox:accept"
+  },
+  {
+    "role": "admin",
+    "permissionKey": "sandbox:accept"
+  },
+  {
+    "role": "operator",
+    "permissionKey": "sandbox:accept"
+  }
 ]
