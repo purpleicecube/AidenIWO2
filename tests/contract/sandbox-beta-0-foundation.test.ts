@@ -47,6 +47,7 @@ import {
   AUDIT_EVENTS,
   LOOP_SANDBOX_BETA_0_AUDIT_EVENTS,
 } from "../../packages/contracts/audit/events";
+import { insertSandboxSessionSchema } from "../../shared/schema";
 
 const ROOT = resolve(__dirname, "../..");
 
@@ -234,5 +235,64 @@ describe("Sandbox β.0 — audit vocabulary coherence", () => {
 describe("Sandbox β.0 — dispatch gate (D-B7)", () => {
   it("exports the dispatch gate error code", () => {
     expect(SANDBOX_DISPATCH_GATE_ERROR_CODE).toBe("sandbox_not_accepted");
+  });
+});
+
+describe("Sandbox β.0 — insertSandboxSessionSchema must reject server-set fields", () => {
+  // CODEX β.0 review (2026-05-17): the original v1 of β.0 had
+  // insertSandboxSessionSchema accept `clientId` from the caller,
+  // which during the ADR-035 carve-out window would have let a
+  // sandbox client pre-seed an arbitrary tenant ID on the row.
+  // This regression test asserts that every server-set field —
+  // including the column added in β.0 — is OMITTED from the
+  // insert schema's keys.
+  //
+  // The actual omit happens via `.omit({...})` in
+  // shared/schema.ts; here we assert the Zod schema's parsed
+  // shape is what we expect.
+
+  it("omits clientId (server-set; caller-supplied value must not leak through)", () => {
+    // Zod's `omit().shape` is the post-omit shape; if `clientId` is
+    // omitted, it must not appear in the shape keys.
+    const shapeKeys = Object.keys(insertSandboxSessionSchema.shape);
+    expect(shapeKeys).not.toContain("clientId");
+  });
+
+  it("omits the acceptance surface (acceptanceState / acceptedByUserId / acceptedAt / reviewNotes)", () => {
+    const shapeKeys = Object.keys(insertSandboxSessionSchema.shape);
+    for (const omitted of [
+      "acceptanceState",
+      "acceptedByUserId",
+      "acceptedAt",
+      "reviewNotes",
+    ]) {
+      expect(shapeKeys).not.toContain(omitted);
+    }
+  });
+
+  it("accepts the operator-supplied surface (name, description, environment, createdBy)", () => {
+    const shapeKeys = Object.keys(insertSandboxSessionSchema.shape);
+    for (const accepted of ["name", "description", "environment", "createdBy"]) {
+      expect(shapeKeys).toContain(accepted);
+    }
+  });
+
+  it("safeParse silently drops any caller-supplied clientId payload (defense-in-depth)", () => {
+    // Z.object().omit(...) drops unknown keys by default. Confirm
+    // that a malicious payload with clientId set does NOT survive
+    // through to the parsed result.
+    const payload = {
+      name: "test session",
+      description: "test",
+      createdBy: "caller-spoofed-user",
+      clientId: "00000000-0000-4000-8000-00000000c001",
+      acceptanceState: "accepted",
+    };
+    const result = insertSandboxSessionSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("clientId");
+      expect(result.data).not.toHaveProperty("acceptanceState");
+    }
   });
 });

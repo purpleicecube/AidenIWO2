@@ -947,11 +947,23 @@ export const insertSandboxSessionSchema = createInsertSchema(sandboxSessions).om
   logs: true,
   result: true,
   completedAt: true,
-  // β.0 acceptance surface — populated through the workflow, never
-  // by the operator's insert payload.
+  // β.0 server-set surface — none of these may be supplied by the
+  // caller. The route layer (or, post-β.x cutover, the
+  // withTenantContext wrapper) is the only authoritative writer.
+  //
+  //   - clientId      : caller cannot pre-seed a tenant. Currently
+  //                     server-set is "do nothing" (legacy NULL
+  //                     carve-out); post-β.x cutover the wrapper
+  //                     resolves it from the JWT.
+  //   - acceptanceState / acceptedByUserId / acceptedAt /
+  //     reviewNotes  : populated through the acceptance state
+  //                     machine, never by the operator's insert
+  //                     payload.
+  clientId: true,
   acceptanceState: true,
   acceptedByUserId: true,
   acceptedAt: true,
+  reviewNotes: true,
   createdAt: true,
   updatedAt: true,
 });
