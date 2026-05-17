@@ -454,7 +454,7 @@ def _render_public_landing() -> None:
                 format_func=lambda i: tenant_choices[i][1],
                 index=tenant_default_idx,
                 key="iwo3_login_tenant_idx",
-                label_visibility="collapsed",
+                help="Pick the tenant you belong to before entering your credentials.",
             )
             chosen_client_id = tenant_choices[tenant_idx][0]
             email = st.text_input(
