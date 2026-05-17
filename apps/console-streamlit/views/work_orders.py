@@ -1041,6 +1041,42 @@ def _render_top_toolbar(api, wo: Any) -> None:
             st.switch_page("views/audit_log.py")
 
 
+def _flash_recovery(wo_id: str, level: str, msg: str) -> None:
+    """FF.AI Hotfix (2026-05-17) — stash a recovery-panel result into
+    session_state and rerun, so the next render shows the message at
+    full column-left width instead of inside the narrow rec_cols where
+    long Aiden assistant_reply text wraps to one-word-per-line and
+    produces a "broken UI" look.
+
+    Scoped per `wo_id` so multiple WOs on the same page don't trample
+    each other's flashes."""
+    st.session_state[f"_recovery_flash_{wo_id}"] = {"level": level, "msg": msg}
+    st.rerun()
+
+
+def _render_recovery_flash(wo_id: str) -> None:
+    """Pop and render the recovery flash for `wo_id` at full width.
+    Long messages (Aiden assistant_reply) truncate to ~280 chars with
+    an expander for the full text — avoids the previous behavior of
+    dumping a 3-screen reply into a narrow yellow column."""
+    flash = st.session_state.pop(f"_recovery_flash_{wo_id}", None)
+    if not flash:
+        return
+    level = flash.get("level") or "warning"
+    msg = flash.get("msg") or ""
+    if level == "success":
+        st.success(msg)
+    elif level == "error":
+        st.error(msg)
+    else:
+        if len(msg) > 280:
+            st.warning(msg[:280].rstrip() + "…")
+            with st.expander("Show full message"):
+                st.markdown(msg)
+        else:
+            st.warning(msg)
+
+
 def _operator_recovery_panel(api, wo: Any) -> None:
     """Loop Xi — Reopen / Edit / Redispatch.
 
@@ -1064,6 +1100,12 @@ def _operator_recovery_panel(api, wo: Any) -> None:
     )
     if not (is_terminal or is_active):
         return
+
+    # Render any flash from a prior button click at full column-left
+    # width BEFORE the narrow rec_cols layout below. Without this,
+    # st.warning(...) inside rec_cols[N] inherits the narrow column
+    # width and word-wraps every word onto its own line.
+    _render_recovery_flash(wo.id)
 
     try:
         decision = api.check_permission("work_order:update")
@@ -1254,11 +1296,15 @@ def _operator_recovery_panel(api, wo: Any) -> None:
                         st.success(f"✅ {kind}")
                         st.rerun()
                     elif r.get("decision_kind") == "clarification":
-                        st.warning(
-                            f"❓ Aiden asked: {r.get('clarification_question')}"
+                        _flash_recovery(
+                            wo.id,
+                            "warning",
+                            f"❓ Aiden asked: {r.get('clarification_question')}",
                         )
                     else:
-                        st.warning(f"⚠️ {r.get('error')}")
+                        _flash_recovery(
+                            wo.id, "warning", f"⚠️ {r.get('error')}"
+                        )
 
 
 def _transition_button(api, wo_id: str, from_status: str, to_status: str) -> None:

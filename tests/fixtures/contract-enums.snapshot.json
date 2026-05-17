@@ -334,6 +334,7 @@
       "adapter_policy.created",
       "adapter_policy.updated",
       "aiden.branded_intent_detected",
+      "aiden.dispatch_overridden_by_requested_outputs",
       "aiden.multi_template_disambiguated",
       "aiden.template_clarification_requested",
       "aiden.tool_called",
@@ -707,6 +708,9 @@
         "sandbox.accepted",
         "sandbox.rejected",
         "sandbox.reopened"
+      ],
+      "FFAI_HOTFIX_2026_05_17_AUDIT_EVENTS": [
+        "aiden.dispatch_overridden_by_requested_outputs"
       ]
     }
   },

@@ -44,8 +44,11 @@ from deps import (
 )
 from runtime.budgets import LlmBudgetExceeded
 from runtime.tier_1_aiden import (
+    AidenAssistantReply,
+    AidenDecision,
     AidenInvocationError,
     AidenNoConfig,
+    AidenWorkOrderBrief,
     invoke_aiden_tier_1,
 )
 from runtime.tier_1_5_pm import (
@@ -251,6 +254,7 @@ async def dispatch_work_order(
                    title,
                    description,
                    status::text             AS status,
+                   priority::text           AS priority,
                    requested_outputs::text  AS requested_outputs
               FROM work_orders
              WHERE id = $1::uuid AND client_id = $2::uuid
@@ -314,19 +318,115 @@ async def dispatch_work_order(
             ),
         )
 
+    # FF.AI Hotfix (2026-05-17) — Operator-explicit requested_outputs is
+    # an authoritative classification signal. If the WO already carries
+    # `{output_kind, template_profile_id}` set by the operator (via
+    # Submit Order picker, /work_orders PATCH, or chat-side resolver),
+    # then this is BY DEFINITION a deliverable request — not a chat.
+    # Override Aiden's assistant_reply (which is its default for any
+    # non-explicit chat-y input) and synthesize a work_order_brief so
+    # Tier 2 actually runs and produces an output_package.
+    #
+    # Audit event `aiden.dispatch_overridden_by_requested_outputs`
+    # records the override for forensic transparency. The original
+    # Aiden response text becomes the brief's `content_blocks.body`
+    # so the Tier 2 sub-agent has Aiden's analysis to work from.
     if decision.decision_kind == "assistant_reply":
-        # Operator submitted a WO with conversational intake (no concrete
-        # work). Don't dispatch; surface Aiden's reply so the operator
-        # can rewrite the WO with actual deliverable language.
-        a = decision.assistant_reply
-        return DispatchResponse(
-            ok=False,
-            decision_kind="assistant_reply",
-            work_order_id=wo["id"],
-            error=(
-                a.message if a else "(no message returned)"
-            ),
-        )
+        existing_ro_raw = wo.get("requested_outputs")
+        parsed_ro: Optional[dict] = None
+        if isinstance(existing_ro_raw, dict):
+            parsed_ro = existing_ro_raw
+        elif isinstance(existing_ro_raw, str):
+            try:
+                parsed_ro = json.loads(existing_ro_raw)
+            except (json.JSONDecodeError, ValueError):
+                parsed_ro = None
+        explicit_kind = (parsed_ro or {}).get("output_kind")
+        explicit_template_id = (parsed_ro or {}).get("template_profile_id")
+        if explicit_kind and explicit_template_id:
+            # Map output_kind → default Tier 2 role. Mirrors the routing
+            # taxonomy in `tier_1_aiden._AIDEN_OUTPUT_SCHEMA` (mark for
+            # written content, tom for decks, hank for web, sop_master
+            # for procedures). Conservative default to mark_tier_2 for
+            # any unknown kind so we never silently drop the override.
+            role_for_output_kind = {
+                "pdf": "mark_tier_2",
+                "pptx": "tom_tier_2",
+                "html": "hank_tier_2",
+                "docx": "sop_master_tier_2",
+            }
+            assigned_role = role_for_output_kind.get(
+                explicit_kind, "mark_tier_2"
+            )
+            ar = decision.assistant_reply
+            body_text = (
+                ar.message
+                if ar
+                else (decision.summary or wo.get("description") or "")
+            )
+            synthetic_brief = AidenWorkOrderBrief(
+                assigned_role=assigned_role,
+                content_blocks={
+                    "title": decision.title or wo.get("title") or "",
+                    "summary": decision.summary or "",
+                    "body": body_text,
+                },
+                priority=wo.get("priority") or "medium",
+                template_profile_id=explicit_template_id,
+                template_output_kind=explicit_kind,
+            )
+            await write_audit_row(
+                conn,
+                client_id=ctx["client_id"],
+                actor_user_id=ctx["user_id"],
+                event="aiden.dispatch_overridden_by_requested_outputs",
+                target_type="work_order",
+                target_id=wo["id"],
+                metadata={
+                    "original_decision_kind": "assistant_reply",
+                    "overridden_decision_kind": "work_order_brief",
+                    "explicit_output_kind": explicit_kind,
+                    "explicit_template_profile_id": explicit_template_id,
+                    "assigned_role": assigned_role,
+                    "rationale": (
+                        "operator-explicit requested_outputs treated as "
+                        "authoritative classification signal"
+                    ),
+                },
+            )
+            # Preserve provenance (provider/model/tokens/latency) so
+            # downstream propagation surfaces still see Aiden's metrics
+            # — only the decision_kind + brief get swapped.
+            decision = AidenDecision(
+                decision_kind="work_order_brief",
+                title=decision.title,
+                summary=decision.summary,
+                assistant_reply=None,
+                tool_call=None,
+                work_order_brief=synthetic_brief,
+                workflow_brief=None,
+                clarification=None,
+                provider=decision.provider,
+                model=decision.model,
+                latency_ms=decision.latency_ms,
+                prompt_tokens=decision.prompt_tokens,
+                completion_tokens=decision.completion_tokens,
+                total_tokens=decision.total_tokens,
+            )
+        else:
+            # Operator submitted a WO with conversational intake (no
+            # concrete work). Don't dispatch; surface Aiden's reply so
+            # the operator can rewrite the WO with actual deliverable
+            # language.
+            a = decision.assistant_reply
+            return DispatchResponse(
+                ok=False,
+                decision_kind="assistant_reply",
+                work_order_id=wo["id"],
+                error=(
+                    a.message if a else "(no message returned)"
+                ),
+            )
 
     # Loop CAP-E Φ.8 — branded-intent classification + chain routing.
     # Runs only when Aiden chose work_order_brief (the default for

@@ -104,7 +104,11 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // LOOP_SANDBOX_BETA_0_AUDIT_EVENTS (sandbox.evaluated /
     // .tested / .under_review / .accepted / .rejected / .reopened).
     // Total: 161 + 6 = 167.
-    expect(snap.auditEvents.all.length).toBe(167);
+    // FF.AI Hotfix (2026-05-17) — 1 new audit event
+    // (aiden.dispatch_overridden_by_requested_outputs) under
+    // FFAI_HOTFIX_2026_05_17_AUDIT_EVENTS for explicit-template
+    // override forensics. Total: 167 + 1 = 168.
+    expect(snap.auditEvents.all.length).toBe(168);
     // Loop Kappa added 5 RBAC keys (canonical_facts: read / create /
     // update / delete / set_severity). Total: 87 + 5 = 92.
     // Sandbox-Hosted-In-App β.0 added 4 RBAC keys (sandbox: evaluate /
@@ -164,6 +168,9 @@ describeIwo3("Loop 5 Phase 5.1 — contract surface enum freeze", () => {
     // audit events (one per non-terminal transition + one each for
     // the terminal accepted/rejected states).
     expect(snap.auditEvents.byLoop.LOOP_SANDBOX_BETA_0_AUDIT_EVENTS.length).toBe(6);
+    // FF.AI Hotfix (2026-05-17) — single new audit event for
+    // explicit-template Tier 1 override forensics.
+    expect(snap.auditEvents.byLoop.FFAI_HOTFIX_2026_05_17_AUDIT_EVENTS.length).toBe(1);
   });
 });
 

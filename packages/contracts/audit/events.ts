@@ -382,6 +382,17 @@ export const AUDIT_EVENTS = {
   SANDBOX_ACCEPTED:     "sandbox.accepted",
   SANDBOX_REJECTED:     "sandbox.rejected",
   SANDBOX_REOPENED:     "sandbox.reopened",
+
+  // FF.AI Hotfix (2026-05-17) — when Aiden Tier 1 returns
+  // `assistant_reply` for a WO that explicitly carries
+  // `requested_outputs.{output_kind, template_profile_id}`, the
+  // dispatcher treats the operator's explicit signal as authoritative
+  // and overrides decision_kind to `work_order_brief`. The override
+  // emits this event so the audit forensics trail shows that Aiden's
+  // own classification was superseded by the operator-supplied
+  // template intent.
+  AIDEN_DISPATCH_OVERRIDDEN_BY_REQUESTED_OUTPUTS:
+    "aiden.dispatch_overridden_by_requested_outputs",
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
@@ -685,6 +696,14 @@ export const LOOP_CAP_E_PHI8_AUDIT_EVENTS: readonly AuditEvent[] = [
   AUDIT_EVENTS.AIDEN_BRANDED_INTENT_DETECTED,
   AUDIT_EVENTS.AIDEN_MULTI_TEMPLATE_DISAMBIGUATED,
   AUDIT_EVENTS.AIDEN_TEMPLATE_CLARIFICATION_REQUESTED,
+];
+
+// FF.AI Hotfix (2026-05-17) — dispatcher honors explicit
+// requested_outputs as authoritative classification signal even when
+// Aiden Tier 1 returned assistant_reply. One audit event records the
+// override for forensic transparency.
+export const FFAI_HOTFIX_2026_05_17_AUDIT_EVENTS: readonly AuditEvent[] = [
+  AUDIT_EVENTS.AIDEN_DISPATCH_OVERRIDDEN_BY_REQUESTED_OUTPUTS,
 ];
 
 // Loop Eta phase 0 — prompt provenance vocabulary. One value per llm_configs
