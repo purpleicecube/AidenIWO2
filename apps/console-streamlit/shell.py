@@ -39,8 +39,8 @@ SEED_USERS: dict[str, tuple[str, str, str]] = {
 }
 
 TENANT_LABELS: dict[str, str] = {
-    "00000000-0000-4000-8000-00000000c001": "IWO | Klear.ai",
     "00000000-0000-4000-8000-00000000c002": "IWO | FreedomForge.AI",
+    "00000000-0000-4000-8000-00000000c001": "IWO | Klear.ai",
 }
 
 
