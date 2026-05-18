@@ -66,7 +66,31 @@ def main() -> None:
     profiles = _load_template_profiles(api)
     output_kinds_available: list[str] = sorted({p["output_kind"] for p in profiles})
 
-    with st.form("submit-order", clear_on_submit=False):
+    # FF.AI Hotfix (2026-05-18) — render the last-created WO banner
+    # ABOVE the form so it persists across reruns (st.form with
+    # clear_on_submit=True wipes everything inside the form context,
+    # which would blink the success message away as soon as the
+    # operator touched anything else on the page).
+    last_wo = st.session_state.get("_submit_order_last_wo")
+    if last_wo:
+        cols = st.columns([10, 1])
+        with cols[0]:
+            st.success(
+                f"✅ Work Order created: `{last_wo['id']}` "
+                f"(status: `{last_wo['status']}`)"
+            )
+            if last_wo.get("requested_outputs_summary"):
+                st.caption(last_wo["requested_outputs_summary"])
+            st.caption(
+                "The auto-dispatch worker will pick this up within one tick "
+                "(Phase 0.2). Open **Work Orders** to watch it advance."
+            )
+        with cols[1]:
+            if st.button("Dismiss", key="dismiss-last-wo"):
+                st.session_state.pop("_submit_order_last_wo", None)
+                st.rerun()
+
+    with st.form("submit-order", clear_on_submit=True):
         title = st.text_input(
             "Title *",
             placeholder="Draft RMIS one-pager for April brief",
@@ -169,23 +193,30 @@ def main() -> None:
                     template_profile_id=template_profile_id,
                 )
             except APIError as err:
+                # API error — keep field values so the operator can
+                # fix-and-retry without retyping. st.form's
+                # clear_on_submit=True will clear the visible inputs,
+                # but the operator still sees the error inline.
                 st.error(f"❌ {err.status_code} — {err.detail}")
                 return
 
-            st.success(
-                f"✅ Work Order created: `{resp.get('id', '—')}` "
-                f"(status: `{resp.get('status', '—')}`)"
-            )
+            # Success — stash the result in session_state so the banner
+            # renders ABOVE the (now-cleared) form on the next render
+            # and persists across subsequent reruns until the operator
+            # dismisses it or submits another WO.
+            requested_outputs_summary: Optional[str] = None
             if output_kind is not None or template_profile_id is not None:
-                st.caption(
+                requested_outputs_summary = (
                     f"Requested outputs recorded: "
                     f"`output_kind={output_kind or '—'}` / "
                     f"`template_profile_id={template_profile_id or '—'}`"
                 )
-            st.caption(
-                "The auto-dispatch worker will pick this up within one tick "
-                "(Phase 0.2). Open **Work Orders** to watch it advance."
-            )
+            st.session_state["_submit_order_last_wo"] = {
+                "id": resp.get("id", "—"),
+                "status": resp.get("status", "—"),
+                "requested_outputs_summary": requested_outputs_summary,
+            }
+            st.rerun()
 
 
 main()
