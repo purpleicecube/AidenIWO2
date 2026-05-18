@@ -423,6 +423,108 @@ def test_post_write_hook_failure_does_not_silently_drop_write() -> None:
 
 
 @iwo3_db
+def test_output_package_markdown_endpoint_returns_canonical_source() -> None:
+    """Sandbox + Markdown Review Layer (2026-05-18) — GET
+    /workspace/output_packages/{id}/markdown returns the canonical
+    markdown body of an output_package. The export pipeline derives
+    PDF/PPTX from THIS body; presentation (tenant brand) applies at
+    render time.
+    """
+    import asyncio
+    import asyncpg
+    import uuid as _uuid
+
+    klear_uuid = _uuid.UUID(KLEAR_CLIENT)
+    pkg_id = str(_uuid.uuid4())
+
+    async def _seed() -> None:
+        conn = await asyncpg.connect(os.environ["IWO3_DATABASE_URL"])
+        try:
+            await conn.execute(
+                """
+                INSERT INTO output_packages
+                  (id, client_id, output_kind, title, summary,
+                   status, priority, content_blocks)
+                VALUES ($1::uuid, $2::uuid, 'gamma_pdf', $3, $4,
+                        'draft', 'medium', $5::jsonb)
+                """,
+                pkg_id,
+                klear_uuid,
+                "Q2 Risk Overview",
+                "Summary of Q2 risk posture.",
+                '{"content_markdown":"# Q2 Risk Overview\\n\\nKey findings...\\n",'
+                '"summary":"Summary of Q2 risk posture."}',
+            )
+        finally:
+            await conn.close()
+
+    async def _cleanup() -> None:
+        conn = await asyncpg.connect(os.environ["IWO3_DATABASE_URL"])
+        try:
+            await conn.execute(
+                "DELETE FROM output_packages WHERE id = $1::uuid", pkg_id
+            )
+        finally:
+            await conn.close()
+
+    asyncio.run(_seed())
+    try:
+        with TestClient(app) as client:
+            r = client.get(
+                f"/workspace/output_packages/{pkg_id}/markdown",
+                headers=_hdr(KLEAR_OWNER),
+            )
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["package_id"] == pkg_id
+            assert body["title"] == "Q2 Risk Overview"
+            assert body["output_kind"] == "gamma_pdf"
+            assert body["extracted_from"] == "output_package:gamma_pdf"
+            assert "Q2 Risk Overview" in body["markdown"]
+    finally:
+        asyncio.run(_cleanup())
+
+
+@iwo3_db
+def test_output_package_markdown_endpoint_404_for_unknown_id() -> None:
+    import uuid as _uuid
+    with TestClient(app) as client:
+        r = client.get(
+            f"/workspace/output_packages/{_uuid.uuid4()}/markdown",
+            headers=_hdr(KLEAR_OWNER),
+        )
+    assert r.status_code == 404
+
+
+@iwo3_db
+def test_workspace_brand_endpoint_returns_klear_palette() -> None:
+    """Sandbox + Markdown Review Layer (2026-05-18) — GET /workspace/brand
+    returns the active tenant's brand profile in a preview-render-friendly
+    shape. Klear has a seeded palette + fonts + brand_terms.
+    """
+    with TestClient(app) as client:
+        r = client.get("/workspace/brand", headers=_hdr(KLEAR_OWNER))
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["client_id"] == KLEAR_CLIENT
+        assert body["has_brand_profile"] is True
+        assert body["tenant_label"] == "Klear.ai"
+        palette = body.get("palette") or {}
+        assert palette.get("primary") == "#8B49E2"
+        fonts = body.get("fonts") or {}
+        assert "heading" in fonts
+        assert "Klear.ai" in (body.get("brand_terms") or [])
+
+
+@iwo3_db
+def test_workspace_brand_endpoint_requires_headers() -> None:
+    """Auth-mode-aware: missing X-IWO3-User/X-IWO3-Client → 401."""
+    with TestClient(app) as client:
+        r = client.get("/workspace/brand")
+        assert r.status_code == 401
+
+
+@iwo3_db
 def test_file_content_fetch_dereferences_output_package_to_markdown() -> None:
     """Sandbox Everywhere follow-on (2026-05-12) — Outputs/ artifacts
     that point at `output_package://...` are dereferenced to markdown

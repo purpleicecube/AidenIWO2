@@ -537,7 +537,53 @@ export function buildCodePreviewHtml(title: string, codeBlocks: ExtractedCodeBlo
 </html>`;
 }
 
-export function buildMarkdownPreviewHtml(title: string, markdown: string): string {
+/**
+ * Sandbox + Markdown Review Layer (2026-05-18).
+ *
+ * Tenant brand profile shape as returned by FastAPI's
+ * `GET /workspace/brand`. The markdown stays canonical; this is the
+ * presentation layer.
+ */
+export interface TenantBrand {
+  client_id: string;
+  brand_revision: number;
+  has_brand_profile: boolean;
+  tenant_label?: string | null;
+  palette?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    gradient?: { from?: string; to?: string };
+    neutrals?: {
+      bg?: string;
+      text?: string;
+      muted?: string;
+    };
+  } | null;
+  fonts?: {
+    heading?: string;
+    body?: string;
+    fallbacks?: string[];
+  } | null;
+  brand_terms?: string[] | null;
+}
+
+function _fontStack(font: string | undefined, fallbacks: string[] | undefined): string {
+  const parts: string[] = [];
+  if (font) parts.push(`'${font}'`);
+  if (fallbacks && fallbacks.length > 0) {
+    parts.push(...fallbacks);
+  } else {
+    parts.push("-apple-system", "BlinkMacSystemFont", "sans-serif");
+  }
+  return parts.join(", ");
+}
+
+export function buildMarkdownPreviewHtml(
+  title: string,
+  markdown: string,
+  brand?: TenantBrand | null,
+): string {
   let html = escapeHtml(markdown);
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
@@ -555,6 +601,27 @@ export function buildMarkdownPreviewHtml(title: string, markdown: string): strin
   html = html.replace(/<\/ul>\s*<\/p>/g, '</ul>');
   html = html.replace(/<p>\s*<\/p>/g, '');
 
+  // Brand-aware presentation layer. When the tenant has a brand
+  // profile, use its palette + fonts. Otherwise fall back to the
+  // built-in dark theme so the preview always has something usable.
+  const palette = brand?.palette || null;
+  const fonts = brand?.fonts || null;
+  const tenantLabel = brand?.tenant_label || "AIDEN_IWO";
+  const hasBrand = !!(brand && brand.has_brand_profile && palette);
+
+  // Pick safe defaults if the brand profile is partial.
+  const colorPrimary = palette?.primary || "#1E5F91";
+  const colorSecondary = palette?.secondary || "#0f172a";
+  const colorAccent = palette?.accent || palette?.primary || "#A61CC8";
+  const colorBg = palette?.neutrals?.bg || (hasBrand ? "#FFFFFF" : "#0f172a");
+  const colorText = palette?.neutrals?.text || (hasBrand ? "#0A0A0A" : "#e2e8f0");
+  const colorMuted = palette?.neutrals?.muted || (hasBrand ? "#37517E" : "#94a3b8");
+  const colorRule = hasBrand ? "#E5E7EB" : "#334155";
+  const colorStrong = hasBrand ? colorText : "#f1f5f9";
+
+  const headingFontStack = _fontStack(fonts?.heading, fonts?.fallbacks);
+  const bodyFontStack = _fontStack(fonts?.body, fonts?.fallbacks);
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -564,25 +631,34 @@ export function buildMarkdownPreviewHtml(title: string, markdown: string): strin
 <title>${escapeHtml(title)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  a { color: #60a5fa; text-decoration: underline; cursor: pointer; transition: color 0.15s; }
-  a:hover { color: #93c5fd; }
-  a:visited { color: #a78bfa; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; max-width: 800px; margin: 0 auto; }
-  .badge { display: inline-block; background: #1e40af; color: #93c5fd; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 1.5rem; }
-  .doc-title { font-size: 1.5rem; margin-bottom: 0.5rem; color: #f8fafc; }
-  h2 { font-size: 1.25rem; margin: 1.5rem 0 0.75rem; color: #93c5fd; border-bottom: 1px solid #334155; padding-bottom: 0.4rem; }
-  h3 { font-size: 1.1rem; margin: 1.25rem 0 0.5rem; color: #a5b4fc; }
-  p { margin-bottom: 0.75rem; line-height: 1.7; color: #cbd5e1; }
-  strong { color: #f1f5f9; }
+  a { color: ${colorAccent}; text-decoration: underline; cursor: pointer; transition: color 0.15s; }
+  a:hover { opacity: 0.85; }
+  body { font-family: ${bodyFontStack}; background: ${colorBg}; color: ${colorText}; padding: 2rem; max-width: 800px; margin: 0 auto; }
+  .brand-band { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.9rem; margin-bottom: 1.5rem; background: ${colorPrimary}; color: #ffffff; border-radius: 4px; font-family: ${headingFontStack}; }
+  .brand-band .label { font-size: 0.85rem; letter-spacing: 0.02em; font-weight: 600; }
+  .brand-band .doc-meta { font-size: 0.7rem; opacity: 0.85; }
+  .doc-title { font-family: ${headingFontStack}; font-size: 1.75rem; margin-bottom: 0.75rem; color: ${colorText}; }
+  h2 { font-family: ${headingFontStack}; font-size: 1.25rem; margin: 1.5rem 0 0.75rem; color: ${colorPrimary}; border-bottom: 1px solid ${colorRule}; padding-bottom: 0.4rem; }
+  h3 { font-family: ${headingFontStack}; font-size: 1.05rem; margin: 1.25rem 0 0.5rem; color: ${colorSecondary}; }
+  p { margin-bottom: 0.75rem; line-height: 1.7; color: ${colorText}; }
+  strong { color: ${colorStrong}; }
+  em { color: ${colorMuted}; }
   ul, ol { margin: 0.5rem 0 1rem 1.5rem; }
-  li { margin-bottom: 0.35rem; line-height: 1.6; color: #cbd5e1; }
-  .footer { margin-top: 2rem; font-size: 0.75rem; color: #64748b; border-top: 1px solid #1e293b; padding-top: 1rem; }
+  li { margin-bottom: 0.35rem; line-height: 1.6; color: ${colorText}; }
+  .footer { margin-top: 2.5rem; font-size: 0.7rem; color: ${colorMuted}; border-top: 1px solid ${colorRule}; padding-top: 1rem; font-family: ${bodyFontStack}; }
+  .footer .brand-rev { float: right; opacity: 0.7; }
 </style>
 </head>
 <body>
-  <span class="badge">AIDEN_IWO Document Preview</span>
+  <div class="brand-band">
+    <span class="label">${escapeHtml(tenantLabel)} · Document Preview</span>
+    <span class="doc-meta">${hasBrand ? `Brand v${brand!.brand_revision}` : "default theme"}</span>
+  </div>
   ${html}
-  <div class="footer">Auto-deployed by AIDEN_IWO Workspace Filing Engine</div>
+  <div class="footer">
+    Rendered by AIDEN_IWO3 from canonical Markdown source.
+    <span class="brand-rev">${hasBrand ? "tenant-branded" : "default theme"}</span>
+  </div>
 </body>
 </html>`;
 }

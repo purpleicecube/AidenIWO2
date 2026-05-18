@@ -185,3 +185,39 @@ export async function fetchSandboxArtifactContent(
     extractedFrom: data.extracted_from ?? null,
   };
 }
+
+
+/**
+ * Sandbox + Markdown Review Layer (2026-05-18) — fetch the active
+ * tenant's brand profile so the sandbox preview can apply tenant
+ * palette + fonts at render time without mutating the markdown
+ * source. The markdown is canonical; this is the presentation layer.
+ *
+ * Best-effort: returns null when the FastAPI surface is unreachable
+ * or returns an error, so the preview falls back to the default
+ * theme rather than failing the entire rerender chain.
+ */
+export async function fetchSandboxTenantBrand(
+  actorUserId: string,
+): Promise<import("./workspace-filing").TenantBrand | null> {
+  const clientId = await getUserPrimaryClientId(actorUserId);
+  if (!clientId) return null;
+
+  const baseUrl = getFastApiBaseUrl();
+  const url = `${baseUrl.replace(/\/$/, "")}/workspace/brand`;
+
+  try {
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-IWO3-User": actorUserId,
+        "X-IWO3-Client": clientId,
+      },
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as import("./workspace-filing").TenantBrand;
+  } catch {
+    return null;
+  }
+}

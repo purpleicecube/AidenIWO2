@@ -321,6 +321,202 @@ async def get_workspace_tree(
     )
 
 
+# ── Sandbox + Markdown Review Layer (2026-05-18) ──────────────────────
+#
+# Canonical chain for document-style WO outputs:
+#   1. Tier-2 generates content_markdown → output_packages.content_blocks
+#   2. Sandbox preview reads that markdown via /workspace/files/:id/content
+#      (output_package:// dereference, shipped 2026-05-12 at bb79edf)
+#   3. Preview HTML wrapper applies tenant brand at RENDER TIME — the
+#      markdown source stays untouched
+#   4. Export endpoints derive PDF / PPTX from the same markdown source
+#
+# This endpoint surfaces the active tenant's brand profile so the
+# Node sandbox + any other presentation surface can apply tenant
+# palette/fonts/voice without re-reading client_brand_profiles itself.
+# The markdown is the source of truth; this is the presentation layer's
+# truth.
+
+
+class TenantBrandResponse(BaseModel):
+    """Active tenant's brand profile, scoped to the presentation layer.
+
+    Returned shape is deliberately minimal: palette + fonts + tenant
+    name + brand_terms. Voice/ICP/template_handles are NOT included
+    here — those are LLM-grounding concerns, not preview-render
+    concerns. Callers who want the full brand_profile shape can read
+    `client_brand_profiles` directly via FastAPI's tenant-scoped
+    connection.
+    """
+
+    client_id: str
+    brand_revision: int
+    has_brand_profile: bool
+    # Display name of the tenant; falls back to client_designation when
+    # brand profile is absent so the preview always has SOMETHING to show.
+    tenant_label: Optional[str] = None
+    palette: Optional[dict[str, Any]] = None
+    fonts: Optional[dict[str, Any]] = None
+    brand_terms: Optional[list[str]] = None
+
+
+class OutputPackageMarkdownResponse(BaseModel):
+    """Canonical markdown body of an output_package, surfaced so the
+    export pipeline can derive PDF/PPTX from the same source the
+    sandbox preview reads. The markdown is the source of truth;
+    PDF/PPTX are derived presentations of that source.
+    """
+
+    package_id: str
+    title: str
+    summary: Optional[str] = None
+    output_kind: str
+    template_profile_id: Optional[str] = None
+    markdown: str
+    extracted_from: Optional[str] = None
+
+
+@router.get(
+    "/output_packages/{package_id}/markdown",
+    response_model=OutputPackageMarkdownResponse,
+    dependencies=[Depends(require_permission_dep("workspace:read"))],
+)
+async def get_output_package_markdown(
+    package_id: str,
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> OutputPackageMarkdownResponse:
+    """Sandbox + Markdown Review Layer (2026-05-18) — return the
+    canonical markdown body of an output_package directly by id.
+    This is the source the export pipeline derives from; presentation
+    (tenant template/branding) is applied at render time, not stamped
+    into this body.
+
+    RLS-scoped: cross-tenant package_id resolves to 404.
+    """
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT id::text                 AS id,
+                   output_kind::text        AS output_kind,
+                   title,
+                   summary,
+                   template_profile_id::text AS template_profile_id,
+                   content_blocks
+            FROM output_packages
+            WHERE id = $1::uuid
+            """,
+            package_id,
+        )
+    except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "invalid_package_id", "value": package_id},
+        )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "package_not_found", "id": package_id},
+        )
+
+    markdown = _serialize_output_package_to_markdown(
+        title=row["title"],
+        summary=row["summary"],
+        output_kind=row["output_kind"],
+        content_blocks=row["content_blocks"],
+    )
+    return OutputPackageMarkdownResponse(
+        package_id=row["id"],
+        title=row["title"] or "Untitled",
+        summary=row["summary"],
+        output_kind=row["output_kind"],
+        template_profile_id=row["template_profile_id"],
+        markdown=markdown,
+        extracted_from=f"output_package:{row['output_kind']}",
+    )
+
+
+@router.get(
+    "/brand",
+    response_model=TenantBrandResponse,
+    dependencies=[Depends(require_permission_dep("workspace:read"))],
+)
+async def get_tenant_brand(
+    ctx: Annotated[dict, Depends(current_user_context)],
+    conn: Annotated[
+        asyncpg.Connection, Depends(get_tenant_scoped_connection)
+    ],
+) -> TenantBrandResponse:
+    """Sandbox + Markdown Review Layer (2026-05-18) — return the active
+    tenant's brand profile in a preview-render-friendly shape so the
+    Node sandbox / export pipeline can apply tenant palette + fonts at
+    render time without mutating the markdown source of truth.
+
+    Tenant scoping: the RLS-scoped connection filters
+    `client_brand_profiles` to the active tenant transparently. Falls
+    back to a tenant_label-only response when the row is absent so
+    callers can always render something sensible.
+    """
+    import json as _json
+
+    # lint:bypass-rls-explain="conn is already tenant-scoped via get_tenant_scoped_connection (iwo3_app + app.current_client_id GUC); RLS filters client_brand_profiles to active tenant transparently"
+    brand_row = await conn.fetchrow(
+        """
+        SELECT palette_json,
+               fonts_json,
+               brand_terms,
+               revision
+        FROM client_brand_profiles
+        WHERE client_id = $1::uuid
+        LIMIT 1
+        """,
+        ctx["client_id"],
+    )
+    tenant_label_row = await conn.fetchrow(
+        """
+        SELECT COALESCE(display_name, designation, id::text) AS tenant_label
+        FROM clients
+        WHERE id = $1::uuid
+        """,
+        ctx["client_id"],
+    )
+    tenant_label = (
+        tenant_label_row["tenant_label"] if tenant_label_row else None
+    )
+
+    if brand_row is None:
+        return TenantBrandResponse(
+            client_id=ctx["client_id"],
+            brand_revision=0,
+            has_brand_profile=False,
+            tenant_label=tenant_label,
+        )
+
+    def _parse_jsonb(value: Any) -> Optional[dict]:
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                return _json.loads(value)
+            except (_json.JSONDecodeError, ValueError):
+                return None
+        return None
+
+    return TenantBrandResponse(
+        client_id=ctx["client_id"],
+        brand_revision=brand_row["revision"] or 0,
+        has_brand_profile=True,
+        tenant_label=tenant_label,
+        palette=_parse_jsonb(brand_row["palette_json"]),
+        fonts=_parse_jsonb(brand_row["fonts_json"]),
+        brand_terms=list(brand_row["brand_terms"] or []),
+    )
+
+
 @router.get(
     "/folders/{folder_id}",
     response_model=FolderListResponse,

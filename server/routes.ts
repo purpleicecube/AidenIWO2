@@ -3363,9 +3363,15 @@ export async function registerRoutes(
         });
       }
 
-      const { fetchSandboxArtifactContent } = await import("./sandbox-crossservice");
+      const { fetchSandboxArtifactContent, fetchSandboxTenantBrand } = await import("./sandbox-crossservice");
       const appUser = (req as any).appUser;
-      const fetched = await fetchSandboxArtifactContent(artifactId, appUser.id);
+      const [fetched, brand] = await Promise.all([
+        fetchSandboxArtifactContent(artifactId, appUser.id),
+        // Sandbox + Markdown Review Layer (2026-05-18) — fetch tenant
+        // brand profile so the preview applies tenant palette + fonts
+        // at render time. Best-effort: null on failure → default theme.
+        fetchSandboxTenantBrand(appUser.id),
+      ]);
 
       if ("kind" in fetched) {
         // Cross-service helper signaled an honest error shape.
@@ -3426,7 +3432,10 @@ export async function registerRoutes(
       }
 
       if (!newHtml && deliverable.length > 50) {
-        newHtml = buildMarkdownPreviewHtml(title, deliverable);
+        // Sandbox + Markdown Review Layer (2026-05-18) — apply tenant
+        // brand at render time. Markdown stays canonical; tenant
+        // palette/fonts/label apply only to the HTML presentation.
+        newHtml = buildMarkdownPreviewHtml(title, deliverable, brand);
       }
 
       if (!newHtml) {
@@ -3696,6 +3705,186 @@ export async function registerRoutes(
       } catch (err: any) {
         res.status(500).json({
           message: "Failed to export sandbox session",
+          error: err.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /api/output-packages/:id/export?format=pdf|pptx — Sandbox +
+   * Markdown Review Layer (2026-05-18). Canonical export path that
+   * derives PDF / PPTX from `output_packages.content_blocks.content_markdown`
+   * directly — NOT from any sandbox session's rendered HTML. The
+   * markdown is the source of truth; the tenant brand is applied at
+   * render time via `buildMarkdownPreviewHtml(title, markdown, brand)`;
+   * then the same html-to-{pdf,pptx}.cjs converters run.
+   *
+   * Same 412 skills_unavailable contract as the sandbox session export
+   * when Playwright / claude-office-skills are absent.
+   */
+  app.get(
+    "/api/output-packages/:id/export",
+    isAuth,
+    requireRole("operator"),
+    async (req, res) => {
+      try {
+        const format = String(req.query.format || "").toLowerCase();
+        if (format !== "pdf" && format !== "pptx") {
+          return res
+            .status(400)
+            .json({ message: "Unknown format. Use ?format=pdf or ?format=pptx" });
+        }
+
+        const packageId = req.params.id;
+        const appUser = (req as any).appUser;
+
+        // Pull canonical markdown + tenant brand via the FastAPI seam.
+        // We deliberately do NOT touch output_packages directly from
+        // the Node side — FastAPI owns that surface + the RLS scoping.
+        const { fetchSandboxTenantBrand } = await import("./sandbox-crossservice");
+        const fastApiBase =
+          process.env.IWO3_FASTAPI_BASE_URL ||
+          process.env.FASTAPI_BASE_URL ||
+          "http://127.0.0.1:8000";
+        const { db } = await import("./db");
+        const { clientMemberships } = await import("@shared/models/auth");
+        const { eq } = await import("drizzle-orm");
+        const [memRow] = await db
+          .select({ clientId: clientMemberships.clientId })
+          .from(clientMemberships)
+          .where(eq(clientMemberships.userId, appUser.id))
+          .limit(1);
+        if (!memRow) {
+          return res.status(400).json({
+            message: "Actor has no client_memberships row; cannot scope the export.",
+            kind: "no_tenant",
+          });
+        }
+        const mdUrl = `${fastApiBase.replace(/\/$/, "")}/workspace/output_packages/${encodeURIComponent(packageId)}/markdown`;
+        const mdResp = await fetch(mdUrl, {
+          headers: {
+            Accept: "application/json",
+            "X-IWO3-User": appUser.id,
+            "X-IWO3-Client": memRow.clientId,
+          },
+        });
+        if (mdResp.status === 404) {
+          return res.status(404).json({ message: "Output package not found", kind: "not_found" });
+        }
+        if (mdResp.status === 400) {
+          return res.status(400).json({ message: "Invalid package id", kind: "invalid_id" });
+        }
+        if (!mdResp.ok) {
+          let body = "";
+          try { body = await mdResp.text(); } catch { /* noop */ }
+          return res.status(502).json({
+            message: `FastAPI returned ${mdResp.status}`,
+            error: body.slice(0, 300),
+            kind: "fastapi_error",
+          });
+        }
+        const mdData = (await mdResp.json()) as {
+          package_id: string;
+          title: string;
+          markdown: string;
+          output_kind: string;
+        };
+
+        const brand = await fetchSandboxTenantBrand(appUser.id);
+
+        const skillsDir =
+          process.env.SKILLS_DIR || "/home/virgina/claude-office-skills";
+        const playwrightPath =
+          process.env.PLAYWRIGHT_PATH ||
+          path.join(skillsDir, "node_modules/playwright");
+        const playwrightAvailable = fs.existsSync(playwrightPath);
+        const html2pptxAvailable = fs.existsSync(
+          path.join(skillsDir, "public/pptx/scripts/html2pptx.js")
+        );
+        const needsPptxAssets = format === "pptx" && !html2pptxAvailable;
+        if (!playwrightAvailable || needsPptxAssets) {
+          return res.status(412).json({
+            message:
+              "Export prerequisites missing: needs Playwright Chromium + claude-office-skills (and html2pptx for PPTX). Set SKILLS_DIR / PLAYWRIGHT_PATH or stop and escalate hosted export.",
+            kind: "skills_unavailable",
+            format,
+            skills_dir: skillsDir,
+            playwright_path: playwrightPath,
+            playwright_present: playwrightAvailable,
+            html2pptx_present: html2pptxAvailable,
+          });
+        }
+
+        const { buildMarkdownPreviewHtml } = await import("./workspace-filing");
+        const brandedHtml = buildMarkdownPreviewHtml(
+          mdData.title || `output-${packageId.slice(0, 8)}`,
+          mdData.markdown,
+          brand,
+        );
+
+        const baseName = slugify(mdData.title || `output-${packageId.slice(0, 8)}`) || "output";
+        const tmpDir = fs.mkdtempSync(
+          path.join(require("os").tmpdir(), "iwo3-package-export-")
+        );
+        const htmlPath = path.join(tmpDir, "input.html");
+        const outPath = path.join(tmpDir, `${baseName}.${format}`);
+        fs.writeFileSync(htmlPath, brandedHtml, "utf-8");
+
+        const scriptPath = path.resolve(
+          process.cwd(),
+          "server/scripts",
+          format === "pdf" ? "html-to-pdf.cjs" : "html-to-pptx.cjs"
+        );
+        if (!fs.existsSync(scriptPath)) {
+          return res.status(412).json({
+            message: `Export script missing at ${scriptPath}.`,
+            kind: "skills_unavailable",
+            format,
+          });
+        }
+
+        const { spawn } = require("child_process") as typeof import("child_process");
+        const child = spawn(
+          process.execPath,
+          [scriptPath, "--input", htmlPath, "--output", outPath],
+          { env: { ...process.env, SKILLS_DIR: skillsDir, PLAYWRIGHT_PATH: playwrightPath } }
+        );
+        let stderr = "";
+        child.stderr.on("data", (d) => {
+          stderr += d.toString();
+        });
+        child.on("close", (code) => {
+          if (code !== 0 || !fs.existsSync(outPath)) {
+            return res.status(502).json({
+              message: `Export script failed (exit ${code})`,
+              kind: "export_failed",
+              format,
+              error: stderr.slice(0, 600),
+            });
+          }
+          const mime =
+            format === "pdf"
+              ? "application/pdf"
+              : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+          res.setHeader("Content-Type", mime);
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${path.basename(outPath)}"`
+          );
+          res.sendFile(outPath, () => {
+            try {
+              fs.unlinkSync(outPath);
+              fs.unlinkSync(htmlPath);
+              fs.rmdirSync(tmpDir);
+            } catch {
+              /* noop */
+            }
+          });
+        });
+      } catch (err: any) {
+        res.status(500).json({
+          message: "Failed to export output package",
           error: err.message,
         });
       }
