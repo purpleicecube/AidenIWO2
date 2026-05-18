@@ -57,6 +57,7 @@ from runtime.tier_1_5_pm import (
 )
 from runtime.tier_2_subagents import (
     Tier2Error,
+    Tier2OutputEnvelope,
     execute_step_run,
     invoke_tier_2,
     produce_output_package,
@@ -331,6 +332,12 @@ async def dispatch_work_order(
     # records the override for forensic transparency. The original
     # Aiden response text becomes the brief's `content_blocks.body`
     # so the Tier 2 sub-agent has Aiden's analysis to work from.
+    # Local override flag captured at Fix A — read post-Tier-2 to force
+    # envelope.output_kind to gamma_* when the operator-explicit
+    # template's engine is gamma_*. Without this, mark_tier_2's default
+    # `output_kind: "generic"` defeats the auto-dispatch gate downstream.
+    ffai_hotfix_force_gamma_kind: Optional[str] = None
+
     if decision.decision_kind == "assistant_reply":
         existing_ro_raw = wo.get("requested_outputs")
         parsed_ro: Optional[dict] = None
@@ -358,6 +365,36 @@ async def dispatch_work_order(
             assigned_role = role_for_output_kind.get(
                 explicit_kind, "mark_tier_2"
             )
+
+            # Look up the template's engine. If it's gamma_*, record
+            # the gamma kind we want (gamma_pdf / gamma_pptx) so we can
+            # force the envelope.output_kind after Tier 2 returns —
+            # mark_tier_2 defaults to `output_kind: generic` for any
+            # content brief and we need the auto-dispatch gate
+            # (`if envelope.output_kind.startswith("gamma_")`) to pass.
+            try:
+                tpl_row = await conn.fetchrow(
+                    """
+                    SELECT engine::text     AS engine,
+                           output_kind::text AS output_kind
+                    FROM template_profiles
+                    WHERE id = $1::uuid AND client_id = $2::uuid
+                    """,
+                    explicit_template_id,
+                    ctx["client_id"],
+                )
+            except (asyncpg.DataError, asyncpg.InvalidTextRepresentationError):
+                tpl_row = None
+            if tpl_row is not None:
+                engine = (tpl_row["engine"] or "").lower()
+                gamma_kind_for_output = {
+                    "pdf": "gamma_pdf",
+                    "pptx": "gamma_pptx",
+                }
+                if engine.startswith("gamma") and explicit_kind in gamma_kind_for_output:
+                    ffai_hotfix_force_gamma_kind = gamma_kind_for_output[
+                        explicit_kind
+                    ]
             ar = decision.assistant_reply
             body_text = (
                 ar.message
@@ -585,6 +622,48 @@ async def dispatch_work_order(
                 decision_kind="work_order_brief",
                 work_order_id=wo["id"],
                 error=f"{exc.args[0] if exc.args else 'tier_2_failed'}: {exc}",
+            )
+
+        # FF.AI Hotfix A.1 (2026-05-18) — when the Fix A override fired
+        # AND the operator-explicit template's engine is gamma_*, force
+        # the envelope.output_kind so the auto-dispatch gate below
+        # (`if envelope.output_kind.startswith("gamma_")`) passes. Without
+        # this, mark_tier_2 returns `output_kind: "generic"` for any
+        # content brief, the output_package gets kind=generic, and Gamma
+        # never auto-renders. Audit row captures the second override for
+        # forensic transparency separate from the Tier-1-side override.
+        if (
+            ffai_hotfix_force_gamma_kind is not None
+            and not envelope.output_kind.startswith("gamma_")
+        ):
+            original_envelope_kind = envelope.output_kind
+            envelope = Tier2OutputEnvelope(
+                content_markdown=envelope.content_markdown,
+                summary=envelope.summary,
+                output_kind=ffai_hotfix_force_gamma_kind,
+                metadata={
+                    **envelope.metadata,
+                    "ffai_hotfix_original_output_kind": original_envelope_kind,
+                    "ffai_hotfix_forced_output_kind": ffai_hotfix_force_gamma_kind,
+                },
+            )
+            await write_audit_row(
+                conn,
+                client_id=ctx["client_id"],
+                actor_user_id=ctx["user_id"],
+                event="aiden.dispatch_overridden_by_requested_outputs",
+                target_type="work_order",
+                target_id=wo["id"],
+                metadata={
+                    "phase": "post_tier_2_envelope_override",
+                    "original_envelope_output_kind": original_envelope_kind,
+                    "forced_envelope_output_kind": ffai_hotfix_force_gamma_kind,
+                    "rationale": (
+                        "template engine is gamma_* and operator set "
+                        "explicit output_kind — envelope.output_kind "
+                        "forced so auto-dispatch gate fires"
+                    ),
+                },
             )
 
         # Beta-2 phase 0.2 — read operator-supplied requested_outputs

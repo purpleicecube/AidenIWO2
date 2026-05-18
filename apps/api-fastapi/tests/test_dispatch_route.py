@@ -233,6 +233,199 @@ def test_dispatch_overrides_assistant_reply_when_requested_outputs_explicit() ->
 
 
 @iwo3_db
+def test_dispatch_overrides_envelope_output_kind_when_template_is_gamma() -> None:
+    """FF.AI Hotfix A.1 (2026-05-18) regression — when Fix A's override
+    fires AND the operator-explicit template's engine is gamma_*, the
+    dispatcher must force `envelope.output_kind` to gamma_pdf/gamma_pptx
+    so the auto-dispatch gate (which checks `startswith("gamma_")`)
+    actually fires. Without this, mark_tier_2 returns
+    `output_kind: generic` and the output_package is created with
+    kind=generic, blocking auto-render.
+
+    Asserts:
+    1. Two override audit rows exist (Tier-1 side + envelope side)
+    2. The second row carries `phase: post_tier_2_envelope_override`
+       and `forced_envelope_output_kind: gamma_pdf`
+    """
+    import asyncio
+    import asyncpg
+    from unittest.mock import patch
+
+    from runtime.tier_1_aiden import (
+        AidenAssistantReply,
+        AidenDecision,
+    )
+    from runtime.tier_2_subagents import Tier2OutputEnvelope
+
+    KLEAR_PDF_TEMPLATE = "00000000-0000-4000-8000-000010000002"  # engine=gamma
+    klear_uuid = uuid.UUID(KLEAR_CLIENT)
+    operator_uuid = uuid.UUID(KLEAR_OPERATOR)
+    wo_id = str(uuid.uuid4())
+
+    async def _seed() -> None:
+        conn = await asyncpg.connect(os.environ["IWO3_DATABASE_URL"])
+        try:
+            await conn.execute(
+                """
+                INSERT INTO work_orders
+                  (id, client_id, title, description, type, priority,
+                   status, requested_outputs, submitted_by_user_id)
+                VALUES ($1::uuid, $2::uuid, $3, $4, 'decision_request',
+                        'medium', 'pending', $5::jsonb, $6::uuid)
+                """,
+                wo_id,
+                klear_uuid,
+                # Intentionally generic so the branded-intent detector
+                # doesn't promote work_order_brief → workflow_brief.
+                # We want the work_order_brief Tier 2 path to run so
+                # the envelope override can fire.
+                "Quarterly status — generic chat intake",
+                "Tell me about quarterly internal review cadence.",
+                f'{{"output_kind":"pdf","template_profile_id":"{KLEAR_PDF_TEMPLATE}"}}',
+                operator_uuid,
+            )
+        finally:
+            await conn.close()
+
+    async def _read_override_rows() -> list[dict]:
+        conn = await asyncpg.connect(os.environ["IWO3_DATABASE_URL"])
+        try:
+            rows = await conn.fetch(
+                """
+                SELECT metadata::text AS meta
+                FROM action_audit_log
+                WHERE target_id = $1
+                  AND action = 'aiden.dispatch_overridden_by_requested_outputs'
+                ORDER BY created_at ASC
+                """,
+                wo_id,
+            )
+            import json as _json
+            return [_json.loads(r["meta"]) for r in rows]
+        finally:
+            await conn.close()
+
+    async def _cleanup() -> None:
+        conn = await asyncpg.connect(os.environ["IWO3_DATABASE_URL"])
+        try:
+            await conn.execute(
+                "DELETE FROM action_audit_log WHERE target_id = $1", wo_id
+            )
+            # output_package rows + their audit rows
+            pkg_ids = await conn.fetch(
+                "SELECT id::text AS id FROM output_packages WHERE work_order_id = $1::uuid",
+                wo_id,
+            )
+            for r in pkg_ids:
+                await conn.execute(
+                    "DELETE FROM action_audit_log WHERE target_id = $1",
+                    r["id"],
+                )
+            await conn.execute(
+                "DELETE FROM output_packages WHERE work_order_id = $1::uuid",
+                wo_id,
+            )
+            await conn.execute(
+                "DELETE FROM work_orders WHERE id = $1::uuid", wo_id
+            )
+        finally:
+            await conn.close()
+
+    asyncio.run(_seed())
+
+    async def _fake_aiden(*args, **kwargs):
+        return AidenDecision(
+            decision_kind="assistant_reply",
+            title="A title",
+            summary="A summary",
+            assistant_reply=AidenAssistantReply(
+                headline="hl", message="msg", suggested_requests=[]
+            ),
+            provider="groq",
+            model="openai/gpt-oss-120b",
+            latency_ms=500,
+            prompt_tokens=100,
+            completion_tokens=200,
+            total_tokens=300,
+        )
+
+    async def _fake_tier_2(*args, **kwargs):
+        # Return a generic envelope (matches mark_tier_2's real-world
+        # default behaviour). Fix A.1 must force this to gamma_pdf.
+        return Tier2OutputEnvelope(
+            content_markdown="# Report body\n\nDetails here.",
+            summary="Short summary",
+            output_kind="generic",
+            metadata={"role": "mark_tier_2"},
+        )
+
+    # Patch dispatch_gamma_for_package to no-op so we don't actually
+    # call Gamma's API during the test.
+    async def _fake_gamma_dispatch(*args, **kwargs):
+        from dataclasses import dataclass
+        @dataclass
+        class _R:
+            handoff_id: str = str(uuid.uuid4())
+        return _R()
+
+    # Patch the branded-intent detector to return is_branded=False so
+    # the dispatcher stays on the work_order_brief Tier 2 path (where
+    # Fix A.1 lives) rather than getting promoted to workflow_brief.
+    async def _fake_branded_intent(*args, **kwargs):
+        from runtime.aiden_branded_intent import BrandedIntent
+        return BrandedIntent(
+            is_branded=False,
+            detected_brand_keywords=(),
+            detected_output_kind=None,
+            detected_design_input_source=None,
+            selected_template_profile_id=None,
+            selected_template_profile_key=None,
+            template_candidates=(),
+            workflow_key=None,
+            primary_adapter_key=None,
+            fallback_adapter_keys=(),
+        )
+
+    try:
+        with patch("routes.dispatch.invoke_aiden_tier_1", _fake_aiden), patch(
+            "routes.dispatch.invoke_tier_2", _fake_tier_2
+        ), patch(
+            "routes.dispatch.dispatch_gamma_for_package", _fake_gamma_dispatch
+        ), patch(
+            "routes.dispatch.detect_branded_intent", _fake_branded_intent
+        ):
+            with TestClient(app) as client:
+                r = client.post(
+                    f"/work_orders/{wo_id}/dispatch",
+                    json={},
+                    headers=_hdr(KLEAR_OPERATOR),
+                )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        rows = asyncio.run(_read_override_rows())
+        assert len(rows) == 2, (
+            f"expected 2 override audit rows (Tier-1 + envelope); got "
+            f"{len(rows)}: rows={rows}, response_body={body}"
+        )
+        # First row is the Tier-1 override (no `phase` field).
+        assert "phase" not in rows[0], (
+            f"first override row should be Tier-1 side: {rows[0]}"
+        )
+        # Second row is the envelope override.
+        assert rows[1].get("phase") == "post_tier_2_envelope_override", (
+            f"second override row should be envelope side: {rows[1]}"
+        )
+        assert rows[1].get("forced_envelope_output_kind") == "gamma_pdf", (
+            f"forced envelope kind should be gamma_pdf: {rows[1]}"
+        )
+        assert rows[1].get("original_envelope_output_kind") == "generic", (
+            f"original envelope kind should be generic: {rows[1]}"
+        )
+    finally:
+        asyncio.run(_cleanup())
+
+
+@iwo3_db
 def test_run_next_step_404_for_unknown_execution() -> None:
     # KLEAR_OWNER carries workflow_step_run:update; operator currently
     # only has :read.
