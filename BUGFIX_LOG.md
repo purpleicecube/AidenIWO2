@@ -1356,6 +1356,70 @@ Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
 
 ---
 
+## Session — IWO3 FFAI Tier 1 Dispatch + Submit Order UX (2026-05-17 / 2026-05-18)
+
+### BUG-074: Aiden Tier 1 ignores explicit `requested_outputs` — every templated WO bails at `assistant_reply` (High, hot-fix)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-17 |
+| Severity | High (every reissued FFAI WO with operator-set `requested_outputs={output_kind, template_profile_id}` returned `decisionKind=assistant_reply` and bailed out before Tier 2; no output_package created, no Gamma render, no PDF — operator UAT identified WO `dbae2eca` re-dispatched twice in a row with identical assistant_reply outcome.) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/routes/dispatch.py`, `packages/contracts/audit/events.ts`, `tests/contract/contract-enums.test.ts`, `tests/fixtures/contract-enums.snapshot.json`, `apps/api-fastapi/tests/test_dispatch_route.py` |
+| Symptom | Operator edited a hosted FFAI WO setting `requested_outputs={output_kind:pdf, template_profile_id:000020000002}`, hit Redispatch. Aiden Tier 1 returned `decisionKind=assistant_reply` (3348 tokens of report content as a chat reply). Dispatcher's existing assistant_reply early-exit fired, no Tier 2 invocation, WO stayed in `processing`. Audit log showed two consecutive assistant_reply decisions on different redispatch attempts. |
+| Root Cause | Aiden Tier 1's prompt treats `assistant_reply` as the default for any non-explicit chat-y input. When the operator explicitly set `requested_outputs` post-creation, the dispatcher's assistant_reply check at `routes/dispatch.py:317` ignored that signal and bailed. The operator's deliberate template binding was being silently overridden by Aiden's default chat-y classification. |
+| Fix | Inserted an override block immediately before the assistant_reply early-exit. When BOTH `output_kind` AND `template_profile_id` are present on `requested_outputs`, treat that as authoritative classification signal: synthesize an `AidenWorkOrderBrief` (assigned_role mapped from output_kind: pdf→mark_tier_2, pptx→tom_tier_2, html→hank_tier_2, docx→sop_master_tier_2), copy Aiden's reply text into content_blocks.body, write new audit event `aiden.dispatch_overridden_by_requested_outputs`, then continue through the existing work_order_brief Tier 2 path. Aiden's provenance (provider/model/tokens/latency) preserved on the synthesized decision. |
+| Verified | New regression test `test_dispatch_overrides_assistant_reply_when_requested_outputs_explicit` patches Aiden to return assistant_reply, asserts dispatch flips to work_order_brief (or workflow_brief if branded-intent further promotes), 1 override audit row exactly. pytest 651/1. tsc 0. Hosted UAT replay later showed override audit row written + Tier 2 invoked. |
+| Files Changed | `apps/api-fastapi/routes/dispatch.py` (+95/-13), `apps/api-fastapi/tests/test_dispatch_route.py` (+120/0), `packages/contracts/audit/events.ts` (+18/0), `tests/contract/contract-enums.test.ts` (+8/-2), `tests/fixtures/contract-enums.snapshot.json` (+5/-1). |
+| Related | New audit event registered under `FFAI_HOTFIX_2026_05_17_AUDIT_EVENTS` array. Snapshot cardinality 167→168. **Architectural decisions surfaced to CODEX:** dual-field gate vs `output_kind` alone (kept dual-field); hard-coded role mapping table vs config-driven (kept hard-coded as transitional baseline); separate event name vs phase-discriminator (chose phase-discriminator for the follow-on BUG-076). **Predecessor of BUG-076** — closing this gap exposed the next downstream seam where mark_tier_2's default `outputKind=generic` defeats the Gamma auto-dispatch gate. Same operator UAT chain; same hot-fix discipline. Ship commit `iwo3/main @ 958a47c`. |
+
+### BUG-075: Streamlit recovery-panel warning callout broken inside narrow column — long Aiden reply wraps to one-word-per-line (Medium, hot-fix)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-17 |
+| Severity | Medium (cosmetic but operator-confusing — long Aiden assistant_reply text dumped into `st.warning(...)` inside `rec_cols[N]` (st.columns([2,2,2,6]) ~14% width nested inside col_left 2/3) wraps every word onto its own line, producing a vertical-stack "broken UI" appearance that obscures the actual error content. Originally reported as part of the FFAI UAT screenshot for WO `dbae2eca`.) |
+| Status | Fixed |
+| Files | `apps/console-streamlit/views/work_orders.py` |
+| Symptom | Operator hit Redispatch on a hosted FFAI WO. Aiden returned `assistant_reply` (long markdown report). Dispatcher returned `{ok:false, decision_kind:"assistant_reply", error:<3348-token reply>}`. `_operator_recovery_panel`'s Redispatch handler dumped that text into `st.warning(...)` inside the narrow `rec_cols[2]` column. Streamlit inherited the column width on the warning callout — every word in the error wrapped onto its own line, looking like the UI was "broken" or "stacking text vertically". |
+| Root Cause | `_operator_recovery_panel` placed `st.warning(...)` calls inside the narrow recovery-action `rec_cols` (3 narrow buttons + 1 spacer = ~14% width per column inside `col_left` which is itself 2/3 of the page). When the warning body was short (a one-line clarification question), the narrow width was tolerable. When the body was a multi-paragraph Aiden assistant_reply, the narrow constraint forced word-by-word wrapping. |
+| Fix | Refactored to a session_state flash pattern. `_flash_recovery(wo_id, level, msg)` stashes the message in session_state and `st.rerun()`s. `_render_recovery_flash(wo_id)` runs at the TOP of `_operator_recovery_panel` BEFORE creating `rec_cols`, so the warning renders at full `col_left` width. Messages >280 chars truncate to first 280 chars + ellipsis with an `st.expander("Show full message")` for the full text. Flash state is keyed on `wo.id` so multiple WOs on the same page don't trample each other. |
+| Verified | Streamlit smokes 27/27 green. Operator UAT replay on hosted: Redispatch warnings now render full-width above the recovery row; long assistant_reply text gets a clean 280-char snippet + expander. |
+| Files Changed | `apps/console-streamlit/views/work_orders.py` (+55/-5). |
+| Related | Only the Redispatch handler was rewired; Run Aiden / Next step / Render Gamma (in `_render_top_toolbar`) use a wider `st.columns([2,2,2,2,4])` and weren't reproducing the issue. Same pattern available for proactive conversion if more reports surface. Ship commit `iwo3/main @ 958a47c` (same commit as BUG-074). |
+
+### BUG-076: Tier 2 envelope `output_kind` defaults to `generic` — blocks Gamma auto-dispatch gate after BUG-074 override fires (High, hot-fix)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-18 |
+| Severity | High (BUG-074 closed the Tier-1 boundary but the next stage of the dispatch chain still drops the operator's explicit-template intent on the floor. mark_tier_2 returns `outputKind: generic` for any content brief — `"generic".startswith("gamma_")` is False — the auto-dispatch gate at `routes/dispatch.py:629` fails silently, output_package created with `kind=generic`, no Gamma render, no PDF. End-to-end symptom unchanged from BUG-074 for operators: re-dispatched WO still doesn't produce a PDF.) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/routes/dispatch.py`, `apps/api-fastapi/tests/test_dispatch_route.py` |
+| Symptom | After BUG-074 shipped, FFAI operator re-ran WO `dbae2eca`. Audit log on hosted showed `aiden.dispatch_overridden_by_requested_outputs` ✅ (Tier-1 override fired), `memory.applied surface=tier_2_subagent` ✅, `llm.invoked agentRole=mark_tier_2 decisionKind=content_envelope outputKind=generic` ✅ — Tier 2 ran. But no `adapter_dispatch.*` events, no `output_handoffs` rows, no Gamma render, WO stayed in `processing`. The chain advanced one step further than before BUG-074, then died at the auto-dispatch gate. |
+| Root Cause | The auto-dispatch gate at `routes/dispatch.py:629` reads `envelope.output_kind` to decide whether to call `dispatch_gamma_for_package`. mark_tier_2's content_envelope path defaults `output_kind` to `"generic"` for any content brief (it doesn't read the template's engine field). `"generic".startswith("gamma_")` is False → gate silently skipped → output_package created with `kind=generic` → Gamma never invoked. The operator's explicit `template_profile_id` (engine=gamma_basic) was stamped on the output_package row but didn't influence the dispatch decision. |
+| Fix | Two-stage override extending BUG-074. Stage 1 (inside BUG-074 override block): look up the template's `engine` column; if `gamma_*` and explicit output_kind is pdf/pptx, set local flag `ffai_hotfix_force_gamma_kind = gamma_pdf` / `gamma_pptx`. Stage 2 (right after `invoke_tier_2` returns): if flag is set AND envelope isn't already gamma_*, rebuild the frozen `Tier2OutputEnvelope` with the forced output_kind (preserves content_markdown + summary; stamps `metadata.ffai_hotfix_original_output_kind` for forensics). Writes a SECOND audit row reusing the BUG-074 event name with `metadata.phase="post_tier_2_envelope_override"` discriminator — keeps audit vocabulary additions minimal. produce_output_package then writes kind=gamma_pdf; the auto-dispatch gate passes; Gamma fires. |
+| Verified | New regression `test_dispatch_overrides_envelope_output_kind_when_template_is_gamma` patches Aiden→assistant_reply, mark_tier_2→envelope(generic), dispatch_gamma_for_package→noop stub, branded_intent→not-branded (forces work_order_brief Tier 2 path). Asserts TWO override audit rows: first Tier-1 side (no `phase` field), second envelope side (`phase=post_tier_2_envelope_override, forced_envelope_output_kind=gamma_pdf, original_envelope_output_kind=generic`). pytest 652/1. tsc 0. CODEX architect-accepted with no required revisions. |
+| Files Changed | `apps/api-fastapi/routes/dispatch.py` (+72/0), `apps/api-fastapi/tests/test_dispatch_route.py` (+200/0). |
+| Related | **Successor of BUG-074** — closing the Tier-1 misclassification exposed the next downstream silent-gap at the auto-dispatch gate. **Same audit event name** (`aiden.dispatch_overridden_by_requested_outputs`) with phase discriminator — no new vocabulary, no snapshot cardinality bump. **Architectural decisions surfaced:** template engine gate uses `startswith("gamma")` to cover both `gamma` and `gamma_basic` variants; envelope mutation preserves mark_tier_2's content_markdown (no extra LLM re-invocation); template lookup runs on the same tenant-scoped RLS connection so cross-tenant template references resolve to null and the override silently no-ops. **branded_intent escape hatch** still bypasses Fix A.1 (promoted workflow_brief skips Tier 2 path entirely) — flagged for next consolidation pass. Ship commit `iwo3/main @ e903d57`. |
+
+### BUG-077: Submit Order form doesn't reset after successful submit — fields stay populated, forces manual clearing before next WO (Low, UX)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-05-18 |
+| Severity | Low (cosmetic UX — form is functional, just inconvenient. Reported during FFAI hosted UAT after creating WO `8dcef9cc` via Submit Order; operator noted "Title", "Description", "Output kind", "Template" all retained their values, requiring manual clearing before submitting a second WO.) |
+| Status | Fixed |
+| Files | `apps/console-streamlit/views/submit_order.py` |
+| Symptom | Operator filled the Submit Order form ("PDF Intro - Meet FF.AI" / "Please generate a strategic partnership PDF (use GAMMA)" / output_kind=pdf), hit Submit Order, saw the green "✅ Work Order created: 8dcef9cc..." banner — but every form field still showed the just-submitted values. To create another WO they had to manually clear Title, Description, etc. |
+| Root Cause | `apps/console-streamlit/views/submit_order.py:69` explicitly set `st.form("submit-order", clear_on_submit=False)`. The success banner + caption blocks were rendered INSIDE the form context (lines 175-188), so flipping `clear_on_submit=True` alone would also wipe the success message on the next interaction. |
+| Fix | (a) Flip form to `clear_on_submit=True` so inputs reset after submit. (b) On successful submit, stash `{id, status, requested_outputs_summary}` in `st.session_state["_submit_order_last_wo"]` and `st.rerun()`. (c) Render the success banner ABOVE the form (outside the form context) so it persists across reruns until the operator dismisses it or submits another WO. (d) Add a "Dismiss" button next to the banner to pop the session-state entry. (e) API-error path keeps existing inline `st.error` — error message persists long enough to read even though the form clears (5xx is rare; refilling is fast). |
+| Verified | Streamlit smokes 27/27 green. Operator UAT confirms form clears after submit + green banner persists above the empty form + Dismiss button works. |
+| Files Changed | `apps/console-streamlit/views/submit_order.py` (+41/-10). |
+| Related | Pure Streamlit UX fix; no backend change. Same session_state-flash pattern used in BUG-075 for the Redispatch warning lift. Ship commit `iwo3/main @ e9be14c`. |
+
+---
+
 ## Summary
 
 Per-session bug counts are the count of unique `BUG-###` IDs first
@@ -1387,7 +1451,8 @@ row.
 | Bugs fixed (IWO3 Loop Xi Recovery Gate Too Narrow, 2026-05-10) | 1 | 0 | 0 | 1 | 0 |
 | Bugs fixed (IWO3 FFAI Tenant Onboarding + Auth Polish, 2026-05-16) | 9 | 0 | 7 | 2 | 0 |
 | Bugs fixed (IWO3 Workspace UX, 2026-05-17) | 1 | 0 | 0 | 1 | 0 |
-| **Total bugs fixed (unique BUG-IDs)** | **65** | **9** | **38** | **17** | **1** |
+| Bugs fixed (IWO3 FFAI Tier 1 Dispatch + Submit Order UX, 2026-05-17/18) | 4 | 0 | 2 | 1 | 1 |
+| **Total bugs fixed (unique BUG-IDs)** | **69** | **9** | **40** | **18** | **2** |
 | Feature implementations (Session 6, 2026-03-07) | 3 | — | — | — | — |
 | Feature implementations (Session 12b, 2026-03-25) | 1 | — | — | — | — |
 | Feature implementations (Session 14, 2026-03-27/28) | 3 | — | — | — | — |
@@ -1400,7 +1465,7 @@ row.
 - Gaps in numbering are intentional (e.g. `BUG-043`..`BUG-047` were
   tracked locally during a loop that ultimately closed without
   shipping a separate fix). Do not reuse retired numbers; advance to
-  the next free `BUG-###` (currently `BUG-071`) when filing a new
+  the next free `BUG-###` (currently `BUG-078`) when filing a new
   entry.
 - Follow-up patches on a prior bug should use a labeled re-entry
   (e.g. `### BUG-050 Extension: ...`, `### BUG-053 Hardened: ...`)
