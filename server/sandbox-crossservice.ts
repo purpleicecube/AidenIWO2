@@ -27,7 +27,11 @@
 
 import { db } from "./db";
 import { clientMemberships } from "@shared/models/auth";
-import { eq } from "drizzle-orm";
+// CODEX follow-up: use IWO3-native artifacts schema (has client_id),
+// not the legacy IWO2-shape one in shared/schema.ts which doesn't.
+import { artifacts as iwo3Artifacts } from "../db/schema/artifacts";
+import { outputPackages } from "../db/schema/output_packages";
+import { and, eq } from "drizzle-orm";
 
 /**
  * FastAPI base URL — defaults to localhost dev. Hosted deploys must
@@ -42,19 +46,124 @@ function getFastApiBaseUrl(): string {
 }
 
 /**
- * Look up the operator's primary client_id. V1 single-tenant
- * assumption: the FIRST membership wins. This is the same pragmatic
- * assumption as `authStorage.getUserEffectiveRole`.
- *
- * Sandbox-bounded — do not use this for non-sandbox tenant selection.
+ * Tenant-resolution error shape — surfaced to callers so they can
+ * render an honest 400/403/404 with the specific kind.
  */
-async function getUserPrimaryClientId(userId: string): Promise<string | null> {
+export interface SandboxTenantResolutionError {
+  status: number;
+  kind:
+    | "invalid_uuid"
+    | "not_found"
+    | "forbidden"
+    | "no_tenant";
+  detail: string;
+}
+
+/**
+ * Sandbox + Markdown Review Layer (2026-05-18) — CODEX architect
+ * follow-up: resolve tenant from the RESOURCE, not from "first
+ * membership wins."
+ *
+ * The previous pattern (`getUserPrimaryClientId(userId)` returning the
+ * first arbitrary `client_memberships` row) silently picked the wrong
+ * tenant for multi-membership operators — wrong brand applied to
+ * preview, or 404 on export if the resolved tenant didn't own the
+ * package.
+ *
+ * These resolvers read the resource's authoritative `client_id`
+ * directly via Drizzle (Node-side iwo3 superuser pool, NOT RLS-scoped
+ * — that's the point; we're resolving WHICH tenant), then verify the
+ * actor has membership in that tenant before returning the value.
+ *
+ * Sandbox-bounded — same scope locks as the rest of this module.
+ */
+export async function resolvePackageTenant(
+  packageId: string,
+  actorUserId: string,
+): Promise<{ clientId: string } | SandboxTenantResolutionError> {
+  let pkg: { clientId: string } | undefined;
+  try {
+    [pkg] = await db
+      .select({ clientId: outputPackages.clientId })
+      .from(outputPackages)
+      .where(eq(outputPackages.id, packageId))
+      .limit(1);
+  } catch (err: any) {
+    return {
+      status: 400,
+      kind: "invalid_uuid",
+      detail: `invalid package id ${packageId}: ${err?.message ?? err}`,
+    };
+  }
+  if (!pkg) {
+    return {
+      status: 404,
+      kind: "not_found",
+      detail: `output_package ${packageId} not found`,
+    };
+  }
+  const ok = await _actorHasMembership(actorUserId, pkg.clientId);
+  if (!ok) {
+    return {
+      status: 403,
+      kind: "forbidden",
+      detail: `actor ${actorUserId} has no membership in tenant ${pkg.clientId} that owns package ${packageId}`,
+    };
+  }
+  return { clientId: pkg.clientId };
+}
+
+export async function resolveArtifactTenant(
+  artifactId: string,
+  actorUserId: string,
+): Promise<{ clientId: string } | SandboxTenantResolutionError> {
+  let art: { clientId: string } | undefined;
+  try {
+    [art] = await db
+      .select({ clientId: iwo3Artifacts.clientId })
+      .from(iwo3Artifacts)
+      .where(eq(iwo3Artifacts.id, artifactId))
+      .limit(1);
+  } catch (err: any) {
+    return {
+      status: 400,
+      kind: "invalid_uuid",
+      detail: `invalid artifact id ${artifactId}: ${err?.message ?? err}`,
+    };
+  }
+  if (!art) {
+    return {
+      status: 404,
+      kind: "not_found",
+      detail: `artifact ${artifactId} not found`,
+    };
+  }
+  const ok = await _actorHasMembership(actorUserId, art.clientId);
+  if (!ok) {
+    return {
+      status: 403,
+      kind: "forbidden",
+      detail: `actor ${actorUserId} has no membership in tenant ${art.clientId} that owns artifact ${artifactId}`,
+    };
+  }
+  return { clientId: art.clientId };
+}
+
+async function _actorHasMembership(
+  actorUserId: string,
+  clientId: string,
+): Promise<boolean> {
   const [row] = await db
     .select({ clientId: clientMemberships.clientId })
     .from(clientMemberships)
-    .where(eq(clientMemberships.userId, userId))
+    .where(
+      and(
+        eq(clientMemberships.userId, actorUserId),
+        eq(clientMemberships.clientId, clientId),
+      ),
+    )
     .limit(1);
-  return row?.clientId ?? null;
+  return !!row;
 }
 
 export interface SandboxArtifactContent {
@@ -89,9 +198,12 @@ export interface SandboxArtifactReadError {
 
 /**
  * Fetch a workspace artifact's text content via FastAPI's existing
- * `GET /workspace/files/:id/content` endpoint. The operator's primary
- * client_id is resolved from `client_memberships` and passed via the
- * `X-IWO3-Client` dev-auth header.
+ * `GET /workspace/files/:id/content` endpoint.
+ *
+ * CODEX architect follow-up (2026-05-18): tenant context is now an
+ * EXPLICIT parameter, not inferred from "first membership wins."
+ * Callers are expected to resolve `clientId` via `resolveArtifactTenant`
+ * (or carry it from session/package context).
  *
  * Returns either the content shape or an error object so the caller
  * (sandbox rerender route) can render an honest 400/404/500 with the
@@ -99,15 +211,15 @@ export interface SandboxArtifactReadError {
  */
 export async function fetchSandboxArtifactContent(
   artifactId: string,
-  actorUserId: string
+  actorUserId: string,
+  clientId: string,
 ): Promise<SandboxArtifactContent | SandboxArtifactReadError> {
-  const clientId = await getUserPrimaryClientId(actorUserId);
   if (!clientId) {
     return {
       status: 400,
       kind: "no_tenant",
       detail:
-        "Actor has no client_memberships row; cannot tenant-scope the artifact read.",
+        "Explicit clientId required — sandbox cross-service callers must resolve tenant from the resource (resolveArtifactTenant / resolvePackageTenant) before invoking content fetch.",
     };
   }
 
@@ -193,14 +305,18 @@ export async function fetchSandboxArtifactContent(
  * palette + fonts at render time without mutating the markdown
  * source. The markdown is canonical; this is the presentation layer.
  *
+ * CODEX architect follow-up (2026-05-18): tenant context is now an
+ * EXPLICIT parameter. Resolve it from the resource (the artifact or
+ * package being previewed/exported) BEFORE calling this helper.
+ *
  * Best-effort: returns null when the FastAPI surface is unreachable
  * or returns an error, so the preview falls back to the default
  * theme rather than failing the entire rerender chain.
  */
 export async function fetchSandboxTenantBrand(
   actorUserId: string,
+  clientId: string,
 ): Promise<import("./workspace-filing").TenantBrand | null> {
-  const clientId = await getUserPrimaryClientId(actorUserId);
   if (!clientId) return null;
 
   const baseUrl = getFastApiBaseUrl();

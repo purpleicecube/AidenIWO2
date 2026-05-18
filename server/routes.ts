@@ -3363,14 +3363,35 @@ export async function registerRoutes(
         });
       }
 
-      const { fetchSandboxArtifactContent, fetchSandboxTenantBrand } = await import("./sandbox-crossservice");
+      const { fetchSandboxArtifactContent, fetchSandboxTenantBrand, resolveArtifactTenant } = await import("./sandbox-crossservice");
       const appUser = (req as any).appUser;
+
+      // CODEX follow-up (2026-05-18): resolve tenant from the
+      // artifact's authoritative client_id, NOT from "first membership
+      // wins." Multi-membership operators previously got whichever
+      // tenant Postgres returned first, which could silently apply the
+      // wrong brand or 404 if the artifact lived in a different tenant.
+      const tenantResolve = await resolveArtifactTenant(artifactId, appUser.id);
+      if ("kind" in tenantResolve) {
+        const statusByKind: Record<typeof tenantResolve.kind, number> = {
+          invalid_uuid: 400,
+          not_found: 404,
+          forbidden: 403,
+          no_tenant: 400,
+        };
+        return res.status(statusByKind[tenantResolve.kind] ?? 500).json({
+          message: "Failed to resolve sandbox source tenant",
+          error: tenantResolve.detail,
+          kind: tenantResolve.kind,
+        });
+      }
+      const resolvedClientId = tenantResolve.clientId;
       const [fetched, brand] = await Promise.all([
-        fetchSandboxArtifactContent(artifactId, appUser.id),
+        fetchSandboxArtifactContent(artifactId, appUser.id, resolvedClientId),
         // Sandbox + Markdown Review Layer (2026-05-18) — fetch tenant
-        // brand profile so the preview applies tenant palette + fonts
-        // at render time. Best-effort: null on failure → default theme.
-        fetchSandboxTenantBrand(appUser.id),
+        // brand profile for the resource's tenant. Best-effort: null
+        // on failure → default theme.
+        fetchSandboxTenantBrand(appUser.id, resolvedClientId),
       ]);
 
       if ("kind" in fetched) {
@@ -3739,34 +3760,39 @@ export async function registerRoutes(
         const packageId = req.params.id;
         const appUser = (req as any).appUser;
 
-        // Pull canonical markdown + tenant brand via the FastAPI seam.
-        // We deliberately do NOT touch output_packages directly from
-        // the Node side — FastAPI owns that surface + the RLS scoping.
-        const { fetchSandboxTenantBrand } = await import("./sandbox-crossservice");
+        // CODEX follow-up (2026-05-18): resolve tenant from the
+        // package's authoritative client_id, NOT from "first membership
+        // wins." Multi-membership operators previously got an arbitrary
+        // tenant, which could silently brand the export with the wrong
+        // palette OR 404 against FastAPI if the inferred tenant didn't
+        // own the package.
+        const { fetchSandboxTenantBrand, resolvePackageTenant } = await import("./sandbox-crossservice");
+        const tenantResolve = await resolvePackageTenant(packageId, appUser.id);
+        if ("kind" in tenantResolve) {
+          const statusByKind: Record<typeof tenantResolve.kind, number> = {
+            invalid_uuid: 400,
+            not_found: 404,
+            forbidden: 403,
+            no_tenant: 400,
+          };
+          return res.status(statusByKind[tenantResolve.kind] ?? 500).json({
+            message: "Failed to resolve output package tenant",
+            error: tenantResolve.detail,
+            kind: tenantResolve.kind,
+          });
+        }
+        const resolvedClientId = tenantResolve.clientId;
+
         const fastApiBase =
           process.env.IWO3_FASTAPI_BASE_URL ||
           process.env.FASTAPI_BASE_URL ||
           "http://127.0.0.1:8000";
-        const { db } = await import("./db");
-        const { clientMemberships } = await import("@shared/models/auth");
-        const { eq } = await import("drizzle-orm");
-        const [memRow] = await db
-          .select({ clientId: clientMemberships.clientId })
-          .from(clientMemberships)
-          .where(eq(clientMemberships.userId, appUser.id))
-          .limit(1);
-        if (!memRow) {
-          return res.status(400).json({
-            message: "Actor has no client_memberships row; cannot scope the export.",
-            kind: "no_tenant",
-          });
-        }
         const mdUrl = `${fastApiBase.replace(/\/$/, "")}/workspace/output_packages/${encodeURIComponent(packageId)}/markdown`;
         const mdResp = await fetch(mdUrl, {
           headers: {
             Accept: "application/json",
             "X-IWO3-User": appUser.id,
-            "X-IWO3-Client": memRow.clientId,
+            "X-IWO3-Client": resolvedClientId,
           },
         });
         if (mdResp.status === 404) {
@@ -3791,7 +3817,7 @@ export async function registerRoutes(
           output_kind: string;
         };
 
-        const brand = await fetchSandboxTenantBrand(appUser.id);
+        const brand = await fetchSandboxTenantBrand(appUser.id, resolvedClientId);
 
         const skillsDir =
           process.env.SKILLS_DIR || "/home/virgina/claude-office-skills";
