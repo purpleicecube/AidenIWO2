@@ -2,10 +2,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { execSync } from "child_process";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 import { storage } from "./storage";
 import type { WorkOrder, LlmSettings, InsertChecklistItem } from "@shared/schema";
 import type { Tier1Result, Tier2Result, EffectiveLlmConfig } from "./llm-client";
