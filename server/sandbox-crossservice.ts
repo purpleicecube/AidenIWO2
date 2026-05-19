@@ -26,9 +26,15 @@
  */
 
 import { db } from "./db";
-import { clientMemberships } from "@shared/models/auth";
-// CODEX follow-up: use IWO3-native artifacts schema (has client_id),
-// not the legacy IWO2-shape one in shared/schema.ts which doesn't.
+// CODEX follow-up D-MMT-3 (2026-05-18): switch to IWO3-native
+// `client_memberships` from db/schema. The legacy shared model in
+// shared/models/auth.ts is truncated — it has no `status` column,
+// so a check there silently treats revoked memberships as authorized.
+// The IWO3 schema has `membership_status` enum {active, revoked};
+// we filter on status='active' to enforce real authorization.
+import { clientMemberships as iwo3ClientMemberships } from "../db/schema/client_memberships";
+// CODEX follow-up D-MMT-1: use IWO3-native artifacts schema (has
+// client_id), not the legacy IWO2-shape one in shared/schema.ts.
 import { artifacts as iwo3Artifacts } from "../db/schema/artifacts";
 import { outputPackages } from "../db/schema/output_packages";
 import { and, eq } from "drizzle-orm";
@@ -149,17 +155,31 @@ export async function resolveArtifactTenant(
   return { clientId: art.clientId };
 }
 
+/**
+ * CODEX follow-up D-MMT-3 (2026-05-18): only an ACTIVE membership row
+ * authorizes resolver success. Revoked memberships
+ * (membership_status='revoked') must NOT silently authorize
+ * preview/export — they return `forbidden` just like a missing
+ * membership.
+ *
+ * The check uses the IWO3-native `client_memberships` schema which
+ * carries the `status` enum {active, revoked}. The legacy shared
+ * model in shared/models/auth.ts is truncated and has no status
+ * column — that's why the previous version silently passed revoked
+ * memberships.
+ */
 async function _actorHasMembership(
   actorUserId: string,
   clientId: string,
 ): Promise<boolean> {
   const [row] = await db
-    .select({ clientId: clientMemberships.clientId })
-    .from(clientMemberships)
+    .select({ clientId: iwo3ClientMemberships.clientId })
+    .from(iwo3ClientMemberships)
     .where(
       and(
-        eq(clientMemberships.userId, actorUserId),
-        eq(clientMemberships.clientId, clientId),
+        eq(iwo3ClientMemberships.userId, actorUserId),
+        eq(iwo3ClientMemberships.clientId, clientId),
+        eq(iwo3ClientMemberships.status, "active"),
       ),
     )
     .limit(1);

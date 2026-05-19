@@ -179,5 +179,73 @@ describeIwo3(
         expect(result.kind).toBe("not_found");
       }
     });
+
+    /**
+     * CODEX follow-up D-MMT-3 (2026-05-18): a REVOKED membership must
+     * NOT authorize preview/export resolution. The test temporarily
+     * revokes the actor's membership in one tenant, asserts the
+     * resolver returns `forbidden` for that tenant's resource,
+     * confirms the actor's membership in the OTHER tenant still
+     * works (revocation is per-tenant, not global), then restores
+     * the original status so other tests aren't affected.
+     */
+    it("resolvePackageTenant returns forbidden when actor's membership is REVOKED in the resource's tenant", async () => {
+      // Revoke super-user's FFAI membership.
+      await pool.query(
+        `UPDATE client_memberships
+            SET status = 'revoked', updated_at = now()
+          WHERE user_id = $1::uuid AND client_id = $2::uuid`,
+        [SUPER_USER, FFAI],
+      );
+
+      try {
+        // Asking for the FFAI package now must return forbidden.
+        const result = await resolvePackageTenant(ffaiPkgId, SUPER_USER);
+        expect("kind" in result, `expected forbidden, got ${JSON.stringify(result)}`).toBe(true);
+        if ("kind" in result) {
+          expect(result.kind).toBe("forbidden");
+          expect(result.status).toBe(403);
+        }
+
+        // Klear membership stays active → Klear package still resolves.
+        const klearResult = await resolvePackageTenant(klearPkgId, SUPER_USER);
+        expect("kind" in klearResult, `Klear should still work: ${JSON.stringify(klearResult)}`).toBe(false);
+        if (!("kind" in klearResult)) {
+          expect(klearResult.clientId).toBe(KLEAR);
+        }
+      } finally {
+        // Restore super-user's FFAI membership so the rest of the
+        // suite (and any future runs) sees the seed-shape state.
+        await pool.query(
+          `UPDATE client_memberships
+              SET status = 'active', updated_at = now()
+            WHERE user_id = $1::uuid AND client_id = $2::uuid`,
+          [SUPER_USER, FFAI],
+        );
+      }
+    });
+
+    it("resolveArtifactTenant returns forbidden when actor's membership is REVOKED in the artifact's tenant", async () => {
+      await pool.query(
+        `UPDATE client_memberships
+            SET status = 'revoked', updated_at = now()
+          WHERE user_id = $1::uuid AND client_id = $2::uuid`,
+        [SUPER_USER, FFAI],
+      );
+      try {
+        const result = await resolveArtifactTenant(ffaiArtId, SUPER_USER);
+        expect("kind" in result).toBe(true);
+        if ("kind" in result) {
+          expect(result.kind).toBe("forbidden");
+        }
+      } finally {
+        await pool.query(
+          `UPDATE client_memberships
+              SET status = 'active', updated_at = now()
+            WHERE user_id = $1::uuid AND client_id = $2::uuid`,
+          [SUPER_USER, FFAI],
+        );
+      }
+    });
   },
 );
