@@ -3766,7 +3766,7 @@ export async function registerRoutes(
         // tenant, which could silently brand the export with the wrong
         // palette OR 404 against FastAPI if the inferred tenant didn't
         // own the package.
-        const { fetchSandboxTenantBrand, resolvePackageTenant } = await import("./sandbox-crossservice");
+        const { fetchSandboxTenantBrand, resolvePackageTenant, getServiceTokenHeader } = await import("./sandbox-crossservice");
         const tenantResolve = await resolvePackageTenant(packageId, appUser.id);
         if ("kind" in tenantResolve) {
           const statusByKind: Record<typeof tenantResolve.kind, number> = {
@@ -3793,6 +3793,7 @@ export async function registerRoutes(
             Accept: "application/json",
             "X-IWO3-User": appUser.id,
             "X-IWO3-Client": resolvedClientId,
+            ...getServiceTokenHeader(),
           },
         });
         if (mdResp.status === 404) {

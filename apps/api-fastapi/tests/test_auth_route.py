@@ -177,3 +177,105 @@ def test_jwt_mode_strict_when_env_set(monkeypatch) -> None:
             },
         )
     assert r.status_code == 401, r.text
+
+
+# Hosted Sandbox Bring-Up (2026-05-19) — sandbox-bounded
+# service-to-service auth seam. The Node sandbox uses
+# X-IWO3-Service-Token to pass dev-auth headers to FastAPI even in
+# hosted JWT mode without minting a JWT per internal hop.
+
+@iwo3_db
+def test_service_token_accepts_dev_headers_in_jwt_mode(monkeypatch) -> None:
+    """With IWO3_SERVICE_TOKEN set on FastAPI + IWO3_AUTH_MODE=jwt,
+    a request carrying X-IWO3-Service-Token matching the env var +
+    valid dev-auth headers succeeds."""
+    monkeypatch.setenv("IWO3_AUTH_MODE", "jwt")
+    monkeypatch.setenv("IWO3_SERVICE_TOKEN", "test-svc-secret")
+    with TestClient(app) as client:
+        r = client.get(
+            "/work_orders",
+            headers={
+                "X-IWO3-User": KLEAR_OWNER,
+                "X-IWO3-Client": KLEAR_CLIENT,
+                "X-IWO3-Service-Token": "test-svc-secret",
+            },
+        )
+    assert r.status_code == 200, r.text
+
+
+@iwo3_db
+def test_service_token_wrong_value_rejected_in_jwt_mode(monkeypatch) -> None:
+    """Wrong service token must NOT silently fall through to JWT or
+    dev_bearer paths — explicit 401 invalid_service_token."""
+    monkeypatch.setenv("IWO3_AUTH_MODE", "jwt")
+    monkeypatch.setenv("IWO3_SERVICE_TOKEN", "test-svc-secret")
+    with TestClient(app) as client:
+        r = client.get(
+            "/work_orders",
+            headers={
+                "X-IWO3-User": KLEAR_OWNER,
+                "X-IWO3-Client": KLEAR_CLIENT,
+                "X-IWO3-Service-Token": "WRONG-SECRET",
+            },
+        )
+    assert r.status_code == 401, r.text
+    detail = r.json().get("detail") or {}
+    assert isinstance(detail, dict)
+    assert detail.get("error") == "invalid_service_token"
+
+
+@iwo3_db
+def test_service_token_unset_env_var_does_not_match_any_header(monkeypatch) -> None:
+    """When IWO3_SERVICE_TOKEN is unset on FastAPI, the service-token
+    header is IGNORED — request falls through to normal auth mode.
+    Critical: an attacker cannot bypass auth by sending the header
+    when no secret is configured."""
+    monkeypatch.setenv("IWO3_AUTH_MODE", "jwt")
+    monkeypatch.delenv("IWO3_SERVICE_TOKEN", raising=False)
+    with TestClient(app) as client:
+        r = client.get(
+            "/work_orders",
+            headers={
+                "X-IWO3-User": KLEAR_OWNER,
+                "X-IWO3-Client": KLEAR_CLIENT,
+                "X-IWO3-Service-Token": "anything",
+            },
+        )
+    # Falls through to JWT path which then 401s for missing Bearer.
+    assert r.status_code == 401, r.text
+
+
+@iwo3_db
+def test_service_token_requires_dev_headers(monkeypatch) -> None:
+    """Service token alone is not enough — caller must still pass
+    X-IWO3-User + X-IWO3-Client. The token authorizes the bearer to
+    SPEAK FOR a user, not to skip identity assertion entirely."""
+    monkeypatch.setenv("IWO3_AUTH_MODE", "jwt")
+    monkeypatch.setenv("IWO3_SERVICE_TOKEN", "test-svc-secret")
+    with TestClient(app) as client:
+        r = client.get(
+            "/work_orders",
+            headers={"X-IWO3-Service-Token": "test-svc-secret"},
+        )
+    assert r.status_code == 401, r.text
+    detail = r.json().get("detail") or {}
+    assert isinstance(detail, dict)
+    assert detail.get("error") == "service_token_missing_identity"
+
+
+@iwo3_db
+def test_dev_bearer_mode_still_works_with_service_token_set(monkeypatch) -> None:
+    """Regression: setting IWO3_SERVICE_TOKEN must not break local
+    dev_bearer-mode operation. Dev headers without a service-token
+    header still work in dev_bearer mode."""
+    monkeypatch.setenv("IWO3_AUTH_MODE", "dev_bearer")
+    monkeypatch.setenv("IWO3_SERVICE_TOKEN", "test-svc-secret")
+    with TestClient(app) as client:
+        r = client.get(
+            "/work_orders",
+            headers={
+                "X-IWO3-User": KLEAR_OWNER,
+                "X-IWO3-Client": KLEAR_CLIENT,
+            },
+        )
+    assert r.status_code == 200, r.text

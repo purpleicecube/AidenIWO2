@@ -52,6 +52,21 @@ function getFastApiBaseUrl(): string {
 }
 
 /**
+ * Hosted Sandbox Bring-Up (2026-05-19) — sandbox-bounded
+ * service-to-service auth header. When `IWO3_SERVICE_TOKEN` is set
+ * on the Node deployment AND the shared secret matches what FastAPI
+ * sees, the dev-auth headers (X-IWO3-User + X-IWO3-Client) are
+ * accepted by FastAPI even in `jwt` mode. Returns an empty object
+ * when the env var is unset (local dev where FastAPI is also in
+ * `dev_bearer` mode) so callers' existing header objects stay clean.
+ */
+export function getServiceTokenHeader(): Record<string, string> {
+  const token = (process.env.IWO3_SERVICE_TOKEN || "").trim();
+  if (!token) return {};
+  return { "X-IWO3-Service-Token": token };
+}
+
+/**
  * Tenant-resolution error shape — surfaced to callers so they can
  * render an honest 400/403/404 with the specific kind.
  */
@@ -254,6 +269,7 @@ export async function fetchSandboxArtifactContent(
         Accept: "application/json",
         "X-IWO3-User": actorUserId,
         "X-IWO3-Client": clientId,
+        ...getServiceTokenHeader(),
       },
     });
   } catch (err: any) {
@@ -349,6 +365,7 @@ export async function fetchSandboxTenantBrand(
         Accept: "application/json",
         "X-IWO3-User": actorUserId,
         "X-IWO3-Client": clientId,
+        ...getServiceTokenHeader(),
       },
     });
     if (!resp.ok) return null;

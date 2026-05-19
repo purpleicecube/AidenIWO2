@@ -177,6 +177,9 @@ async def current_user_context(
         Optional[str], Header(alias="X-IWO3-Client")
     ] = None,
     authorization: Annotated[Optional[str], Header(alias="Authorization")] = None,
+    x_iwo3_service_token: Annotated[
+        Optional[str], Header(alias="X-IWO3-Service-Token")
+    ] = None,
 ) -> dict:
     """Auth-mode-aware user context resolver.
 
@@ -187,11 +190,57 @@ async def current_user_context(
     precedence when both are present so a JWT-authenticated request
     keeps working even if a stale dev header is included.
 
+    Hosted Sandbox Bring-Up (2026-05-19) — sandbox-bounded
+    service-to-service auth path: when the request carries a
+    `X-IWO3-Service-Token` header that matches the deployment's
+    `IWO3_SERVICE_TOKEN` env var, accept the dev-auth headers
+    (X-IWO3-User + X-IWO3-Client) regardless of the global auth mode.
+    This is the narrow seam the Node sandbox service uses to talk to
+    FastAPI in hosted JWT mode without minting a JWT for the operator
+    on every internal hop. The token is shared between both Railway
+    services as a deployment secret; it does NOT elevate permissions —
+    role + RLS still enforce authorization downstream.
+
     Returns ``{"user_id": str, "client_id": str}`` and stashes it on
     ``request.state.user_context`` so tenant-scoped connection deps can
     read it.
     """
     mode = _auth_mode()
+
+    # Sandbox-bounded service-to-service auth seam — checked BEFORE the
+    # JWT path so a Node service in hosted can pass dev-auth headers
+    # without a JWT. Behaviour:
+    #   - Missing env var OR blank env var → header is ignored, normal
+    #     auth-mode flow continues. This keeps local dev unaffected.
+    #   - Header present AND env matches → accept dev auth headers
+    #     regardless of global mode (sandbox-bounded by environment, not
+    #     by route — every FastAPI route benefits when this is set, but
+    #     the only documented caller is the Node sandbox cross-service
+    #     helper).
+    #   - Header present AND env does NOT match → 401 explicit. Don't
+    #     silently fall through — that would let attackers probe the
+    #     dev_bearer fallback by sending a wrong token AND dev headers.
+    service_token_env = (os.environ.get("IWO3_SERVICE_TOKEN") or "").strip()
+    if x_iwo3_service_token is not None and service_token_env:
+        if x_iwo3_service_token != service_token_env:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": "invalid_service_token",
+                    "hint": "X-IWO3-Service-Token header value did not match deployment secret",
+                },
+            )
+        if not x_iwo3_user or not x_iwo3_client:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": "service_token_missing_identity",
+                    "hint": "service-token path still requires X-IWO3-User and X-IWO3-Client headers",
+                },
+            )
+        ctx = {"user_id": x_iwo3_user, "client_id": x_iwo3_client}
+        request.state.user_context = ctx
+        return ctx
 
     # JWT mode: signed access token via Authorization header.
     if mode == "jwt" or (authorization and authorization.startswith("Bearer ")):
