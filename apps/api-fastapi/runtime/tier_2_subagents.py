@@ -183,12 +183,22 @@ TIER_2_OUTPUT_SCHEMA_BASE = """
 You must respond with a strict JSON object. You have TWO modes — pick
 exactly one per response by setting `decision_kind`:
 
-decision_kind="tool_call" — when you need runtime data (recent work
-orders, work-order counts, runtime health, search results, etc.) before
-you can compose the final deliverable. The runtime executes the tool,
-feeds the result back in your next turn, then you compose the final
-content_envelope. NEVER fabricate runtime data. NEVER claim you "looked
-up" or "checked" anything — call the tool, then answer.
+decision_kind="tool_call" — when you need data you do not hold before
+you can compose the final deliverable. TWO families, both mandatory:
+
+  (a) RUNTIME DATA — recent work orders, work-order counts, runtime
+      health, sub-agent state.
+  (b) THE OUTSIDE WORLD — any fact about a company, person, product,
+      market, price or event beyond this platform, and anything that may
+      have changed since you were trained. If a web_search_* tool is
+      assigned to you, SEARCH IT. Do not write external facts, figures,
+      dates or URLs into a deliverable from memory — a deliverable goes
+      to a client, and a stale fact in it is worse than a missing one.
+
+The runtime executes the tool, feeds the result back in your next turn,
+then you compose the final content_envelope. NEVER fabricate runtime
+data or external facts. NEVER claim you "looked up", "checked" or
+"searched" anything unless a tool result for it is present in this turn.
 
 decision_kind="content_envelope" — DEFAULT. When you have everything you
 need to produce the deliverable.
@@ -969,9 +979,15 @@ async def produce_output_package(
     client_id: str,
     actor_user_id: Optional[str],
     correlation_id: Optional[str] = None,
+    filing_folder_id_override: Optional[str] = None,
 ) -> str:
     """Persist a Tier 2 envelope as an `output_packages` row. Returns
-    the package id. Caller decides whether to dispatch (Gamma etc)."""
+    the package id. Caller decides whether to dispatch (Gamma etc).
+
+    `filing_folder_id_override` routes the workspace artifact to a
+    specific folder — the operator having said "put it in Press
+    Office". Omitted, the default `Outputs/<date>/<slug>_<id8>` applies.
+    """
     pkg_id = str(uuid.uuid4())
     content_blocks = {
         "content_markdown": envelope.content_markdown,
@@ -1025,20 +1041,21 @@ async def produce_output_package(
     # persisted, and the operator can save it manually from the
     # Output Packages surface. We log and continue.
     try:
-        outputs_folder_id = await conn.fetchval(
-            """
-            SELECT root_outputs.id::text
-              FROM workspace_folders root
-              JOIN workspace_folders root_outputs
-                ON root_outputs.parent_folder_id = root.id
-               AND root_outputs.deleted_at IS NULL
-               AND root_outputs.name = 'Outputs'
-             WHERE root.client_id = $1::uuid
-               AND root.parent_folder_id IS NULL
-               AND root.name = '/'
-               AND root.deleted_at IS NULL
-            """,
-            client_id,
+        # Loop 2026-09-05 — file into `Outputs/<date>/<slug>_<id8>`
+        # instead of flat into `Outputs`. Restores the IWO2 shape
+        # (`workspace-filing.ts`: date folder + per-work-order folder);
+        # the flat version made "where is my document?" unanswerable
+        # without three UUIDs. `override_folder_id` carries an operator
+        # instruction routed through Aiden's workspace tools.
+        from runtime.workspace_filing import resolve_filing_folder
+
+        outputs_folder_id = await resolve_filing_folder(
+            conn,
+            client_id=client_id,
+            created_by_user_id=actor_user_id or "",
+            work_order_id=work_order_id,
+            title=title,
+            override_folder_id=filing_folder_id_override,
         )
         if outputs_folder_id:
             artifact_id = await conn.fetchval(
@@ -1060,6 +1077,13 @@ async def produce_output_package(
                 outputs_folder_id,
                 json.dumps({
                     "outputPackageId": pkg_id,
+                    # Without workOrderId the filed artifact has no link
+                    # back to the request that produced it, so
+                    # `workspace_locate_output` could not answer "where
+                    # did MY document go?" — only "here are recent
+                    # files". That gap is what left Aiden guessing.
+                    "workOrderId": work_order_id,
+                    "workflowExecutionId": workflow_execution_id,
                     "outputKind": envelope.output_kind,
                     "summary": envelope.summary,
                 }),

@@ -535,6 +535,50 @@ def _render_grounded_chips(reply: dict[str, Any]) -> None:
     st.caption(f"_Grounded by:_ {chips}")
 
 
+# Open-search surfacing — "Searched the web" row under an answer that
+# was produced from a live search or scrape. Distinct from the memory
+# chips above: those say what was recalled, this says what was fetched
+# this turn. Renders nothing when no tool ran, so silence still means
+# "answered without a tool" rather than "tool row failed to draw".
+_TOOL_LABELS = {
+    "web_search_brave": "🔎 Brave",
+    "web_search_perplexity": "🔎 Perplexity",
+    "web_search_ddg": "🔎 DuckDuckGo",
+    "web_scrape": "📄 Page fetch",
+}
+
+
+def _render_web_sources(reply: dict[str, Any]) -> None:
+    """Render the live-search provenance row: which tool ran, the query
+    it ran, and every source URL it returned."""
+    reply = reply or {}
+    tool = reply.get("tool_used")
+    if not tool:
+        return
+    sources = reply.get("web_sources") or []
+    if tool not in _TOOL_LABELS and not sources:
+        # A runtime tool (health / counts) — name it, no links to show.
+        st.caption(f"_Ran tool:_ `{tool}`")
+        return
+
+    label = _TOOL_LABELS.get(tool, f"`{tool}`")
+    query = reply.get("tool_query")
+    header = f"_Searched the web via_ {label}"
+    if query:
+        header += f" — “{query}”"
+    st.caption(header)
+    if not sources:
+        st.caption("_No sources returned._")
+        return
+    links = "  ·  ".join(
+        f"[{(s.get('title') or s.get('url') or '')[:48]}]({s.get('url')})"
+        for s in sources
+        if s.get("url")
+    )
+    if links:
+        st.caption(f"_Sources:_ {links}")
+
+
 def _render_context_actions(actions: dict[str, Any], idx: int) -> None:
     """Render Open-X buttons for a status message. Routes via
     st.session_state to the destination page so the same filter/picker
@@ -756,6 +800,7 @@ def main() -> None:
                 # Loop Iota — Grounded by chips render before the action
                 # buttons so operators see the memory provenance first.
                 _render_grounded_chips(m["reply"])
+                _render_web_sources(m["reply"])
                 _render_actions(api, messages, idx, m["reply"])
             actions = m.get("context_actions") or {}
             if actions:

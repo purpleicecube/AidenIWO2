@@ -130,6 +130,19 @@ _GROUNDING_RULES_PREAMBLE = """## GROUNDING RULES
 - Use ONLY the facts, data, metrics, and quotes found in the sources below.
 - Do NOT invent or extrapolate numbers, statistics, or claims absent from the source content.
 - If the sources do not contain specific data needed, say so explicitly rather than fabricating.
+- SCOPE: these rules govern what you may assert from THIS block. They do NOT forbid you
+  from calling a tool to obtain new grounded sources. If the missing data is the kind a
+  tool available to you can retrieve (a web search, a scrape, a runtime lookup), call that
+  tool INSTEAD of replying that your sources do not cover it. A tool result is a source —
+  once returned, treat it exactly like the material below.
+- Consulting this block is NOT a web search. Never describe reading these sources as
+  having "searched", "checked", "looked up" or "found nothing online".
+- CHAT HISTORY IS A RECORD OF WHAT WAS SAID, NOT A SOURCE OF VERIFIED FACT. An
+  earlier assistant turn quoted back to you is not evidence. This matters most for
+  links and paths into this platform: a URL that appears in chat history or in a
+  retrieved document may itself have been invented in an earlier turn, and repeating
+  it launders a fabrication into an apparent fact. Re-derive any platform path or
+  link from a tool call in the CURRENT turn, or say you cannot.
 - When citing a source, reference its filename or path so the operator can verify."""
 
 

@@ -75,6 +75,15 @@ class AidenChatResponse(BaseModel):
     # intake). One entry per validated source kind in the assembled
     # bundle.
     memory_sources: Optional[list[dict[str, Any]]] = None
+    # Open-search surfacing — which tool actually ran this turn, and the
+    # web sources it returned. `tool_used` is set for EVERY executed tool
+    # (runtime ones included) so the operator can always tell whether an
+    # answer was tool-backed; `web_sources` is populated only by the
+    # search/scrape tools. Both stay None when no tool ran — the absence
+    # is meaningful and must not be rendered as an empty chip row.
+    tool_used: Optional[str] = None
+    tool_query: Optional[str] = None
+    web_sources: Optional[list[dict[str, str]]] = None
 
 
 def _decision_to_payload(dec) -> dict[str, Any]:  # noqa: ANN001
@@ -400,6 +409,12 @@ async def aiden_chat(
             error=f"{exc.kind}: {exc}",
         )
 
+    # Open-search surfacing — declared before the tool block so the
+    # response construction below can read them unconditionally.
+    executed_tool_name: Optional[str] = None
+    executed_tool_query: Optional[str] = None
+    web_sources_for_ui: Optional[list[dict[str, str]]] = None
+
     # Beta-2 — tool_call → execute → re-invoke loop. Aiden returns a
     # tool_call when the operator asks about runtime state; the runtime
     # executes the tool with the live tenant-scoped connection, then
@@ -413,6 +428,8 @@ async def aiden_chat(
         )
 
         tool_call = decision.tool_call
+        executed_tool_name = tool_call.tool_name
+        executed_tool_query = str(tool_call.args.get("query") or "").strip() or None
         try:
             tool_result = await execute_tool(
                 conn,
@@ -426,8 +443,20 @@ async def aiden_chat(
                 ok=False,
                 decision_kind="tool_call",
                 title=decision.title,
+                tool_used=executed_tool_name,
+                tool_query=executed_tool_query,
                 error=f"tool_failed: {exc}",
             )
+
+        # Normalise search/scrape output into renderable sources BEFORE
+        # the follow-up invoke — the tool result is otherwise consumed
+        # into prompt text and discarded, which is why the console could
+        # never show where an answer came from.
+        from runtime.tools.search import extract_web_sources
+
+        web_sources_for_ui = extract_web_sources(
+            executed_tool_name, tool_result
+        ) or None
 
         # Re-invoke Aiden with the original message + tool result as
         # context. Aiden composes the final assistant_reply using REAL
@@ -512,6 +541,9 @@ async def aiden_chat(
             memory_sources_for_ui.append(entry)
     return AidenChatResponse(
         ok=True,
+        tool_used=executed_tool_name,
+        tool_query=executed_tool_query,
+        web_sources=web_sources_for_ui,
         decision_kind=payload.get("decision_kind"),
         title=payload.get("title"),
         summary=payload.get("summary"),

@@ -491,3 +491,79 @@ SEARCH_TOOLS: dict[str, ToolDefinition] = {
         handler=_web_scrape,
     ),
 }
+
+
+# ── Source extraction (pure; no network) ─────────────────────────────
+#
+# The four search/scrape handlers each return a different shape. The
+# chat surface needs ONE shape to render "Sources" chips under an
+# answer, so normalisation lives here next to the handlers that define
+# those shapes — if a handler's return shape changes, this function is
+# in the same file and the same review.
+#
+# Pure over (tool_name, result): no conn, no I/O, unit-testable.
+
+_WEB_SOURCE_TOOLS = frozenset(
+    {"web_search_brave", "web_search_perplexity", "web_search_ddg", "web_scrape"}
+)
+
+_MAX_SOURCES = 8
+
+
+def _clean_url(value: Any) -> str:
+    url = str(value or "").strip()
+    if not url.startswith(("http://", "https://")):
+        return ""
+    return url
+
+
+def extract_web_sources(
+    tool_name: str, result: Any
+) -> list[dict[str, str]]:
+    """Normalise a search/scrape tool result into `[{title, url}]`.
+
+    Returns `[]` for non-search tools, malformed results, or results
+    carrying no usable http(s) URL — the caller renders nothing rather
+    than an empty chip row. Deduped by URL, order preserved, capped at
+    `_MAX_SOURCES`.
+    """
+    if tool_name not in _WEB_SOURCE_TOOLS or not isinstance(result, dict):
+        return []
+
+    pairs: list[tuple[str, str]] = []
+
+    if tool_name == "web_search_brave":
+        for row in result.get("results") or []:
+            if isinstance(row, dict):
+                pairs.append((str(row.get("title") or ""), row.get("url")))
+
+    elif tool_name == "web_search_perplexity":
+        # Sonar citations are bare URL strings; some builds return
+        # {url: ...} objects. Accept both.
+        for cite in result.get("citations") or []:
+            if isinstance(cite, dict):
+                pairs.append((str(cite.get("title") or ""), cite.get("url")))
+            else:
+                pairs.append(("", cite))
+
+    elif tool_name == "web_search_ddg":
+        pairs.append(("Abstract", result.get("abstract_url")))
+        for topic in result.get("related_topics") or []:
+            if isinstance(topic, dict):
+                pairs.append((str(topic.get("text") or ""), topic.get("url")))
+
+    elif tool_name == "web_scrape":
+        pairs.append((str(result.get("title") or ""), result.get("url")))
+
+    sources: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for title, raw_url in pairs:
+        url = _clean_url(raw_url)
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        label = title.strip() or urlparse(url).netloc or url
+        sources.append({"title": label[:160], "url": url})
+        if len(sources) >= _MAX_SOURCES:
+            break
+    return sources
