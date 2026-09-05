@@ -49,6 +49,10 @@ from routes import (
     workflows,
     workspace,
 )
+from workers.audit_partition_worker import (
+    audit_partition_worker_loop,
+    ensure_audit_partitions_at_startup,
+)
 from workers.poll_worker import poll_worker_loop
 from workers.telegram_worker import telegram_worker_loop
 from workers.wo_dispatch_worker import wo_dispatch_worker_loop
@@ -61,6 +65,15 @@ log = logging.getLogger("iwo3.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await startup_db_pool()
+    # Ensure the action_audit_log partition window BEFORE serving any
+    # traffic. Every audited mutation (~55 call sites) INSERTs into a
+    # RANGE-partitioned table; with no partition covering `now()` the
+    # request 500s. Awaited, not backgrounded, so the first request
+    # cannot lose a race against the first tick. Never fatal.
+    await ensure_audit_partitions_at_startup(get_db_pool())
+    audit_partition_task = asyncio.create_task(
+        audit_partition_worker_loop(get_db_pool())
+    )
     worker_task = asyncio.create_task(poll_worker_loop(get_db_pool()))
     telegram_task = asyncio.create_task(
         telegram_worker_loop(get_db_pool())
@@ -78,9 +91,16 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        for t in (worker_task, telegram_task, wo_dispatch_task, workflow_step_task):
+        for t in (
+            audit_partition_task,
+            worker_task,
+            telegram_task,
+            wo_dispatch_task,
+            workflow_step_task,
+        ):
             t.cancel()
         for t, name in (
+            (audit_partition_task, "audit_partition_worker"),
             (worker_task, "poll_worker"),
             (telegram_task, "telegram_worker"),
             (wo_dispatch_task, "wo_dispatch_worker"),
