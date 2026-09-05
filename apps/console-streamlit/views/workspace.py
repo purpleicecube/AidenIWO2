@@ -216,6 +216,30 @@ def _set_focus(folder_id: str) -> None:
     st.session_state.pop(_SS_PREVIEW_FILE, None)
 
 
+# Deep link. `?file=<artifact_id>` opens that document directly, so a
+# link handed out in chat (or pasted into a message) lands on the
+# document itself. Before this the preview could only be reached by
+# clicking a card, which is why Aiden had no real URL to give and
+# invented one.
+_SS_DEEPLINK_DONE = "workspace_deeplink_consumed"
+
+
+def _consume_deep_link() -> None:
+    """Honour ?file=<id> once per session-key, then drop the param so a
+    later Close doesn't get undone by a rerun re-reading the URL."""
+    try:
+        params = st.query_params
+        requested = params.get("file")
+    except Exception:  # noqa: BLE001 - older Streamlit / no context
+        return
+    if not requested:
+        return
+    if st.session_state.get(_SS_DEEPLINK_DONE) == requested:
+        return
+    st.session_state[_SS_DEEPLINK_DONE] = requested
+    st.session_state[_SS_PREVIEW_FILE] = requested
+
+
 def _set_preview(file_id: str) -> None:
     st.session_state[_SS_PREVIEW_FILE] = file_id
 
@@ -837,6 +861,87 @@ def _render_file_overflow(
 # ── Preview pane ─────────────────────────────────────────────────────
 
 
+# ── Downloads ────────────────────────────────────────────────────────
+#
+# The operator's ask: "actual output URLs to be the easy convenient way
+# to quickly see the output (.md, pdf, HTML or doc)". Two halves —
+# a deep link that opens the document (above), and getting a real file
+# out of it (here).
+#
+# Markdown and HTML are produced locally with no dependency. PDF is
+# deliberately NOT offered as a local button: `sandbox_pdf` is still a
+# stub, python-docx/weasyprint are not installed, and a greyed-out or
+# silently-broken PDF button is worse than none. PDF today comes from
+# the Gamma render path, which is live and verified — so the UI says
+# that rather than pretending.
+
+_HTML_SHELL = """<!doctype html>
+<html><head><meta charset="utf-8">
+<title>{title}</title>
+<style>
+ body{{font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+   max-width:52rem;margin:3rem auto;padding:0 1.5rem;color:#111827}}
+ h1,h2,h3{{line-height:1.25;margin-top:2rem}}
+ code,pre{{background:#f3f4f6;border-radius:4px}}
+ pre{{padding:1rem;overflow-x:auto}} code{{padding:.15em .35em}}
+ table{{border-collapse:collapse;width:100%}}
+ th,td{{border:1px solid #e5e7eb;padding:.5rem .65rem;text-align:left}}
+ blockquote{{border-left:3px solid #d1d5db;margin:1rem 0;padding-left:1rem;color:#4b5563}}
+</style></head><body>
+{body}
+</body></html>"""
+
+
+def _safe_stem(name: str) -> str:
+    stem = (name or "document").rsplit(".", 1)[0]
+    return "".join(c for c in stem if c.isalnum() or c in " -_").strip() or "document"
+
+
+def _self_contained_html(title: str, markdown_text: str) -> str:
+    """Wrap content in a standalone HTML file — no external CSS, no
+    fonts, no scripts, so it opens correctly from disk or an email
+    attachment. Markdown is embedded in a <pre> when no converter is
+    available rather than shipping a half-rendered page."""
+    try:
+        import markdown as _md  # type: ignore
+
+        body = _md.markdown(
+            markdown_text, extensions=["tables", "fenced_code"]
+        )
+    except Exception:  # noqa: BLE001 - converter not installed
+        import html as _html
+
+        body = f"<pre>{_html.escape(markdown_text)}</pre>"
+    import html as _html
+
+    return _HTML_SHELL.format(title=_html.escape(title), body=body)
+
+
+def _render_download_row(name: str, payload: str, mime: str) -> None:
+    stem = _safe_stem(name)
+    c1, c2, c3 = st.columns([1, 1, 2])
+    with c1:
+        st.download_button(
+            "⬇ .md",
+            data=payload.encode("utf-8"),
+            file_name=f"{stem}.md",
+            mime="text/markdown",
+            key=f"ws-dl-md-{stem}",
+            use_container_width=True,
+        )
+    with c2:
+        st.download_button(
+            "⬇ .html",
+            data=_self_contained_html(stem, payload).encode("utf-8"),
+            file_name=f"{stem}.html",
+            mime="text/html",
+            key=f"ws-dl-html-{stem}",
+            use_container_width=True,
+        )
+    with c3:
+        st.caption("_PDF: use **Render Gamma** on the work order — the local PDF renderer is still a stub._")
+
+
 def _render_preview(api, file_row: dict[str, Any]) -> None:  # noqa: ANN001
     try:
         content = api.get_workspace_file_content(file_row["id"])
@@ -882,10 +987,62 @@ def _render_preview(api, file_row: dict[str, Any]) -> None:  # noqa: ANN001
 
     payload = content.get("content")
     if encoding == "utf-8":
+        # Downloads first — the operator asked for "a quick convenient
+        # way to see the output as .md / PDF / HTML". Raw markdown in a
+        # code block was neither quick nor convenient.
+        _render_download_row(name, payload or "", mime)
         if "json" in mime:
             st.code(payload or "", language="json")
         elif "markdown" in mime or (file_row.get("filename") or "").lower().endswith(".md"):
-            st.code(payload or "", language="markdown")
+            # Rendered by default; raw source one click away. This is a
+            # deliverable an operator reads, not source they audit.
+            if st.toggle(
+                "Show raw markdown",
+                value=False,
+                key=f"ws-raw-{file_row['id']}",
+            ):
+                st.code(payload or "", language="markdown")
+            else:
+                st.markdown(payload or "")
+        elif "html" in mime:
+            # Review finding 2026-09-05 (P2): rendering artifact HTML
+            # through `components.html()` EXECUTES it — scripts run and
+            # can make browser-side network requests, with the operator's
+            # session in the tab that opened it. This content is
+            # generated by sub-agents or uploaded by users, so it is not
+            # trusted input.
+            #
+            # Default is therefore inert source. Live rendering is opt-in
+            # per file, and when chosen it goes into a sandboxed iframe
+            # via a data: URL — a separate opaque origin, no scripts, no
+            # forms, no top-level navigation. Downloading the .html and
+            # opening it deliberately remains the full-fidelity path.
+            render_live = st.toggle(
+                "Render HTML (sandboxed — scripts disabled)",
+                value=False,
+                key=f"ws-rawhtml-{file_row['id']}",
+                help=(
+                    "Artifact HTML is untrusted. Preview runs in a "
+                    "sandboxed frame with scripts blocked; download the "
+                    "file to view it fully."
+                ),
+            )
+            if render_live:
+                import base64 as _b64
+                import streamlit.components.v1 as _components
+
+                encoded = _b64.b64encode(
+                    (payload or "").encode("utf-8")
+                ).decode("ascii")
+                _components.html(
+                    '<iframe sandbox="" style="width:100%;height:580px;'
+                    'border:1px solid #e5e7eb;border-radius:6px"'
+                    f' src="data:text/html;base64,{encoded}"></iframe>',
+                    height=600,
+                    scrolling=True,
+                )
+            else:
+                st.code(payload or "", language="html")
         else:
             st.code(payload or "", language="text")
     elif encoding == "base64" and payload and (mime or "").startswith("image/"):
@@ -1176,6 +1333,9 @@ def _inject_css() -> None:
 
 def main() -> None:
     _inject_css()
+    # Honour ?file=<artifact_id> before anything renders, so a deep
+    # link opens straight onto the document.
+    _consume_deep_link()
     st.markdown('<div class="ws-page-title">Workspace</div>', unsafe_allow_html=True)
 
     api = page_requires_api()
