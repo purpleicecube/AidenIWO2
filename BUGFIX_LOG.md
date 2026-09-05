@@ -1420,6 +1420,138 @@ Operator: Darrel Vaughn | Reviewer: Claude Opus 4.7 | Tree: IWO3 (`iwo3/main`)
 
 ---
 
+## Session — IWO3 Stand-Up, Grounding & Output Delivery (2026-09-04 / 2026-09-05)
+
+Operator: Darrel Vaughn | Reviewer: Claude Code (Opus 5)
+
+Context: the runtime had not been started since 2026-05-19. Bringing it
+up surfaced a cluster of defects that share one shape — **a check or a
+rule that proves the wrong thing**. A health check that counts a row
+instead of resolving it. A prompt rule stated for one direction only. A
+guard on one write path but not the other four. An agent asked to do
+something it has no tool for. Seven entries, `BUG-078`..`BUG-084`.
+
+---
+
+### BUG-078: `action_audit_log` partition window expired — every audited mutation 500s platform-wide (Critical, data/infra)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-09-04 |
+| Severity | Critical (every privileged mutation in IWO3 offline since 2026-07-01; ~55 audit call sites across 13 route modules; also 60 failing vitest integration tests on any freshly reset database) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/workers/audit_partition_worker.py` (new), `apps/api-fastapi/main.py`, `infra/local/apply-migrations.ts` |
+| Symptom | Operator sent "hEY AIDEN" in Chat with Aiden and got `API error 500: Internal Server Error`. Log showed `asyncpg.exceptions.CheckViolationError: no partition of relation "action_audit_log" found for row` at `routes/chat_sessions.py:164 → authz/audit_writer.py:44`. Reads were fine, so System Health showed all five checks green while nothing could be written. |
+| Root Cause | `action_audit_log` is RANGE-partitioned by month. Migration `0002_partition_action_audit_log.sql` seeds exactly three partitions (2026-04, 2026-05, 2026-06) and ships a self-healing helper, `ensure_audit_partition_for(ts)`, whose own comment states *"Callers (the audit writer in Loop 3+) SELECT this immediately before INSERT to self-heal a missing next-month partition in production."* **Nothing ever called it.** Neither `authz/audit_writer.py` nor its TS twin `packages/contracts/audit/writer.ts` invoked the helper; its only caller in the repo was its own integration test (`tests/integration/audit-partition.test.ts`). On 2026-07-01 the last partition expired. The contract was written down in a SQL comment and never carried into either implementation — and the test proved the *function* worked while nothing tested that anyone *used* it. |
+| Fix | New `workers/audit_partition_worker.py` ensures a rolling window of current month + `IWO3_AUDIT_PARTITION_MONTHS_AHEAD` (default 3). `ensure_audit_partitions_at_startup()` is **awaited in `main.lifespan` before traffic is served** — a background first tick would race the first request, and a request that loses that race 500s. A daily loop keeps the window rolling for long-lived processes. `infra/local/apply-migrations.ts` gained `ensureAuditPartitionWindow()` for the same guarantee on a fresh migrate, because vitest talks to Postgres directly and never boots the API. Deliberately **not** implemented as ensure-before-insert per the migration's original design: that costs a DDL round-trip per audited request and runs as whatever role the request holds, and `ensure_audit_partition_for` is not `SECURITY DEFINER`, so it needs `CREATE` on schema public — true on this dev box, and exactly the grant a hardened deployment revokes. |
+| Verified | Live: `audit_partition: window ensured at startup ['2026-09-01'..'2026-12-01']` on boot; chat returns 200. Integration suite **60 failed → 19 failed** (the residual 19 are pre-existing permission-vocabulary snapshot drift, unrelated), **0 partition errors**. 9 unit tests in `tests/test_audit_partition_worker.py`; `month_starts` is pure so year-boundary, 31→30-day and leap-year rollovers are tested without freezing the clock. Gates validated by reintroducing three defects (window starting next month: 7 failures; naive +31d arithmetic: 6; silently claiming success when the helper is absent: 1). |
+| Files Changed | `workers/audit_partition_worker.py` (+188 new), `main.py` (+22/-3), `infra/local/apply-migrations.ts` (+40), `tests/test_audit_partition_worker.py` (+130 new). |
+| Related | Root cause of the System Health blind spot also seen in BUG-082 — a page whose every check is a read reported "all pass" while every write failed. Lesson: **test the seam, not the two sides of it.** |
+
+---
+
+### BUG-079: Aiden never searches the web — `tool_call` rubric scoped to runtime state, and the memory preamble forbade going to get a source (High, grounding)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-09-04 |
+| Severity | High (every question about the outside world answered from stale training data or declined; four registered web-search tools and four configured API keys sat unused) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/runtime/tier_1_aiden.py`, `apps/api-fastapi/runtime/tier_2_subagents.py`, `apps/api-fastapi/memory/budget.py`, `apps/api-fastapi/routes/aiden.py`, `apps/api-fastapi/runtime/tools/search.py`, `apps/console-streamlit/views/chat.py` |
+| Symptom | Measured before changing anything: **0 of 6** world-knowledge probes ("who is the current CEO of Sedgwick?", "top RMIS vendors in 2026?", "what did Guidewire announce most recently?") triggered a tool call. Aiden either answered from training data or replied *"I've searched the provided memory context and source documents, but none contain…"* — having run no tool, while `web_search_brave`, `web_search_perplexity`, `web_search_ddg` and `web_scrape` were all registered and keyed. |
+| Root Cause | Three instructions, all needed to move. (1) The persona rubric scoped `tool_call` to *"CURRENT runtime state — system health, work-order counts…"*. (2) The appended schema template's mode defaults routed *"any conversational, exploratory, or **business question**"* to `assistant_reply` — which is precisely the shape of a prospect-research question. (3) **The load-bearing one:** the shared memory `GROUNDING RULES` preamble said *"Use ONLY the facts… found in the sources below"* and *"If the sources do not contain specific data needed, say so"*, with **no counterpart permitting a tool call to GO AND GET a source**. A closed-world rule stated absolutely, colliding with an open-world capability. Written to prevent fabrication, it was correctly followed into uselessness. |
+| Fix | (1)+(2) `tool_call` gains an explicit family (b) — the outside world — with *"your training data is stale and you cannot tell how stale"*; `assistant_reply` explicitly excludes outside-world questions; mode defaults state a business question about the outside world is not a default-reply case. (3) The preamble gains a SCOPE clause: the rules govern what may be asserted **from this block**, and explicitly do not forbid calling a tool to obtain new grounded sources — *"a tool result is a source"*. Anti-fabrication force preserved verbatim. Also: *"consulting this block is NOT a web search"*, killing the "I've searched" phrasing. Tier-2 rubric broadened symmetrically (a stale external fact in a client deliverable is worse than a missing one). `routes/aiden.py` now returns `tool_used` / `tool_query` / `web_sources`; `views/chat.py` renders a *"Searched the web via 🔎 Brave — '<query>'"* provenance row with clickable sources — the tool result was previously consumed into prompt text and discarded, so the console could never show where an answer came from. New pure `extract_web_sources()` normalises four different handler return shapes. |
+| Verified | **0/6 → 6/6** searched. Control probes unchanged: greetings and architecture questions call nothing; runtime questions still call `runtime_health` / `work_order_counts`; work requests still route to a brief. 23 tests across `test_open_search_rubric.py` + `test_search_sources.py`; gates validated by reintroducing each of the three defects (6, 2 and 2 failures) plus the source normaliser's non-http URL guard (1). |
+| Files Changed | `tier_1_aiden.py` (+41/-9), `memory/budget.py` (+13), `tier_2_subagents.py` (+22/-8), `routes/aiden.py` (+32), `tools/search.py` (+76), `views/chat.py` (+45), 2 new test files. |
+| Related | **Regression caught and fixed inside the same loop:** the first cut of the outside-world rule pulled work requests into `clarification` — `test_tier_1_routing` went red 2/9, with *"review this customer record… produce an audit finding"* returning `clarification` 3/3 against a clean 9/9 baseline. Fixed by scoping family (b) to *answering* questions: it never re-routes a request to PRODUCE a deliverable, and is never grounds for clarification — Tier 2 does its own research. `test_outside_world_rule_does_not_re_route_work_requests` holds that line. |
+
+---
+
+### BUG-080: Provider changed without its credential — sub-agent saves cleanly then 401s on every invoke (High, data integrity)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-09-05 |
+| Severity | High (a silently broken sub-agent; the error names the API key, not the wiring, so it reads as a dead credential and sends the operator hunting for a key that is fine) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/routes/llm.py`, `infra/local/seed-loader.ts`, `apps/console-streamlit/views/sub_agents.py` |
+| Symptom | Operator switched `darla_tier_2` from openrouter to groq using the new model picker and selected a Groq model. Connection test returned `credential_invalid: groq returned HTTP 401: {"error":{"message":"Invalid API Key"…}}`. The card's own chips showed the contradiction: **provider `groq / qwen/qwen3.8-27b`, credential `ENV OPENROUTER_API_KEY set`.** |
+| Root Cause | `provider` and `credential_ref` are independent columns written by independent code paths, with no cross-validation anywhere. The Sub-Agents form's Credential ref field says *"leave blank to keep existing"* — correct when changing only a model, actively wrong when changing provider. The runtime then sent the OpenRouter key to `api.groq.com`. The hole was always present; the catalogue-driven model picker (see Roadmap §Sub-Agent Model Catalogue) made switching provider a one-click affair, converting a latent trap into an easy one. |
+| Fix | New `_validate_provider_credential_pair()` in `routes/llm.py`, applied on **all four** llm_configs write paths — create, update (validating the *effective* pair: new provider against existing credential), rollback, and the TypeScript seed loader (`assertProviderCredentialPair`). Deliberately narrow: fires only when the env var is one of the well-known names belonging to a *different* known provider, so `GROQ_KEY_PROD` or a shared gateway secret still saves — it catches cross-wires, it does not police naming. The 400 names the fix, not just the problem. UI: switching provider now shows an amber warning naming the key that will 401 and **pre-fills** Credential ref with the correct value. |
+| Verified | Live: the exact bad payload returns 400 `provider_credential_mismatch` with the corrective hint. Darla repaired to `groq / qwen/qwen3.8-27b` + `GROQ_API_KEY`, connection test `ok 451ms`. All 22 rows across both tenants audited — zero remaining mismatches. 15 tests in `test_provider_credential_pair.py`; gates validated by removing the guard (5 failures) and by making it over-strict so legitimate custom key names break (3). |
+| Files Changed | `routes/llm.py` (+66), `infra/local/seed-loader.ts` (+45), `views/sub_agents.py` (+34), `tests/test_provider_credential_pair.py` (+130 new), `tests/test_llm_config_write_path_invariants.py` (+185 new). |
+| Related | **Rollback was a live landmine, not a theoretical one.** A version snapshot taken before the guard existed can carry a mismatched pair, and restoring it would sneak the bad state past create and update. `darla_tier_2` had exactly such a snapshot in `llm_config_versions`; rolling back to it now returns 400. Version rows are immutable by design, so refusing on the way back in is the correct handling. **Enumerated coverage:** `test_llm_config_write_path_invariants.py` AST-walks `routes/llm.py`, finds every statement writing `llm_configs`, and fails unless each either calls the guard or is *provably* free of both columns — fail-safe, so dynamic SQL counts as unprovable. Proven by adding a fake future endpoint that writes both columns unguarded: the gate failed by name. |
+
+---
+
+### BUG-081: pytest against the operator database destroyed Klear's Gamma credential — every render `credential_missing` for 3½ months (Critical, test hygiene)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-09-05 |
+| Severity | Critical (silent destruction of live tenant configuration by a test fixture; no guard existed to prevent recurrence) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/tests/conftest.py`, `adapter_credentials` (data repair) |
+| Symptom | Operator clicked **Render Gamma** on WO `c78262ed` and got `credential_missing: env var GAMMA_REGISTRY_TEST_KEY is not set or empty`. That variable is set nowhere in any `.env`. FFAI's row pointed correctly at `GAMMA_API_KEY`; Klear's did not. |
+| Root Cause | **BUG-069 already fixed this**, repairing `GAMMA_REGISTRY_TEST_KEY → GAMMA_API_KEY` on both tenants on 2026-05-16 — FFAI's row still carries that repair (`updated_at 2026-05-16 17:25`). Klear's row was **created fresh on 2026-05-19 00:46:30**, never updated, with no notes. `tests/test_poll_registry.py::_seed_gamma_credential` runs, verbatim: `DELETE FROM adapter_credentials WHERE client_id = <Klear> AND adapter_catalog_id = <gamma>` then `INSERT … 'credential_ref:env:GAMMA_REGISTRY_TEST_KEY'` — with **no teardown restoring the original**. The pytest suite was run with `IWO3_DATABASE_URL` pointed at the live database. Not a reseed: there is no `adapter_credentials` seed file, so the seeder cannot touch this table. The same run is the likely source of the **50 of 54 junk folders** in Klear's workspace (`A_*`, `B_*`, `sub_*`, `post_write_hook_repro_*`, `Drafts-renamed_*`). |
+| Fix | (a) Credential repaired to `credential_ref:env:GAMMA_API_KEY` with a note recording the cause so the next person does not re-diagnose it. (b) **`tests/conftest.py` now refuses the whole pytest session** when `IWO3_DATABASE_URL` names a database not ending in `_test`, naming the database, explaining what the fixtures delete, and pointing at the disposable lane. `IWO3_ALLOW_NON_TEST_DB=true` is the explicit override. Deliberately blunt rather than sorting read-only tests from destructive ones: a suite that can silently eat production data is not worth the convenience of skipping a two-word env var. The vitest lane already enforced this (`infra/local/test-integration-iwo3.sh`, three guards); the pytest lane had **none**. |
+| Verified | Live Gamma render on the failing WO now completes end-to-end: handoff `completed`, generation id `WdVQYvzwWhKOv3P7IKJLG`, real PDF at `assets.api.gamma.app/export/pdf/…`. Guard verified on all three paths — live DB → clean `pytest.UsageError` refusal, test DB → runs, override → runs. |
+| Files Changed | `tests/conftest.py` (+58), one `adapter_credentials` UPDATE. |
+| Related | Same hazard hit during this very session: a route test run against live appended audit rows before it was caught. Residual cleanup: 50 junk workspace folders not yet swept. |
+
+---
+
+### BUG-082: System Health "Gamma API ✅ Pass" while every render 401s — the check counted a row instead of resolving it (Medium, observability)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-09-05 |
+| Severity | Medium (no functional impact, but it is the check that should have caught BUG-081 and instead concealed it) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/routes/system_status.py` |
+| Symptom | The System Health page reported **Gamma API — "live gate + credential row present" ✅ Pass** for the entire period in which every Gamma render failed with `credential_missing`. |
+| Root Cause | The check ran `SELECT 1 FROM adapter_credentials … LIMIT 1`. It verified a row *existed*; it never parsed `credential_ref` or checked that the named env var resolves. A health check that proves a row exists proves nothing about whether the operation works. |
+| Fix | The check now resolves the credential via `env_var_from_credential_ref()` and tests the environment, reporting the variable by name — `"live gate + GAMMA_API_KEY resolved"` on success, and on failure `"credential points at env var X, which is not set or is empty — renders will fail with credential_missing"`. Malformed refs are reported distinctly from unset ones. |
+| Verified | Live: all five checks green and now meaning it. |
+| Files Changed | `routes/system_status.py` (+30/-8). |
+| Related | Second instance in two days of this page passing while the thing it names is broken (BUG-078 was the first — every check on it is a read, so it stayed green while every write 500'd). **Open follow-up:** sweep the remaining three checks for the same pattern, and add a write-path probe. |
+
+---
+
+### BUG-083: Aiden has no workspace tools — fabricates the action, then fabricates a URL for it (High, capability gap + fabrication)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-09-05 |
+| Severity | High (operator asked for a folder, was told it was created, and it was not; platform URLs invented wholesale) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/runtime/tools/workspace.py` (new), `apps/api-fastapi/runtime/aiden_tools.py`, `apps/api-fastapi/runtime/tier_1_aiden.py`, `apps/api-fastapi/memory/budget.py` |
+| Symptom | Operator: *"I need a specific workspace folder created that is titled with today's date."* Aiden raised a work order; Paul produced a **Markdown file titled "Deployment Report" describing a folder creation** (three copies, filed among the real deliverables); no folder existed. Asked for the link, Aiden returned `<BASE_URL>/workspace/folder/2026-09-05` and `<BASE_URL>/workspace/output/<pkg-id>?format=pdf` — **routes that have never existed in this codebase**. |
+| Root Cause | Two failures, one cause: **an agent with no tool for a job will either fake the job or fake the answer.** The API has had full workspace CRUD since Loop 1 (`POST /workspace/folders`, `PATCH`/`DELETE /workspace/folders/{id}`, `POST /workspace/files`, `GET /workspace/tree`); Aiden's registry had 14 tools and **none** reached any of it. With no tool and no rule permitting "I cannot", the only available move was a work order — which by construction produces a document *about* the action. The URL fabrication then had no counterpart rule: the anti-fabrication clause added in BUG-079 covers external facts and tool output, but Aiden treated a **platform** URL as something he knows rather than something he fetched. |
+| Fix | New `runtime/tools/workspace.py` — `workspace_create_folder`, `workspace_list_tree`, `workspace_locate_output` (registry 14 → 17). Deliberately **no delete or rename**: an agent that can remove an operator's folders on a misparsed instruction is a worse failure than one that cannot tidy up. Actor is injected from the authenticated context into the handler's args copy, never taken from the model; all handlers run on the tenant-scoped connection so RLS confines them. New **Platform honesty** rules: never state a folder/file/link was created without a tool result *in this turn*; never construct a URL or path into this platform; when no tool can do the job, say so plainly and stop — *"raising a work order so a sub-agent writes a document describing the action is not doing the action"*. |
+| Verified | Folders now actually created from chat (`2026-09-05`, `Press Office` both exist in Klear's workspace). Probe set: create-folder / locate-output / list-tree / create-named-folder → **4 of 4** call the correct tool. |
+| Files Changed | `runtime/tools/workspace.py` (+250 new), `runtime/aiden_tools.py` (+12), `tier_1_aiden.py` (+30), `memory/budget.py` (+7). |
+| Related | **ARCHITECTURAL FINDING — rules in `AIDEN_SYSTEM_PROMPT` are dead code for any tenant with a custom prompt.** The honesty rules had no effect until moved. Klear's `llm_configs.aiden_tier_1.system_prompt` is a **12,774-character** custom prompt that *replaces* the runtime default entirely; only `_AIDEN_OUTPUT_SCHEMA_TEMPLATE` is appended to every prompt (it carries the BUG-066 SUPERSEDES clause). Rules that must hold for every tenant belong in the schema template. BUG-079's search rules survived this trap only by accident, having been duplicated into both blocks. **Secondary finding:** fabrications become self-reinforcing — the invented URLs are stored in `chat_messages` and in three filed artifacts, and were recalled as grounded evidence. The memory preamble now states *"chat history is a record of what was said, not a source of verified fact"* and requires platform paths to be re-derived from a tool call each turn. |
+
+---
+
+### BUG-084: Output filing went flat — IWO2's date + per-work-order folders lost, no link back to the request (Medium, regression)
+
+| Field | Detail |
+| --- | --- |
+| Date | 2026-09-05 |
+| Severity | Medium (deliverables were delivered, but unfindable without three UUIDs) |
+| Status | Fixed |
+| Files | `apps/api-fastapi/runtime/workspace_filing.py` (new), `apps/api-fastapi/runtime/tier_2_subagents.py`, `apps/console-streamlit/views/workspace.py`, `apps/api-fastapi/runtime/tools/workspace.py` |
+| Symptom | Operator: *"where's the actual output document? It should be in the workspace, appropriately labeled folder, easy to find. This is way too hard."* Every artifact any agent had ever produced sat flat in one `Outputs` folder. Landing on one showed raw markdown in a code block with no download and no link. |
+| Root Cause | Regression from IWO2. `server/workspace-filing.ts` there filed to `05_Artifacts/<date>/<order-slug>_<id8>/` and `02_Execution/<date>/<order-slug>_<id8>/`, auto-creating both levels via `getDateFolder()` + `ensureSubFolder()`. IWO3's `tier_2_subagents.py` replaced that with a single hardcoded lookup for the folder literally named `Outputs`. The filed artifact's metadata also carried no `workOrderId`, so nothing could join a deliverable back to the request that produced it. |
+| Fix | New `runtime/workspace_filing.py` restores `Outputs/<YYYY-MM-DD>/<slug>_<id8>/`, idempotent under concurrency (unique-violation loser re-reads rather than failing the filing). `filing_folder_id_override` is **plumbed but not yet operator-reachable** — the parameter exists and is honoured, but no caller passes it, so "put this output in Press Office" cannot yet affect delivery; wiring it needs Aiden to express a destination at dispatch time. Logged as CR-020. Date is UTC to line up with the audit trail an operator cross-references. Artifact metadata now records `workOrderId` + `workflowExecutionId`. Console: `?file=<artifact_id>` deep link opens the document directly; markdown **renders** with a raw toggle; `⬇ .md` and `⬇ .html` (self-contained — inline CSS, no external fonts or scripts, opens from disk or an email attachment). `workspace_locate_output` returns a real `url` built from `IWO3_CONSOLE_BASE_URL`; **when that is unset it returns no URL rather than guessing** — the cure for an invented URL is a real one or none. |
+| Verified | Live chat: *"Where are my recent output documents? Give me links."* → `tool=workspace_locate_output`, `fabricated: False`, `real link: True`, e.g. `http://localhost:8502/workspace?file=42877cfd-…`. Deep link proven to land: rendered the Workspace page with `?file=<press-office spec>` under Streamlit AppTest — 0 exceptions, preview state set, spec content rendered, raw-markdown toggle present. |
+| Files Changed | `runtime/workspace_filing.py` (+210 new), `tier_2_subagents.py` (+28/-16), `views/workspace.py` (+120), `tools/workspace.py` (+45), `.env` (+`IWO3_CONSOLE_BASE_URL`). |
+| Related | **PDF/DOCX deliberately not offered as local download buttons.** `sandbox_pdf` and `sandbox_docx` are stubs and no local converter is installed; the viewer says so and points at Render Gamma (live, verified in BUG-081) rather than shipping a button that lies. Fixing `sandbox_docx` remains open — it is the only degraded surface on System Health with **no fallback route**, so a DOCX request fails hard rather than degrading. **Also open:** `workspace_locate_output` filtered by `work_order_id` finds nothing for artifacts filed before 2026-09-05 (no such metadata); it falls back to recent outputs and tells Aiden to present them as recent files, not a confirmed match. |
+
+---
+
 ## Summary
 
 Per-session bug counts are the count of unique `BUG-###` IDs first
@@ -1465,7 +1597,7 @@ row.
 - Gaps in numbering are intentional (e.g. `BUG-043`..`BUG-047` were
   tracked locally during a loop that ultimately closed without
   shipping a separate fix). Do not reuse retired numbers; advance to
-  the next free `BUG-###` (currently `BUG-078`) when filing a new
+  the next free `BUG-###` (currently `BUG-085`) when filing a new
   entry.
 - Follow-up patches on a prior bug should use a labeled re-entry
   (e.g. `### BUG-050 Extension: ...`, `### BUG-053 Hardened: ...`)

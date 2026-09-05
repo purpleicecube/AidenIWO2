@@ -1,7 +1,7 @@
 # AIDEN IWO — Features Inventory & Roadmap
 
-> **Version:** 2.2
-> **Last Updated:** 2026-03-15
+> **Version:** 2.4
+> **Last Updated:** 2026-09-05
 > **Maintainer:** Darrel Vaughn
 
 ---
@@ -94,6 +94,12 @@ Operator → Submit Work Order
 | System prompt v0.4.0 — major uplift: correct progression order (Identity → Architecture → GCC Authority → Platform Constraints → 5-Phase Cycle → Guardrails → Output → Stance), Tier 1.5 Workflow PM added to architecture, GCC authority runtime-enforcement notes, Memory Advisor (P1.4) spec, PPTX pipeline routing, rate limit awareness in PHASE 2, smart file preview in PHASE 5, artifact_type in JSON schema | `[RECENT]` |
 | Multi-model routing (auto-select best LLM per task type) | `[ROADMAP]` |
 
+| Open web search from chat (Brave / Perplexity / DuckDuckGo / scrape) with mandatory-search rubric for outside-world questions | `[RECENT]` |
+| Search provenance in chat — tool used, query issued, clickable sources | `[RECENT]` |
+| Platform-honesty rules — no claimed action without a tool result, no constructed platform URLs, explicit "I cannot" | `[RECENT]` |
+| Grounding preamble scoped so closed-world sourcing does not forbid fetching a new source | `[RECENT]` |
+| Chat history treated as a record of what was said, not a source of verified fact | `[RECENT]` |
+
 ### C. Tier 2 — PocketFlow Execution Engine
 
 | Feature | Status |
@@ -137,6 +143,14 @@ Operator → Submit Work Order
 | Sub-agent "Tool Needed" signal parsing — `handleToolNeededSignal` in `orchestration.ts` detects `**Tool Needed**: [name]` blocks in step output; auto-provisions matching skill and retries step in semi/autonomous mode; surfaces HITL block in manual mode | `[SHIPPED]` |
 | Mark sub-agent — B04_MKTG persona addendum integrated (IDENTITY, CORE OPERATING STYLE, SIGNATURE STRENGTHS ×5, LEADERSHIP BEHAVIOR, PREFERRED DELIVERABLES, HARD BOUNDARIES, TONE) combined with full CODEX governance blocks | `[SHIPPED]` |
 
+| Sub-agent model picker driven by the live provider catalogue (Groq / OpenRouter) | `[RECENT]` |
+| Provider model-catalogue TTL cache (6h default, `?refresh=true` bypass, stale-on-failure fallback) | `[RECENT]` |
+| Advisory chat-capability classification — hides speech / embedding / classifier models behind "show all" | `[RECENT]` |
+| Current-model preservation — a retired or filtered model stays selectable and flagged, never silently re-pointed | `[RECENT]` |
+| Provider ↔ credential cross-wire guard on every `llm_configs` write path (create / update / rollback / seed) | `[RECENT]` |
+| Model connection test per sub-agent (`POST /llm/test`) | `[SHIPPED]` |
+| Per-config version history + rollback | `[SHIPPED]` |
+
 ### E. GCC Memory (Global Context Commits)
 
 | Feature | Status |
@@ -164,6 +178,16 @@ Operator → Submit Work Order
 | Re-filing support after work order revision | `[SHIPPED]` |
 | **Workspace Context Documents** — Operator-created project folders with designated reference documents. On work order submission, the system pulls designated docs from a folder and injects them into the work order context for Tier 2 execution. Includes constraints: max doc count per order, max file size per doc, total context budget, supported formats (.md, .docx, .pdf, .txt, .xlsx). UI: folder picker in submit-order form, document selector with preview, context size indicator. | `[PLANNED]` |
 | **Desktop File Upload to Workspace** — Operator can upload files from their local desktop directly into a designated workspace folder. Backend: `POST /api/workspace/upload` accepts JSON `{name, mimeType, data, folderId}`; stores text files as UTF-8, binaries as base64; 10MB max. Supported formats: .md, .txt, .html, .css, .js, .ts, .json, .pdf, .docx, .pptx, .xlsx, images (PNG/JPEG/GIF/WebP/SVG). UI: "Upload File" item in the New dropdown (file picker) + drag-from-desktop drop zone overlay on the file grid, scoped to the currently open folder. Supports multi-file drop. | `[RECENT]` |
+
+| Auto-filing to `Outputs/<YYYY-MM-DD>/<order-slug>_<id8>/` (IWO2 shape restored) | `[RECENT]` |
+| Operator-directed filing override — "put this in a folder called X" | `[IN DEV]` — parameter plumbed and honoured, no caller passes it yet (CR-020) |
+| Aiden workspace tools — `workspace_create_folder`, `workspace_list_tree`, `workspace_locate_output` | `[RECENT]` |
+| Deep link to a document (`/workspace?file=<artifact_id>`) | `[RECENT]` |
+| Rendered markdown preview with raw-source toggle | `[RECENT]` |
+| Download as `.md` and self-contained `.html` | `[RECENT]` |
+| Artifact → work order linkage (`workOrderId` in artifact metadata) | `[RECENT]` |
+| Download as PDF / DOCX from the workspace viewer | `[PLANNED]` — blocked on CR-013 (`sandbox_docx` / `sandbox_pdf` stubs); PDF available today via Render Gamma |
+| Folder rename / move / delete from Aiden | `[ROADMAP]` — deliberately excluded from the first tool set; destructive actions stay human |
 
 ### G. Skills System
 
@@ -280,6 +304,10 @@ Operator → Submit Work Order
 | Audit dashboard (visual log explorer) | `[ROADMAP]` |
 | WebSocket real-time notifications | `[ROADMAP]` |
 
+| Audit-log partition maintenance worker (startup ensure + daily roll, current month + 3) | `[RECENT]` |
+| Gamma health check resolves its credential rather than counting a row | `[RECENT]` |
+| Write-path probe on System Health | `[PLANNED]` — CR-012 |
+
 ### P. UI / Frontend
 
 | Page | Status |
@@ -318,6 +346,16 @@ Operator → Submit Work Order
 | CR-009 | Low (UX) | Login button opens new tab in local dev | landing.tsx | Open |
 | CR-010 | Low risk | qualityReview variable unguarded in orchestration | orchestration.ts:309 | Open |
 | CR-011 | Low risk | JSON filter heuristic may over-filter valid JSON without HTML tags | pocketflow.ts:693-712 | Open |
+| CR-012 | High | **Health checks that count rather than resolve.** System Health passed while every mutation 500'd (BUG-078) and again while every Gamma render 401'd (BUG-082) — every check on the page is a read. Gamma is fixed; the remaining three need the same treatment plus a write-path probe. | `routes/system_status.py` | Open |
+| CR-013 | High | **`sandbox_docx` is a stub with no fallback route.** The only degraded surface on System Health that fails hard instead of degrading; `python-docx` is not installed. Blocks DOCX for SOP Master (1 of 2 surfaces) and Paul (1 of 8). Figma / 21st-Magic stubs are fine — both fall back to `sandbox_html` by design. | `adapter/sandbox_renderers.py:692` | Open |
+| CR-014 | High | **Rules written into `AIDEN_SYSTEM_PROMPT` are dead code for any tenant with a custom prompt.** Klear's `aiden_tier_1.system_prompt` is 12,774 chars and replaces the runtime persona entirely; only `_AIDEN_OUTPUT_SCHEMA_TEMPLATE` reaches every tenant. Needs an invariant test asserting that tenant-invariant rules live in the appended block. | `runtime/tier_1_aiden.py` | Open |
+| CR-015 | Medium | **Tier-1 tool assignment is not honoured.** `sub_agent_tools` lists 3 tools for `aiden_tier_1`; the runtime hands it all 17 from `TOOL_REGISTRY`. The Tools tab therefore misrepresents Tier-1 capability. Decide: honour the assignment, or mark Tier-1 as registry-wide in the UI. | `runtime/aiden_tools.py`, `views/sub_agents.py` | Open |
+| CR-016 | Medium | **79 work orders frozen since 2026-05-19** (40 `pending`, 39 `processing`). No worker picks them up; nothing will clear them unaided. | `work_orders` data | Open |
+| CR-017 | Medium | **50 of 54 workspace folders in the Klear tenant are test fixtures** (`A_*`, `B_*`, `sub_*`, `post_write_hook_repro_*`, `Drafts-renamed_*`) left by pytest runs against the live DB (BUG-081). New ones are now blocked; these need sweeping. | `workspace_folders` data | Open |
+| CR-018 | Medium | **19 vitest integration failures** — permission-key vocabulary snapshot drift (96 keys in schema vs a 92-key snapshot) plus sandbox tenant resolution. Pre-existing; was concealed beneath the 60 partition failures until BUG-078 was fixed. | `tests/contract/`, `tests/integration/` | Open |
+| CR-020 | Medium | **Operator-directed filing is not reachable.** `filing_folder_id_override` is honoured by `produce_output_package` but no caller passes it; documented as shipped in the first draft of BUG-084 and corrected. Needs Aiden to express a destination at dispatch time. | `runtime/tier_2_subagents.py:971` | Open |
+| CR-021 | Medium | **`workspace_locate_output` returns nothing for pre-2026-09-05 artifacts when filtered by work order** — those rows carry no `workOrderId`. Falls back to recent outputs with an explicit note; a backfill would close it properly. | `runtime/tools/workspace.py` | Open |
+| CR-019 | Low | **Tier-1 prompt crowding.** After this session's additions (search rubric, platform honesty, workspace routing) the live-LLM routing smoke `test_routing_compliance_to_nyx` flakes ~2 in 5, against 3-of-3 clean before. The prompt has grown materially in one day; the routing taxonomy may need re-tightening or the smoke re-baselining. | `runtime/tier_1_aiden.py`, `tests/test_tier_1_routing.py` | Open |
 
 ---
 
@@ -427,4 +465,5 @@ Operator → Submit Work Order
 | 2026-03-13 | 2.0 | **App v0.9.2.** PPTX workflow readiness: replaced generic PPTX skill with IWO2-native md-to-pptx pipeline spec, updated TOM/PM Alpha/Mark/Paul system prompts for workflow orchestration. 2DO Checklist feature shipped: `checklist_items` table, 4 API endpoints, 11 lifecycle hooks (orchestration + pocketflow), collapsible UI panel with phase badges and progress tracking. Contract drift fix (CODEX 5.4): reconciled workflow PM completion path with `tier2Result` model, fixed synthetic WorkOrder/Tier1Result shapes, added `toolsUsed` to Tier2Result schema, fixed 17 TS errors. All 50 tests pass. |
 | 2026-03-14 | 2.1 | **App v0.9.5.** Gamma Template Registry shipped: `gamma_template_registry` + `gamma_generation_records` tables, three-layer model (Gamma template → content contract → LLM prompt), format-aware early resolution, `gammaPolicy` on SharedDict, content contract injection via `designContext`. HITL Candidate Review: `gammaDeliveryPolicy` on workflow templates (candidate_review mode), WO-level `gammaTemplateKey` override, three-level template precedence (WO > workflow > global), candidate persistence in `.local/gamma_candidates/`, 6 candidate API endpoints. 21st.dev Magic MCP integration for Mark/Tom. Dashboard/detail WO status sync fix. Auto-publish standalone workflow output to Sandbox. Version bump across all governance docs + app code. `.local/tmp/` added to .gitignore. |
 | 2026-03-15 | 2.2 | Added roadmap note for an optional child-linked Work Order workflow architecture. Clarified this as an enterprise-grade alternative for workflows that need independent ownership, approvals, SLAs, queueing, and WO-level audit/checklist reuse, while keeping `workflow_step_runs` as the default model for simpler flows. |
+| 2026-09-05 | 2.4 | **IWO3 Stand-Up, Grounding & Output Delivery.** Runtime restarted after a 3½-month idle; seven defects filed `BUG-078`..`BUG-084`. **Shipped:** audit-partition maintenance worker (every audited mutation had 500'd since 2026-07-01); open web search actually firing (0/6 → 6/6 probes) with source provenance in chat; catalogue-driven **Sub-Agent model dropdown** (live Groq/OpenRouter lists, 6h TTL cache with manual refresh, advisory chat-capability filter, current-model preservation); provider↔credential cross-wire guard on all four write paths plus an AST invariant gate; pytest live-database refusal guard; Gamma health check now resolves its credential; **Aiden workspace tools** (`workspace_create_folder` / `workspace_list_tree` / `workspace_locate_output`, registry 14 → 17); IWO2-shape output filing restored (`Outputs/<date>/<slug>_<id8>`) with operator override; workspace deep links (`?file=<id>`), rendered markdown, and `.md` / self-contained `.html` downloads. **New gaps opened:** CR-012..CR-019. 69+ new tests, every gate validated by reintroducing its defect. |
 | 2026-03-15 | 2.3 | **Session 11 — Done Contract + Gamma PPTX Remediation + Pre-Replit Stabilization.** 15+ features shipped: Done Contract (4 artifact tracks + Wrap It Up HITL override), PPTX preflight validator, slide source shaper, post-Gamma compliance, PPTX review supplement, workflow PPTX post-processing safety net, local fallback reclassification, Gamma heartbeat, unified version identity, startup env validation, published-mode auth hardening, truthful /api/health, Gamma status in System Health UI, machine-local path portability, execution log + checklist + GCC metadata enrichment with model config. 4 bugs fixed (BUG-038 through BUG-041). UI fixes: WO header layout, chat three-dot menu, SplitPane gutter. Branding: FreedomForge.AI → Klear.ai / IOWA. |
