@@ -142,9 +142,16 @@ async def system_checks(
     # 4. Gamma — env flag enabled AND a credential row exists for
     # this tenant. Mirrors the dual-gate contract on /adapter_status/gamma.
     gamma_env = os.environ.get("GAMMA_LIVE_ENABLED", "") == "true"
+    # The row's credential_ref is RESOLVED, not merely counted. This
+    # check previously ran `SELECT 1` and reported "live gate +
+    # credential row present" — which stayed green for months while
+    # Klear's row pointed at GAMMA_REGISTRY_TEST_KEY, an env var set
+    # nowhere, and every render failed with `credential_missing`. A
+    # health check that proves a row exists proves nothing about
+    # whether the render will work.
     gamma_row = await conn.fetchrow(
         """
-        SELECT 1 AS ok
+        SELECT ac.credential_ref
           FROM adapter_credentials ac
           JOIN adapter_catalog cat ON cat.id = ac.adapter_catalog_id
          WHERE ac.client_id = $1 AND cat.adapter_key = 'gamma'
@@ -153,13 +160,32 @@ async def system_checks(
         ctx["client_id"],
     )
     gamma_cred = bool(gamma_row)
-    gamma_ok = gamma_env and gamma_cred
+    gamma_env_name = (
+        env_var_from_credential_ref(gamma_row["credential_ref"])
+        if gamma_cred
+        else None
+    )
+    gamma_secret_set = bool(
+        gamma_env_name and os.environ.get(gamma_env_name, "").strip()
+    )
+    gamma_ok = gamma_env and gamma_cred and gamma_secret_set
     if not gamma_env:
         gamma_detail = "GAMMA_LIVE_ENABLED env flag not set"
     elif not gamma_cred:
         gamma_detail = "no adapter_credentials row for this tenant"
+    elif not gamma_env_name:
+        gamma_detail = (
+            "credential_ref is malformed "
+            f"({gamma_row['credential_ref']!r}) — expected "
+            "credential_ref:env:NAME"
+        )
+    elif not gamma_secret_set:
+        gamma_detail = (
+            f"credential points at env var {gamma_env_name}, which is not "
+            "set or is empty — renders will fail with credential_missing"
+        )
     else:
-        gamma_detail = "live gate + credential row present"
+        gamma_detail = f"live gate + {gamma_env_name} resolved"
     checks.append(
         SystemCheck(
             name="gamma",

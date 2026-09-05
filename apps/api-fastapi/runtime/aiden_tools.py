@@ -43,6 +43,79 @@ class ToolDefinition:
         [asyncpg.Connection, dict[str, Any], str],
         Awaitable[dict[str, Any]],
     ]
+    # RBAC permission the ACTOR must hold for this tool to run.
+    #
+    # Review finding (2026-09-05, P1): `/aiden/chat` gates on
+    # `work_order:create`, but a tool reached through it performed a
+    # privileged workspace mutation with no check of its own — the same
+    # action requires `workspace:write` on `POST /workspace/folders`.
+    # RLS only enforces tenant membership, so it could not stand in for
+    # authorization. Today every seeded role holding `work_order:create`
+    # also holds `workspace:write`, so the matrix happens to close the
+    # hole — but a guard that depends on a coincidence in the permission
+    # table is not a guard. Read-only tools stay None.
+    required_permission: Optional[str] = None
+
+
+async def _actor_has_permission(
+    conn: asyncpg.Connection,
+    *,
+    user_id: Optional[str],
+    client_id: str,
+    permission: str,
+) -> bool:
+    """Same decision inputs as `deps._load_permission_ctx` — role from
+    active membership, role_permissions, then per-user allow/deny
+    grants — evaluated by the shared `check_permission_decide`. No actor
+    means no permission; a tool that mutates must never run unattributed.
+    """
+    if not user_id:
+        return False
+    from authz.check_permission import UserGrant, check_permission_decide
+
+    role = await conn.fetchval(
+        """
+        SELECT role::text FROM client_memberships
+         WHERE user_id = $1::uuid AND client_id = $2::uuid
+           AND status = 'active'
+         LIMIT 1
+        """,
+        user_id,
+        client_id,
+    )
+    if role is None:
+        return False
+    role_perms = [
+        r["permission_key"]
+        for r in await conn.fetch(
+            """
+            SELECT p.permission_key
+              FROM role_permissions rp
+              JOIN permissions p ON p.id = rp.permission_id
+             WHERE rp.role = $1::membership_role
+            """,
+            role,
+        )
+    ]
+    grants = [
+        UserGrant(permission_key=r["permission_key"], grant_type=r["grant_type"])
+        for r in await conn.fetch(
+            """
+            SELECT p.permission_key, pg.grant_type::text AS grant_type
+              FROM permission_grants pg
+              JOIN permissions p ON p.id = pg.permission_id
+             WHERE pg.user_id = $1::uuid AND pg.client_id = $2::uuid
+            """,
+            user_id,
+            client_id,
+        )
+    ]
+    return check_permission_decide(
+        role=role,
+        role_permissions=role_perms,
+        user_grants=grants,
+        permission=permission,
+    ).allowed
 
 
 # ── Tool handlers ────────────────────────────────────────────────────
@@ -366,6 +439,37 @@ async def execute_tool(
     failed_event = f"{event_prefix}.tool_failed"
     called_event = f"{event_prefix}.tool_called"
 
+    # Authorization before side effects. Mirrors `require_permission_dep`
+    # so a tool-mediated mutation is gated exactly as the equivalent
+    # HTTP route, and emits the same `authz.denied` audit event.
+    if tool.required_permission:
+        allowed = await _actor_has_permission(
+            conn,
+            user_id=actor_user_id,
+            client_id=client_id,
+            permission=tool.required_permission,
+        )
+        if not allowed:
+            await write_audit_row(
+                conn,
+                client_id=client_id,
+                actor_user_id=actor_user_id,
+                event="authz.denied",
+                target_type="aiden_tool",
+                target_id=tool_name,
+                metadata={
+                    "tool_name": tool_name,
+                    "permission": tool.required_permission,
+                    "surface": event_prefix,
+                },
+            )
+            raise ToolExecutionError(
+                tool_name,
+                "permission_denied",
+                f"{tool_name} requires {tool.required_permission!r}, which "
+                "this operator does not hold",
+            )
+
     def _meta_base() -> dict[str, Any]:
         meta: dict[str, Any] = {
             "tool_name": tool_name,
@@ -378,8 +482,14 @@ async def execute_tool(
             meta["iteration_index"] = iteration_index
         return meta
 
+    # Workspace tools create rows that need a non-null creator, and the
+    # actor must come from the authenticated context — never from the
+    # model. Injected into the handler's copy only, so the audit row's
+    # `args` still records exactly what the LLM asked for.
+    handler_args = dict(args or {})
+    handler_args["_actor_user_id"] = actor_user_id or ""
     try:
-        result = await tool.handler(conn, dict(args or {}), client_id)
+        result = await tool.handler(conn, handler_args, client_id)
     except Exception as exc:  # noqa: BLE001
         meta = _meta_base()
         meta["kind"] = type(exc).__name__
@@ -418,10 +528,12 @@ async def execute_tool(
 # tripping a partially-initialised-module circular import.
 from .tools.document_rendering import DOCUMENT_RENDERING_TOOLS  # noqa: E402
 from .tools.search import SEARCH_TOOLS  # noqa: E402
+from .tools.workspace import WORKSPACE_TOOLS  # noqa: E402
 from .tools.data_ops import DATA_OPS_TOOLS  # noqa: E402
 from .tools.stitch_mcp import STITCH_TOOLS  # noqa: E402
 
 TOOL_REGISTRY.update(DOCUMENT_RENDERING_TOOLS)
 TOOL_REGISTRY.update(SEARCH_TOOLS)
+TOOL_REGISTRY.update(WORKSPACE_TOOLS)
 TOOL_REGISTRY.update(DATA_OPS_TOOLS)
 TOOL_REGISTRY.update(STITCH_TOOLS)

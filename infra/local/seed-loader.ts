@@ -1048,11 +1048,56 @@ interface SeedSubAgentTool {
   notes: string | null;
 }
 
+/**
+ * Env-var names that unambiguously belong to one known provider.
+ * Mirrors `_PROVIDER_ENV_HINTS` in `apps/api-fastapi/routes/llm.py` —
+ * keep the two in step.
+ */
+const PROVIDER_ENV_HINTS: Record<string, string> = {
+  GROQ_API_KEY: "groq",
+  OPENROUTER_API_KEY: "openrouter",
+  OPENAI_API_KEY: "openai",
+  ANTHROPIC_API_KEY: "anthropic",
+};
+
+/**
+ * Refuse to seed a sub-agent wired to a DIFFERENT provider's key.
+ *
+ * A row with `provider=groq` and `credential_ref:env:OPENROUTER_API_KEY`
+ * saves cleanly and then returns HTTP 401 "Invalid API Key" on every
+ * invoke — an error that names the key rather than the wiring, so it
+ * reads as a dead credential. The API guards its own create/update and
+ * rollback paths; the seed loader is the remaining way such a row can
+ * reach a database, and it runs on every fresh reset. Failing loudly
+ * here beats shipping a broken agent to every new environment.
+ *
+ * Narrow by design: an unconventional env var name (`GROQ_KEY_PROD`, a
+ * shared gateway secret) passes. Only an unambiguous cross-wire fails.
+ */
+function assertProviderCredentialPair(r: SeedLlmConfig): void {
+  const match = /^credential_ref:env:([A-Za-z0-9_]+)$/.exec(
+    r.credentialRef ?? ""
+  );
+  if (!match) return;
+  const owner = PROVIDER_ENV_HINTS[match[1].toUpperCase()];
+  if (!owner || owner === r.provider) return;
+  const expected = Object.entries(PROVIDER_ENV_HINTS).find(
+    ([, prov]) => prov === r.provider
+  )?.[0];
+  throw new Error(
+    `[seed] llm_configs row '${r.agentRole}' (${r.clientId}) is cross-wired: ` +
+      `provider='${r.provider}' but credential_ref points at ${match[1]}, ` +
+      `which is ${owner}'s key. Every invoke would return HTTP 401. ` +
+      `Expected credential_ref:env:${expected ?? "<provider key>"}.`
+  );
+}
+
 async function upsertLlmConfigs(
   c: PoolClient,
   rows: SeedLlmConfig[]
 ): Promise<void> {
   for (const r of rows) {
+    assertProviderCredentialPair(r);
     await c.query(
       `INSERT INTO llm_configs
          (id, client_id, agent_role, display_name, description,

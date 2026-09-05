@@ -488,14 +488,28 @@ class ApiClient:
         data = self._request("GET", "/llm/providers")
         return data["providers"]
 
-    def list_provider_models(self, *, provider: str) -> dict[str, Any]:
-        """GET /llm/models?provider=X.
+    def list_provider_models(
+        self, *, provider: str, refresh: bool = False
+    ) -> dict[str, Any]:
+        """GET /llm/models?provider=X[&refresh=true].
 
-        Returns `{provider, keyConfigured, models, error?}`. Empty
-        models with keyConfigured=false means the caller should fall
-        back to manual text input — matches IWO2's ModelSelector.
+        Returns `{provider, keyConfigured, models, error?, fetched_at,
+        cached, ttl_seconds}`. Empty models with keyConfigured=false
+        means the caller should fall back to manual text input —
+        matches IWO2's ModelSelector.
+
+        Each model carries an advisory `chat_capable` flag: a provider's
+        catalogue mixes chat models with speech, embedding and
+        classifier models, and only the chat ones can drive an agent.
+
+        The route serves a TTL-cached catalogue (default 6h) so a
+        picker re-rendering on every Streamlit rerun does not fire a
+        live provider request each time. `refresh=True` bypasses it.
         """
-        return self._request("GET", "/llm/models", params={"provider": provider})
+        params: dict[str, Any] = {"provider": provider}
+        if refresh:
+            params["refresh"] = "true"
+        return self._request("GET", "/llm/models", params=params)
 
     def test_llm(
         self, *, agent_role: str, user_message: str = "ping"

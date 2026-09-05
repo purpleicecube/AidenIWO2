@@ -44,6 +44,7 @@ from deps import (
     get_tenant_scoped_connection,
     require_permission_dep,
 )
+from llm import model_catalog
 from llm.config_resolver import resolve_llm_config
 from llm.credentials import (
     LlmCredentialError,
@@ -120,6 +121,12 @@ class ProviderModel(BaseModel):
     name: str
     contextWindow: Optional[int] = None
     owned_by: Optional[str] = None
+    # Advisory capability hint — a provider's /models list mixes chat
+    # models with speech, embedding and classifier models, and wiring a
+    # Whisper model to a sub-agent fails much later as a broken work
+    # order. The API never filters on this; the UI defaults to it.
+    chat_capable: bool = True
+    not_chat_reason: Optional[str] = None
 
 
 class ListModelsResponse(BaseModel):
@@ -127,6 +134,11 @@ class ListModelsResponse(BaseModel):
     keyConfigured: bool
     models: list[ProviderModel]
     error: Optional[str] = None
+    # Catalogue freshness, so a picker can say "as of ..." rather than
+    # implying a list fetched six hours ago is live.
+    fetched_at: Optional[float] = None
+    cached: bool = False
+    ttl_seconds: Optional[int] = None
 
 
 @router.get(
@@ -140,6 +152,7 @@ async def list_provider_models(
     conn: Annotated[
         asyncpg.Connection, Depends(get_tenant_scoped_connection)
     ],
+    refresh: bool = False,
 ) -> ListModelsResponse:
     if provider not in known_providers():
         raise HTTPException(
@@ -179,6 +192,23 @@ async def list_provider_models(
             provider=provider, keyConfigured=False, models=[]
         )
 
+    # Serve from the TTL cache unless the operator asked for a refresh.
+    # A provider catalogue changes on the order of weeks; the picker
+    # re-renders on every Streamlit rerun. Without this, every keystroke
+    # on the settings page fired a live provider request.
+    if not refresh:
+        hit = model_catalog.get(ctx["client_id"], provider)
+        if hit is not None:
+            cached_models, fetched_at = hit
+            return ListModelsResponse(
+                provider=provider,
+                keyConfigured=True,
+                models=[ProviderModel(**m) for m in cached_models],
+                fetched_at=fetched_at,
+                cached=True,
+                ttl_seconds=model_catalog.ttl_seconds(),
+            )
+
     try:
         raw_models = list_openai_compatible_models(
             provider=provider,
@@ -186,6 +216,22 @@ async def list_provider_models(
             base_url=row["base_url"],
         )
     except LlmProviderError as exc:
+        # A failed refresh must not discard a good catalogue — serving a
+        # stale list beats collapsing the picker to manual entry, as
+        # long as the caller is told it is stale.
+        # Age-blind on purpose — see model_catalog.get_stale().
+        stale = model_catalog.get_stale(ctx["client_id"], provider)
+        if stale is not None:
+            stale_models, fetched_at = stale
+            return ListModelsResponse(
+                provider=provider,
+                keyConfigured=True,
+                models=[ProviderModel(**m) for m in stale_models],
+                error=f"{exc.kind}: {exc} (showing cached catalogue)",
+                fetched_at=fetched_at,
+                cached=True,
+                ttl_seconds=model_catalog.ttl_seconds(),
+            )
         return ListModelsResponse(
             provider=provider,
             keyConfigured=True,
@@ -193,10 +239,15 @@ async def list_provider_models(
             error=f"{exc.kind}: {exc}",
         )
 
+    annotated = model_catalog.annotate_models(raw_models)
+    fetched_at = model_catalog.put(ctx["client_id"], provider, annotated)
     return ListModelsResponse(
         provider=provider,
         keyConfigured=True,
-        models=[ProviderModel(**m) for m in raw_models],
+        models=[ProviderModel(**m) for m in annotated],
+        fetched_at=fetched_at,
+        cached=False,
+        ttl_seconds=model_catalog.ttl_seconds(),
     )
 
 
@@ -361,6 +412,62 @@ def _validate_credential_ref(ref: str) -> None:
         )
 
 
+# Env-var names that unambiguously belong to one known provider. Used
+# to catch a config wired to a DIFFERENT provider's key — the failure
+# mode is a 401 from the provider at invoke time, which reads as "bad
+# API key" and sends the operator hunting for a key that is perfectly
+# fine, just pointed at the wrong endpoint.
+_PROVIDER_ENV_HINTS: dict[str, str] = {
+    "GROQ_API_KEY": "groq",
+    "OPENROUTER_API_KEY": "openrouter",
+    "OPENAI_API_KEY": "openai",
+    "ANTHROPIC_API_KEY": "anthropic",
+}
+
+
+def expected_env_var(provider: str) -> Optional[str]:
+    """Conventional env var for a provider, or None if unconventional."""
+    for env_name, prov in _PROVIDER_ENV_HINTS.items():
+        if prov == provider:
+            return env_name
+    return None
+
+
+def _validate_provider_credential_pair(
+    provider: str, credential_ref: str
+) -> None:
+    """Reject a config whose credential names a DIFFERENT known provider.
+
+    Deliberately narrow. A deployment may name its env var anything
+    (`GROQ_KEY_PROD`, a shared gateway secret), and policing naming
+    would break those. This only fires when the env var is one of the
+    well-known names belonging to another provider in the catalogue —
+    an unambiguous cross-wire, not an unusual convention.
+    """
+    env_name = env_var_from_credential_ref(credential_ref)
+    if not env_name:
+        return
+    owner = _PROVIDER_ENV_HINTS.get(env_name.upper())
+    if owner is None or owner == provider:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={
+            "error": "provider_credential_mismatch",
+            "provider": provider,
+            "credential_ref": credential_ref,
+            "credential_belongs_to": owner,
+            "expected_env_var": expected_env_var(provider),
+            "hint": (
+                f"provider is '{provider}' but the credential points at "
+                f"{env_name}, which is {owner}'s key. Sending it to "
+                f"{provider} returns HTTP 401. Set credential_ref to "
+                f"credential_ref:env:{expected_env_var(provider)}."
+            ),
+        },
+    )
+
+
 def _validate_provider(provider: str) -> None:
     if provider not in known_providers():
         raise HTTPException(
@@ -389,6 +496,7 @@ async def create_config(
     _validate_agent_role(body.agent_role)
     _validate_credential_ref(body.credential_ref)
     _validate_provider(body.provider)
+    _validate_provider_credential_pair(body.provider, body.credential_ref)
 
     try:
         row = await conn.fetchrow(
@@ -620,6 +728,23 @@ async def update_config(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "config_not_found", "id": config_id},
         )
+
+    # Validate the EFFECTIVE pair, not just what this request carries.
+    # Switching provider without also updating credential_ref leaves the
+    # config pointed at another provider's key — the row saves cleanly
+    # and every later invoke returns HTTP 401 "Invalid API Key", which
+    # reads as a dead key rather than a mis-wired config. Observed live
+    # on darla_tier_2 (2026-09-05): provider moved openrouter → groq via
+    # the new model picker while credential_ref stayed on
+    # OPENROUTER_API_KEY.
+    _validate_provider_credential_pair(
+        body.provider if body.provider is not None else old["provider"],
+        (
+            body.credential_ref
+            if body.credential_ref is not None
+            else old["credential_ref"]
+        ),
+    )
 
     sets.append("updated_at = now()")
     args.append(config_id)
@@ -1201,6 +1326,16 @@ async def rollback_config(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "config_not_found", "id": config_id},
         )
+
+    # A snapshot taken BEFORE the cross-wire guard existed can carry a
+    # mismatched provider/credential pair — rolling back to it would
+    # restore a config that can only ever return HTTP 401, sneaking the
+    # bad state past the create/update guards. Verified present in this
+    # repo's own data: darla_tier_2 has exactly such a snapshot from
+    # 2026-09-05. Refuse it and say why; the operator fixes forward.
+    _validate_provider_credential_pair(
+        target["provider"], target["credential_ref"]
+    )
 
     # Apply target's fields to the live row.
     options_json = target["options"]  # already JSON text from fetch_version_by_id

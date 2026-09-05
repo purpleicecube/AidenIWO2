@@ -23,7 +23,18 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from llm import model_catalog
 from main import app
+
+
+@pytest.fixture(autouse=True)
+def _isolate_model_catalog_cache():
+    """`llm.model_catalog` caches per (client_id, provider) at module
+    scope, so catalogues leak between tests in the same process. Clear
+    around every test in this module — several assert on a COLD fetch."""
+    model_catalog.clear()
+    yield
+    model_catalog.clear()
 
 
 KLEAR_CLIENT = "00000000-0000-4000-8000-00000000c001"
@@ -181,9 +192,63 @@ def test_list_models_bubbles_provider_error_as_200_with_error_field(
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["keyConfigured"] is True
+    # Cold cache: nothing to fall back to, so the list is empty. With a
+    # warm cache the route deliberately serves the stale catalogue
+    # instead — see test_provider_error_serves_stale_catalogue_when_warm.
     assert body["models"] == []
     assert body["error"] is not None
     assert body["error"].startswith("credential_invalid:")
+
+
+def test_provider_error_serves_stale_catalogue_when_warm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed refresh must not collapse the picker to manual entry.
+
+    If a catalogue was fetched successfully earlier, a subsequent
+    provider outage serves that list — flagged stale via `error` and
+    `cached` — rather than returning nothing. Losing the dropdown
+    because Groq had a bad minute is a worse outcome than showing a
+    list that is a few hours old, as long as the caller is told."""
+    from llm.providers import LlmProviderError
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-not-real")
+
+    good = [{"id": "openai/gpt-oss-120b", "name": "openai/gpt-oss-120b"}]
+    monkeypatch.setattr(
+        "routes.llm.list_openai_compatible_models",
+        lambda **kwargs: good,
+    )
+    with TestClient(app) as client:
+        headers = {
+            "X-IWO3-User": KLEAR_OPERATOR,
+            "X-IWO3-Client": KLEAR_CLIENT,
+        }
+        warm = client.get("/llm/models", params={"provider": "groq"}, headers=headers)
+        assert warm.status_code == 200, warm.text
+        assert [m["id"] for m in warm.json()["models"]] == ["openai/gpt-oss-120b"]
+
+        def boom(**kwargs: Any) -> list[dict[str, Any]]:
+            raise LlmProviderError(
+                kind="upstream_unavailable",
+                message="groq returned HTTP 503",
+                http_status=503,
+                provider="groq",
+            )
+
+        monkeypatch.setattr("routes.llm.list_openai_compatible_models", boom)
+        r = client.get(
+            "/llm/models",
+            params={"provider": "groq", "refresh": "true"},
+            headers=headers,
+        )
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [m["id"] for m in body["models"]] == ["openai/gpt-oss-120b"]
+    assert body["cached"] is True
+    assert "upstream_unavailable" in body["error"]
+    assert "cached catalogue" in body["error"]
 
 
 # ── Unit tests for the provider helper itself (no DB needed) ─────────

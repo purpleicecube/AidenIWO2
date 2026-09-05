@@ -39,6 +39,7 @@ from typing import Any
 import streamlit as st
 
 from api_client import APIError
+from model_picker import render_catalog_controls, render_model_picker
 from shell import page_requires_api
 
 
@@ -57,6 +58,30 @@ _ROLE_LABELS = {
 }
 
 _PROVIDER_OPTIONS = ["groq", "openrouter", "openai", "anthropic"]
+
+# Providers present in the dropdown that the runtime cannot actually
+# call — `GET /llm/providers` reports `callable_in_phase_9_3: false`.
+# Selecting one saves cleanly and then fails at invoke time, so the form
+# warns rather than silently accepting it.
+_NON_CALLABLE_PROVIDERS = {"anthropic"}
+
+# Conventional credential env var per provider. Switching provider
+# without also switching the credential leaves the config pointed at
+# another provider's key; the save succeeds and every later invoke
+# returns HTTP 401 "Invalid API Key" — which reads as a dead key, not a
+# mis-wired config. Hit live on Darla (2026-09-05) the first time the
+# new model picker made switching provider a one-click affair.
+_PROVIDER_ENV_VAR = {
+    "groq": "GROQ_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+}
+
+
+def _expected_credential_ref(provider: str) -> str:
+    env = _PROVIDER_ENV_VAR.get(provider)
+    return f"credential_ref:env:{env}" if env else ""
 
 
 # ── small helpers ─────────────────────────────────────────────────────
@@ -234,6 +259,56 @@ def _render_edit_form(
                 f"Could not load current prompt: {err.status_code} — {err.detail}"
             )
 
+    st.markdown("**Section 3a — Provider & model**")
+    pcol, _ = st.columns([1, 2])
+    with pcol:
+        provider = st.selectbox(
+            "Provider",
+            _PROVIDER_OPTIONS,
+            index=(
+                _PROVIDER_OPTIONS.index(cfg["provider"])
+                if cfg["provider"] in _PROVIDER_OPTIONS
+                else 0
+            ),
+            key=f"{form_key}-prov",
+            disabled=not can_admin,
+        )
+    if provider in _NON_CALLABLE_PROVIDERS:
+        st.warning(
+            f"`{provider}` is not callable in this runtime "
+            "(`GET /llm/providers` reports callable=false). A config saved "
+            "against it will store cleanly but the agent will not run."
+        )
+    model = render_model_picker(
+        api,
+        provider=provider,
+        current_model=cfg["model"],
+        key_prefix=f"{form_key}-mp",
+        disabled=not can_admin,
+        base_url=cfg.get("base_url") or "",
+    )
+    render_catalog_controls(
+        api, provider=provider, key_prefix=f"{form_key}-mp", disabled=not can_admin
+    )
+    provider_switched = provider != cfg["provider"]
+    if model != cfg["model"] or provider_switched:
+        st.info(
+            f"Pending change: `{cfg['provider']}/{cfg['model']}` → "
+            f"`{provider}/{model}` — not saved until you press "
+            "**Save changes** below."
+        )
+    if provider_switched:
+        st.warning(
+            f"**Provider changed to `{provider}` — its credential must change too.** "
+            f"This config currently authenticates with "
+            f"`{cfg.get('env_var_name') or 'its existing key'}`. Sending that to "
+            f"`{provider}` returns HTTP 401 *Invalid API Key*. The Credential ref "
+            f"field below has been pre-filled with "
+            f"`{_expected_credential_ref(provider)}` — clear it only if this "
+            f"deployment names its key something else."
+        )
+    st.divider()
+
     with st.form(key=form_key, clear_on_submit=False):
         st.markdown("**Section 2 — Persona / system prompt**")
         st.markdown(
@@ -267,7 +342,7 @@ def _render_edit_form(
         )
 
         st.divider()
-        st.markdown("**Section 3 — LLM connection**")
+        st.markdown("**Section 3b — Connection details**")
         col1, col2 = st.columns(2)
         with col1:
             display_name = st.text_input(
@@ -275,20 +350,8 @@ def _render_edit_form(
                 value=cfg["display_name"],
                 key=f"{form_key}-name",
             )
-            provider = st.selectbox(
-                "Provider",
-                _PROVIDER_OPTIONS,
-                index=(
-                    _PROVIDER_OPTIONS.index(cfg["provider"])
-                    if cfg["provider"] in _PROVIDER_OPTIONS
-                    else 0
-                ),
-                key=f"{form_key}-prov",
-            )
-            model = st.text_input(
-                "Model",
-                value=cfg["model"],
-                key=f"{form_key}-model",
+            st.caption(
+                f"Provider / model — set above: `{provider}` / `{model}`"
             )
         with col2:
             enabled = st.toggle(
@@ -303,9 +366,18 @@ def _render_edit_form(
             )
             credential_ref = st.text_input(
                 "Credential ref (e.g. credential_ref:env:GROQ_API_KEY)",
-                value="",
+                value=(
+                    _expected_credential_ref(provider)
+                    if provider_switched
+                    else ""
+                ),
                 placeholder="leave blank to keep existing",
-                key=f"{form_key}-credref",
+                key=f"{form_key}-credref-{provider}",
+                help=(
+                    "Blank keeps the stored credential. Pre-filled "
+                    "automatically when you switch provider, because the "
+                    "old provider's key will 401 against the new one."
+                ),
             )
         description = st.text_area(
             "Description",
