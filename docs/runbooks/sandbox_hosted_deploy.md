@@ -98,10 +98,17 @@ Copy the value. You'll paste it into BOTH services' env in step 3.
 | `BOOTSTRAP_ADMIN_PASSWORD` | Initial admin password for hosted Node login |
 | `IWO3_FASTAPI_BASE_URL` | Internal URL of the FastAPI Railway service (Railway shows it in the FastAPI service's Networking tab — usually `https://iwo3-api-production.up.railway.app` or the internal `*.railway.internal` shape) |
 | **`IWO3_SERVICE_TOKEN`** | **The hex string from step 2** — must be IDENTICAL to the value on `iwo3-api` |
+| **`GROQ_API_KEY`** *and/or* **`OPENROUTER_API_KEY`** *and/or* **`ANTHROPIC_API_KEY`** | **At least one is required** — Node boot validation (`server/env-check.ts`) hard-aborts if none are present. Mirror whichever key(s) the `iwo3-api` service already has. |
 | `GITHUB_TOKEN` | Optional — required only for `/api/sandbox-sessions/.../publish` |
 | `PORT` | Leave unset — Railway injects this; Express reads `process.env.PORT` |
 
 Healthcheck path is already set by `railway.node.json` to `/api/health`.
+
+> **Note on LLM keys.** Even though the sandbox surface itself does
+> not invoke an LLM, the Node server boots with hard-block validation
+> covering work-order processing (Mark / Tom / Hank / Paul sub-agents)
+> which IS still in this image. Without at least one provider key the
+> process exits before binding the port and Railway healthchecks fail.
 
 ### Step 4 — Add `IWO3_SERVICE_TOKEN` to existing `iwo3-api` (FastAPI service)
 
